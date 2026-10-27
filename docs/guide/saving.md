@@ -33,22 +33,22 @@ profile again, without writing anything.
 The **edit mode** decides how edits reach the keyboard. Each half stores it
 outside the profile, so restoring a backup never changes it.
 
-- **Live + review**, the default: edits run at once and wait for your Save.
-  The keyboard never saves them on its own.
-- **Live**: edits run at once, and the keyboard saves by itself once 3
+- **Live edit**: edits run at once, and the keyboard saves by itself once 3
   seconds have passed with no new edit and no key held. It does this even if
   Ark has closed. A held key puts the save off. A failed save leaves the
   edits running, unsaved, and says so; Save tries again.
-- **Apply**: the keyboard runs its saved profile until Ark applies a complete
-  new one.
+- **Live preview + save**, the default: edits run at once and wait for your
+  Save. The keyboard never saves them on its own.
+- **Review and save**: the keyboard runs its saved profile until Ark saves a
+  complete new one.
 
 The mode changes only with nothing unsaved and both halves connected.
 
 ## Keyboard adjustments
 
 The DPI keys and the QMK lighting keys change the setting at once and join the
-working copy on both halves, like any edit. In Live + review they wait for
-your Save. In Live, and in Apply when the adjustment is the only unsaved
+working copy on both halves, like any edit. In Live preview + save they wait
+for your Save. In Live edit, and in Review and save when the adjustment is the only unsaved
 change, the keyboard saves them after the same 3 quiet seconds.
 
 QMK's own settings storage is never written and never wins over the profile.

@@ -410,7 +410,7 @@ static void test_an_apply_and_an_adjustment_land_in_the_order_made(void) {
 
     // An adjustment arriving while an admitted Apply runs lets it finish, then
     // publishes onto the applied profile (here without settings: the inherited
-    // defaults gain it) and is saved by the keyboard in Apply mode.
+    // defaults gain it) and is saved by the keyboard in Review and save.
     stage_valid_candidate_pair(&left, &right, 10u, &now);
     assert(noah_profile_owner_adjust(&left, NOAH_SETTING_SNIPING_DPI, 300u));
     commit_valid_candidate_pair(&left, &right, 10u, 3u, &now);
@@ -547,7 +547,7 @@ static void test_a_failed_automatic_save_is_reported_and_not_repeated(void) {
 // byte the saved profile ("Unsaved edits match what is saved", keyboard
 // check, 2026-10-19). Saving it writes nothing: the keyboard runs its saved
 // profile again with the same revision on both halves, whether the host
-// saves (Live + review) or the keyboard does by itself (Live).
+// saves (Live preview + save) or the keyboard does by itself (Live edit).
 static void test_saving_the_saved_bytes_writes_nothing(void) {
     static noah_profile_owner_t left, right;
     static memory_t lm, rm;
@@ -608,5 +608,5 @@ static void test_saving_the_saved_bytes_writes_nothing(void) {
         assert(left.working.active && left.working.revision == revision + 1u && active_scalar(&right, NOAH_SETTING_DEFAULT_DPI) == 600u);
     }
     auto_quiet = true;
-    puts("saving a working copy identical to the saved profile writes nothing, in Live + review and in Live");
+    puts("saving a working copy identical to the saved profile writes nothing, in Live preview + save and in Live edit");
 }

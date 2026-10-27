@@ -86,11 +86,11 @@
 
 // ─── Edit mode ─────────────────────────────────────────────────────────────
 //
-// The edit mode (Apply, Live, Live + review; D-F32) lives in QMK's EEPROM
-// user datablock on each half, outside every profile: two 16-byte records,
-// so a write cut short leaves the previous one (qmk_profile_working.c). The
-// version is this layout's, so a datablock QMK formatted for anything else
-// reads as never set.
+// The edit mode (Live edit, Live preview + save, Review and save; D-F32)
+// lives in QMK's EEPROM user datablock on each half, outside every profile:
+// two 16-byte records, so a write cut short leaves the previous one
+// (qmk_profile_working.c). The version is this layout's, so a datablock QMK
+// formatted for anything else reads as never set.
 #define EECONFIG_USER_DATA_SIZE 32
 #define EECONFIG_USER_DATA_VERSION 0x4E450132u
 
