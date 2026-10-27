@@ -294,13 +294,15 @@ _Avoid_: protected playback, input protection
 **Pointing mode**:
 A role the trackball takes instead of moving the pointer, either scrolling or
 directional, while its key is held or locked or one of its linked layers is
-on; one runs at a time.
+on; one runs at a time. Its keys keep the keycode names `PD_MODE_n` and
+`PD_MODE_n_LOCK` (D-F50), which the words to avoid do not cover.
 _Avoid_: pd mode, PD-mode, pointer mode, trackball mode
 
 **Pointing slot**:
 One of 32 fixed, numbered places that holds a pointing mode or is empty; keys
-reach the slot, so a slot keeps its keys when its mode changes.
-_Avoid_: PD slot, pointing-mode slot, mode slot
+reach the slot, so a slot keeps its keys when its mode changes. `PD_MODE_n`
+holds slot `n`'s mode and `PD_MODE_n_LOCK` locks it (D-F50).
+_Avoid_: PD slot, `PD_SLOT_n` (retired), pointing-mode slot, mode slot
 
 **Link** (of a pointing slot):
 Its linked layers, the layers its key turns on, and what ends it (D-F62). No

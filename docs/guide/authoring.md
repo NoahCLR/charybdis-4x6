@@ -198,7 +198,7 @@ Colours are `HSV(hue, saturation, value)`, each 0 to 255:
   the `end_color`.
 - `pointing_mode_colors[]`: a colour and `.locality` for every pointing slot
   (`POINTING_MODE_DRAGSCROLL`… `POINTING_MODE_PINCH`, then
-  `POINTING_MODE_SLOT_6` to `_31`).
+  `POINTING_MODE_6` to `_31`).
 - `combo_feedback_colors` and `key_behavior_feedback_colors`: the colours,
   `.tap_commit_mode` (`KEY_FEEDBACK_TAP_COMMIT_OFF` or
   `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS`) and `.locality`.
@@ -210,8 +210,8 @@ bottom.
 ## `pd_config.c`: adding a pointing mode
 
 `noah_pd_defaults[]` has one record per slot, all 32 in order. To add a mode,
-fill an empty slot's record and give it a name; then place `PD_SLOT_n` or
-`PD_SLOT_n_LOCK` in the keymap and give it a colour in `pointing_mode_colors[]`.
+fill an empty slot's record and give it a name; then place `PD_MODE_n` or
+`PD_MODE_n_LOCK` in the keymap and give it a colour in `pointing_mode_colors[]`.
 
 ```c
 {.id=6, .name="Undo / Redo", .kind=1, .axis=1, .dpi=100, .threshold_x=40,

@@ -31,15 +31,15 @@ Held by: `tests/host/run_pointing_mode_tests.sh` (`pointing_mode_profile_registr
 
 Each userspace keycode family owns one fixed block in QMK's user range,
 reserved beyond what is supported, so adding slots or layers renumbers nothing
-(D-F51, [ADR](../adr/0051-userspace-keycodes-in-fixed-blocks.md)). A slot
-keycode names its slot; the mode comes from the active profile (D-F50,
+(D-F51, [ADR](../adr/0051-userspace-keycodes-in-fixed-blocks.md)). A pointing
+keycode runs its slot's mode, which comes from the active profile (D-F50,
 [ADR](../adr/0050-pointing-keycodes-name-slots.md)).
 
 | Block | Keycodes | Supported |
 | --- | --- | --- |
 | `0x7e40..0x7e7f` | none: inert | — |
-| `0x7e80..0x7e9f` | `PD_SLOT_n`, hold slot `n` | 32, the whole block |
-| `0x7ea0..0x7ebf` | `PD_SLOT_n_LOCK`, toggle slot `n`'s lock | 32, the whole block |
+| `0x7e80..0x7e9f` | `PD_MODE_n`, hold slot `n`'s mode | 32, the whole block |
+| `0x7ea0..0x7ebf` | `PD_MODE_n_LOCK`, lock slot `n`'s mode | 32, the whole block |
 | `0x7ec0..0x7edf` | `LOCK_LAYER(n)`, toggle layer `n`'s lock | 16 (`0x7ec0..0x7ecf`) |
 | `0x7ee0..0x7eff` | unassigned: inert | — |
 | `0x7f00..0x7f7f` | `CUSTOM_KEY_0..127` | 128 |
@@ -263,11 +263,12 @@ Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compil
 A running mode has a source: its key, held or locked as below, or its
 [linked layers](#linked-layers). These rules are a key source's.
 
-- Pressing `PD_SLOT_n` activates slot `n` while it is held; the mode ends
+- Pressing `PD_MODE_n` runs slot `n`'s mode while it is held; the mode ends
   when the last key holding it is released. Two keys may hold one mode; the
   first is its owner key, and a later key takes a released owner's place.
-- `PD_SLOT_n_LOCK` toggles slot `n`'s lock. A locked mode stays on until it
-  is unlocked; releasing a hold key does not end it.
+- `PD_MODE_n_LOCK` locks slot `n`'s mode on, or unlocks it if it is locked. A
+  locked mode stays on until it is unlocked; releasing a hold key does not end
+  it.
 - Pressing a slot's hold key while that slot is locked unlocks it; the mode
   stays on until the key is released.
 - Activating or locking a slot first unlocks any other locked mode and ends

@@ -63,7 +63,7 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 };
 
 const pointing_mode_def_t pointing_modes[POINTING_MODE_COUNT] = {
-    [POINTING_MODE_INDEX_DRAGSCROLL] = {.mode_flag = POINTING_MODE_DRAGSCROLL, .keycode = PD_SLOT_0}, [POINTING_MODE_INDEX_VOLUME] = {.mode_flag = POINTING_MODE_VOLUME, .keycode = PD_SLOT_1}, [POINTING_MODE_INDEX_BRIGHTNESS] = {.mode_flag = POINTING_MODE_BRIGHTNESS, .keycode = PD_SLOT_2}, [POINTING_MODE_INDEX_ZOOM] = {.mode_flag = POINTING_MODE_ZOOM, .keycode = PD_SLOT_3}, [POINTING_MODE_INDEX_ARROW] = {.mode_flag = POINTING_MODE_ARROW, .keycode = PD_SLOT_4}, [POINTING_MODE_INDEX_PINCH] = {.mode_flag = POINTING_MODE_PINCH, .keycode = PD_SLOT_5},
+    [POINTING_MODE_INDEX_DRAGSCROLL] = {.mode_flag = POINTING_MODE_DRAGSCROLL, .keycode = PD_MODE_0}, [POINTING_MODE_INDEX_VOLUME] = {.mode_flag = POINTING_MODE_VOLUME, .keycode = PD_MODE_1}, [POINTING_MODE_INDEX_BRIGHTNESS] = {.mode_flag = POINTING_MODE_BRIGHTNESS, .keycode = PD_MODE_2}, [POINTING_MODE_INDEX_ZOOM] = {.mode_flag = POINTING_MODE_ZOOM, .keycode = PD_MODE_3}, [POINTING_MODE_INDEX_ARROW] = {.mode_flag = POINTING_MODE_ARROW, .keycode = PD_MODE_4}, [POINTING_MODE_INDEX_PINCH] = {.mode_flag = POINTING_MODE_PINCH, .keycode = PD_MODE_5},
 };
 
 static void test_fail(const char *expr, const char *file, int line) {

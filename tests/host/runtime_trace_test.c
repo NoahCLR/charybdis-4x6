@@ -353,7 +353,7 @@ static void test_pointing_mode_and_split_sync_events_share_one_trace_buffer(void
 
     test_reset_stubs();
 
-    CHECK(pointing_mode_handle_keycode_press(PD_SLOT_1));
+    CHECK(pointing_mode_handle_keycode_press(PD_MODE_1));
     CHECK(pointing_mode_toggle_lock_state(POINTING_MODE_VOLUME));
     CHECK(pointing_mode_toggle_lock_state(POINTING_MODE_VOLUME));
     pointing_mode_apply_remote_snapshot(POINTING_MODE_ARROW, POINTING_MODE_ARROW);

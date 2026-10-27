@@ -127,8 +127,8 @@ Wherever a domain stores an action, it is four bytes:
 | 1 | QMK keycode | any 16-bit keycode | the operand itself |
 | 2 | layer, momentary | layer `0..15` | `MO(n)` |
 | 3 | layer lock | layer `0..15` | `LOCK_LAYER(n)`, `0x7ec0 + n` |
-| 4 | pointing slot, held | slot `0..31` | `PD_SLOT_n`, `0x7e80 + n` |
-| 5 | pointing slot, locked | slot `0..31` | `PD_SLOT_n_LOCK`, `0x7ea0 + n` |
+| 4 | pointing slot, held | slot `0..31` | `PD_MODE_n`, `0x7e80 + n` |
+| 5 | pointing slot, locked | slot `0..31` | `PD_MODE_n_LOCK`, `0x7ea0 + n` |
 | 6 | macro | slot `0..127` | `QK_MACRO_n`, `0x7700 + n` |
 | 7 | custom key | `0..127` | `CUSTOM_KEY_n`, `0x7f00 + n` |
 

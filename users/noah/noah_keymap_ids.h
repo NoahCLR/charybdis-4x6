@@ -169,8 +169,8 @@ _Static_assert((QK_MACRO_0 + MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "Macro slot 
 // modes or layers never moves another keycode:
 //
 //   0x7e40–0x7e7f  retired (custom keys 0–63 before D-F14): inert
-//   0x7e80–0x7e9f  PD_SLOT_n            hold pointing slot n    (32, all used)
-//   0x7ea0–0x7ebf  PD_SLOT_n_LOCK       toggle pointing slot n  (32, all used)
+//   0x7e80–0x7e9f  PD_MODE_n            hold slot n's mode      (32, all used)
+//   0x7ea0–0x7ebf  PD_MODE_n_LOCK       lock slot n's mode      (32, all used)
 //   0x7ec0–0x7edf  LOCK_LAYER(n)        toggle layer n's lock   (32 reserved)
 //   0x7ee0–0x7eff  unassigned: inert, refused as a step or combo output
 //   0x7f00–0x7f7f  CUSTOM_KEY_0–127     named keys: their shortcut and behaviour
@@ -187,8 +187,9 @@ _Static_assert((QK_MACRO_0 + MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "Macro slot 
 // name and shortcut come from CUSTOM_KEYS in keymap.c until Charybdis Ark
 // changes them. A behaviour step may send one; it sends only its shortcut,
 // layers included.
-// PD_SLOT_n holds a configurable pointing slot; add a key_behaviors[] row for
-// explicit tap, hold, long-hold or multi-tap behavior on top of that default.
+// PD_MODE_n holds a configurable pointing slot's mode; add a key_behaviors[] row
+// for explicit tap, hold, long-hold or multi-tap behavior on top of that
+// default.
 // LOCK_LAYER(n) toggles a layer lock from actions authored in key_behaviors[].
 
 #define NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE (SAFE_RANGE + 0x00)
@@ -352,8 +353,8 @@ enum {
 _Static_assert(NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE == 0x7e40 && NOAH_KEYCODE_PD_HOLD_BASE == 0x7e80 && NOAH_KEYCODE_PD_LOCK_BASE == 0x7ea0 && NOAH_KEYCODE_LAYER_LOCK_BASE == 0x7ec0 && NOAH_KEYCODE_CUSTOM_KEY_BASE == 0x7f00, "userspace keycode blocks are the action ABI");
 _Static_assert(NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE + NOAH_KEYCODE_RETIRED_CUSTOM_KEY_RESERVED == NOAH_KEYCODE_PD_HOLD_BASE, "the retired custom-key block ends where pointing holds begin");
 _Static_assert(CUSTOM_KEY_SLOT_COUNT <= NOAH_KEYCODE_CUSTOM_KEY_RESERVED && CUSTOM_KEY_127 == 0x7f7f && NOAH_KEYCODE_CUSTOM_KEY_BASE + NOAH_KEYCODE_CUSTOM_KEY_RESERVED - 1 <= QK_USER_MAX, "custom keys fill their block inside QMK's user range");
-_Static_assert(PD_SLOT_0 == 0x7e80 && PD_SLOT_31 == 0x7e9f && PD_SLOT_31 - PD_SLOT_0 + 1 <= NOAH_KEYCODE_PD_RESERVED && NOAH_KEYCODE_PD_HOLD_BASE + NOAH_KEYCODE_PD_RESERVED == NOAH_KEYCODE_PD_LOCK_BASE, "pointing holds stay inside their block");
-_Static_assert(PD_SLOT_0_LOCK == 0x7ea0 && PD_SLOT_31_LOCK == 0x7ebf && PD_SLOT_31_LOCK - PD_SLOT_0_LOCK + 1 <= NOAH_KEYCODE_PD_RESERVED && NOAH_KEYCODE_PD_LOCK_BASE + NOAH_KEYCODE_PD_RESERVED == NOAH_KEYCODE_LAYER_LOCK_BASE, "pointing locks stay inside their block");
+_Static_assert(PD_MODE_0 == 0x7e80 && PD_MODE_31 == 0x7e9f && PD_MODE_31 - PD_MODE_0 + 1 <= NOAH_KEYCODE_PD_RESERVED && NOAH_KEYCODE_PD_HOLD_BASE + NOAH_KEYCODE_PD_RESERVED == NOAH_KEYCODE_PD_LOCK_BASE, "pointing holds stay inside their block");
+_Static_assert(PD_MODE_0_LOCK == 0x7ea0 && PD_MODE_31_LOCK == 0x7ebf && PD_MODE_31_LOCK - PD_MODE_0_LOCK + 1 <= NOAH_KEYCODE_PD_RESERVED && NOAH_KEYCODE_PD_LOCK_BASE + NOAH_KEYCODE_PD_RESERVED == NOAH_KEYCODE_LAYER_LOCK_BASE, "pointing locks stay inside their block");
 _Static_assert(LAYER_COUNT <= NOAH_KEYCODE_LAYER_LOCK_RESERVED && NOAH_KEYCODE_LAYER_LOCK_BASE + NOAH_KEYCODE_LAYER_LOCK_RESERVED == NOAH_KEYCODE_USERSPACE_END, "layer locks stay inside their block");
 _Static_assert(NOAH_KEYCODE_USERSPACE_END - 1 <= QK_USER_MAX, "userspace keycodes stay in QMK's user range");
 _Static_assert(NOAH_KEYCODE_CUSTOM_KEY_LAYER_TAP_BASE == CUSTOM_KEY_127 + 1 && NOAH_KEYCODE_CUSTOM_KEY_LAYER_TAP_BASE + CUSTOM_KEY_SLOT_COUNT - 1 == QK_USER_MAX, "custom keys' runtime layer taps fill the last block of QMK's user range");

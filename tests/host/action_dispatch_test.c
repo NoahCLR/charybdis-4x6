@@ -294,11 +294,11 @@ const pointing_mode_def_t pointing_modes[POINTING_MODE_COUNT] = {NOAH_POINTING_M
 #undef NOAH_POINTING_MODE_TEST_ROW
 
 bool is_pointing_mode_lock_action(uint16_t action) {
-    return action == PD_SLOT_4_LOCK;
+    return action == PD_MODE_4_LOCK;
 }
 
 pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
-    return keycode == PD_SLOT_4 ? POINTING_MODE_ARROW : 0;
+    return keycode == PD_MODE_4 ? POINTING_MODE_ARROW : 0;
 }
 
 static void test_action_descriptor_classifies_common_actions(void) {
@@ -309,8 +309,8 @@ static void test_action_descriptor_classifies_common_actions(void) {
     noah_action_desc_t layer_toggle = noah_action_describe(TG(2));
     noah_action_desc_t layer_jump   = noah_action_describe(TO(5));
     noah_action_desc_t qmk_behavior = noah_action_describe(OSM(MOD_LSFT));
-    noah_action_desc_t pd_key       = noah_action_describe(PD_SLOT_4);
-    noah_action_desc_t pd_lock      = noah_action_describe(PD_SLOT_4_LOCK);
+    noah_action_desc_t pd_key       = noah_action_describe(PD_MODE_4);
+    noah_action_desc_t pd_lock      = noah_action_describe(PD_MODE_4_LOCK);
     noah_action_desc_t macro_action = noah_action_describe(MACRO_0);
     noah_action_desc_t custom       = noah_action_describe(CUSTOM_KEY_0 + 1);
     noah_action_desc_t literal      = noah_action_describe(KC_C);
@@ -546,7 +546,7 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_TAP));
     CHECK(noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
     CHECK(noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
-    CHECK(noah_action_describe(CUSTOM_KEY_63).kind == NOAH_ACTION_KIND_CUSTOM_KEY && noah_action_describe(PD_SLOT_0).kind != NOAH_ACTION_KIND_CUSTOM_KEY);
+    CHECK(noah_action_describe(CUSTOM_KEY_63).kind == NOAH_ACTION_KIND_CUSTOM_KEY && noah_action_describe(PD_MODE_0).kind != NOAH_ACTION_KIND_CUSTOM_KEY);
     CHECK(noah_action_desc_uses_held_lifecycle_for_press_and_hold(custom));
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(custom));
     CHECK(!noah_action_desc_is_pure_modifier_literal(custom));
@@ -854,8 +854,8 @@ static void test_unassigned_userspace_codes_are_refused_everywhere(void) {
     }
     CHECK(noah_action_describe(CUSTOM_KEY_63).kind == NOAH_ACTION_KIND_CUSTOM_KEY);
     CHECK(noah_action_describe(CUSTOM_KEY_127).kind == NOAH_ACTION_KIND_CUSTOM_KEY);
-    CHECK(noah_action_describe(PD_SLOT_4).kind == NOAH_ACTION_KIND_POINTING_MODE_HOLD);
-    CHECK(noah_action_describe(PD_SLOT_4_LOCK).kind == NOAH_ACTION_KIND_POINTING_MODE_LOCK);
+    CHECK(noah_action_describe(PD_MODE_4).kind == NOAH_ACTION_KIND_POINTING_MODE_HOLD);
+    CHECK(noah_action_describe(PD_MODE_4_LOCK).kind == NOAH_ACTION_KIND_POINTING_MODE_LOCK);
     CHECK(noah_action_describe(LOCK_LAYER(LAYER_COUNT - 1)).kind == NOAH_ACTION_KIND_LAYER_LOCK);
     CHECK(noah_action_describe(QK_USER - 1).kind != NOAH_ACTION_KIND_UNASSIGNED_USER);
 
