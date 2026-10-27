@@ -72,9 +72,9 @@ echo
 echo "What changed, by area:"
 area "hooks and core (quantum/, tmk_core/, platforms/)" quantum tmk_core platforms
 area "keycode numbering (the client's catalog, the action-ABI digest)" data/constants/keycodes quantum/keycodes.h quantum/quantum_keycodes.h
-area "VIA (the client's layout, storage and macros)" quantum/via.c quantum/via.h quantum/dynamic_keymap.c
+area "Raw HID (the client's report transport)" quantum/raw_hid.h tmk_core/protocol/usb_descriptor.h tmk_core/protocol/usb_descriptor.c
 area "RGB matrix (the client's effect list)" quantum/rgb_matrix
 area "Charybdis board" keyboards/bastardkb/charybdis
 area "submodules (ChibiOS, pico-sdk, ...)" lib
 echo
-echo "Keycode, VIA or RGB changes need a client follow-up (re-pin its upstream snapshots)."
+echo "Keycode, Raw HID or RGB changes need a client follow-up (re-pin its upstream snapshots)."

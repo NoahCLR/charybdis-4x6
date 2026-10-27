@@ -4,25 +4,35 @@
 
 #include "../behavior/handled_key.h"
 #include "../behavior/key_behavior_lookup.h"
+#include "../behavior/participation.h"
+#include "api.h"
 #include "deferred_release.h"
 #include "process_internal.h"
 #include "trace.h"
 #include "noah_keymap_ids.h"
-#include "../../pointing/defs/pd_modes.h"
-#include "../../pointing/runtime/pd_mode_keyboard_event_internal.h"
+#include "../../pointing/defs/pointing_modes.h"
+#include "../../pointing/runtime/pointing_mode_keyboard_event_internal.h"
 #include "../../pointing/policy/pointer_layer_policy.h"
 #include "reducer/ownership_state.h"
 #include "reducer/runtime.h"
 #include "reducer/state_query.h"
 #include "../../action/synthetic_record.h"
+#include "../../action/custom_key_shortcut.h"
 #include "../../action/owned_keycode.h"
 #include "../../compat/qmk_combo_origin.h"
+#include "../../macro/macro_input_guard.h"
+#include "../../macro/macro_payload.h"
+#include "../../compat/qmk_native_report_contract.h"
+#include "../../compat/qmk_pointing_contract.h"
+#include "../../compat/qmk_source_layer_contract.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 #include "../../state/ownership/layer_ownership.h"
 #include "../../state/modifiers/keyboard_mod_policy.h"
 #include "../../state/diagnostics/runtime_diag.h"
-#include "../../profile/storage/profile_store_runtime_hooks.h"
 #include "slot/origin_registry.h"
+#ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+#    include "../../compat/qmk_profile_adjustments.h"
+#endif
 
 #ifdef NOAH_HOST_TEST_ENV
 bool key_runtime_integration_userspace_feeds_core_key_events(void) {
@@ -49,7 +59,10 @@ struct key_runtime_process_ctx_t {
     keyrecord_t             *record;
     handled_key_resolution_t resolution;
     bool                     resolution_loaded;
+    bool                     use_row; // participation: whether this record uses the keycode's behaviour row
 };
+
+static void key_runtime_process_settle_report_ownership(uint16_t keycode, keyrecord_t *record, bool keep_processing);
 
 static void key_runtime_process_end_keyboard_event_mod_mask(void) {
     key_runtime_core_state_t *state = key_runtime_core_state();
@@ -71,7 +84,7 @@ static void key_runtime_process_begin_keyboard_event_mod_mask(void) {
         return;
     }
 
-    masked_real_mods = pd_mode_active_keyboard_event_masked_real_mods();
+    masked_real_mods = pointing_mode_active_keyboard_event_masked_real_mods();
     if (!keyboard_mod_policy_begin_real_mod_mask(masked_real_mods)) {
         return;
     }
@@ -82,7 +95,7 @@ static void key_runtime_process_begin_keyboard_event_mod_mask(void) {
 
 static const handled_key_resolution_t *key_runtime_process_resolution(key_runtime_process_ctx_t *ctx) {
     if (!ctx->resolution_loaded) {
-        handled_key_lookup_into(ctx->runtime_keycode, &ctx->resolution);
+        handled_key_lookup_row_tap_count_into(ctx->runtime_keycode, 1u, ctx->use_row, &ctx->resolution);
         ctx->resolution_loaded = true;
     }
 
@@ -136,46 +149,6 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_release_slo
     return KEY_RUNTIME_PROCESS_NEXT;
 }
 
-// A release goes to whoever took its press. A press a pointing mode consumed
-// never reached the key's behavior, so its release goes to the mode even if
-// another mode is active by then, and before preflight, which could otherwise
-// drop it and leave the mode waiting for it. The reducer's token for it is
-// ordinary and non-handled, so finalizing it here retires everything it owns.
-static key_runtime_process_stage_outcome_t key_runtime_process_stage_pd_mode_release(key_runtime_process_ctx_t *ctx) {
-    if (ctx->record->event.pressed || ctx->record->event.type != KEY_EVENT || !key_runtime_core_take_intercepted_release(ctx->record->event.key)) {
-        return KEY_RUNTIME_PROCESS_NEXT;
-    }
-
-    (void)pd_mode_handle_key_event(ctx->keycode, ctx->record);
-    (void)key_runtime_core_finalize_non_handled_release(ctx->record->event.key);
-    key_runtime_trace_message("process:pd_mode_key_release", "release of a press an active pd mode consumed");
-    return KEY_RUNTIME_PROCESS_RETURN_FALSE;
-}
-
-// Only presses are offered to the active mode; the release of a press it did
-// not take stays with the key's behavior, which owns what that press started.
-static key_runtime_process_stage_outcome_t key_runtime_process_stage_pd_mode(key_runtime_process_ctx_t *ctx) {
-    bool key_event = ctx->record->event.type == KEY_EVENT;
-    bool consumed;
-
-    if (!ctx->record->event.pressed) {
-        return KEY_RUNTIME_PROCESS_NEXT;
-    }
-    if (key_event) {
-        key_runtime_core_offer_press_to_mode(ctx->record->event.key);
-    }
-    consumed = pd_mode_handle_key_event(ctx->runtime_keycode, ctx->record);
-    if (key_event) {
-        key_runtime_core_end_mode_offer(ctx->record->event.key, consumed);
-    }
-    if (!consumed) {
-        return KEY_RUNTIME_PROCESS_NEXT;
-    }
-
-    key_runtime_trace_message("process:pd_mode_key_handler", "key event consumed by active pd mode");
-    return KEY_RUNTIME_PROCESS_RETURN_FALSE;
-}
-
 static key_runtime_process_stage_outcome_t key_runtime_process_stage_handled_key(key_runtime_process_ctx_t *ctx) {
     const handled_key_resolution_t *resolution;
     const press_token_t            *token;
@@ -195,13 +168,13 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_handled_key
         }
         handled = key_runtime_process_handled_key_press(ctx->runtime_keycode, ctx->record);
     } else {
-        handled = key_runtime_process_handled_key_release(ctx->runtime_keycode, ctx->record, NULL);
+        handled = key_runtime_process_handled_key_release(ctx->record, NULL);
         if (!handled) {
             resolution = key_runtime_process_resolution(ctx);
             if (!handled_key_resolution_is_handled(*resolution)) {
                 return KEY_RUNTIME_PROCESS_NEXT;
             }
-            handled = key_runtime_process_handled_key_release(ctx->runtime_keycode, ctx->record, resolution);
+            handled = key_runtime_process_handled_key_release(ctx->record, resolution);
         }
         if (handled) {
             key_runtime_deferred_release_drain_dispatches();
@@ -227,30 +200,6 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_non_handled
     return KEY_RUNTIME_PROCESS_NEXT;
 }
 
-// A plain LT() with no authored row keeps QMK's own tap/hold decision: QMK's
-// tapping engine resolves it before this record arrives and marks a hold with
-// tap.count 0. Only that hold, which QMK would turn into layer_on() and
-// layer_off(), goes through layer ownership; a tap still reaches QMK and sends
-// the tap keycode.
-static bool key_runtime_process_is_plain_layer_tap_hold(uint16_t keycode, const keyrecord_t *record) {
-    return IS_QK_LAYER_TAP(keycode) && QK_LAYER_TAP_GET_LAYER(keycode) < LAYER_COUNT && record->tap.count == 0u && record->event.type == KEY_EVENT;
-}
-
-static key_runtime_process_stage_outcome_t key_runtime_process_stage_layer_tap_hold(key_runtime_process_ctx_t *ctx) {
-    if (!key_runtime_process_is_plain_layer_tap_hold(ctx->keycode, ctx->record)) {
-        return KEY_RUNTIME_PROCESS_NEXT;
-    }
-
-    if (ctx->record->event.pressed) {
-        layer_ownership_momentary_press(ctx->record->event.key, (uint8_t)QK_LAYER_TAP_GET_LAYER(ctx->keycode));
-    } else {
-        (void)layer_ownership_momentary_release(ctx->record->event.key);
-    }
-
-    key_runtime_trace_message("process:layer_tap_hold", "plain layer-tap hold owned");
-    return KEY_RUNTIME_PROCESS_RETURN_FALSE;
-}
-
 static key_runtime_process_stage_outcome_t key_runtime_process_stage_direct_action(key_runtime_process_ctx_t *ctx) {
     if (!key_runtime_process_direct_action_key(ctx->keycode, ctx->record)) {
         return KEY_RUNTIME_PROCESS_NEXT;
@@ -260,11 +209,25 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_direct_acti
     return KEY_RUNTIME_PROCESS_RETURN_FALSE;
 }
 
-// A custom key without a behaviour does nothing. Its press is consumed so the
-// keycode never reaches QMK.
+// Behaviours and mode overrides have already had their turn. A native key
+// sharing a usage still owns it; only the redundant QMK register/unregister
+// edge is suppressed. Credit a suppressed press exactly once, just as finalize
+// credits a press that reaches QMK's default action.
+static key_runtime_process_stage_outcome_t key_runtime_process_stage_native_overlap(key_runtime_process_ctx_t *ctx) {
+    if (!owned_keycode_should_suppress_default(ctx->keycode, ctx->record)) return KEY_RUNTIME_PROCESS_NEXT;
+    if (ctx->record->event.pressed) {
+        key_runtime_process_settle_report_ownership(ctx->keycode, ctx->record, true);
+    }
+    noah_qmk_native_overlap_report_event(ctx->keycode, ctx->record->event.pressed);
+    return KEY_RUNTIME_PROCESS_RETURN_FALSE;
+}
+
+// A custom key with neither a behaviour nor a shortcut does nothing. Its press
+// is consumed so the keycode never reaches QMK. One with a shortcut is a
+// runtime-handled key even without a row (D-F26) and never gets here.
 static key_runtime_process_stage_outcome_t key_runtime_process_stage_idle_custom_key(key_runtime_process_ctx_t *ctx) {
     if (ctx->record->event.pressed && NOAH_KEYCODE_IS_CUSTOM_KEY(ctx->keycode)) {
-        key_runtime_trace_message("process:idle_custom_key", "custom key without a behaviour consumed");
+        key_runtime_trace_message("process:idle_custom_key", "custom key without a behaviour or shortcut consumed");
         return KEY_RUNTIME_PROCESS_RETURN_FALSE;
     }
 
@@ -272,18 +235,24 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_idle_custom
 }
 
 static bool key_runtime_process_finish(key_runtime_process_ctx_t *ctx, bool keep_processing) {
-    (void)ctx;
+#ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+    // It also tells the DPI policy of QMK's Charybdis keys it passes on.
+    if (keep_processing) keep_processing = noah_qmk_profile_adjustment_process(ctx->keycode, ctx->record);
+#else
+    // QMK writes the sensor's CPI for this key after this hook, before any
+    // scan applies the DPI policy again.
+    if (keep_processing && noah_qmk_contract_pointer_keycode_sets_cpi(ctx->keycode)) pointing_mode_forget_applied_dpi();
+#endif
     noah_runtime_diag_scope_leave();
     return keep_processing;
 }
 
-// Report ownership means "QMK's default handler holds this usage in the report".
-// That is only knowable once the event result is final, so it is settled from
-// the finalize hook rather than pre-process. Crediting a press that userspace
-// later consumes would make a managed owner of the same usage skip its own key
-// registration, and would keep the last managed modifier release from clearing
-// the report bit. Pre-process still tracks which physical keys are down, which
-// is a different question and stays where it is.
+// Native report ownership is settled after behaviour/mode admission. Finalize
+// credits presses QMK processes; the late overlap stage credits native presses
+// whose usage is already held without sending a redundant edge. Its bitmap
+// entry prevents finalize from crediting that press twice. A press consumed by
+// a behaviour or mode remains uncredited, so it cannot veto managed teardown.
+// Physical modifier observation is a separate masking question in pre-process.
 static void key_runtime_process_settle_report_ownership(uint16_t keycode, keyrecord_t *record, bool keep_processing) {
     key_runtime_core_state_t *state = key_runtime_core_state();
 
@@ -315,41 +284,74 @@ static void key_runtime_process_settle_report_ownership(uint16_t keycode, keyrec
 
     owned_keycode_track_physical_event(keycode, record);
     keyboard_mod_ownership_track_report_keycode_event(keycode, record);
-    keyboard_mod_ownership_track_mod_tap_hold_event(keycode, record);
 }
 
-// Physical keys whose press the profile output fence dropped. Their release
-// is dropped too, even after the fence lifts, so no half event reaches QMK.
-static uint8_t key_runtime_fenced_presses[KEY_ORIGIN_BITMAP_SIZE];
-
-static bool key_runtime_process_output_fenced(const keyrecord_t *record) {
-    bool key_event = record->event.type == KEY_EVENT && key_origin_keypos_valid(record->event.key);
-
-    if (key_event && !record->event.pressed && key_origin_bitmap_has_keypos(key_runtime_fenced_presses, record->event.key)) {
-        key_origin_bitmap_remove_keypos(key_runtime_fenced_presses, record->event.key);
+// Whether a record uses its keycode's behaviour row (participation-policy.md).
+// A physical key answers with the decision its press stored; a combo's output
+// with its completed chord's output permission and origin layer; anything
+// else uses the row.
+static bool key_runtime_process_record_uses_row(uint16_t keycode, const keyrecord_t *record) {
+    if (!record) {
         return true;
     }
-    // QMK resolves a VIA key before reaching this hook. Once a logical
-    // decision is authorized, local VIA bytes may be only partly rolled
-    // forward; do not dispatch that mixed keymap to the host.
-    if (noah_profile_store_runtime_output_ready()) {
-        return false;
+    if (record->event.type == KEY_EVENT) {
+        return noah_participation_record_behavior(record);
     }
-    if (key_event && record->event.pressed) {
-        key_origin_bitmap_add_keypos(key_runtime_fenced_presses, record->event.key);
+    if (noah_participation_record_generated_captured(record)) return noah_participation_record_behavior(record);
+    if (record->event.type == COMBO_EVENT) {
+        return noah_participation_combo_output(UINT16_MAX, keycode, noah_qmk_combo_origin_record_source_layer(keycode, record));
     }
     return true;
 }
 
-bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
-    if (key_runtime_process_output_fenced(record)) {
-        return false;
+// QMK's tapping engine asks this about every record (BK's is_tap_record_user)
+// as it leaves the queue, after is_tap_keycode_user below has answered for the
+// keycode. That answer stands: every LT(), MT() and OSM() key is the runtime's,
+// row or not and behaviours on or off (D-F27), as are TT() and OSL(), so QMK
+// classifies none of them. A placement bypass changes nothing here, because a
+// key the runtime handles without its row is handled with it too. The hook
+// stays for the press it settles and the combo output it captures.
+bool is_tap_record_user(keyrecord_t *record, bool native_tap, bool default_tap) {
+    uint16_t keycode = get_record_keycode(record, false);
+    if (record->event.type == KEY_EVENT && !noah_synthetic_record_active()) {
+        // QMK asks as a press leaves its queue, with the keycode it resolves
+        // now: settle the press on that layer, as process_record will see it.
+        noah_participation_record_deliver(record, keycode, noah_qmk_contract_resolve_source_layer(record->event.key));
     }
+    if (record->event.type == COMBO_EVENT && !noah_participation_record_generated_captured(record)) {
+        // Attach the completion snapshot without consuming the pending
+        // origin that will be normalized at actual dispatch.
+        noah_qmk_combo_origin_capture_record(keycode, record);
+    }
+
+    (void)native_tap;
+    return default_tap;
+}
+
+bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (!noah_record_admission_macro_admit(record, macro_payload_engine_protected(), noah_synthetic_record_active())) return false;
     if (noah_synthetic_record_active()) {
         return true;
     }
 
     if (record->event.type == KEY_EVENT && key_origin_keypos_valid(record->event.key)) {
+        if (noah_key_runtime_settle_layer_taps_before_press(record)) {
+            // This press ended a released key's pending layer tap, which has
+            // just changed the layers: resolve it again, as QMK's later
+            // lookups (combos, tapping, processing) will.
+            keycode = get_record_keycode(record, true);
+        }
+        // The press's participation, captured against the layer QMK just
+        // resolved its keycode from, before tapping or combos see it. A press
+        // that waits is settled again when it is delivered.
+        if (record->event.pressed) {
+            uint8_t source_layer = noah_qmk_contract_source_layer(record->event.key);
+            noah_participation_press_store(record->event.key, noah_participation_behavior(keycode, source_layer, record->event.key), noah_participation_combo_press(source_layer, record->event.key));
+        }
+        // The keycode is not frozen: QMK resolves a press that waits behind a
+        // tap/hold key again when it processes it, on the layer its hold turned
+        // on, and that delivery settles participation (participation-policy.md).
+        noah_participation_record_capture(record, noah_qmk_contract_source_layer(record->event.key));
         key_origin_registry_set_single(record->event.key);
         noah_qmk_combo_origin_observe_physical_key_event(keycode, record);
         keyboard_mod_ownership_track_physical_keycode_event(keycode, record);
@@ -360,7 +362,7 @@ bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     static const key_runtime_process_stage_entry_t stages[] = {
-        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough}, {.name = "pd_mode_release", .handler = key_runtime_process_stage_pd_mode_release}, {.name = "preflight", .handler = key_runtime_process_stage_preflight}, {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode}, {.name = "pd_mode", .handler = key_runtime_process_stage_pd_mode}, {.name = "handled_key", .handler = key_runtime_process_stage_handled_key}, {.name = "non_handled_release_cleanup", .handler = key_runtime_process_stage_non_handled_release_cleanup}, {.name = "layer_tap_hold", .handler = key_runtime_process_stage_layer_tap_hold}, {.name = "direct_action", .handler = key_runtime_process_stage_direct_action}, {.name = "idle_custom_key", .handler = key_runtime_process_stage_idle_custom_key},
+        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough}, {.name = "preflight", .handler = key_runtime_process_stage_preflight}, {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode}, {.name = "handled_key", .handler = key_runtime_process_stage_handled_key}, {.name = "non_handled_release_cleanup", .handler = key_runtime_process_stage_non_handled_release_cleanup}, {.name = "direct_action", .handler = key_runtime_process_stage_direct_action}, {.name = "native_overlap", .handler = key_runtime_process_stage_native_overlap}, {.name = "idle_custom_key", .handler = key_runtime_process_stage_idle_custom_key},
     };
     key_runtime_process_ctx_t ctx = {
         .keycode         = keycode,
@@ -376,9 +378,16 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     pointer_layer_policy_sync_layer_ownership_anchor();
 
     noah_qmk_combo_origin_normalize_record(keycode, record);
+    if (!noah_synthetic_record_active()) {
+        // process_record_quantum() has just resolved a press's keycode and
+        // stored its source layer, so the cache names the layer it came from.
+        noah_participation_record_deliver(record, keycode, noah_qmk_contract_source_layer(record->event.key));
+    }
+    ctx.use_row = key_runtime_process_record_uses_row(keycode, record);
 
     if (!noah_synthetic_record_active()) {
-        key_runtime_core_observe_process_record_event(keycode, record);
+        key_runtime_preflight_settle_before_release(keycode, record);
+        key_runtime_core_observe_process_record_event_with_row(keycode, record, ctx.use_row);
     }
 
     key_runtime_trace_record("process:entry", keycode, record);
@@ -415,14 +424,13 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 // QMK's rule for what uses up a one-shot layer (process_record in action.c):
 // any press except a modifier, a one-shot modifier, a mod-tap still held, or
-// OSL() itself. It is released once that press has been processed, so the
-// press still resolved on the one-shot layer.
-static bool key_runtime_process_press_uses_oneshot_layer(uint16_t keycode, const keyrecord_t *record) {
-    if (IS_MODIFIER_KEYCODE(keycode) || IS_QK_ONE_SHOT_MOD(keycode) || IS_QK_ONE_SHOT_LAYER(keycode)) {
-        return false;
-    }
-
-    return !(IS_QK_MOD_TAP(keycode) && record->tap.count == 0u);
+// OSL() itself, and so a custom key whose shortcut is One-shot (D-F26). It is
+// released once that press has been processed, so the press still resolved on
+// the one-shot layer. Every MT() is the runtime's (D-F27): its release planner
+// consumes the layer for a qualifying tap, including a delayed multi-tap, so
+// its press never does.
+static bool key_runtime_process_press_uses_oneshot_layer(uint16_t keycode) {
+    return !(IS_MODIFIER_KEYCODE(keycode) || IS_QK_ONE_SHOT_MOD(keycode) || IS_QK_ONE_SHOT_LAYER(keycode) || IS_QK_MOD_TAP(keycode) || noah_custom_key_is_oneshot(keycode));
 }
 
 static void key_runtime_process_settle_oneshot_layer(uint16_t keycode, const keyrecord_t *record) {
@@ -430,7 +438,7 @@ static void key_runtime_process_settle_oneshot_layer(uint16_t keycode, const key
         return;
     }
 
-    if (layer_ownership_oneshot_layer() != UINT8_MAX && key_runtime_process_press_uses_oneshot_layer(keycode, record)) {
+    if (layer_ownership_oneshot_layer() != UINT8_MAX && key_runtime_process_press_uses_oneshot_layer(keycode)) {
         (void)layer_ownership_oneshot_consume();
     }
 }
@@ -453,9 +461,11 @@ void noah_post_process_record_user(uint16_t keycode, keyrecord_t *record) {
     noah_process_record_user_finalize(keycode, record, true);
 }
 
-// Runtime-owned keys already own tap, hold and repeated-tap decisions. This
-// includes authored dual-role rows and intrinsic TT/OSL layer ownership. Native
-// keys without a runtime owner still use QMK tapping.
+// QMK's answer for the keycode, which is_tap_record_user above keeps. No key
+// the runtime handles is QMK's tap key. The only tap actions it does not handle
+// are TT() and OSL() to layers 16-31: the firmware refuses them wherever it
+// validates a keymap, and since VIA left (D-F31) nothing else writes one; QMK
+// would still decide it (D-F47; key-press.md, "The one tap key QMK still decides").
 bool is_tap_keycode_user(uint16_t keycode, bool default_tap) {
     return default_tap && !key_behavior_lookup(keycode).handled;
 }

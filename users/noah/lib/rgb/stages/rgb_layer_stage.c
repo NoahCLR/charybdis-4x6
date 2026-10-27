@@ -8,7 +8,6 @@
 
 #    include <string.h>
 
-#    include "keymap_introspection.h" // QMK
 
 static bool layer_key_led_map_dirty = true;
 static bool layer_key_led_map[LAYER_COUNT][RGB_MATRIX_LED_COUNT];
@@ -20,27 +19,53 @@ typedef struct {
     rgb_t   colors[LAYER_COUNT];
     uint8_t modes[LAYER_COUNT];
     bool    solid[LAYER_COUNT];
-} rgb_effective_layer_profile_t;
+} rgb_active_profile_layer_profile_t;
 
-static bool rgb_runtime_layer_stage_profile(const noah_effective_rgb_frame_t *frame, rgb_effective_layer_profile_t *profile) {
-    if (!profile || !rgb_effective_config_layer_stage_enabled(frame)) {
-        return false;
+// Every layer's colour, derived once per lighting publication instead of on
+// each chunk. It is used only while the frame's publication is still the
+// current one: an epoch is never reused while the runtime lives, so a
+// publication that landed while the rows were read can never be current again.
+static struct {
+    rgb_active_profile_layer_profile_t profile;
+    uint32_t                           epoch;
+    uint32_t                           publication_count;
+    bool                               live;
+    bool                               valid;
+} layer_profile_cache;
+
+static const rgb_active_profile_layer_profile_t *rgb_runtime_layer_stage_profile(const noah_active_profile_rgb_frame_t *frame) {
+    // Without a frame the accessors read the compiled view, as an uninstalled
+    // runtime's frame does.
+    uint32_t epoch             = frame ? frame->epoch : 0u;
+    uint32_t publication_count = frame ? frame->publication_count : 0u;
+    bool     live              = frame && frame->live;
+
+    if (!rgb_active_profile_config_layer_stage_enabled(frame)) {
+        return NULL;
     }
-    memset(profile, 0, sizeof(*profile));
+    if (layer_profile_cache.valid && layer_profile_cache.epoch == epoch && layer_profile_cache.publication_count == publication_count && layer_profile_cache.live == live) {
+        return &layer_profile_cache.profile;
+    }
+
+    layer_profile_cache.valid = false;
     for (uint8_t layer = 0u; layer < LAYER_COUNT; layer++) {
         layer_color_config_t config;
 
-        if (!rgb_effective_config_layer_color(frame, layer, &config)) {
-            return false;
+        if (!rgb_active_profile_config_layer_color(frame, layer, &config)) {
+            return NULL;
         }
-        profile->colors[layer] = hsv_to_rgb(config.color);
-        profile->modes[layer]  = config.mode;
-        profile->solid[layer]  = !(config.color.s == 0u && config.color.v == 0u);
+        layer_profile_cache.profile.colors[layer] = hsv_to_rgb(config.color);
+        layer_profile_cache.profile.modes[layer]  = config.mode;
+        layer_profile_cache.profile.solid[layer]  = !(config.color.s == 0u && config.color.v == 0u);
     }
-    return true;
+    layer_profile_cache.epoch             = epoch;
+    layer_profile_cache.publication_count = publication_count;
+    layer_profile_cache.live              = live;
+    layer_profile_cache.valid             = true;
+    return &layer_profile_cache.profile;
 }
 
-static bool rgb_runtime_layer_stage_paints_only_keys_present_on_this_layer(const rgb_effective_layer_profile_t *profile, uint8_t layer) {
+static bool rgb_runtime_layer_stage_paints_only_keys_present_on_this_layer(const rgb_active_profile_layer_profile_t *profile, uint8_t layer) {
     return profile && layer < LAYER_COUNT && profile->modes[layer] == KEYS_MAPPED_ON_THIS_LAYER_ONLY;
 }
 
@@ -61,6 +86,12 @@ static bool rgb_runtime_layer_stage_keycode_is_mapped(uint16_t keycode) {
 }
 
 static void rgb_runtime_layer_stage_rebuild_key_led_map(void) {
+    static uint32_t epoch;
+    uint32_t current = noah_active_profile_rgb_publication_epoch();
+    if (epoch != current) {
+        epoch = current;
+        layer_key_led_map_dirty = true;
+    }
     if (!layer_key_led_map_dirty) {
         return;
     }
@@ -70,7 +101,7 @@ static void rgb_runtime_layer_stage_rebuild_key_led_map(void) {
     for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
         for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
             for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-                uint16_t keycode = keycode_at_keymap_location(layer, row, col);
+                uint16_t keycode = keymap_key_to_keycode(layer, (keypos_t){.row = row, .col = col});
                 if (!rgb_runtime_layer_stage_keycode_is_mapped(keycode)) {
                     continue;
                 }
@@ -89,7 +120,7 @@ static void rgb_runtime_layer_stage_rebuild_key_led_map(void) {
     layer_key_led_map_dirty = false;
 }
 
-static bool rgb_runtime_frame_paint_layer(rgb_runtime_frame_t *frame, const rgb_effective_layer_profile_t *profile, uint8_t layer, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_frame_paint_layer(rgb_runtime_frame_t *frame, const rgb_active_profile_layer_profile_t *profile, uint8_t layer, uint8_t led_min, uint8_t led_max) {
     if (!rgb_runtime_layer_stage_paints_only_keys_present_on_this_layer(profile, layer)) {
         return rgb_runtime_frame_fill(frame, profile->colors[layer], led_min, led_max);
     }
@@ -115,14 +146,15 @@ void rgb_runtime_layer_stage_post_init(void) {
 }
 
 void rgb_runtime_layer_stage_invalidate_maps(void) {
-    layer_key_led_map_dirty = true;
+    layer_key_led_map_dirty   = true;
+    layer_profile_cache.valid = false;
 }
 
-static bool rgb_runtime_layer_stage_has_solid_color(const rgb_effective_layer_profile_t *profile, uint8_t layer) {
+static bool rgb_runtime_layer_stage_has_solid_color(const rgb_active_profile_layer_profile_t *profile, uint8_t layer) {
     return profile && layer < LAYER_COUNT && profile->solid[layer];
 }
 
-static bool rgb_runtime_layer_stage_group_color(const rgb_effective_layer_profile_t *profile, uint8_t layer, hsv_t group_color, rgb_t *out_color) {
+static bool rgb_runtime_layer_stage_group_color(const rgb_active_profile_layer_profile_t *profile, uint8_t layer, hsv_t group_color, rgb_t *out_color) {
     if (!profile || !out_color || layer >= LAYER_COUNT) {
         return false;
     }
@@ -140,7 +172,7 @@ static bool rgb_runtime_layer_stage_group_color(const rgb_effective_layer_profil
     return true;
 }
 
-static bool rgb_runtime_layer_stage_paint_group_for_layer(rgb_runtime_frame_t *frame, const rgb_effective_layer_profile_t *profile, const rgb_effective_layer_group_t *group, uint8_t layer, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_layer_stage_paint_group_for_layer(rgb_runtime_frame_t *frame, const rgb_active_profile_layer_profile_t *profile, const rgb_active_profile_layer_group_t *group, uint8_t layer, uint8_t led_min, uint8_t led_max) {
     rgb_t group_rgb;
 
     if (!(frame && group)) {
@@ -186,48 +218,50 @@ bool rgb_runtime_frame_fill(rgb_runtime_frame_t *frame, rgb_t color, uint8_t led
     return true;
 }
 
-static bool rgb_runtime_layer_stage_render_selection(rgb_runtime_frame_t *frame, layer_state_t state, uint8_t selected_layer, const noah_effective_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
-    rgb_effective_layer_profile_t profile;
-    bool                          painted = false;
+// Layers first..end-1 only, each with its own rows; a split render lets a
+// linked pointing mode paint between them.
+static bool rgb_runtime_layer_stage_render_selection(rgb_runtime_frame_t *frame, layer_state_t state, uint8_t selected_layer, uint8_t first, uint8_t end, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
+    const rgb_active_profile_layer_profile_t *profile = rgb_runtime_layer_stage_profile(profile_frame);
+    bool                                      painted = false;
 
-    if (!rgb_runtime_layer_stage_profile(profile_frame, &profile)) {
+    if (!profile) {
         return false;
     }
 
-    for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
+    for (uint8_t layer = first; layer < end; layer++) {
         if (!rgb_runtime_layer_stage_selection_contains(state, selected_layer, layer)) {
             continue;
         }
-        if (!rgb_runtime_layer_stage_has_solid_color(&profile, layer)) {
+        if (!rgb_runtime_layer_stage_has_solid_color(profile, layer)) {
             continue;
         }
 
-        painted |= rgb_runtime_frame_paint_layer(frame, &profile, layer, led_min, led_max);
+        painted |= rgb_runtime_frame_paint_layer(frame, profile, layer, led_min, led_max);
     }
 
-    uint8_t group_count = rgb_effective_config_layer_group_count(profile_frame);
+    uint8_t group_count = rgb_active_profile_config_layer_group_count(profile_frame);
     for (uint8_t group = 0; group < group_count; group++) {
 #    ifdef RGB_LAYER_STAGE_TEST_BACKEND
         layer_group_scan_count++;
 #    endif
-        rgb_effective_layer_group_t group_config;
+        rgb_active_profile_layer_group_t group_config;
 
-        if (!rgb_effective_config_layer_group_at(profile_frame, group, &group_config)) {
+        if (!rgb_active_profile_config_layer_group_at(profile_frame, group, &group_config)) {
             rgb_runtime_frame_clear(frame, led_min, led_max);
             return false;
         }
 
         if (group_config.selector == RGB_LAYER_GROUP_ALL) {
-            for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
+            for (uint8_t layer = first; layer < end; layer++) {
                 if (rgb_runtime_layer_stage_selection_contains(state, selected_layer, layer)) {
-                    painted |= rgb_runtime_layer_stage_paint_group_for_layer(frame, &profile, &group_config, layer, led_min, led_max);
+                    painted |= rgb_runtime_layer_stage_paint_group_for_layer(frame, profile, &group_config, layer, led_min, led_max);
                 }
             }
             continue;
         }
 
-        if (group_config.selector < LAYER_COUNT && rgb_runtime_layer_stage_selection_contains(state, selected_layer, group_config.selector)) {
-            painted |= rgb_runtime_layer_stage_paint_group_for_layer(frame, &profile, &group_config, group_config.selector, led_min, led_max);
+        if (group_config.selector >= first && group_config.selector < end && rgb_runtime_layer_stage_selection_contains(state, selected_layer, group_config.selector)) {
+            painted |= rgb_runtime_layer_stage_paint_group_for_layer(frame, profile, &group_config, group_config.selector, led_min, led_max);
         }
     }
 
@@ -235,19 +269,23 @@ static bool rgb_runtime_layer_stage_render_selection(rgb_runtime_frame_t *frame,
 }
 
 bool rgb_runtime_layer_stage_render_frame(rgb_runtime_frame_t *frame, layer_state_t state, uint8_t led_min, uint8_t led_max) {
-    return rgb_runtime_layer_stage_render_effective_frame(frame, state, NULL, led_min, led_max);
+    return rgb_runtime_layer_stage_render_active_profile_frame(frame, state, NULL, led_min, led_max);
 }
 
-bool rgb_runtime_layer_stage_render_effective_frame(rgb_runtime_frame_t *frame, layer_state_t state, const noah_effective_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
+bool rgb_runtime_layer_stage_render_active_profile_frame(rgb_runtime_frame_t *frame, layer_state_t state, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
+    return rgb_runtime_layer_stage_render_active_profile_layers_frame(frame, state, 0u, LAYER_COUNT, profile_frame, led_min, led_max);
+}
+
+bool rgb_runtime_layer_stage_render_active_profile_layers_frame(rgb_runtime_frame_t *frame, layer_state_t state, uint8_t first, uint8_t end, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
     bool painted;
 
-    if (!frame) {
+    if (!frame || first > end || end > LAYER_COUNT) {
         return false;
     }
 
     rgb_runtime_frame_clear(frame, led_min, led_max);
-    painted = rgb_runtime_layer_stage_render_selection(frame, state, RGB_LAYER_GROUP_ALL, profile_frame, led_min, led_max);
-    if (!rgb_effective_config_frame_current(profile_frame)) {
+    painted = rgb_runtime_layer_stage_render_selection(frame, state, RGB_LAYER_GROUP_ALL, first, end, profile_frame, led_min, led_max);
+    if (!rgb_active_profile_config_frame_current(profile_frame)) {
         rgb_runtime_frame_clear(frame, led_min, led_max);
         return false;
     }
@@ -255,10 +293,10 @@ bool rgb_runtime_layer_stage_render_effective_frame(rgb_runtime_frame_t *frame, 
 }
 
 bool rgb_runtime_layer_stage_render_selected_frame(rgb_runtime_frame_t *frame, uint8_t layer, uint8_t led_min, uint8_t led_max) {
-    return rgb_runtime_layer_stage_render_effective_selected_frame(frame, layer, NULL, led_min, led_max);
+    return rgb_runtime_layer_stage_render_active_profile_selected_frame(frame, layer, NULL, led_min, led_max);
 }
 
-bool rgb_runtime_layer_stage_render_effective_selected_frame(rgb_runtime_frame_t *frame, uint8_t layer, const noah_effective_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
+bool rgb_runtime_layer_stage_render_active_profile_selected_frame(rgb_runtime_frame_t *frame, uint8_t layer, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
     bool painted;
 
     if (!frame || layer >= LAYER_COUNT) {
@@ -266,8 +304,8 @@ bool rgb_runtime_layer_stage_render_effective_selected_frame(rgb_runtime_frame_t
     }
 
     rgb_runtime_frame_clear(frame, led_min, led_max);
-    painted = rgb_runtime_layer_stage_render_selection(frame, 0, layer, profile_frame, led_min, led_max);
-    if (!rgb_effective_config_frame_current(profile_frame)) {
+    painted = rgb_runtime_layer_stage_render_selection(frame, 0, layer, 0u, LAYER_COUNT, profile_frame, led_min, led_max);
+    if (!rgb_active_profile_config_frame_current(profile_frame)) {
         rgb_runtime_frame_clear(frame, led_min, led_max);
         return false;
     }

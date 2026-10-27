@@ -1,4 +1,4 @@
-#include "lib/profile/runtime/effective_settings_runtime.h"
+#include "lib/profile/runtime/active_profile_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // Auto-Mouse RGB Timeout Fade
 // ────────────────────────────────────────────────────────────────────────────
@@ -8,7 +8,7 @@
 //
 // raw_elapsed comes from the QMK auto-mouse timer. We clamp it to
 // AUTO_MOUSE_TIME so the fade can stay parked at its destination until the
-// auto-mouse layer bit actually drops out on a later scan. That avoids a
+// pointer layer bit actually drops out on a later scan. That avoids a
 // one-frame snap back to the authored pointer-layer color at timeout end.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once

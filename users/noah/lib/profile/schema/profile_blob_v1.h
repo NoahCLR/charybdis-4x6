@@ -1,44 +1,49 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Canonical Live-Profile Blob And Semantic Actions — Profile Wire v1.0
+// Canonical Live-Profile Blob And Semantic Actions — schema 4.0
 // ───────────────────────────────────────────────────────────────────────────
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include "profile_reader.h"
 #include "profile_versions.h"
 
 enum {
     NOAH_PROFILE_BLOB_V1_HEADER_SIZE            = 8u,
-    NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE     = 4u,
+    // Domain id, version and a 32-bit payload length (schema 4, D-F28).
+    NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE     = 6u,
     NOAH_PROFILE_BLOB_V1_ACTION_SIZE            = 4u,
     NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR           = NOAH_PROFILE_SCHEMA_MAJOR,
-    NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR           = 0u,
+    NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR           = NOAH_PROFILE_SCHEMA_MINOR,
     NOAH_PROFILE_BLOB_V1_CANONICAL_FLAG         = 1u,
     NOAH_PROFILE_BLOB_V1_KNOWN_FLAGS            = 1u,
     NOAH_PROFILE_BLOB_V1_MAX_SIZE               = NOAH_PROFILE_PAYLOAD_MAX,
     NOAH_PROFILE_BLOB_V1_MAX_DOMAINS            = NOAH_PROFILE_DOMAIN_COUNT,
-    NOAH_PROFILE_DOMAIN_V1_PD                   = 0x50u,
-    NOAH_PROFILE_DOMAIN_V1_SETTINGS             = 0x40u,
-    NOAH_PROFILE_DOMAIN_V1_COMBOS               = 0x30u,
-    NOAH_PROFILE_DOMAIN_V1_COMBOS_VERSION       = 1u,
-    NOAH_PROFILE_DOMAIN_V1_RGB                  = 0x10u,
-    NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS        = 0x20u,
-    NOAH_PROFILE_DOMAIN_V1_RGB_VERSION          = NOAH_PROFILE_RGB_VERSION,
-    NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION = 1u,
-    NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS   = 8u,
-    NOAH_PROFILE_ACTION_V1_MAX_PD_MODES         = NOAH_PROFILE_PD_COUNT,
-    NOAH_PROFILE_ACTION_V1_MAX_VIA_MACRO_SLOTS  = 64u,
-    NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS      = 64u,
+    NOAH_PROFILE_DOMAIN_V1_COMBOS_VERSION       = NOAH_PROFILE_DOMAIN_VERSION_COMBOS,
+    NOAH_PROFILE_DOMAIN_V1_RGB_VERSION          = NOAH_PROFILE_DOMAIN_VERSION_RGB,
+    NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION = NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS,
+    NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS   = 16u,
+    NOAH_PROFILE_ACTION_V1_MAX_POINTING_MODES   = NOAH_PROFILE_PD_COUNT,
+    NOAH_PROFILE_ACTION_V1_MAX_MACRO_SLOTS      = 128u,
+    NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS      = 128u,
 };
+
+// A size against its ceiling, through 32 bits: a domain's 16-bit size limit
+// may sit at a ceiling of 0xFFFF once slots outgrow 64 KiB (D-F29), where a
+// direct comparison is always true.
+static inline bool noah_profile_size_within(uint32_t size, uint32_t ceiling) {
+    return size <= ceiling;
+}
 
 typedef enum {
     NOAH_PROFILE_ACTION_V1_NONE              = 0u,
     NOAH_PROFILE_ACTION_V1_QMK_KEYCODE       = 1u,
     NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY   = 2u,
     NOAH_PROFILE_ACTION_V1_LAYER_LOCK        = 3u,
-    NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY = 4u,
-    NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK      = 5u,
-    NOAH_PROFILE_ACTION_V1_VIA_MACRO         = 6u,
+    NOAH_PROFILE_ACTION_V1_POINTING_MODE_MOMENTARY = 4u,
+    NOAH_PROFILE_ACTION_V1_POINTING_MODE_LOCK = 5u,
+    NOAH_PROFILE_ACTION_V1_MACRO             = 6u,
     // Kind 7 named the retired user macros in earlier action vocabularies;
     // this vocabulary (a different action ABI digest) gives it to custom keys.
     NOAH_PROFILE_ACTION_V1_CUSTOM_KEY = 7u,
@@ -108,6 +113,27 @@ typedef struct {
     noah_profile_domain_v1_t domains[NOAH_PROFILE_BLOB_V1_MAX_DOMAINS];
 } noah_profile_blob_v1_t;
 
+// Bounded envelope traversal; callers supply one complete 8-byte blob header
+// or 6-byte domain header. No payload reads or semantic decoding happen here.
+typedef struct {
+    uint32_t offset, byte_length;
+    uint8_t count, index, prior_id, mask;
+} noah_profile_envelope_t;
+
+typedef struct {
+    const noah_profile_domain_shape_t *shape;
+    uint32_t offset, length;
+} noah_profile_domain_record_t;
+
+noah_profile_codec_v1_result_t noah_profile_envelope_begin(noah_profile_envelope_t *walk, const uint8_t header[8], size_t length, noah_profile_codec_v1_error_t *error);
+noah_profile_codec_v1_result_t noah_profile_envelope_next(noah_profile_envelope_t *walk, const uint8_t header[6], noah_profile_domain_record_t *record, noah_profile_codec_v1_error_t *error);
+noah_profile_codec_v1_result_t noah_profile_envelope_finish(const noah_profile_envelope_t *walk, noah_profile_codec_v1_error_t *error);
+// Finds domain_id's payload in the blob of byte_length bytes at base_offset by
+// walking its envelope through the reader. A cold-path lookup for publication,
+// so a validated profile need not carry every domain's range; false when the
+// domain is absent or the envelope cannot be read.
+bool noah_profile_blob_v1_find_domain(const noah_profile_reader_t *reader, size_t base_offset, size_t byte_length, uint8_t domain_id, noah_profile_domain_range_t *range);
+
 typedef struct {
     uint8_t  kind;
     uint8_t  flags;
@@ -119,8 +145,8 @@ typedef struct {
 // support is checked by the separate action-ABI compatibility layer.
 typedef struct {
     uint32_t max_logical_layers;
-    uint32_t max_pd_modes;
-    uint32_t max_via_macro_slots;
+    uint32_t max_pointing_modes;
+    uint32_t max_macro_slots;
     uint32_t max_custom_keys;
 } noah_profile_action_v1_limits_t;
 

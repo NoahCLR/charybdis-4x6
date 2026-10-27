@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 BUILD_DIR="$(mktemp -d)"
@@ -18,17 +19,23 @@ trap cleanup EXIT INT TERM
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DQMK_STUB_SUPPRESS_LAYER_COUNT \
-    -DVIA_ENABLE \
-    -DTOTAL_EEPROM_BYTE_COUNT=0x4000u \
+    -DNOAH_PORTABLE_PROFILE_ENABLE \
+    -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     -include "$ROOT/tests/host/include/noah_compile_config.h" \
     "$ROOT/tests/host/profile_store_runtime_test.c" \
     "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
-    "$ROOT/users/noah/lib/profile/storage/profile_store.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
+        "$ROOT/users/noah/lib/profile/storage/profile_store.c" \
     "$ROOT/users/noah/lib/profile/storage/profile_store_runtime.c" \
-    "$ROOT/users/noah/lib/compat/qmk_profile_eeprom.c" \
+    "$ROOT/users/noah/lib/profile/storage/profile_flash_store.c" \
+    "$ROOT/users/noah/lib/compat/qmk_profile_flash.c" \
+    "$ROOT/users/noah/lib/compat/qmk_durable_io.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
     -o "$BIN"
 
 "$BIN"

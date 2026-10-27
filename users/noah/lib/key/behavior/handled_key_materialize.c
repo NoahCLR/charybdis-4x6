@@ -31,7 +31,7 @@ static __attribute__((noinline)) void handled_key_materialize_hold(const handled
     out->hold          = source_found ? handled_key_hold_behavior(&source) : hold_behavior_none();
     out->hold_strategy = source_found ? handled_key_hold_strategy_behavior(&source) : KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT;
     out->layer         = source_found ? handled_key_resolution_source_layer(&source) : UINT8_MAX;
-    out->pd_mode       = source_found ? source.pd_mode : 0;
+    out->pointing_mode = source_found ? source.pointing_mode : 0;
     out->flags         = resolution->flags & (uint16_t)~(HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP);
 
     if (source_found && handled_key_resolution_source_is_momentary_layer(&source)) {
@@ -62,7 +62,7 @@ void handled_key_materialized_refresh_contract(handled_key_materialized_t *mater
         materialized->flags |= HANDLED_KEY_FLAG_FALLBACK_HOLD;
     }
 
-    materialized->contract = handled_key_behavior_contract(materialized->hold_strategy, materialized->flags, materialized->tap_action, materialized->pd_mode, materialized->hold, materialized->long_hold);
+    materialized->contract = handled_key_behavior_contract(materialized->hold_strategy, materialized->flags, materialized->tap_action, materialized->pointing_mode, materialized->hold, materialized->long_hold);
 }
 
 void handled_key_materialize_into(const handled_key_resolution_t *resolution, const handled_key_resolution_ctx_t *ctx, handled_key_materialized_t *out) {

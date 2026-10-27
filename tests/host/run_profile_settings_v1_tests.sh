@@ -1,20 +1,23 @@
 #!/bin/sh
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
 . "$ROOT/tests/host/noah_host_qmk_env.sh"
 noah_host_export_qmk_cpath "$ROOT"
-for variant in normal sanitized configured configured_sanitized; do
+for variant in normal sanitized; do
     flags=""
     case "$variant" in *sanitized) flags="-fsanitize=address,undefined -fno-omit-frame-pointer";; esac
-    case "$variant" in configured*) flags="$flags -DNOAH_PD_PROFILE_ENABLE";; esac
     cc -std=c11 -Wall -Wextra -Werror -pedantic $flags -DNOAH_PORTABLE_PROFILE_ENABLE -DQMK_KEYBOARD_H='"qmk_stub.h"' \
         -I"$ROOT" -I"$ROOT/users/noah" -I"$ROOT/tests/host/include" \
         "$ROOT/tests/host/profile_settings_v1_test.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
-        "$ROOT/users/noah/lib/profile/runtime/effective_settings_runtime.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
+        "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_settings_runtime.c" \
         -o "$BUILD_DIR/test"
     "$BUILD_DIR/test"
 done

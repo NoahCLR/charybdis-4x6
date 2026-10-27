@@ -7,7 +7,6 @@
 #include "users/noah/noah_runtime.h"
 
 void           eeconfig_init_user(void);
-bool           get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record);
 bool           process_record_admit_user(keyrecord_t *record);
 bool           pre_process_record_user(uint16_t keycode, keyrecord_t *record);
 bool           process_record_user(uint16_t keycode, keyrecord_t *record);
@@ -16,6 +15,7 @@ void           matrix_scan_user(void);
 void           matrix_slave_scan_user(void);
 void           housekeeping_task_user(void);
 void           suspend_power_down_user(void);
+void           keyboard_pre_init_user(void);
 void           keyboard_post_init_user(void);
 layer_state_t  layer_state_set_user(layer_state_t state);
 report_mouse_t pointing_device_task_user(report_mouse_t mouse_report);
@@ -38,6 +38,7 @@ typedef struct {
     unsigned slave_scan_calls;
     unsigned housekeeping_calls;
     unsigned suspend_power_down_calls;
+    unsigned pre_init_calls;
     unsigned post_init_calls;
     unsigned layer_state_calls;
     unsigned pointing_task_calls;
@@ -78,7 +79,6 @@ typedef enum {
 
 typedef struct {
     unsigned                   eeconfig_calls;
-    unsigned                   hold_calls;
     unsigned                   pre_process_calls;
     unsigned                   process_calls;
     unsigned                   post_process_calls;
@@ -86,13 +86,13 @@ typedef struct {
     unsigned                   slave_scan_calls;
     unsigned                   housekeeping_calls;
     unsigned                   suspend_power_down_calls;
+    unsigned                   pre_init_calls;
     unsigned                   post_init_calls;
     unsigned                   layer_state_calls;
     unsigned                   pointing_task_calls;
     unsigned                   pointing_init_calls;
     unsigned                   mouse_record_calls;
     unsigned                   rgb_calls;
-    bool                       hold_force_true;
     bool                       pre_process_keep_processing;
     bool                       process_keep_processing;
     hook_process_chain_style_t process_chain_style;
@@ -184,6 +184,10 @@ void noah_suspend_power_down_user(void) {
     noah_hook_stub_state.suspend_power_down_calls++;
 }
 
+void noah_keyboard_pre_init_user(void) {
+    noah_hook_stub_state.pre_init_calls++;
+}
+
 void noah_keyboard_post_init_user(void) {
     noah_hook_stub_state.post_init_calls++;
 }
@@ -222,13 +226,6 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
 void eeconfig_init_user(void) {
     hook_override_state.eeconfig_calls++;
     noah_eeconfig_init_user();
-}
-
-bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
-    hook_override_state.hold_calls++;
-    (void)keycode;
-    (void)record;
-    return hook_override_state.hold_force_true;
 }
 
 bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -288,6 +285,11 @@ void housekeeping_task_user(void) {
 void suspend_power_down_user(void) {
     hook_override_state.suspend_power_down_calls++;
     noah_suspend_power_down_user();
+}
+
+void keyboard_pre_init_user(void) {
+    hook_override_state.pre_init_calls++;
+    noah_keyboard_pre_init_user();
 }
 
 void keyboard_post_init_user(void) {
@@ -361,8 +363,6 @@ static void test_weak_defaults_use_expected_shared_behavior(void) {
     CHECK(noah_hook_stub_state.admit_calls == 1 && noah_hook_stub_state.admit_record == &record);
 #endif
 
-    CHECK(!get_hold_on_other_key_press(0x1234u, &record));
-
     CHECK(pre_process_record_user(0x2222u, &record));
     CHECK(noah_hook_stub_state.pre_process_calls == 1);
     CHECK(noah_hook_stub_state.pre_process_keycode == 0x2222u);
@@ -398,6 +398,9 @@ static void test_weak_defaults_use_expected_shared_behavior(void) {
     suspend_power_down_user();
     CHECK(noah_hook_stub_state.suspend_power_down_calls == 1);
     CHECK(noah_hook_stub_state.housekeeping_calls == 1);
+
+    keyboard_pre_init_user();
+    CHECK(noah_hook_stub_state.pre_init_calls == 1);
 
     keyboard_post_init_user();
     CHECK(noah_hook_stub_state.post_init_calls == 1);
@@ -439,7 +442,6 @@ static void test_strong_overrides_can_chain_to_noah_helpers(void) {
     noah_hook_stub_state.mouse_record_return_value  = false;
     noah_hook_stub_state.rgb_return_value           = false;
 
-    hook_override_state.hold_force_true             = true;
     hook_override_state.pre_process_keep_processing = false;
     hook_override_state.process_keep_processing     = false;
     hook_override_state.layer_state_extra_bits      = 0x00000080u;
@@ -452,9 +454,6 @@ static void test_strong_overrides_can_chain_to_noah_helpers(void) {
     eeconfig_init_user();
     CHECK(hook_override_state.eeconfig_calls == 1);
     CHECK(noah_hook_stub_state.eeconfig_calls == 1);
-
-    CHECK(get_hold_on_other_key_press(0x4567u, &record));
-    CHECK(hook_override_state.hold_calls == 1);
 
     CHECK(!pre_process_record_user(0x5555u, &record));
     CHECK(hook_override_state.pre_process_calls == 1);
@@ -497,6 +496,10 @@ static void test_strong_overrides_can_chain_to_noah_helpers(void) {
     suspend_power_down_user();
     CHECK(hook_override_state.suspend_power_down_calls == 1);
     CHECK(noah_hook_stub_state.suspend_power_down_calls == 1);
+
+    keyboard_pre_init_user();
+    CHECK(hook_override_state.pre_init_calls == 1);
+    CHECK(noah_hook_stub_state.pre_init_calls == 1);
 
     keyboard_post_init_user();
     CHECK(hook_override_state.post_init_calls == 1);

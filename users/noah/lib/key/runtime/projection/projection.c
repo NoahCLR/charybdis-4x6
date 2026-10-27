@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "../../../action/action_dispatch.h"
+#include "../../../action/custom_key_shortcut.h"
 #include "../../../pointing/policy/pointer_layer_policy.h"
 #include "../../../state/ownership/keyboard_mod_ownership.h"
 #include "../../../state/ownership/layer_ownership.h"
@@ -28,9 +29,12 @@ void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
             noah_emit_action_tap_at(key_runtime_effect_dispatch_action_key_pos(effect), effect->data.dispatch_action.action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
             return;
         case KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER:
-            key_runtime_core_pd_projection_preempt_held_action(effect->data.held_action.action);
+            // A pointing mode's key runs its mode before another key's hold
+            // is preempted, so the new mode replaces the old one directly and
+            // a layer both keys turn on stays on (D-F62).
             key_runtime_core_observe_held_action_register(effect->data.held_action.key_pos, effect->data.held_action.action);
             held_action_register(effect->data.held_action.key_pos, effect->data.held_action.action);
+            key_runtime_core_pd_projection_preempt_held_action(effect->data.held_action.action);
             return;
         case KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER:
             held_action_unregister(effect->data.held_action.key_pos, effect->data.held_action.action);
@@ -45,19 +49,28 @@ void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
             held_repeat_start(effect->data.repeat.key_pos, effect->data.repeat.action, effect->data.repeat.repeat_hz);
             return;
         case KEY_RUNTIME_EFFECT_LAYER_PRESS:
-            layer_ownership_momentary_press(effect->data.layer_press.key_pos, effect->data.layer_press.layer);
+            // A dual-role custom key's own hold is its shortcut's layers (D-F26).
+            if (noah_custom_key_momentary_layers_named(effect->data.layer_press.layer)) {
+                layer_ownership_shortcut_momentary_press(effect->data.layer_press.key_pos, noah_custom_key_shortcut((uint8_t)(effect->data.layer_press.layer & ~NOAH_CUSTOM_KEY_MOMENTARY_LAYERS)).layers);
+            } else {
+                layer_ownership_momentary_press(effect->data.layer_press.key_pos, effect->data.layer_press.layer);
+            }
             return;
         case KEY_RUNTIME_EFFECT_LAYER_RELEASE:
-            layer_ownership_momentary_release(effect->data.key_pos);
+            (void)layer_ownership_momentary_release(effect->data.key_pos);
+            (void)layer_ownership_shortcut_momentary_release(effect->data.key_pos);
+            return;
+        case KEY_RUNTIME_EFFECT_LAYER_ONESHOT_CONSUME:
+            (void)layer_ownership_oneshot_consume();
             return;
         case KEY_RUNTIME_EFFECT_FEEDBACK_PULSE:
             key_runtime_core_feedback_projection_project_pulse(effect->data.feedback_pulse.key_pos, (key_feedback_pulse_kind_t)effect->data.feedback_pulse.kind, effect->data.feedback_pulse.tap_branch);
             return;
-        case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
-            key_runtime_core_pd_projection_project_lock_tap(effect->data.pd_mode_lock_tap.pd_mode, effect->data.pd_mode_lock_tap.key_pos);
+        case KEY_RUNTIME_EFFECT_POINTING_MODE_LOCK_TAP:
+            key_runtime_core_pd_projection_project_lock_tap(effect->data.pointing_mode_lock_tap.pointing_mode, effect->data.pointing_mode_lock_tap.key_pos);
             return;
-        case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_STATE:
-            key_runtime_core_pd_projection_project_lock_state(effect->data.pd_mode_lock_state.pd_mode, effect->data.pd_mode_lock_state.locked, effect->data.pd_mode_lock_state.key_pos);
+        case KEY_RUNTIME_EFFECT_POINTING_MODE_LOCK_STATE:
+            key_runtime_core_pd_projection_project_lock_state(effect->data.pointing_mode_lock_state.pointing_mode, effect->data.pointing_mode_lock_state.locked, effect->data.pointing_mode_lock_state.key_pos);
             return;
         case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
             for (uint8_t repeat = 0, repeat_count = (uint8_t)(effect->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_REPEAT_COUNT_MASK); repeat < repeat_count; repeat++) {
@@ -144,12 +157,12 @@ projection_snapshot_t key_runtime_core_projection_snapshot_capture(void) {
     snapshot.keyboard_mod_state                   = mod_snapshot.live_state;
     snapshot.keyboard_managed_mod_mask            = key_runtime_core_projection_refcount_mask(mod_snapshot.managed_refcounts, KEYBOARD_MOD_OWNERSHIP_MOD_COUNT);
     snapshot.keyboard_physical_mod_mask           = key_runtime_core_projection_refcount_mask(mod_snapshot.physical_refcounts, KEYBOARD_MOD_OWNERSHIP_MOD_COUNT);
-    snapshot.pd_mode_local_active                 = pd_mode_local_active_snapshot();
-    snapshot.pd_mode_local_locked                 = pd_mode_local_locked_snapshot();
-    snapshot.pd_mode_display_active               = pd_mode_display_active_snapshot();
-    snapshot.pd_mode_display_locked               = pd_mode_display_locked_snapshot();
+    snapshot.pointing_mode_local_active           = pointing_mode_local_active_snapshot();
+    snapshot.pointing_mode_local_locked           = pointing_mode_local_locked_snapshot();
+    snapshot.pointing_mode_display_active         = pointing_mode_display_active_snapshot();
+    snapshot.pointing_mode_display_locked         = pointing_mode_display_locked_snapshot();
     snapshot.pointer_anchor_active                = pointer_snapshot.auto_mouse_anchored;
-    snapshot.pointer_pd_mode_anchor_active        = pointer_snapshot.pd_mode_anchor_active;
+    snapshot.pointer_pointing_mode_anchor_active  = pointer_snapshot.pointing_mode_anchor_active;
     snapshot.pointer_prefers_typing_layer         = pointer_snapshot.prefers_typing_layer;
     snapshot.pointer_toggle_enabled               = pointer_snapshot.auto_mouse_toggle_enabled;
     snapshot.pointer_sniping_layer_active         = pointer_snapshot.sniping_layer_active;
@@ -162,30 +175,30 @@ projection_snapshot_t key_runtime_core_projection_snapshot_capture(void) {
     snapshot.deferred_release_timed_blocker_count = noah_runtime_debug_deferred_release_timed_blocker_count();
 
     if (state) {
-        snapshot.core_shadow_layer_state                       = state->shadow_projection.layer_state;
-        snapshot.core_shadow_locked_layer_mask                 = state->shadow_projection.locked_layer_mask;
-        snapshot.core_shadow_keyboard_mod_state                = state->shadow_projection.keyboard_mod_state;
-        snapshot.core_shadow_keyboard_managed_mod_mask         = state->shadow_projection.keyboard_managed_mod_mask;
-        snapshot.core_shadow_keyboard_physical_mod_mask        = state->shadow_projection.keyboard_physical_mod_mask;
-        snapshot.core_shadow_pd_mode_local_active              = state->shadow_projection.pd_mode_local_active;
-        snapshot.core_shadow_pd_mode_local_locked              = state->shadow_projection.pd_mode_local_locked;
-        snapshot.core_shadow_pointer_anchor_active             = state->shadow_projection.pointer_anchor_active;
-        snapshot.core_shadow_pointer_pd_mode_anchor_active     = state->shadow_projection.pointer_pd_mode_anchor_active;
-        snapshot.core_shadow_pointer_prefers_typing_layer      = state->shadow_projection.pointer_prefers_typing_layer;
-        snapshot.core_shadow_pointer_toggle_enabled            = state->shadow_projection.pointer_toggle_enabled;
-        snapshot.core_press_token_count                        = state->press_token_count;
-        snapshot.core_tap_series_count                         = state->tap_series_count;
-        snapshot.core_lease_count                              = state->lease_count;
-        snapshot.core_pending_release_count                    = state->pending_release_count;
-        snapshot.core_pending_release_high_water_mark          = state->pending_release_high_water_mark;
-        snapshot.core_pending_release_validation_failure_count = state->pending_release_validation_failure_count;
-        snapshot.core_deferred_release_blocker_count           = key_runtime_core_deferred_release_blocker_count();
-        snapshot.core_deferred_release_timed_blocker_count     = key_runtime_core_deferred_release_timed_blocker_count();
-        snapshot.core_persistent_intent_count                  = state->persistent_intent_count;
-        snapshot.core_release_keycode_mismatch_count           = state->release_keycode_mismatch_count;
-        snapshot.core_orphan_release_count                     = state->orphan_release_count;
-        snapshot.core_cancelled_press_count                    = state->cancelled_press_count;
-        snapshot.core_token_allocation_failure_count           = state->token_allocation_failure_count;
+        snapshot.core_shadow_layer_state                         = state->shadow_projection.layer_state;
+        snapshot.core_shadow_locked_layer_mask                   = state->shadow_projection.locked_layer_mask;
+        snapshot.core_shadow_keyboard_mod_state                  = state->shadow_projection.keyboard_mod_state;
+        snapshot.core_shadow_keyboard_managed_mod_mask           = state->shadow_projection.keyboard_managed_mod_mask;
+        snapshot.core_shadow_keyboard_physical_mod_mask          = state->shadow_projection.keyboard_physical_mod_mask;
+        snapshot.core_shadow_pointing_mode_local_active          = state->shadow_projection.pointing_mode_local_active;
+        snapshot.core_shadow_pointing_mode_local_locked          = state->shadow_projection.pointing_mode_local_locked;
+        snapshot.core_shadow_pointer_anchor_active               = state->shadow_projection.pointer_anchor_active;
+        snapshot.core_shadow_pointer_pointing_mode_anchor_active = state->shadow_projection.pointer_pointing_mode_anchor_active;
+        snapshot.core_shadow_pointer_prefers_typing_layer        = state->shadow_projection.pointer_prefers_typing_layer;
+        snapshot.core_shadow_pointer_toggle_enabled              = state->shadow_projection.pointer_toggle_enabled;
+        snapshot.core_press_token_count                          = state->press_token_count;
+        snapshot.core_tap_series_count                           = state->tap_series_count;
+        snapshot.core_lease_count                                = state->lease_count;
+        snapshot.core_pending_release_count                      = state->pending_release_count;
+        snapshot.core_pending_release_high_water_mark            = state->pending_release_high_water_mark;
+        snapshot.core_pending_release_validation_failure_count   = state->pending_release_validation_failure_count;
+        snapshot.core_deferred_release_blocker_count             = key_runtime_core_deferred_release_blocker_count();
+        snapshot.core_deferred_release_timed_blocker_count       = key_runtime_core_deferred_release_timed_blocker_count();
+        snapshot.core_persistent_intent_count                    = state->persistent_intent_count;
+        snapshot.core_release_keycode_mismatch_count             = state->release_keycode_mismatch_count;
+        snapshot.core_orphan_release_count                       = state->orphan_release_count;
+        snapshot.core_cancelled_press_count                      = state->cancelled_press_count;
+        snapshot.core_token_allocation_failure_count             = state->token_allocation_failure_count;
     }
 
     return snapshot;
@@ -196,10 +209,11 @@ bool key_runtime_core_projection_snapshot_equal(const projection_snapshot_t *lhs
         return lhs == rhs;
     }
 
-    return lhs->layer_state == rhs->layer_state && lhs->locked_layer_mask == rhs->locked_layer_mask && lhs->keyboard_mod_state.real == rhs->keyboard_mod_state.real && lhs->keyboard_mod_state.weak == rhs->keyboard_mod_state.weak && lhs->keyboard_mod_state.oneshot == rhs->keyboard_mod_state.oneshot && lhs->keyboard_mod_state.oneshot_locked == rhs->keyboard_mod_state.oneshot_locked && lhs->keyboard_managed_mod_mask == rhs->keyboard_managed_mod_mask && lhs->keyboard_physical_mod_mask == rhs->keyboard_physical_mod_mask && lhs->pd_mode_local_active == rhs->pd_mode_local_active && lhs->pd_mode_local_locked == rhs->pd_mode_local_locked && lhs->pd_mode_display_active == rhs->pd_mode_display_active && lhs->pd_mode_display_locked == rhs->pd_mode_display_locked && lhs->pointer_anchor_active == rhs->pointer_anchor_active && lhs->pointer_pd_mode_anchor_active == rhs->pointer_pd_mode_anchor_active && lhs->pointer_prefers_typing_layer == rhs->pointer_prefers_typing_layer &&
-           lhs->pointer_toggle_enabled == rhs->pointer_toggle_enabled && lhs->pointer_sniping_layer_active == rhs->pointer_sniping_layer_active && lhs->pointer_key_tracker == rhs->pointer_key_tracker && lhs->pointer_layer == rhs->pointer_layer && lhs->active_slot_count == rhs->active_slot_count && lhs->pending_multi_tap_slot_count == rhs->pending_multi_tap_slot_count && lhs->deferred_release_count == rhs->deferred_release_count && lhs->deferred_release_blocker_count == rhs->deferred_release_blocker_count && lhs->deferred_release_timed_blocker_count == rhs->deferred_release_timed_blocker_count && lhs->core_shadow_layer_state == rhs->core_shadow_layer_state && lhs->core_shadow_locked_layer_mask == rhs->core_shadow_locked_layer_mask && lhs->core_shadow_keyboard_mod_state.real == rhs->core_shadow_keyboard_mod_state.real && lhs->core_shadow_keyboard_mod_state.weak == rhs->core_shadow_keyboard_mod_state.weak &&
-           lhs->core_shadow_keyboard_mod_state.oneshot == rhs->core_shadow_keyboard_mod_state.oneshot && lhs->core_shadow_keyboard_mod_state.oneshot_locked == rhs->core_shadow_keyboard_mod_state.oneshot_locked && lhs->core_shadow_keyboard_managed_mod_mask == rhs->core_shadow_keyboard_managed_mod_mask && lhs->core_shadow_keyboard_physical_mod_mask == rhs->core_shadow_keyboard_physical_mod_mask && lhs->core_shadow_pd_mode_local_active == rhs->core_shadow_pd_mode_local_active && lhs->core_shadow_pd_mode_local_locked == rhs->core_shadow_pd_mode_local_locked && lhs->core_shadow_pointer_anchor_active == rhs->core_shadow_pointer_anchor_active && lhs->core_shadow_pointer_pd_mode_anchor_active == rhs->core_shadow_pointer_pd_mode_anchor_active && lhs->core_shadow_pointer_prefers_typing_layer == rhs->core_shadow_pointer_prefers_typing_layer && lhs->core_shadow_pointer_toggle_enabled == rhs->core_shadow_pointer_toggle_enabled && lhs->core_press_token_count == rhs->core_press_token_count &&
-           lhs->core_tap_series_count == rhs->core_tap_series_count && lhs->core_lease_count == rhs->core_lease_count && lhs->core_pending_release_count == rhs->core_pending_release_count && lhs->core_pending_release_high_water_mark == rhs->core_pending_release_high_water_mark && lhs->core_pending_release_validation_failure_count == rhs->core_pending_release_validation_failure_count && lhs->core_deferred_release_blocker_count == rhs->core_deferred_release_blocker_count && lhs->core_deferred_release_timed_blocker_count == rhs->core_deferred_release_timed_blocker_count && lhs->core_persistent_intent_count == rhs->core_persistent_intent_count && lhs->core_release_keycode_mismatch_count == rhs->core_release_keycode_mismatch_count && lhs->core_orphan_release_count == rhs->core_orphan_release_count && lhs->core_cancelled_press_count == rhs->core_cancelled_press_count && lhs->core_token_allocation_failure_count == rhs->core_token_allocation_failure_count;
+    return lhs->layer_state == rhs->layer_state && lhs->locked_layer_mask == rhs->locked_layer_mask && lhs->keyboard_mod_state.real == rhs->keyboard_mod_state.real && lhs->keyboard_mod_state.weak == rhs->keyboard_mod_state.weak && lhs->keyboard_mod_state.oneshot == rhs->keyboard_mod_state.oneshot && lhs->keyboard_mod_state.oneshot_locked == rhs->keyboard_mod_state.oneshot_locked && lhs->keyboard_managed_mod_mask == rhs->keyboard_managed_mod_mask && lhs->keyboard_physical_mod_mask == rhs->keyboard_physical_mod_mask && lhs->pointing_mode_local_active == rhs->pointing_mode_local_active && lhs->pointing_mode_local_locked == rhs->pointing_mode_local_locked && lhs->pointing_mode_display_active == rhs->pointing_mode_display_active && lhs->pointing_mode_display_locked == rhs->pointing_mode_display_locked && lhs->pointer_anchor_active == rhs->pointer_anchor_active && lhs->pointer_pointing_mode_anchor_active == rhs->pointer_pointing_mode_anchor_active &&
+           lhs->pointer_prefers_typing_layer == rhs->pointer_prefers_typing_layer && lhs->pointer_toggle_enabled == rhs->pointer_toggle_enabled && lhs->pointer_sniping_layer_active == rhs->pointer_sniping_layer_active && lhs->pointer_key_tracker == rhs->pointer_key_tracker && lhs->pointer_layer == rhs->pointer_layer && lhs->active_slot_count == rhs->active_slot_count && lhs->pending_multi_tap_slot_count == rhs->pending_multi_tap_slot_count && lhs->deferred_release_count == rhs->deferred_release_count && lhs->deferred_release_blocker_count == rhs->deferred_release_blocker_count && lhs->deferred_release_timed_blocker_count == rhs->deferred_release_timed_blocker_count && lhs->core_shadow_layer_state == rhs->core_shadow_layer_state && lhs->core_shadow_locked_layer_mask == rhs->core_shadow_locked_layer_mask && lhs->core_shadow_keyboard_mod_state.real == rhs->core_shadow_keyboard_mod_state.real && lhs->core_shadow_keyboard_mod_state.weak == rhs->core_shadow_keyboard_mod_state.weak &&
+           lhs->core_shadow_keyboard_mod_state.oneshot == rhs->core_shadow_keyboard_mod_state.oneshot && lhs->core_shadow_keyboard_mod_state.oneshot_locked == rhs->core_shadow_keyboard_mod_state.oneshot_locked && lhs->core_shadow_keyboard_managed_mod_mask == rhs->core_shadow_keyboard_managed_mod_mask && lhs->core_shadow_keyboard_physical_mod_mask == rhs->core_shadow_keyboard_physical_mod_mask && lhs->core_shadow_pointing_mode_local_active == rhs->core_shadow_pointing_mode_local_active && lhs->core_shadow_pointing_mode_local_locked == rhs->core_shadow_pointing_mode_local_locked && lhs->core_shadow_pointer_anchor_active == rhs->core_shadow_pointer_anchor_active && lhs->core_shadow_pointer_pointing_mode_anchor_active == rhs->core_shadow_pointer_pointing_mode_anchor_active && lhs->core_shadow_pointer_prefers_typing_layer == rhs->core_shadow_pointer_prefers_typing_layer && lhs->core_shadow_pointer_toggle_enabled == rhs->core_shadow_pointer_toggle_enabled &&
+           lhs->core_press_token_count == rhs->core_press_token_count && lhs->core_tap_series_count == rhs->core_tap_series_count && lhs->core_lease_count == rhs->core_lease_count && lhs->core_pending_release_count == rhs->core_pending_release_count && lhs->core_pending_release_high_water_mark == rhs->core_pending_release_high_water_mark && lhs->core_pending_release_validation_failure_count == rhs->core_pending_release_validation_failure_count && lhs->core_deferred_release_blocker_count == rhs->core_deferred_release_blocker_count && lhs->core_deferred_release_timed_blocker_count == rhs->core_deferred_release_timed_blocker_count && lhs->core_persistent_intent_count == rhs->core_persistent_intent_count && lhs->core_release_keycode_mismatch_count == rhs->core_release_keycode_mismatch_count && lhs->core_orphan_release_count == rhs->core_orphan_release_count && lhs->core_cancelled_press_count == rhs->core_cancelled_press_count &&
+           lhs->core_token_allocation_failure_count == rhs->core_token_allocation_failure_count;
 }
 
 #if defined(NOAH_RUNTIME_TRACE_ENABLE)

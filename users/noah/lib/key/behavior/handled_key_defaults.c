@@ -4,6 +4,9 @@
 
 #include "handled_key_internal.h"
 
+#include "noah_keymap_ids.h"
+#include "../../action/custom_key_shortcut.h"
+
 __attribute__((weak)) key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count) {
     (void)keycode;
     (void)tap_count;
@@ -16,7 +19,7 @@ __attribute__((weak)) bool key_behavior_has_more_taps(uint16_t keycode, uint8_t 
     return false;
 }
 
-__attribute__((weak)) bool key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t count, pd_mode_mask_t base_mode) {
+__attribute__((weak)) bool key_behavior_future_tap_path_has_foreign_pointing_mode(uint16_t keycode, uint8_t count, pointing_mode_mask_t base_mode) {
     (void)keycode;
     (void)count;
     (void)base_mode;
@@ -32,6 +35,9 @@ __attribute__((weak)) bool key_behavior_view_has_more_taps(const key_behavior_vi
 }
 
 uint8_t behavior_get_layer(uint16_t keycode) {
+    if (noah_custom_key_is_dual_role(keycode)) {
+        return (uint8_t)(NOAH_CUSTOM_KEY_MOMENTARY_LAYERS | (keycode - CUSTOM_KEY_0));
+    }
     return IS_QK_LAYER_TAP(keycode) ? QK_LAYER_TAP_GET_LAYER(keycode) : noah_action_keycode_momentary_layer(keycode);
 }
 
@@ -39,8 +45,8 @@ bool is_layer_key(uint16_t keycode) {
     return noah_action_keycode_is_owned_momentary_layer(keycode) || IS_QK_LAYER_TAP(keycode);
 }
 
-pd_mode_mask_t handled_key_pd_mode_for_behavior(key_behavior_view_t behavior) {
-    return pd_mode_for_keycode(behavior.keycode);
+pointing_mode_mask_t handled_key_pointing_mode_for_behavior(key_behavior_view_t behavior) {
+    return pointing_mode_for_keycode(behavior.keycode);
 }
 
 bool handled_key_resolution_step_present(const handled_key_resolution_t *resolution) {
@@ -80,10 +86,39 @@ bool handled_key_resolution_uses_fallback_hold_behavior(const handled_key_resolu
 }
 
 bool handled_key_resolution_uses_deferred_stacked_pd_hold(const handled_key_resolution_t *resolution) {
-    return resolution && resolution->tap_count == 1 && resolution->pd_mode != 0 && resolution->step.tap.present && key_behavior_future_tap_path_has_foreign_pd_mode(resolution->keycode, resolution->tap_count, resolution->pd_mode);
+    return resolution && resolution->tap_count == 1 && resolution->pointing_mode != 0 && resolution->step.tap.present && key_behavior_future_tap_path_has_foreign_pointing_mode(resolution->keycode, resolution->tap_count, resolution->pointing_mode);
+}
+
+// A pressed custom key with a shortcut and no authored row of its own, or a
+// bypassed one, is a native key (D-F26): the runtime holds its shortcut from
+// the press until the release, so a quick tap is a press and a release, never
+// a second tap after it. Read through a transparent cell it is the lower key's
+// keycode, as an ordinary key is: its shortcut is the tap, and its hold is the
+// fallback hold. A Tap-toggle or One-shot shortcut makes its key a layer key
+// instead, as TT() and OSL() are (below).
+static bool handled_key_resolution_holds_custom_shortcut_natively(const handled_key_resolution_t *resolution) {
+    return resolution && resolution->tap_count == 1 && resolution->authored_tap_depth == 0u && !resolution->step.hold.present && (resolution->flags & HANDLED_KEY_FLAG_TRANSPARENT_SOURCE) == 0u && NOAH_KEYCODE_IS_CUSTOM_KEY(resolution->keycode) && noah_custom_key_has_shortcut(resolution->keycode) && !noah_custom_key_is_dual_role(resolution->keycode);
+}
+
+// A Tap-toggle or One-shot custom key (D-F26) is TT() or OSL() of its
+// shortcut's layers: they are on from every press, the key's own momentary
+// hold, and so, without an authored hold at this count, are its modifiers and
+// key, which then leave nothing to decide, as LM()'s do. Read directly rather
+// than through a transparent cell.
+static bool handled_key_resolution_holds_custom_shortcut_dual_role(const handled_key_resolution_t *resolution) {
+    return resolution && !resolution->step.hold.present && !resolution->step.long_hold.present && (resolution->flags & HANDLED_KEY_FLAG_TRANSPARENT_SOURCE) == 0u && noah_custom_key_is_dual_role(resolution->keycode);
 }
 
 static uint16_t handled_key_default_tap_action(const handled_key_resolution_t *resolution) {
+    if (handled_key_resolution_holds_custom_shortcut_natively(resolution)) {
+        return KC_NO;
+    }
+    // Held from the press, a dual-role custom key's tap is left only what it
+    // does to its layers: One-shot arms them. Tap-toggle's taps do nothing
+    // until its last, which its built-in step sends.
+    if (handled_key_resolution_holds_custom_shortcut_dual_role(resolution)) {
+        return noah_custom_key_shortcut_for_keycode(resolution->keycode).layer_kind == NOAH_SHORTCUT_LAYERS_ONESHOT ? (uint16_t)CUSTOM_KEY_LAYER_TAP(resolution->keycode - CUSTOM_KEY_0) : KC_NO;
+    }
     return resolution ? noah_action_desc_default_tap_action(noah_action_describe(resolution->keycode)) : KC_NO;
 }
 
@@ -112,11 +147,19 @@ hold_behavior_t handled_key_hold_behavior(const handled_key_resolution_t *resolu
         return resolution->step.hold;
     }
 
-    if (resolution->tap_count == 1 && resolution->pd_mode != 0 && !handled_key_resolution_uses_deferred_stacked_pd_hold(resolution)) {
+    if (resolution->tap_count == 1 && resolution->pointing_mode != 0 && !handled_key_resolution_uses_deferred_stacked_pd_hold(resolution)) {
         return (hold_behavior_t){
             .present = true,
             .action  = resolution->keycode,
-            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+            .style   = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+        };
+    }
+
+    if (handled_key_resolution_holds_custom_shortcut_natively(resolution)) {
+        return (hold_behavior_t){
+            .present = true,
+            .action  = resolution->keycode,
+            .style   = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
         };
     }
 
@@ -126,25 +169,35 @@ hold_behavior_t handled_key_hold_behavior(const handled_key_resolution_t *resolu
         return (hold_behavior_t){
             .present = true,
             .action  = noah_action_keycode_layer_mod_mods(resolution->keycode),
-            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+            .style   = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
         };
+    }
+
+    // A Tap-toggle or One-shot custom key's modifiers and key are held from
+    // the press beside its layers (D-F26); layers alone hold nothing more.
+    if (handled_key_resolution_holds_custom_shortcut_dual_role(resolution)) {
+        return noah_custom_key_shortcut_has_report_parts(noah_custom_key_shortcut_for_keycode(resolution->keycode)) ? (hold_behavior_t){
+            .present = true,
+            .action  = resolution->keycode,
+            .style   = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+        } : hold_behavior_none();
     }
 
     if (resolution->tap_count == 1 && noah_action_keycode_dual_role_hold(resolution->keycode) != KC_NO) {
         return (hold_behavior_t){
             .present = true,
             .action  = noah_action_keycode_dual_role_hold(resolution->keycode),
-            .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
+            .style   = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
         };
     }
 
     if (handled_key_resolution_uses_deferred_stacked_pd_hold(resolution)) {
-        // Keep stacked PD modes out of the immediate activation path while the
-        // tap-count branch is unresolved.
+        // Keep stacked pointing modes out of the immediate activation path
+        // while the tap-count branch is unresolved.
         return (hold_behavior_t){
             .present = true,
             .action  = resolution->keycode,
-            .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
+            .style   = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
         };
     }
 
@@ -164,6 +217,12 @@ uint16_t handled_key_tap_action_behavior(const handled_key_resolution_t *resolut
         return resolution->step.tap.action;
     }
 
+    // An empty tap at a later count repeats the first tap: the one the row sets
+    // there, or the key's own (D-F33).
+    if (resolution->first_tap.present) {
+        return resolution->first_tap.action;
+    }
+
     return handled_key_single_tap_action(resolution);
 }
 
@@ -180,11 +239,17 @@ uint8_t handled_key_tap_repeat_count_behavior(const handled_key_resolution_t *re
 }
 
 key_runtime_slot_hold_strategy_t handled_key_hold_strategy_behavior(const handled_key_resolution_t *resolution) {
-    if (resolution && resolution->tap_count == 1 && resolution->pd_mode != 0 && !handled_key_resolution_uses_deferred_stacked_pd_hold(resolution)) {
+    if (resolution && resolution->tap_count == 1 && resolution->pointing_mode != 0 && !handled_key_resolution_uses_deferred_stacked_pd_hold(resolution)) {
         return KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT;
     }
     if (resolution && resolution->tap_count == 1 && !resolution->step.hold.present && noah_action_keycode_is_layer_mod(resolution->keycode)) {
         return KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT;
+    }
+    if (handled_key_resolution_holds_custom_shortcut_natively(resolution)) {
+        return KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT;
+    }
+    if (handled_key_resolution_holds_custom_shortcut_dual_role(resolution)) {
+        return noah_custom_key_shortcut_has_report_parts(noah_custom_key_shortcut_for_keycode(resolution->keycode)) ? KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT : KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT;
     }
 
     if (handled_key_resolution_uses_fallback_hold_behavior(resolution)) {

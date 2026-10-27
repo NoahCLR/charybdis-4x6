@@ -22,7 +22,7 @@ working directory explicitly to this firmware repository.
   QMK's compiledb option cleans build output; do not run it concurrently with
   another firmware build. Regenerate after changing compile-time configuration.
 - **Run all firmware host tests** is the default test task.
-- Layout overview and source formatting remain available through **Tasks: Run
+- Source formatting remains available through **Tasks: Run
   Task**.
 
 Charybdis Ark launch/check/catalog tasks belong to the sibling `charybdis-ark`

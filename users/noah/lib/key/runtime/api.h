@@ -20,4 +20,9 @@ typedef struct {
 
 void noah_key_runtime_scan(void);
 bool noah_key_runtime_settle_pending_fallback_hold(void);
+// A physical press about to be resolved, of a key without a behaviour, ends
+// other keys' multi-tap windows: settle their pending layer-changing taps
+// (layer locks) first, so the press resolves on the layers they leave on.
+// True if the layers may have changed.
+bool noah_key_runtime_settle_layer_taps_before_press(keyrecord_t *record);
 void noah_key_runtime_activity_snapshot(noah_key_runtime_activity_snapshot_t *out);

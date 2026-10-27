@@ -7,7 +7,8 @@ set -eu
 # not what a plain `qmk compile` produces. The live-profile owner needs
 # NOAH_PHYSICAL_HALF, since durable profile origin identity is side-specific,
 # so a build without it silently omits the owner and the keyboard has no
-# committed profile to read. See docs/LIVE_EDIT_APP_DIRECTION.md, D-L08.
+# saved profile to read. See D-F35
+# (docs/adr/0035-live-profile-owner-on-by-default.md).
 #
 # NOAH_PHYSICAL_HALF is deliberately not derived from FORCE_MASTER/FORCE_SLAVE.
 # Those select the transport role, which can swap at runtime; the physical half
@@ -18,8 +19,8 @@ set -eu
 #
 # --no-owner builds the comparison pair without the live-profile owner, for
 # A/B against ordinary behaviour.
-# The split link always runs at QMK's default speed; the faster one garbled
-# split messages (D-L43), so NOAH_SPLIT_BAUD is refused rather than ignored.
+# The split link runs at a fixed 460,800 baud on both halves (D-F52).
+# The removed NOAH_SPLIT_BAUD selector is refused rather than ignored.
 #
 # The pair is always compiled in the image tools/build-image names, the one CI
 # builds releases in, so the firmware flashed here and the firmware users
@@ -28,12 +29,22 @@ set -eu
 # build is reproducible: QMK's version stamps are fixed (SKIP_VERSION) and
 # source paths are mapped, so one commit and BK pin give the same bytes on any
 # machine. A note beside the pair records the inputs, compiler and hashes.
+#
+# Run with Docker, it compiles copies of the checkout and BK held in memory at
+# their own paths (tools/qmk-copies.sh), more than twice as fast as through
+# macOS file sharing, and the only thing it writes is the pair in BUILD_ROOT.
+# Outside the build image it writes nothing into BK, so builds in several
+# worktrees can run at once: the vault's verify reads that sentence and then
+# takes no build lock. Inside the image (CI) it builds in the checkouts.
 
 REPO_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 QMK_ROOT="${QMK_ROOT:-$(CDPATH= cd -- "$REPO_ROOT/../bastardkb-qmk" && pwd)}"
 BUILD_ROOT="${BUILD_ROOT:-$(CDPATH= cd -- "$REPO_ROOT/.." && pwd)/builds}"
 ARTIFACT="$QMK_ROOT/bastardkb_charybdis_4x6_noah.uf2"
-IMAGE="$(sed -n '1p' "$REPO_ROOT/tools/build-image")"
+# NOAH_BUILD_IMAGE builds in another image, such as one tools/make-build-image.sh
+# has built but not yet published, to compare its pair before pinning it. The
+# note names the image used.
+IMAGE="${NOAH_BUILD_IMAGE:-$(sed -n '1p' "$REPO_ROOT/tools/build-image")}"
 
 # The pair is firmware and BK compiled together, so it is built only against
 # the BK commit qmk-pin.json names, from a clean checkout. verify and CI check
@@ -46,7 +57,11 @@ PIN="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["commit"
     exit 1
 }
 QMK_HEAD="$(git -C "$QMK_ROOT" rev-parse HEAD 2>/dev/null || echo "not a Git checkout")"
-QMK_DIRTY="$(git -C "$QMK_ROOT" status --porcelain --ignore-submodules=all 2>/dev/null || true)"
+# Ignore untracked submodule metadata, but refuse tracked edits, different
+# submodule commits and dependencies that have not been initialized.
+QMK_DIRTY="$(git -C "$QMK_ROOT" status --porcelain --ignore-submodules=untracked 2>/dev/null || true)
+$(git -C "$QMK_ROOT" submodule status --recursive 2>/dev/null | sed -n '/^[+-U]/p')"
+QMK_DIRTY="$(printf '%s\n' "$QMK_DIRTY" | sed '/^$/d')"
 if [ "$QMK_HEAD" != "$PIN" ] || [ -n "$QMK_DIRTY" ]; then
     if [ "${NOAH_ALLOW_UNPINNED_QMK:-}" = 1 ]; then
         echo "Not the pin: building against BK $QMK_HEAD${QMK_DIRTY:+ (modified)}, not the pinned $PIN." >&2
@@ -79,23 +94,39 @@ if [ "$in_image" = 0 ]; then
     # No network: everything the build reads is in the image and the mounted
     # checkouts, so an attempt to download anything fails instead of changing
     # the pair. Docker fetches the pinned image itself before the container runs.
-    set -- run --rm --network none --user "$(id -u):$(id -g)" -e HOME=/tmp -e NOAH_IN_BUILD_IMAGE=1 \
-        -e "QMK_ROOT=$QMK_ROOT" -e "BUILD_ROOT=$BUILD_ROOT" \
+    . "$REPO_ROOT/tools/qmk-copies.sh"
+    case "$QMK_ROOT/" in "$REPO_ROOT"/*)
+        echo "BK at $QMK_ROOT is inside this checkout; outside the build image the pair builds from copies of both, so put BK beside it." >&2
+        exit 1 ;;
+    esac
+    uid="$(id -u)"
+    gid="$(id -g)"
+    # Git reads the copies through the mounted Git directories, read-only:
+    # GIT_OPTIONAL_LOCKS=0 keeps git status from refreshing their indexes.
+    set -- run --rm --network none --user "$uid:$gid" -e HOME=/tmp -e NOAH_IN_BUILD_IMAGE=1 \
+        -e "QMK_ROOT=$QMK_ROOT" -e "BUILD_ROOT=$BUILD_ROOT" -e GIT_OPTIONAL_LOCKS=0 \
         -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e "GIT_CONFIG_VALUE_0=*"
     for var in $(env | sed -n 's/^\(NOAH_[A-Z0-9_]*\)=.*/\1/p'); do
         [ "$var" = NOAH_IN_BUILD_IMAGE ] || set -- "$@" -e "$var"
     done
+    volume="$(noah_qmk_volume "$QMK_ROOT" "$IMAGE")"
+    set -- "$@" --tmpfs "$REPO_ROOT:uid=$uid,gid=$gid,exec" -v "$REPO_ROOT:/mnt/noah/repo:ro" \
+        --tmpfs "$QMK_ROOT:uid=$uid,gid=$gid,exec" -v "${volume:-$QMK_ROOT}:/mnt/noah/qmk:ro"
     mounted=" "
-    for dir in "$REPO_ROOT" "$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir)" \
-               "$QMK_ROOT" "$(git -C "$QMK_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo "$QMK_ROOT")" \
-               "$BUILD_ROOT"; do
+    for dir in "$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir)" \
+               "$(git -C "$QMK_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"; do
+        [ -n "$dir" ] || continue
         case "$mounted" in *" $dir "*) continue ;; esac
         mounted="$mounted$dir "
-        set -- "$@" -v "$dir:$dir"
+        set -- "$@" -v "$dir:$dir:ro"
     done
-    set -- "$@" -w "$REPO_ROOT" "$IMAGE" sh "$REPO_ROOT/tools/build-firmware-pair.sh"
+    set -- "$@" -v "$BUILD_ROOT:$BUILD_ROOT"
+    copy="tar -C /mnt/noah/repo $(noah_skip_git "$REPO_ROOT") -cf - . | tar -C '$REPO_ROOT' -xf - &&"
+    copy="$copy tar -C /mnt/noah/qmk $(noah_qmk_copy_excludes "$volume" "$QMK_ROOT") -cf - . | tar -C '$QMK_ROOT' -xf -"
+    # Paths here have no spaces (checkouts and worktrees under the workspace).
+    set -- "$@" -w / "$IMAGE" sh -c "$copy && cd '$REPO_ROOT' && exec sh tools/build-firmware-pair.sh \"\$@\"" pair
     [ -z "$first" ] || set -- "$@" "$first"
-    echo "Building in $IMAGE..."
+    echo "Building in $IMAGE${NOAH_BUILD_IMAGE:+ (NOAH_BUILD_IMAGE, not the pinned image)}, from copies in memory..."
     exec docker "$@"
 fi
 
@@ -112,7 +143,7 @@ elif [ $# -gt 0 ]; then
 fi
 
 if [ -n "${NOAH_SPLIT_BAUD:-}" ]; then
-    echo "NOAH_SPLIT_BAUD was removed: the split link stays at QMK's default speed (D-L43)" >&2
+    echo "NOAH_SPLIT_BAUD was removed: the split link is fixed at 460800 baud (D-F52)" >&2
     exit 1
 fi
 
@@ -142,6 +173,21 @@ case "${NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS:-}" in
     *) echo "NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS must be yes or no" >&2; exit 1 ;;
 esac
 
+# Resource acceptance uses an instrumented pair in the same pinned compiler.
+# Keep its artifacts separate from the ordinary flashable pair. Every gate
+# runs on both halves and reports, whatever an earlier one found, so one
+# failure cannot hide another; the build fails at the end if any gate did.
+RESOURCE_ARGS=""
+case "${NOAH_RESOURCE_CHECKS:-}" in
+    ""|no) ;;
+    yes)
+        [ -z "$OWNER_ARGS" ] || { echo "resource checks require the profile owner" >&2; exit 1; }
+        RESOURCE_ARGS="-e NOAH_STACK_BUDGET_ENABLE=yes"
+        SUFFIX="${SUFFIX}_resources"
+        ;;
+    *) echo "NOAH_RESOURCE_CHECKS must be yes or no" >&2; exit 1 ;;
+esac
+
 branch=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD)
 destdir="$BUILD_ROOT/$branch"
 mkdir -p "$destdir"
@@ -159,6 +205,19 @@ KEYMAP_ROOT="$REPO_ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah"
 # Isolate this invocation and every QMK generator make calls from that config;
 # otherwise a task worktree can silently build the main checkout instead.
 # Explicit keymap paths also override old keymap symlinks inside the QMK tree.
+
+# resource_gate REPORT COMMAND...: runs one gate into its report beside the
+# pair and prints it. A failure is noted, not fatal, until both halves ran.
+RESOURCE_FAILURES=""
+resource_gate() {
+    gate_report="$1"
+    shift
+    if ! "$@" >"$gate_report" 2>&1; then
+        RESOURCE_FAILURES="$RESOURCE_FAILURES
+  $gate_report"
+    fi
+    cat "$gate_report"
+}
 
 build_half() {
     role="$1"
@@ -182,13 +241,31 @@ build_half() {
         -e "MAIN_KEYMAP_PATH_5=$KEYMAP_ROOT" \
         -e SKIP_VERSION=yes \
         -e "EXTRAFLAGS=-ffile-prefix-map=$REPO_ROOT=/userspace -ffile-prefix-map=$QMK_ROOT=/qmk" \
-        -e "$role=yes" -e "NOAH_PHYSICAL_HALF=$half" $OWNER_ARGS $TRANSPORT_ARGS )
+        -e "$role=yes" -e "NOAH_PHYSICAL_HALF=$half" $OWNER_ARGS $TRANSPORT_ARGS $RESOURCE_ARGS )
     if [ ! -f "$ARTIFACT" ]; then
         echo "Expected firmware not found: $ARTIFACT" >&2
         exit 1
     fi
     cp "$ARTIFACT" "$destdir/$name.uf2"
     echo "  -> $destdir/$name.uf2"
+    if [ -n "$RESOURCE_ARGS" ]; then
+        target=bastardkb_charybdis_4x6_noah
+        # Preserve this half before the next compile replaces QMK's output.
+        for extension in elf map; do
+            cp "$QMK_ROOT/.build/$target.$extension" "$destdir/$name.$extension"
+        done
+        for flags in cflags ldflags; do
+            cp "$QMK_ROOT/.build/obj_$target/$flags.txt" "$destdir/$name.$flags.txt"
+        done
+        resource_gate "$destdir/$name.memory.txt" \
+            sh "$REPO_ROOT/tests/host/run_firmware_memory_budget_checks.sh"
+        for manifest in firmware_stack_budget firmware_stack_budget_live_profile_owner; do
+            resource_gate "$destdir/$name.$manifest.txt" \
+                python3 "$REPO_ROOT/tools/check_firmware_stack_budget.py" \
+                --manifest "$REPO_ROOT/tools/$manifest.json" \
+                --elf "$destdir/$name.elf" --map "$destdir/$name.map"
+        done
+    fi
 }
 
 build_half FORCE_MASTER right "${n}_charybdis_right${SUFFIX}"
@@ -196,7 +273,7 @@ build_half FORCE_SLAVE left "${n}_charybdis_left${SUFFIX}"
 
 # What the pair was built from and with, and its hashes: a published pair can
 # be matched to a local one byte for byte.
-uncommitted() { [ -z "$(git -C "$1" status --porcelain --ignore-submodules=all 2>/dev/null)" ] || echo " +uncommitted"; }
+uncommitted() { [ -z "$(git -C "$1" status --porcelain --ignore-submodules=untracked 2>/dev/null)" ] || echo " +uncommitted"; }
 {
     echo "firmware $(git -C "$REPO_ROOT" rev-parse HEAD)$(uncommitted "$REPO_ROOT")"
     echo "bk $QMK_HEAD$(uncommitted "$QMK_ROOT")${UNPINNED:-}"
@@ -208,10 +285,16 @@ uncommitted() { [ -z "$(git -C "$1" status --porcelain --ignore-submodules=all 2
     done
 } > "$destdir/${n}_charybdis${SUFFIX}.build.txt"
 
+if [ -n "$RESOURCE_FAILURES" ]; then
+    echo >&2
+    echo "Resource gates failed; their reports:$RESOURCE_FAILURES" >&2
+    exit 1
+fi
+
 echo
 if [ -n "$OWNER_ARGS" ]; then
-    echo "Built the 32-PD-slot factory-only comparison pair WITHOUT the live-profile owner."
+    echo "Built the 32-pointing-slot factory-only comparison pair WITHOUT the live-profile owner."
 else
-    echo "Built the 32-PD-slot pair."
+    echo "Built the 32-pointing-slot pair."
 fi
 echo "Flash the right half to the master side and the left half to the slave side."

@@ -10,6 +10,9 @@ enum {
     NOAH_PROFILE_WIRE_V1_REPORT_SIZE      = 32u,
     NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE     = 25u,
     NOAH_PROFILE_WIRE_V1_COMMAND_GET      = 0x08u,
+    // The firmware answers every Raw HID report itself (D-F31). A report no
+    // Profile Wire handler takes comes back with this command byte.
+    NOAH_PROFILE_WIRE_V1_COMMAND_UNHANDLED = 0xFFu,
     NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL   = 0x00u,
     NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY = 0x01u,
     NOAH_PROFILE_WIRE_V1_VALUE_STATUS     = 0x02u,
@@ -17,14 +20,38 @@ enum {
     // builds; see users/noah/lib/state/diagnostics/runtime_diag.h.
     NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD = 0x04u,
     // The compiled defaults the firmware was built with, served through the
-    // same page layout. A keyboard with nothing committed is still running
+    // same page layout. A keyboard with nothing saved is still running
     // something, and this is it.
     NOAH_PROFILE_WIRE_V1_VALUE_COMPILED = 0x05u,
     NOAH_PROFILE_WIRE_V1_VALUE_COMBOS   = 0x06u,
+    // Live edits, Save, Revert and the edit mode (D-F32). SET values:
+    NOAH_PROFILE_WIRE_V1_VALUE_EDIT_BEGIN  = 0x20u,
+    NOAH_PROFILE_WIRE_V1_VALUE_EDIT_SPLICE = 0x21u,
+    NOAH_PROFILE_WIRE_V1_VALUE_EDIT_DATA   = 0x22u,
+    NOAH_PROFILE_WIRE_V1_VALUE_EDIT_COMMIT = 0x23u,
+    NOAH_PROFILE_WIRE_V1_VALUE_EDIT_ABORT  = 0x24u,
+    NOAH_PROFILE_WIRE_V1_VALUE_SAVE        = 0x25u,
+    NOAH_PROFILE_WIRE_V1_VALUE_REVERT      = 0x26u,
+    // GET and SET: the edit mode.
+    NOAH_PROFILE_WIRE_V1_VALUE_EDIT_MODE = 0x27u,
+    // SET: restart both halves (D-F34).
+    NOAH_PROFILE_WIRE_V1_VALUE_RESTART = 0x28u,
+    // GET values: edit status pages, the working copy (paged like PAYLOAD),
+    // and the runtime overrides and QMK's live values.
+    NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS = 0x20u,
+    NOAH_PROFILE_WIRE_V1_VALUE_WORKING     = 0x21u,
+    NOAH_PROFILE_WIRE_V1_VALUE_RUNTIME     = 0x22u,
     // Page 0 of a payload read is metadata; pages 1..N carry raw payload
     // bytes, a full report payload each.
     NOAH_PROFILE_WIRE_V1_PAYLOAD_METADATA_PAGE = 0u,
-    NOAH_PROFILE_WIRE_V1_CAPABILITY_PAGES      = 2u,
+    // Profile Wire 2.0 opens the new base (D-F28): 32-bit profile lengths
+    // and offsets everywhere, a feature word of build differences only.
+    NOAH_PROFILE_WIRE_V1_PROTOCOL_MAJOR = 2u,
+    NOAH_PROFILE_WIRE_V1_PROTOCOL_MINOR = 0u,
+    // Capability layout 3 (D-F28): page 1 the byte-wide ceilings, page 2 the
+    // wider ones, payload capacities 32 bits.
+    NOAH_PROFILE_WIRE_V1_CAPABILITY_LAYOUT     = 3u,
+    NOAH_PROFILE_WIRE_V1_CAPABILITY_PAGES      = 3u,
     NOAH_PROFILE_WIRE_V1_STATUS_PAGES          = 2u,
 };
 
@@ -35,60 +62,59 @@ typedef enum {
     NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE  = 3u,
 } noah_profile_wire_v1_status_code_t;
 
+// The feature word holds only what a build genuinely varies by (D-F28).
+// Everything this base does is implied by its protocol and schema versions;
+// every Profile Wire 1 bit is retired (docs/spec/profile-wire-v1/hid-channel.md).
+// No firmware behaviour depends on a bit: the word only describes the build.
 enum {
-    // The firmware understands the read surface and frozen storage/schema
-    // bounds. Candidate writes, activation, preview, and peer reconciliation
-    // get their own bits only when those implementations actually land.
-    NOAH_PROFILE_FEATURE_READ_SURFACE          = 1u << 0,
-    NOAH_PROFILE_FEATURE_STORAGE_LAYOUT        = 1u << 1,
-    NOAH_PROFILE_FEATURE_RGB_SCHEMA            = 1u << 2,
-    NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA   = 1u << 3,
-    NOAH_PROFILE_FEATURE_SPLIT_KEYBOARD        = 1u << 4,
-    NOAH_PROFILE_FEATURE_CANDIDATE_WRITE       = 1u << 5,
-    NOAH_PROFILE_FEATURE_PERSISTENT_COMMIT     = 1u << 6,
-    NOAH_PROFILE_FEATURE_RGB_PREVIEW           = 1u << 7,
-    NOAH_PROFILE_FEATURE_RUNTIME_ACTIVATION    = 1u << 8,
-    NOAH_PROFILE_FEATURE_PEER_RECONCILIATION   = 1u << 9,
-    NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST     = 1u << 10,
-    NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH = 1u << 11,
-    NOAH_PROFILE_FEATURE_ATOMIC_LOGICAL_APPLY  = 1u << 12,
-    NOAH_PROFILE_FEATURE_LEGACY_PD_SOURCE      = 1u << 13,
-    // TG(), TO(), TT() and OSL() act through userspace layer ownership, so a
-    // host may offer them in behaviours and combos where they can run.
-    NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES   = 1u << 14,
-    // Behaviours send QMK and keyboard functions (DPI_MOD, RGB Matrix, Magic,
-    // QK_BOOT…) through QMK's key processing, so a host may offer them in a
-    // behaviour's target, tap and hold.
-    NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS = 1u << 15,
-    // Userspace keycodes sit in fixed blocks (custom keys 0x7e40, pointing
-    // holds 0x7e80, locks 0x7ea0, layer locks 0x7ec0); action kind 7 is a
-    // custom key and settings v5 names the custom keys.
-    NOAH_PROFILE_FEATURE_CUSTOM_KEYS = 1u << 16,
-    // Physical key timestamps survive QMK buffering; authored LT rows own tapping.
-    NOAH_PROFILE_FEATURE_PHYSICAL_GESTURE_TIMING = 1u << 17,
-    NOAH_PROFILE_FEATURE_OWNED_TAPPING = 1u << 18,
+    // One half of a split keyboard: a save copies the profile to the other
+    // half, and status reports the other half.
+    NOAH_PROFILE_FEATURE_SPLIT_KEYBOARD = 1u << 0,
+    // The build saves profiles: candidate writes (with reuse and streaming
+    // chunks), durable commit and activation. Set once the live-profile
+    // owner reports; the candidate chunk size is zero exactly without it.
+    NOAH_PROFILE_FEATURE_SAVES = 1u << 1,
+    // The build has a pointing device, so pointing keys and the pointing
+    // domain mean something on it.
+    NOAH_PROFILE_FEATURE_POINTING = 1u << 2,
+    NOAH_PROFILE_FEATURES_KNOWN = NOAH_PROFILE_FEATURE_SPLIT_KEYBOARD | NOAH_PROFILE_FEATURE_SAVES | NOAH_PROFILE_FEATURE_POINTING,
 };
+
+// A wide-page request: [command, channel, value, request id, page low, page
+// high], then 26 reserved zero bytes. The response echoes bytes 0..4 only,
+// since byte 5 carries its status; the request id correlates it.
+enum { NOAH_PROFILE_WIRE_V1_WIDE_REQUEST_FIXED = 6u };
+static inline uint16_t noah_profile_wire_v1_wide_page(const uint8_t *frame) {
+    return (uint16_t)(frame[4] | ((uint16_t)frame[5] << 8u));
+}
 
 enum {
     NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT = 1u << 0,
-    NOAH_PROFILE_STATE_COMMITTED_VALID            = 1u << 1,
+    NOAH_PROFILE_STATE_SAVED_VALID                = 1u << 1,
     NOAH_PROFILE_STATE_CANDIDATE_PENDING          = 1u << 2,
     NOAH_PROFILE_STATE_PREVIEW_ACTIVE             = 1u << 3,
     NOAH_PROFILE_STATE_PEER_KNOWN                 = 1u << 4,
     NOAH_PROFILE_STATE_PEER_CONVERGED             = 1u << 5,
     NOAH_PROFILE_STATE_WAITING_SAFE_BOUNDARY      = 1u << 6,
     NOAH_PROFILE_STATE_DIGESTS_UNAVAILABLE        = 1u << 7,
-    // A cancelled save's peer ABORT was never acknowledged; see
+    // A cancelled save's other-half ABORT was never acknowledged; see
     // NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS. No new save starts until
-    // the peer confirms, and a peer that never does needs a restart.
+    // the other half confirms; if it never does, a restart clears it.
     NOAH_PROFILE_STATE_PEER_CLEANUP_PENDING = 1u << 8,
+    // A slot holds a profile in an earlier store format. It is not read or
+    // converted (D-F28), so the keyboard runs its compiled defaults until a
+    // save; the flag clears once a profile is saved.
+    NOAH_PROFILE_STATE_STORED_EARLIER_FORMAT = 1u << 9,
 };
 
 typedef enum {
     NOAH_PROFILE_ACTIVE_COMPILED_ONLY = 0u,
-    NOAH_PROFILE_ACTIVE_COMMITTED     = 1u,
+    NOAH_PROFILE_ACTIVE_SAVED         = 1u,
     NOAH_PROFILE_ACTIVE_PREVIEW       = 2u,
     NOAH_PROFILE_ACTIVE_PENDING       = 3u,
+    // Unsaved live edits (D-F32): generation and origin are the saved base's,
+    // the active digest field carries the working copy's revision.
+    NOAH_PROFILE_ACTIVE_WORKING = 4u,
 } noah_profile_active_kind_t;
 
 typedef struct {
@@ -105,7 +131,7 @@ typedef struct {
     uint8_t  max_logical_layers;
     uint8_t  max_behavior_rows;
     uint8_t  max_tap_steps_per_behavior;
-    uint8_t  max_populated_behavior_steps;
+    uint16_t max_populated_behavior_steps;
     uint8_t  max_combos;
     uint8_t  max_keys_per_combo;
     uint8_t  max_reusable_rgb_groups;
@@ -113,12 +139,15 @@ typedef struct {
     uint8_t  physical_led_count;
     uint8_t  led_bitmap_size;
     uint8_t  custom_key_slots;
-    uint8_t  via_macro_slots;
-    uint16_t max_profile_payload;
-    uint16_t profile_slot_payload;
-    uint16_t profile_slot_size;
-    uint16_t via_macro_bytes;
+    uint8_t  macro_slots;
+    uint32_t max_profile_payload;
+    uint32_t profile_slot_payload;
+    uint32_t profile_slot_size;
+    uint32_t macro_bytes;
     uint8_t  supported_domain_mask;
+    uint8_t  max_name_bytes;
+    uint8_t  layer_mask_bits;
+    uint8_t  placement_positions;
 } noah_profile_wire_v1_capabilities_t;
 
 typedef struct {
@@ -127,14 +156,14 @@ typedef struct {
     uint32_t compiled_default_digest;
     uint32_t active_digest;
     uint32_t pending_digest;
-    uint32_t committed_digest;
+    uint32_t saved_digest;
     uint8_t  active_kind;
     uint32_t active_generation;
     uint8_t  active_origin_half;
-    uint32_t committed_generation;
-    uint8_t  committed_origin_half;
-    uint32_t peer_generation;
-    uint8_t  peer_origin_half;
+    uint32_t saved_generation;
+    uint8_t  saved_origin_half;
+    uint32_t slave_generation;
+    uint8_t  slave_origin_half;
     uint16_t candidate_transaction_id;
     uint16_t last_committed_transaction_id;
     uint16_t conflict_count;
@@ -148,7 +177,7 @@ typedef struct {
 } noah_profile_wire_v1_read_service_t;
 
 // Handles only Profile Wire v1 custom-get requests. The request header is:
-// [VIA command, channel, value, nonzero request id, page], followed by zeroed
+// [command, channel, value, nonzero request id, page], followed by zeroed
 // reserved bytes. A handled response preserves those five correlation bytes,
 // then returns [status, payload length, payload...].
 bool noah_profile_wire_v1_handle_get(const noah_profile_wire_v1_read_service_t *service, uint8_t *frame, uint8_t length);

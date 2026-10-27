@@ -11,18 +11,46 @@
         "kind": "elf_map_symbol",
         "symbol": "__process_stack_size__",
         "minimum_bytes": 2560,
-        "reserve": {"fraction": 0.25, "minimum_bytes": 512}
+        "reserve": {
+          "fraction": 0.25,
+          "minimum_bytes": 512
+        }
       },
       "indirect_edges": [
         {
-          "caller": "noah_profile_candidate_store_backend_activation_step",
-          "callee": "noah_effective_settings_invalidate",
-          "reason": "provider publication invokes the portable settings invalidator, including the inlined QMK apply helper"
+          "caller": "adjustment_inherit",
+          "callee": "noah_profile_settings_defaults_byte",
+          "reason": "The owner reads the authored settings defaults through its configured callback to create the settings domain an adjustment needs."
         },
         {
-          "caller": "noah_qmk_durable_io_matrix_scan",
-          "callee": "noah_profile_store_runtime_matrix_scan_step",
-          "reason": "the shared master/slave durable-I/O scheduler dispatches the engineering live-profile owner through its rotating step table"
+          "caller": "advance_incoming_reuse",
+          "callee": "write_candidate",
+          "reason": "The scan-owned other-half reuse path writes bounded pieces through the shared candidate backend interface; the pinned compiler inlines backend_reuse into this caller."
+        },
+        {
+          "caller": "noah_profile_other_half_store_backend_write",
+          "callee": "write_candidate",
+          "reason": "The other-half store writes each received chunk through the shared candidate backend interface in pieces of at most 20 bytes."
+        },
+        {
+          "caller": "noah_profile_other_half_store_backend_write",
+          "callee": "read_candidate",
+          "reason": "A fully repeated other-half chunk reads the staged bytes through the shared candidate backend before accepting the retry."
+        },
+        {
+          "caller": "noah_profile_split_reconciler_scan_mode",
+          "callee": "host_staged_read",
+          "reason": "The prepared push reads the retained host candidate through its injected source reader; the pinned compiler inlines push_read into the scan owner."
+        },
+        {
+          "caller": "noah_profile_candidate_store_backend_activation_step",
+          "callee": "noah_active_profile_settings_invalidate",
+          "reason": "Provider publication invokes the portable settings invalidator; its injected native apply callback is accounted separately."
+        },
+        {
+          "caller": "noah_profile_candidate_transaction_scan",
+          "callee": "read_source",
+          "reason": "The scan-owned reuse operation invokes the candidate backend active-source reader; source identity and the copied snapshot stay on this call path."
         },
         {
           "caller": "noah_profile_candidate_transaction_scan",
@@ -41,17 +69,17 @@
         },
         {
           "caller": "io_write",
-          "callee": "noah_qmk_profile_eeprom_write",
-          "reason": "the writable profile store invokes its injected QMK EEPROM write adapter"
+          "callee": "flash_write",
+          "reason": "the writable profile store writes through its injected flash backend's page buffer (D-F29)"
         },
         {
           "caller": "noah_profile_candidate_store_backend_activation_step",
-          "callee": "noah_effective_key_behavior_runtime_invalidate",
+          "callee": "noah_active_profile_key_behavior_runtime_invalidate",
           "reason": "provider publication invokes the installed key-behavior invalidator"
         },
         {
           "caller": "noah_profile_candidate_store_backend_activation_step",
-          "callee": "noah_effective_rgb_runtime_invalidate",
+          "callee": "noah_active_profile_rgb_runtime_invalidate",
           "reason": "provider publication invokes the installed RGB invalidator"
         },
         {
@@ -61,18 +89,18 @@
         },
         {
           "caller": "io_read",
-          "callee": "noah_qmk_profile_eeprom_read",
-          "reason": "the writable profile store invokes its injected QMK EEPROM read adapter"
+          "callee": "flash_read",
+          "reason": "the profile store reads the slot flash region in place through its injected flash backend (D-F29)"
         },
         {
           "caller": "noah_profile_candidate_store_backend_activation_step",
-          "callee": "noah_effective_pd_invalidate",
-          "reason": "Provider publication invokes the validated immutable PD cache invalidator."
+          "callee": "noah_active_profile_combo_runtime_invalidate",
+          "reason": "Provider publication invokes the installed combo cache invalidator through its listener table."
         },
         {
-          "caller": "noah_profile_store_runtime_matrix_scan_step",
-          "callee": "noah_effective_pd_invalidate",
-          "reason": "Boot publication of the compiled generation, inlined into the scan step, invokes the PD cache invalidator through the provider listener table."
+          "caller": "noah_profile_candidate_store_backend_activation_step",
+          "callee": "owner_pd_invalidate",
+          "reason": "Provider publication invokes the owner's PD invalidator, which ends a layer-started mode around the validated immutable PD cache invalidator."
         },
         {
           "caller": "noah_profile_reader_read",
@@ -82,78 +110,380 @@
         {
           "caller": "noah_profile_reader_read",
           "callee": "staged_reader_read",
-          "reason": "Committed PD cache uses the candidate backend immutable EEPROM reader callback."
+          "reason": "The saved profile's PD cache uses the candidate backend immutable EEPROM reader callback."
         },
         {
           "caller": "staged_reader_read",
-          "callee": "noah_qmk_profile_eeprom_read",
-          "reason": "The staged profile reader invokes the installed bounded EEPROM adapter."
+          "callee": "flash_read",
+          "reason": "the staged profile reader reads the slot flash region in place through the installed flash backend (D-F29)"
+        },
+        {
+          "caller": "noah_active_profile_settings_invalidate",
+          "callee": "noah_qmk_portable_apply",
+          "reason": "Compat registers the native settings apply callback at storage initialization; validated publication invokes it through apply_settings."
+        },
+        {
+          "caller": "main",
+          "callee": "noah_profile_store_runtime_init",
+          "reason": "The post-init stage table dispatch is inlined into main by the pinned release compiler; its profile stage invokes the owner initializer."
+        },
+        {
+          "caller": "read_flash",
+          "callee": "rp2040_read",
+          "reason": "the flash backend reads through its driver's XIP read (D-F29)"
+        },
+        {
+          "caller": "io_sync",
+          "callee": "flash_sync",
+          "reason": "the writable profile store makes its writes durable through its injected flash backend (D-F29)"
+        },
+        {
+          "caller": "flush",
+          "callee": "rp2040_program_page",
+          "reason": "the flash backend programs a full or synced page through its driver (D-F29)"
+        },
+        {
+          "caller": "erase_next",
+          "callee": "rp2040_erase_sector",
+          "reason": "the flash backend erases the next sector of a save through its driver (D-F29)"
+        },
+        {
+          "caller": "noah_active_profile_provider_publish_in_place",
+          "callee": "apply_plan",
+          "reason": "A live edit (D-F32) rewrites the working copy through the provider's mutate callback, inside the in-place publication."
+        },
+        {
+          "caller": "noah_active_profile_provider_publish_in_place",
+          "callee": "noah_active_profile_combo_runtime_invalidate",
+          "reason": "In-place publication of a live edit invokes the installed combo invalidator."
+        },
+        {
+          "caller": "noah_active_profile_provider_publish_in_place",
+          "callee": "noah_active_profile_settings_invalidate",
+          "reason": "In-place publication of a live edit invokes the portable settings invalidator; its injected native apply callback is accounted separately."
+        },
+        {
+          "caller": "scan_working",
+          "callee": "noah_qmk_profile_working_transport_exchange",
+          "reason": "The master half's working-copy sync sends one request through its injected split exchange (D-F32)."
         }
       ],
       "paths": [
         {
+          "name": "other-half reuse rejected mailbox admission reply",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "process_mailbox", "process_payload_reuse", "cache_reuse_busy_reply", "cache_response", "noah_profile_split_v1_frame_encode"]
+        },
+        {
+          "name": "other-half reuse mailbox admission reply",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "process_mailbox", "process_payload_reuse", "cache_incoming_reuse_result", "cache_response", "noah_profile_split_v1_frame_encode"]
+        },
+        {
+          "name": "other-half reuse progress reply",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "cache_incoming_reuse_result", "cache_response", "noah_profile_split_v1_frame_encode"]
+        },
+        {
+          "name": "other-half reuse saved-profile slot flash read",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "other-half reuse compiled RGB materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
+        },
+        {
+          "name": "other-half reuse compiled settings materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_settings_defaults_byte"]
+        },
+        {
+          "name": "other-half reuse compiled combo materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_compiled_v1_action"]
+        },
+        {
+          "name": "other-half reuse compiled keymap materialization (writer inlined into write_domain)",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain"]
+        },
+        {
+          "name": "other-half reuse compiled macros materialization (writer inlined into write_domain)",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain"]
+        },
+        {
+          "name": "other-half reuse candidate write",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "write_candidate", "io_write", "flash_write", "write_flash", "flush", "rp2040_program_page"]
+        },
+        {
+          "name": "other-half large chunk candidate write",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "process_mailbox", "process_payload_chunk", "noah_profile_other_half_store_backend_write", "write_candidate", "io_write", "flash_write", "write_flash", "flush", "rp2040_program_page"]
+        },
+        {
+          "name": "other-half repeated large chunk read",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "process_mailbox", "process_payload_chunk", "noah_profile_other_half_store_backend_write", "read_candidate", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "other-half large chunk mailbox decode",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "process_mailbox", "noah_profile_split_v1_frame_decode"]
+        },
+        {
+          "name": "prepared other-half copy staged slot flash read",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "host_staged_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "other-half payload chunk and reuse exchange",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "push_send", "rpc_exchange", "noah_qmk_profile_split_transport_exchange", "transaction_rpc_exec", "transport_execute_transaction"]
+        },
+        {
           "name": "portable profile globals and macro-name readback",
-          "functions": ["main", "via_custom_value_command_kb", "noah_setting"]
+          "functions": ["main", "noah_profile_channel_dispatch", "readback_fill", "noah_profile_settings_defaults_byte"]
         },
         {
           "name": "portable profile settings publication",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_settings_invalidate", "nvm_eeconfig_update_keymap", "eeprom_update_word", "wear_leveling_write"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_active_profile_settings_invalidate", "noah_qmk_portable_apply", "maybe_update_pointing_device_cpi", "pointing_device_set_cpi"]
         },
         {
           "name": "engineering owner compiled-profile validation",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_profile_validator_v1_step"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "noah_profile_validator_v1_step"]
         },
         {
           "name": "engineering owner boot discovery read",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "io_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "noah_profile_store_boot_select_step", "io_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
-          "name": "engineering owner committed-profile adoption",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "validation_step", "noah_profile_validator_v1_step"]
+          "name": "keyboard name boot storage read",
+          "functions": ["main", "noah_qmk_usb_product_name_pre_init", "noah_profile_store_boot_select_step", "io_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "keyboard name restart readiness",
+          "functions": ["main", "noah_qmk_usb_product_name_task", "noah_profile_owner_status", "noah_profile_split_authority_status"]
+        },
+        {
+          "name": "keyboard name USB restart",
+          "functions": ["main", "noah_qmk_usb_product_name_task", "usbStart", "usb_lld_reset"]
+        },
+        {
+          "name": "engineering owner saved-profile adoption",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "validation_step", "noah_profile_validator_v1_step"]
         },
         {
           "name": "engineering owner host payload write",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "write_candidate", "io_write", "noah_qmk_profile_eeprom_write", "wear_leveling_write"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_transaction_scan", "write_candidate", "io_write", "flash_write", "write_flash", "flush", "rp2040_program_page"]
+        },
+        {
+          "name": "candidate reuse saved-profile slot flash read",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "candidate reuse compiled RGB materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
+        },
+        {
+          "name": "candidate reuse compiled settings materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_settings_defaults_byte"]
+        },
+        {
+          "name": "candidate reuse compiled combo materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_compiled_v1_action"]
+        },
+        {
+          "name": "candidate reuse compiled keymap materialization (writer inlined into write_domain)",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain"]
+        },
+        {
+          "name": "candidate reuse compiled macros materialization (writer inlined into write_domain)",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain"]
         },
         {
           "name": "engineering owner host validation step",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "validation_step", "noah_profile_validator_v1_step"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_transaction_scan", "validation_step", "noah_profile_validator_v1_step"]
         },
         {
           "name": "engineering owner host marker-last commit write",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "commit_step_candidate", "noah_profile_store_prepare_commit_step", "io_write", "noah_qmk_profile_eeprom_write", "wear_leveling_write"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_transaction_scan", "commit_step_candidate", "noah_profile_store_prepare_commit_step", "io_write", "flash_write", "write_flash", "flush", "rp2040_program_page"]
         },
         {
           "name": "engineering owner key-behavior publication",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_key_behavior_runtime_invalidate"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_active_profile_key_behavior_runtime_invalidate"]
         },
         {
           "name": "engineering owner RGB publication",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_rgb_runtime_invalidate"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_active_profile_rgb_runtime_invalidate"]
         },
         {
           "name": "engineering owner split metadata exchange",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "metadata_exchange", "rpc_exchange", "noah_qmk_profile_split_transport_exchange", "transaction_rpc_exec", "transport_execute_transaction"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "metadata_exchange", "rpc_exchange", "noah_qmk_profile_split_transport_exchange", "transaction_rpc_exec", "transport_execute_transaction"]
         },
         {
-          "name": "engineering owner coherent VIA status read",
-          "functions": ["main", "via_custom_value_command_kb", "noah_profile_store_runtime_owner_status", "noah_profile_split_authority_status"]
+          "name": "engineering owner coherent Profile Wire status read",
+          "functions": ["main", "noah_profile_channel_dispatch", "noah_profile_store_runtime_owner_status", "noah_profile_owner_status", "noah_profile_split_authority_status"]
         },
         {
           "name": "engineering mutation Raw HID dispatch",
-          "functions": ["main", "via_custom_value_command_kb"]
+          "functions": ["main", "noah_profile_channel_dispatch"]
+        },
+        {
+          "name": "Combo published cache slot flash read",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_active_profile_combo_runtime_invalidate", "noah_profile_combo_v1_iteration_step", "read_at", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "PD host record validation",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_transaction_scan", "validation_step", "noah_profile_validator_v1_step", "noah_profile_pd_v1_iterator_step", "noah_profile_pd_v1_validate_record", "tap_valid"]
         },
         {
           "name": "PD compiled cache initialization",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_effective_pd_invalidate", "publish_pd_cache", "noah_profile_reader_read", "compiled_reader_read", "write_pd_payload", "noah_profile_pd_v1_validate_record.part.2"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "initialize_runtime_graph", "publish_pd_cache", "noah_profile_pd_v1_iterator_step", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_pd_v1_validate_record", "tap_valid"]
         },
         {
-          "name": "PD published cache EEPROM read",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_pd_invalidate", "publish_pd_cache", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "name": "PD published cache slot flash read",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "owner_pd_invalidate", "publish_pd_cache", "noah_profile_pd_v1_iterator_step", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "PD published record validation",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_pd_invalidate", "publish_pd_cache", "noah_profile_pd_v1_validate_entry", "noah_profile_pd_v1_validate_record.part.2"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "owner_pd_invalidate", "publish_pd_cache", "noah_profile_pd_v1_iterator_step", "noah_profile_pd_v1_validate_record", "tap_valid"]
+        },
+        {
+          "name": "Compiled profile initial RGB materialization",
+          "functions": ["main", "noah_profile_store_runtime_init", "noah_profile_compiled_v1_open", "write_domain", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
+        },
+        {
+          "name": "Compiled RGB boot cache materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "initialize_runtime_graph", "noah_active_profile_rgb_runtime_invalidate", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
+        },
+        {
+          "name": "Compiled RGB boot cache validation",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "initialize_runtime_graph", "noah_active_profile_rgb_runtime_invalidate", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_v1_validation_step", "read_bytes", "noah_profile_reader_read"]
+        },
+        {
+          "name": "Compiled RGB published fallback materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_active_profile_rgb_runtime_invalidate", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
+        },
+        {
+          "name": "Compiled RGB published fallback validation",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_active_profile_rgb_runtime_invalidate", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_v1_validation_step", "read_bytes", "noah_profile_reader_read"]
+        },
+        {
+          "name": "Compiled RGB first frame materialization",
+          "functions": ["main", "rgb_matrix_task", "rgb_active_profile_config_frame_current", "frame_status", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
+        },
+        {
+          "name": "Compiled settings boot cache materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "initialize_runtime_graph", "noah_active_profile_settings_invalidate", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_settings_defaults_byte"]
+        },
+        {
+          "name": "Compiled settings published fallback materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_active_profile_settings_invalidate", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_settings_defaults_byte"]
+        },
+        {
+          "name": "Compiled combo boot cache materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "initialize_runtime_graph", "noah_active_profile_combo_runtime_invalidate", "noah_profile_combo_v1_iteration_step", "read_at", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_compiled_v1_action"]
+        },
+        {
+          "name": "Compiled combo published fallback materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_active_profile_combo_runtime_invalidate", "noah_profile_combo_v1_iteration_step", "read_at", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_compiled_v1_action"]
+        },
+        {
+          "name": "indexed behavior publication slot flash reads",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_active_profile_key_behavior_runtime_invalidate", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "sixteen-member combo host validation reads",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_transaction_scan", "validation_step", "noah_profile_validator_v1_step", "noah_profile_combo_v1_iteration_step", "read_at", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "save erase ahead in a quiet grant",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_begin", "erase_next", "rp2040_erase_sector"]
+        },
+        {
+          "name": "save write erases unerased flash first",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_transaction_scan", "write_candidate", "io_write", "flash_write", "write_flash", "erase_next", "rp2040_erase_sector"]
+        },
+        {
+          "name": "host candidate commit sync",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_transaction_scan", "commit_step_candidate", "noah_profile_store_prepare_commit_step", "io_sync", "flash_sync", "flush", "rp2040_program_page"]
+        },
+        {
+          "name": "EEPROM reset forgets the slots at boot",
+          "functions": ["main", "rp2040_erase_sector"]
+        },
+        {
+          "name": "live edit Raw HID data admission",
+          "functions": ["main", "noah_profile_channel_dispatch", "noah_profile_working_copy_data", "noah_profile_crc32_update"]
+        },
+        {
+          "name": "live edit Raw HID commit plan reads the saved envelope",
+          "functions": ["main", "noah_profile_channel_dispatch", "noah_profile_working_copy_commit", "noah_active_profile_snapshot_read", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "live edit Raw HID status reply",
+          "functions": ["main", "noah_profile_channel_dispatch", "noah_profile_store_runtime_working_status", "noah_profile_working_copy_status"]
+        },
+        {
+          "name": "live edit domain validation step",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "noah_profile_validator_v1_step"]
+        },
+        {
+          "name": "live edit working copy load from the saved slot",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "noah_active_profile_snapshot_read", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "live edit in-place rewrite",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "noah_active_profile_provider_publish_in_place", "apply_plan"]
+        },
+        {
+          "name": "live edit combo republication",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "noah_active_profile_provider_publish_in_place", "noah_active_profile_combo_runtime_invalidate", "noah_profile_combo_v1_iteration_step"]
+        },
+        {
+          "name": "live edit settings republication",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "noah_active_profile_provider_publish_in_place", "noah_active_profile_settings_invalidate", "noah_qmk_portable_apply"]
+        },
+        {
+          "name": "working copy sync exchange",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "noah_qmk_profile_working_transport_exchange", "transaction_rpc_exec", "transport_execute_transaction"]
+        },
+        {
+          "name": "working copy sync whole-copy read",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "build_forward", "noah_profile_working_copy_read", "noah_active_profile_snapshot_read", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "save abandons its candidate",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "save_step", "fail_save"]
+        },
+        {
+          "name": "automatic save admission",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "automatic_step", "noah_profile_owner_save"]
+        },
+        {
+          "name": "keyboard adjustment commit reads the saved envelope",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "automatic_step", "adjustment_step", "noah_profile_working_copy_commit", "noah_active_profile_snapshot_read", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "keyboard adjustment creates the inherited settings domain",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "automatic_step", "adjustment_step", "adjustment_inherit", "noah_profile_working_copy_commit", "noah_active_profile_snapshot_read", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "keyboard adjustment reads the authored settings defaults",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "automatic_step", "adjustment_step", "adjustment_inherit", "noah_profile_settings_defaults_byte"]
+        },
+        {
+          "name": "DPI adjustment key queues a scalar",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "noah_qmk_profile_adjustment_process", "noah_profile_store_runtime_adjust", "noah_profile_setting_v1_valid"]
+        },
+        {
+          "name": "DPI adjustment feedback projects CPI without EEPROM",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "noah_qmk_profile_adjustment_process", "maybe_update_pointing_device_cpi", "pointing_device_set_cpi"]
+        },
+        {
+          "name": "keyboard adjustment safe-boundary republication retains pending feedback",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "noah_active_profile_provider_publish_in_place", "noah_active_profile_settings_invalidate", "noah_qmk_portable_apply", "projected_setting", "noah_setting"]
+        },
+        {
+          "name": "restart asks the other half from the Raw HID handler",
+          "functions": ["main", "noah_profile_channel_dispatch", "noah_qmk_keyboard_restart_request", "transaction_rpc_exec", "transport_execute_transaction"]
+        },
+        {
+          "name": "restart resets this half from housekeeping",
+          "functions": ["main", "soft_reset_keyboard", "shutdown_kb", "ws2812_flush"]
+        },
+        {
+          "name": "a stopped half answers the working copy's poll",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "answer_stopped", "noah_profile_working_sync_slave_scan", "noah_profile_working_copy_status", "noah_active_profile_provider_copy_active"]
         }
       ]
     },
@@ -167,7 +497,10 @@
         "working_area_fixed_overhead_bytes": 172,
         "working_area_alignment_bytes": 8,
         "expected_working_area_bytes": 1200,
-        "reserve": {"fraction": 0.25, "minimum_bytes": 256}
+        "reserve": {
+          "fraction": 0.25,
+          "minimum_bytes": 256
+        }
       },
       "indirect_edges": [
         {
@@ -179,6 +512,21 @@
           "caller": "slave_rpc_exec_callback",
           "callee": "noah_qmk_profile_split_rpc",
           "reason": "the registered local profile transaction dispatches the callback from the split RPC table"
+        },
+        {
+          "caller": "slave_rpc_exec_callback",
+          "callee": "working_rpc",
+          "reason": "QMK dispatches the registered working-copy sync RPC (D-F32): a bounded mailbox copy and a cached reply."
+        },
+        {
+          "caller": "slave_rpc_exec_callback",
+          "callee": "restart_rpc",
+          "reason": "QMK dispatches the registered restart RPC (D-F34): it checks one 8-byte frame, notes the restart and writes the acknowledgement."
+        },
+        {
+          "caller": "noah_qmk_profile_split_rpc",
+          "callee": "noah_qmk_durable_io_storage_paused",
+          "reason": "With its mailbox full, the reconciler's busy reply asks its injected storage_paused callback, the durable-I/O grant's (qmk_durable_io.c, D-F29), whether a save is waiting for a quiet keyboard (STORAGE_PAUSED)."
         }
       ],
       "paths": [
@@ -189,6 +537,22 @@
         {
           "name": "engineering profile split mailbox publication",
           "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_profile_split_rpc", "publish_mailbox"]
+        },
+        {
+          "name": "working copy sync mailbox",
+          "functions": ["SlaveThread", "slave_rpc_exec_callback", "working_rpc"]
+        },
+        {
+          "name": "restart RPC",
+          "functions": ["SlaveThread", "slave_rpc_exec_callback", "restart_rpc", "noah_qmk_keyboard_restart_encode"]
+        },
+        {
+          "name": "profile split busy reply asks whether storage is paused",
+          "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_profile_split_rpc", "noah_qmk_durable_io_storage_paused"]
+        },
+        {
+          "name": "profile split busy reply encoding",
+          "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_profile_split_rpc", "encode_busy_response", "noah_profile_split_v1_frame_encode", "noah_profile_split_v1_frame_length", "frame_shape_valid", "noah_profile_split_descriptor_valid"]
         }
       ]
     }

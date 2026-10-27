@@ -2,9 +2,11 @@
 // Key Runtime Transitions
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Runtime-state transitions for the handled-key engine. These helpers mutate
-// the shared key runtime state and emit an ordered plan of side effects, but do
-// not execute those effects themselves.
+// The executor of the reducer's effect plan. A transition is one reducer call
+// planning into one stack-held plan (reducer/runtime.h), which the caller then
+// executes here: traced, announced to split consumers and projected through
+// projection/projection.c. A streaming plan is also projected here while it is
+// planned (planning/effect_plan.h).
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -13,31 +15,24 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../behavior/handled_key.h"
-#include "planning/effect_queue.h"
+#include "reducer/runtime.h"
 
-#define KEY_RUNTIME_TRANSITION_PLAN_CAPACITY 16
+// The feedback sequence a key event or scan starts from, for
+// key_runtime_transition_execute_event_plan().
+uint32_t key_runtime_transition_feedback_mark(void);
 
-typedef struct {
-    KEY_RUNTIME_EFFECT_QUEUE_FIELDS(KEY_RUNTIME_TRANSITION_PLAN_CAPACITY);
-} key_runtime_transition_plan_t;
+// Traces the plan under `stage` (none for NULL), announces it to split
+// consumers if it holds anything, projects it and empties it.
+void key_runtime_transition_execute_plan(const char *stage, key_runtime_core_effect_plan_t *plan);
 
-_Static_assert(sizeof(key_runtime_transition_plan_t) <= 196u, "key_runtime_transition_plan_t must stay within the approved stack budget");
+// The same for a key event or a scan, which can change what the feedback maps
+// render without leaving anything to project: opening a multi-tap window makes
+// a pending tap series visible while the tap itself is still deferred. An empty
+// plan still announces a feedback change since `feedback_mark`, or the split
+// worker never learns and the slave renders nothing while the master lights up.
+void key_runtime_transition_execute_event_plan(const char *stage, key_runtime_core_effect_plan_t *plan, uint32_t feedback_mark);
 
-void key_runtime_transition_plan_init(key_runtime_transition_plan_t *plan);
-void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *plan);
-
-void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan);
-void key_runtime_transition_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_transition_plan_t *plan);
-void key_runtime_transition_flush_foreign_dual_role_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_transition_plan_t *plan);
-void key_runtime_transition_flush_active_keys_except(keypos_t key_pos, key_runtime_transition_plan_t *plan);
-void key_runtime_transition_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_transition_plan_t *plan);
-bool key_runtime_transition_handled_key_press(uint16_t keycode, keypos_t key_pos, key_runtime_transition_plan_t *plan);
-bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *record, const handled_key_resolution_t *resolution, key_runtime_transition_plan_t *plan);
-void key_runtime_transition_scan(key_runtime_transition_plan_t *plan);
-bool key_runtime_transition_settle_pending_fallback_hold(key_runtime_transition_plan_t *plan);
-
-// Announce a feedback change that produced no transition plan, so split
-// consumers still learn about it. See the definition for why key events need
-// this as well as scans.
-void key_runtime_process_notify_planless_feedback_change(const key_runtime_transition_plan_t *plan, uint32_t feedback_sequence_before);
+// Projects and empties a full streaming plan without announcing it; the
+// transition's own execute announces it, since it still holds what was pushed
+// after the drain.
+void key_runtime_transition_drain_plan(key_runtime_core_effect_plan_t *plan);

@@ -2,7 +2,8 @@
 // Keyboard Modifier Ownership
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Tracks direct physical modifier keys separately from managed modifier holds
+// Tracks physical modifier keys and modifier-only QK_MODS combinations
+// (KC_MEH/KC_HYPR and wrapped modifiers) separately from managed modifier holds
 // so releasing one owner does not clear another. Managed holds include both
 // userspace-owned registrations and QMK paths that flow through
 // register_mods()/unregister_mods(), such as held MT()/OSM() modifiers.
@@ -12,6 +13,8 @@
 // report count says QMK's default handler put that modifier in the report and
 // has not taken it out, which is what teardown needs: a handled key whose press
 // userspace consumed is physically down but owns nothing in the report.
+// Native combination releases are consumed before QMK's all-parts teardown;
+// finalize drops only parts with no remaining report or managed owner.
 //
 // A QMK mod-tap is both. Once QMK resolves it as a hold, its default action
 // registers the modifiers through register_mods(), a managed owner for
@@ -41,9 +44,6 @@ typedef struct {
 
 void    keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record);
 void    keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyrecord_t *record);
-// Called once QMK's default action has run for the record, from the same
-// finalize step that settles report ownership.
-void    keyboard_mod_ownership_track_mod_tap_hold_event(uint16_t keycode, keyrecord_t *record);
 bool    keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_t *record);
 bool    keyboard_mod_ownership_can_register_mods(uint8_t mods);
 bool    keyboard_mod_ownership_can_unregister_mods(uint8_t mods);

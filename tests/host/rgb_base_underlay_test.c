@@ -85,10 +85,10 @@ static rgb_t rgb_from_hsv(hsv_t hsv) {
 
 typedef struct {
     const uint8_t                     *bytes;
-    noah_effective_rgb_runtime_t      *runtime;
-    noah_effective_profile_identity_t  previous;
-    noah_effective_profile_identity_t  active;
-    noah_effective_profile_snapshot_t *snapshot;
+    noah_active_profile_rgb_runtime_t *runtime;
+    noah_active_profile_identity_t     previous;
+    noah_active_profile_identity_t     active;
+    noah_active_profile_snapshot_t *snapshot;
     size_t                             calls;
     size_t                             invalidate_on_call;
 } invalidating_reader_t;
@@ -99,7 +99,7 @@ static bool invalidating_reader_read(void *context_value, size_t offset, uint8_t
     memcpy(target, &context->bytes[offset], length);
     context->calls++;
     if (context->calls == context->invalidate_on_call) {
-        noah_effective_rgb_runtime_invalidate(context->runtime, 2u, context->previous, context->active, context->snapshot);
+        noah_active_profile_rgb_runtime_invalidate(context->runtime, 2u, context->previous, context->active, context->snapshot);
     }
     return true;
 }
@@ -254,15 +254,15 @@ static void test_base_layer_remains_under_mapped_only_overlay_layers(void) {
     check_frame_led(&frame, 3, rgb_from_hsv(layer_led_groups[0].color));
 }
 
-static noah_effective_profile_identity_t test_identity(uint32_t generation) {
-    return (noah_effective_profile_identity_t){
+static noah_active_profile_identity_t test_identity(uint32_t generation) {
+    return (noah_active_profile_identity_t){
         .generation              = generation,
         .payload_crc32           = 0x1000u + generation,
         .payload_digest          = 0x2000u + generation,
         .compiled_default_digest = 0x3000u,
         .action_abi_digest       = 0x4000u,
         .origin                  = 0u,
-        .kind                    = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE,
+        .kind                    = NOAH_ACTIVE_PROFILE_KIND_VALIDATED_PROFILE,
     };
 }
 
@@ -272,12 +272,14 @@ static void test_live_layer_profile_and_stale_frame(const char *fixture_path) {
     noah_profile_rgb_v1_limits_t      limits = noah_profile_rgb_v1_default_limits();
     noah_profile_rgb_v1_view_t        view;
     noah_profile_rgb_v1_error_t       error;
-    noah_effective_rgb_runtime_t      runtime;
-    noah_effective_rgb_frame_t        profile_frame;
-    noah_effective_profile_identity_t active   = test_identity(1u);
-    noah_effective_profile_snapshot_t snapshot = {0};
+    noah_active_profile_rgb_runtime_t runtime;
+    noah_active_profile_rgb_frame_t   profile_frame;
+    noah_active_profile_identity_t active      = test_identity(1u);
+    noah_active_profile_snapshot_t snapshot = {0};
     rgb_runtime_frame_t               frame;
 
+    // This rendering fixture models six supported slots with current RGB v3.
+    limits.supported_pointing_mode_mask = 0x3fu;
     limits.logical_layer_count    = LAYER_COUNT;
     limits.maximum_brightness     = 200u;
     limits.tap_branch_color_count = 4u;
@@ -286,13 +288,13 @@ static void test_live_layer_profile_and_stale_frame(const char *fixture_path) {
     snapshot.profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
     snapshot.profile.rgb         = view;
 
-    noah_effective_rgb_runtime_init(&runtime);
-    CHECK(noah_effective_rgb_runtime_install(&runtime));
-    noah_effective_rgb_runtime_invalidate(&runtime, 1u, (noah_effective_profile_identity_t){0}, active, &snapshot);
-    CHECK(rgb_effective_config_capture_frame(&profile_frame) == NOAH_EFFECTIVE_RGB_OK);
+    noah_active_profile_rgb_runtime_init(&runtime);
+    CHECK(noah_active_profile_rgb_runtime_install(&runtime));
+    noah_active_profile_rgb_runtime_invalidate(&runtime, 1u, (noah_active_profile_identity_t){0}, active, &snapshot);
+    CHECK(rgb_active_profile_config_capture_frame(&profile_frame) == NOAH_ACTIVE_PROFILE_RGB_OK);
 
     test_reset();
-    CHECK(rgb_runtime_layer_stage_render_effective_frame(&frame, 0u, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
+    CHECK(rgb_runtime_layer_stage_render_active_profile_frame(&frame, 0u, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
     check_frame_led(&frame, 0u, rgb_from_hsv((hsv_t){.h = 1u, .s = 2u, .v = 3u}));
     check_frame_led(&frame, 1u, rgb_from_hsv((hsv_t){.h = 1u, .s = 2u, .v = 3u}));
     check_frame_led(&frame, 2u, rgb_from_hsv((hsv_t){.h = 1u, .s = 2u, .v = 3u}));
@@ -300,21 +302,24 @@ static void test_live_layer_profile_and_stale_frame(const char *fixture_path) {
 
     test_keymap[LAYER_NAV][0][1] = 0x004fu;
     layer_state                  = (layer_state_t)1u << LAYER_NAV;
-    CHECK(rgb_runtime_layer_stage_render_effective_frame(&frame, layer_state, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
+    CHECK(rgb_runtime_layer_stage_render_active_profile_frame(&frame, layer_state, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
     check_frame_led(&frame, 0u, rgb_from_hsv((hsv_t){.h = 10u, .s = 20u, .v = 30u}));
     check_frame_led(&frame, 1u, rgb_from_hsv((hsv_t){.h = 10u, .s = 20u, .v = 30u}));
     check_frame_led(&frame, 2u, rgb_from_hsv((hsv_t){.h = 1u, .s = 2u, .v = 3u}));
     check_frame_led(&frame, 3u, rgb_from_hsv((hsv_t){.h = 1u, .s = 2u, .v = 3u}));
 
-    noah_effective_profile_identity_t next          = test_identity(2u);
-    noah_effective_profile_snapshot_t behavior_only = {.identity = next};
+    // This publication's layer rows were read by the renders above, so the
+    // records left to read are the layer groups': the publication lands on the
+    // first group row, and that group's own record is still read after it.
+    noah_active_profile_identity_t next             = test_identity(2u);
+    noah_active_profile_snapshot_t behavior_only = {.identity = next};
     invalidating_reader_t             reader        = {
         .bytes              = payload,
         .runtime            = &runtime,
         .previous           = active,
         .active             = next,
         .snapshot           = &behavior_only,
-        .invalidate_on_call = 4u,
+        .invalidate_on_call = 1u,
     };
     profile_frame.view.reader = (noah_profile_reader_t){
         .read    = invalidating_reader_read,
@@ -322,12 +327,134 @@ static void test_live_layer_profile_and_stale_frame(const char *fixture_path) {
         .length  = length,
     };
 
-    CHECK(!rgb_runtime_layer_stage_render_effective_frame(&frame, layer_state, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
+    CHECK(!rgb_runtime_layer_stage_render_active_profile_frame(&frame, layer_state, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
     CHECK(reader.calls > reader.invalidate_on_call);
     for (uint8_t led = 0u; led < RGB_MATRIX_LED_COUNT; led++) {
         CHECK(!frame.painted[led]);
     }
-    noah_effective_rgb_runtime_uninstall(&runtime);
+    noah_active_profile_rgb_runtime_uninstall(&runtime);
+}
+
+static noah_profile_rgb_v1_limits_t test_render_limits(void) {
+    noah_profile_rgb_v1_limits_t limits = noah_profile_rgb_v1_default_limits();
+
+    // This rendering fixture models six supported slots with current RGB v3.
+    limits.supported_pointing_mode_mask = 0x3fu;
+    limits.logical_layer_count          = LAYER_COUNT;
+    limits.maximum_brightness           = 200u;
+    limits.tap_branch_color_count       = 4u;
+    return limits;
+}
+
+static void check_frame_range(const rgb_runtime_frame_t *frame, uint8_t led_min, uint8_t led_max, rgb_t expected) {
+    for (uint8_t led = led_min; led < led_max; led++) {
+        check_frame_led(frame, led, expected);
+    }
+}
+
+static void check_frame_range_unpainted(const rgb_runtime_frame_t *frame, uint8_t led_min, uint8_t led_max) {
+    for (uint8_t led = led_min; led < led_max; led++) {
+        CHECK(!frame->painted[led]);
+    }
+}
+
+// Layer colours change only when a profile is published, so the layer stage
+// reads them once per publication instead of on every chunk, and reads the
+// frame's publication in place rather than copying the frame. A publication
+// between chunks or frames is still the one the next frame shows, never mixed
+// with the last.
+static void test_layer_colours_are_read_once_per_publication(const char *fixture_path) {
+    uint8_t                           first_payload[TEST_RGB_PAYLOAD_SIZE];
+    uint8_t                           second_payload[TEST_RGB_PAYLOAD_SIZE];
+    size_t                            length       = fixture_payload(fixture_path, first_payload, sizeof(first_payload));
+    size_t                            layer_offset = 16u + (size_t)first_payload[4] * 9u;
+    noah_profile_rgb_v1_limits_t      limits       = test_render_limits();
+    noah_profile_rgb_v1_error_t       error;
+    noah_active_profile_rgb_runtime_t runtime;
+    noah_active_profile_rgb_frame_t   profile_frame;
+    noah_active_profile_identity_t    first  = test_identity(40u);
+    noah_active_profile_identity_t    second = test_identity(41u);
+    noah_active_profile_snapshot_t    first_snapshot  = {.identity = first, .profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB};
+    noah_active_profile_snapshot_t    second_snapshot = {.identity = second, .profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB};
+    invalidating_reader_t             first_reader    = {.bytes = first_payload, .runtime = &runtime, .previous = first, .active = second, .snapshot = &second_snapshot, .invalidate_on_call = SIZE_MAX};
+    invalidating_reader_t             second_reader   = {.bytes = second_payload, .invalidate_on_call = SIZE_MAX};
+    noah_profile_reader_t             first_bytes     = {.read = invalidating_reader_read, .context = &first_reader, .length = length};
+    noah_profile_reader_t             second_bytes    = {.read = invalidating_reader_read, .context = &second_reader, .length = length};
+    rgb_t                             first_base      = rgb_from_hsv((hsv_t){.h = 1u, .s = 2u, .v = 3u});
+    rgb_t                             second_base     = rgb_from_hsv((hsv_t){.h = 50u, .s = 60u, .v = 70u});
+    rgb_runtime_frame_t               frame;
+    size_t                            group_reads;
+
+    memcpy(second_payload, first_payload, length);
+    second_payload[layer_offset + 1u] = 50u;
+    second_payload[layer_offset + 2u] = 60u;
+    second_payload[layer_offset + 3u] = 70u;
+    CHECK(noah_profile_rgb_v1_decode_reader(&first_bytes, 0u, length, &limits, &first_snapshot.profile.rgb, &error) == NOAH_PROFILE_RGB_V1_OK);
+    CHECK(noah_profile_rgb_v1_decode_reader(&second_bytes, 0u, length, &limits, &second_snapshot.profile.rgb, &error) == NOAH_PROFILE_RGB_V1_OK);
+    // Each layer row is one record and one read; a layer group is two (its row
+    // and its group), read on every chunk.
+    group_reads = 2u * first_snapshot.profile.rgb.layer_group_count;
+    CHECK(first_snapshot.profile.rgb.layer_color_count == LAYER_COUNT);
+
+    noah_active_profile_rgb_runtime_init(&runtime);
+    CHECK(noah_active_profile_rgb_runtime_install(&runtime));
+    noah_active_profile_rgb_runtime_invalidate(&runtime, 1u, (noah_active_profile_identity_t){0}, first, &first_snapshot);
+    test_reset();
+
+    // A frame of three chunks, the split stack's second pass on the last.
+    noah_active_profile_rgb_runtime_test_reset_frame_copies();
+    CHECK(rgb_active_profile_config_capture_frame(&profile_frame) == NOAH_ACTIVE_PROFILE_RGB_OK);
+    first_reader.calls = 0u;
+    CHECK(rgb_runtime_layer_stage_render_active_profile_frame(&frame, 0u, &profile_frame, 0u, 2u));
+    check_frame_range(&frame, 0u, 2u, first_base);
+    CHECK(first_reader.calls == LAYER_COUNT + group_reads);
+    first_reader.calls = 0u;
+    CHECK(rgb_runtime_layer_stage_render_active_profile_frame(&frame, 0u, &profile_frame, 2u, 3u));
+    check_frame_range(&frame, 2u, 3u, first_base);
+    CHECK(rgb_runtime_layer_stage_render_active_profile_frame(&frame, 0u, &profile_frame, 3u, 4u));
+    check_frame_range(&frame, 3u, 4u, first_base);
+    CHECK(rgb_runtime_layer_stage_render_active_profile_layers_frame(&frame, 0u, 0u, 1u, &profile_frame, 3u, 4u));
+    check_frame_range(&frame, 3u, 4u, first_base);
+    CHECK(first_reader.calls == 3u * group_reads);
+    CHECK(noah_active_profile_rgb_runtime_test_frame_copies() == 1u);
+
+    // The next frame of the same publication reads no layer row either.
+    CHECK(rgb_active_profile_config_capture_frame(&profile_frame) == NOAH_ACTIVE_PROFILE_RGB_OK);
+    first_reader.calls = 0u;
+    CHECK(rgb_runtime_layer_stage_render_active_profile_frame(&frame, 0u, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
+    check_frame_range(&frame, 0u, RGB_MATRIX_LED_COUNT, first_base);
+    CHECK(first_reader.calls == group_reads);
+    CHECK(noah_active_profile_rgb_runtime_test_frame_copies() == 2u);
+
+    // A publication between two chunks: the rest of that frame paints nothing
+    // of either profile, and the next frame shows only the new one.
+    CHECK(rgb_runtime_layer_stage_render_active_profile_frame(&frame, 0u, &profile_frame, 0u, 2u));
+    check_frame_range(&frame, 0u, 2u, first_base);
+    noah_active_profile_rgb_runtime_invalidate(&runtime, 2u, first, second, &second_snapshot);
+    CHECK(!rgb_runtime_layer_stage_render_active_profile_frame(&frame, 0u, &profile_frame, 2u, RGB_MATRIX_LED_COUNT));
+    check_frame_range_unpainted(&frame, 2u, RGB_MATRIX_LED_COUNT);
+    CHECK(rgb_active_profile_config_capture_frame(&profile_frame) == NOAH_ACTIVE_PROFILE_RGB_OK);
+    second_reader.calls = 0u;
+    CHECK(rgb_runtime_layer_stage_render_active_profile_frame(&frame, 0u, &profile_frame, 0u, 2u));
+    check_frame_range(&frame, 0u, 2u, second_base);
+    CHECK(second_reader.calls == LAYER_COUNT + group_reads);
+    second_reader.calls = 0u;
+    CHECK(rgb_runtime_layer_stage_render_active_profile_frame(&frame, 0u, &profile_frame, 2u, RGB_MATRIX_LED_COUNT));
+    check_frame_range(&frame, 2u, RGB_MATRIX_LED_COUNT, second_base);
+    CHECK(second_reader.calls == group_reads);
+
+    // A publication between frames, landing while the layer rows are read:
+    // that frame paints nothing, and the next shows the newest profile.
+    noah_active_profile_rgb_runtime_invalidate(&runtime, 3u, second, first, &first_snapshot);
+    CHECK(rgb_active_profile_config_capture_frame(&profile_frame) == NOAH_ACTIVE_PROFILE_RGB_OK);
+    first_reader.calls              = 0u;
+    first_reader.invalidate_on_call = 2u;
+    CHECK(!rgb_runtime_layer_stage_render_active_profile_frame(&frame, 0u, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
+    check_frame_range_unpainted(&frame, 0u, RGB_MATRIX_LED_COUNT);
+    CHECK(rgb_active_profile_config_capture_frame(&profile_frame) == NOAH_ACTIVE_PROFILE_RGB_OK);
+    CHECK(rgb_runtime_layer_stage_render_active_profile_frame(&frame, 0u, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
+    check_frame_range(&frame, 0u, RGB_MATRIX_LED_COUNT, second_base);
+    noah_active_profile_rgb_runtime_uninstall(&runtime);
 }
 
 static void test_live_automouse_profile_and_stale_frame(const char *fixture_path) {
@@ -336,10 +463,10 @@ static void test_live_automouse_profile_and_stale_frame(const char *fixture_path
     noah_profile_rgb_v1_limits_t      limits = noah_profile_rgb_v1_default_limits();
     noah_profile_rgb_v1_view_t        view;
     noah_profile_rgb_v1_error_t       error;
-    noah_effective_rgb_runtime_t      runtime;
-    noah_effective_rgb_frame_t        profile_frame;
-    noah_effective_profile_identity_t active        = test_identity(10u);
-    noah_effective_profile_snapshot_t snapshot      = {0};
+    noah_active_profile_rgb_runtime_t runtime;
+    noah_active_profile_rgb_frame_t   profile_frame;
+    noah_active_profile_identity_t active           = test_identity(10u);
+    noah_active_profile_snapshot_t snapshot         = {0};
     rgb_t                             compiled_base = rgb_from_hsv(layer_colors[LAYER_BASE].color);
     rgb_t                             live_end      = rgb_from_hsv((hsv_t){.h = 8u, .s = 9u, .v = 10u});
 
@@ -353,6 +480,8 @@ static void test_live_automouse_profile_and_stale_frame(const char *fixture_path
     check_output_led(2u, compiled_base);
     check_output_led(3u, rgb_from_hsv(layer_led_groups[0].color));
 
+    // This rendering fixture models six supported slots with current RGB v3.
+    limits.supported_pointing_mode_mask = 0x3fu;
     limits.logical_layer_count    = LAYER_COUNT;
     limits.maximum_brightness     = 200u;
     limits.tap_branch_color_count = 4u;
@@ -361,26 +490,26 @@ static void test_live_automouse_profile_and_stale_frame(const char *fixture_path
     snapshot.profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
     snapshot.profile.rgb         = view;
 
-    noah_effective_rgb_runtime_init(&runtime);
-    CHECK(noah_effective_rgb_runtime_install(&runtime));
-    noah_effective_rgb_runtime_invalidate(&runtime, 1u, (noah_effective_profile_identity_t){0}, active, &snapshot);
-    CHECK(rgb_effective_config_capture_frame(&profile_frame) == NOAH_EFFECTIVE_RGB_OK);
+    noah_active_profile_rgb_runtime_init(&runtime);
+    CHECK(noah_active_profile_rgb_runtime_install(&runtime));
+    noah_active_profile_rgb_runtime_invalidate(&runtime, 1u, (noah_active_profile_identity_t){0}, active, &snapshot);
+    CHECK(rgb_active_profile_config_capture_frame(&profile_frame) == NOAH_ACTIVE_PROFILE_RGB_OK);
 
     test_reset();
     layer_state             = (layer_state_t)1u << LAYER_SYM;
     fake_automouse_progress = AUTOMOUSE_RGB_ACTIVE_SPAN;
-    CHECK(rgb_runtime_automouse_stage_should_render_effective(layer_state, &profile_frame));
-    CHECK(rgb_runtime_automouse_stage_render_effective(layer_state, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
+    CHECK(rgb_runtime_automouse_stage_should_render_active_profile(layer_state, &profile_frame));
+    CHECK(rgb_runtime_automouse_stage_render_active_profile(layer_state, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
     for (uint8_t led = 0u; led < RGB_MATRIX_LED_COUNT; led++) {
         check_output_led(led, live_end);
     }
 
-    noah_effective_rgb_frame_t disabled_frame = profile_frame;
+    noah_active_profile_rgb_frame_t disabled_frame = profile_frame;
     disabled_frame.view.stage_enable_mask &= (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_AUTOMOUSE;
-    CHECK(!rgb_runtime_automouse_stage_should_render_effective(layer_state, &disabled_frame));
+    CHECK(!rgb_runtime_automouse_stage_should_render_active_profile(layer_state, &disabled_frame));
 
-    noah_effective_profile_identity_t next          = test_identity(11u);
-    noah_effective_profile_snapshot_t behavior_only = {.identity = next};
+    noah_active_profile_identity_t next             = test_identity(11u);
+    noah_active_profile_snapshot_t behavior_only = {.identity = next};
     invalidating_reader_t             reader        = {
         .bytes              = payload,
         .runtime            = &runtime,
@@ -390,7 +519,7 @@ static void test_live_automouse_profile_and_stale_frame(const char *fixture_path
         .invalidate_on_call = SIZE_MAX,
     };
     profile_frame.view.reader = (noah_profile_reader_t){.read = invalidating_reader_read, .context = &reader, .length = length};
-    CHECK(rgb_runtime_automouse_stage_render_effective(layer_state, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
+    CHECK(rgb_runtime_automouse_stage_render_active_profile(layer_state, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
     CHECK(reader.calls > 1u);
 
     size_t final_reader_call  = reader.calls;
@@ -401,12 +530,12 @@ static void test_live_automouse_profile_and_stale_frame(const char *fixture_path
         led_output[led] = sentinel;
     }
 
-    CHECK(!rgb_runtime_automouse_stage_render_effective(layer_state, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
+    CHECK(!rgb_runtime_automouse_stage_render_active_profile(layer_state, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
     CHECK(reader.calls == final_reader_call);
     for (uint8_t led = 0u; led < RGB_MATRIX_LED_COUNT; led++) {
         check_output_led(led, sentinel);
     }
-    noah_effective_rgb_runtime_uninstall(&runtime);
+    noah_active_profile_rgb_runtime_uninstall(&runtime);
 }
 
 static void test_live_automouse_policy_modes(const char *fixture_path) {
@@ -417,30 +546,32 @@ static void test_live_automouse_policy_modes(const char *fixture_path) {
     // A pass-through base and mapped-only lower layer distinguish all policies.
     payload[layer_offset + 1] = payload[layer_offset + 2] = payload[layer_offset + 3] = 0;
     noah_profile_rgb_v1_limits_t limits                                               = noah_profile_rgb_v1_default_limits();
+    // This rendering fixture models six supported slots with current RGB v3.
+    limits.supported_pointing_mode_mask = 0x3fu;
     limits.logical_layer_count                                                        = LAYER_COUNT;
     limits.maximum_brightness                                                         = 200;
     limits.tap_branch_color_count                                                     = 4;
-    noah_effective_rgb_runtime_t runtime;
-    noah_effective_rgb_runtime_init(&runtime);
-    CHECK(noah_effective_rgb_runtime_install(&runtime));
+    noah_active_profile_rgb_runtime_t runtime;
+    noah_active_profile_rgb_runtime_init(&runtime);
+    CHECK(noah_active_profile_rgb_runtime_install(&runtime));
     for (uint8_t mode = 0; mode < 3; mode++) {
         payload[fade_offset]                       = mode;
-        noah_effective_profile_snapshot_t snapshot = {.identity = test_identity(20u + mode)};
+        noah_active_profile_snapshot_t snapshot = {.identity = test_identity(20u + mode)};
         noah_profile_rgb_v1_error_t       error;
         CHECK(noah_profile_rgb_v1_decode(payload, length, &limits, &snapshot.profile.rgb, &error) == NOAH_PROFILE_RGB_V1_OK);
         snapshot.profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
-        noah_effective_rgb_runtime_invalidate(&runtime, mode + 1, (noah_effective_profile_identity_t){0}, snapshot.identity, &snapshot);
-        noah_effective_rgb_frame_t frame;
-        CHECK(rgb_effective_config_capture_frame(&frame) == NOAH_EFFECTIVE_RGB_OK);
+        noah_active_profile_rgb_runtime_invalidate(&runtime, mode + 1, (noah_active_profile_identity_t){0}, snapshot.identity, &snapshot);
+        noah_active_profile_rgb_frame_t frame;
+        CHECK(rgb_active_profile_config_capture_frame(&frame) == NOAH_ACTIVE_PROFILE_RGB_OK);
         test_reset();
         test_keymap[LAYER_NAV][0][1] = 4;
         layer_state                  = ((layer_state_t)1u << LAYER_NAV) | ((layer_state_t)1u << LAYER_SYM);
         fake_automouse_progress      = AUTOMOUSE_RGB_ACTIVE_SPAN;
         rgb_runtime_frame_t destination;
-        CHECK(rgb_runtime_layer_stage_render_effective_frame(&destination, (layer_state_t)1u << LAYER_NAV, &frame, 0, RGB_MATRIX_LED_COUNT));
+        CHECK(rgb_runtime_layer_stage_render_active_profile_frame(&destination, (layer_state_t)1u << LAYER_NAV, &frame, 0, RGB_MATRIX_LED_COUNT));
         for (uint8_t led = 0; led < RGB_MATRIX_LED_COUNT; led++)
             ws2812_leds[led] = (ws2812_led_t){.r = 21, .g = 22, .b = 23};
-        CHECK(rgb_runtime_automouse_stage_render_effective(layer_state, &frame, 0, RGB_MATRIX_LED_COUNT));
+        CHECK(rgb_runtime_automouse_stage_render_active_profile(layer_state, &frame, 0, RGB_MATRIX_LED_COUNT));
         unsigned retained = 0, filled = 0;
         for (uint8_t led = 0; led < RGB_MATRIX_LED_COUNT; led++) {
             rgb_t expected;
@@ -458,7 +589,7 @@ static void test_live_automouse_policy_modes(const char *fixture_path) {
         }
         CHECK(retained > 0 && filled > 0);
     }
-    noah_effective_rgb_runtime_uninstall(&runtime);
+    noah_active_profile_rgb_runtime_uninstall(&runtime);
 }
 
 int main(int argc, char **argv) {
@@ -468,7 +599,12 @@ int main(int argc, char **argv) {
     test_live_layer_profile_and_stale_frame(argv[1]);
     test_live_automouse_profile_and_stale_frame(argv[1]);
     test_live_automouse_policy_modes(argv[1]);
+    test_layer_colours_are_read_once_per_publication(argv[1]);
 
     puts("rgb_base_underlay host tests passed");
     return 0;
+}
+
+uint16_t keymap_key_to_keycode(uint8_t layer, keypos_t key) {
+    return keycode_at_keymap_location(layer, key.row, key.col);
 }

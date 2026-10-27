@@ -7,22 +7,37 @@ NOAH_COMMON_SOURCES := \
     runtime_init.c \
     hooks.c \
     lib/profile/protocol/profile_candidate_v1.c \
+    lib/profile/schema/profile_domain_registry.c \
     lib/profile/schema/profile_blob_v1.c \
     lib/profile/schema/profile_combo_v1.c \
     lib/profile/schema/profile_settings_v1.c \
+    lib/profile/schema/profile_settings_defaults.c \
     lib/profile/schema/profile_pd_v1.c \
+    lib/profile/schema/profile_keymap_v1.c \
+    lib/profile/schema/profile_macros_v1.c \
     lib/profile/schema/profile_reader.c \
     lib/profile/schema/key_behavior_domain_v1.c \
     lib/profile/schema/profile_rgb_v1.c \
     lib/profile/schema/profile_validator_v1.c \
     lib/profile/schema/profile_compiled_defaults_v1.c \
+    lib/profile/schema/profile_rgb_compiled_v1.c \
+    lib/profile/schema/key_behavior_compiled_v1.c \
+    lib/profile/schema/profile_combo_compiled_v1.c \
+    lib/profile/schema/profile_pd_compiled_v1.c \
+    lib/profile/schema/profile_keymap_compiled_v1.c \
+    lib/profile/schema/profile_macros_compiled_v1.c \
     lib/profile/runtime/profile_action_runtime_v1.c \
-    lib/profile/runtime/effective_profile_provider.c \
-    lib/profile/runtime/effective_key_behavior_runtime.c \
-    lib/profile/runtime/effective_rgb_runtime.c \
-    lib/profile/runtime/effective_combo_runtime.c \
-    lib/profile/runtime/effective_settings_runtime.c \
-    lib/profile/runtime/effective_pd_runtime.c \
+    lib/profile/runtime/active_profile_provider.c \
+    lib/profile/runtime/profile_working_copy.c \
+    lib/profile/split/profile_working_sync.c \
+    lib/profile/runtime/active_profile_keymap_macros_runtime.c \
+    lib/compat/qmk_profile_keymap.c \
+    lib/macro/profile_macro_provider.c \
+    lib/profile/runtime/active_profile_key_behavior_runtime.c \
+    lib/profile/runtime/active_profile_rgb_runtime.c \
+    lib/profile/runtime/active_profile_combo_runtime.c \
+    lib/profile/runtime/active_profile_settings_runtime.c \
+    lib/profile/runtime/active_profile_pd_runtime.c \
     lib/compat/qmk_portable_profile.c \
     lib/compat/qmk_portable_editor.c \
     lib/profile/runtime/profile_activation_policy.c \
@@ -32,32 +47,29 @@ NOAH_COMMON_SOURCES := \
     lib/profile/storage/profile_storage_layout.c \
     lib/profile/storage/profile_checksum.c \
     lib/profile/storage/profile_store.c \
+    lib/profile/storage/profile_flash_store.c \
     lib/profile/storage/profile_store_runtime.c \
     lib/profile/storage/profile_candidate_transaction.c \
     lib/profile/storage/profile_candidate_store_backend.c \
-    lib/profile/storage/profile_peer_store_backend.c \
+    lib/profile/storage/profile_other_half_store_backend.c \
     lib/profile/protocol/profile_wire_v1.c \
     lib/compat/qmk_durable_io.c \
     lib/compat/qmk_split_activity.c \
     lib/compat/qmk_split_diagnostics.c \
     lib/compat/qmk_split_transport_crc.c \
     lib/compat/qmk_loop_stages.c \
-    lib/compat/qmk_profile_eeprom.c \
+    lib/compat/qmk_profile_flash.c \
     lib/compat/qmk_physical_half.c \
     lib/compat/qmk_profile_split_transport.c \
-    lib/compat/qmk_via_profile_channel.c \
+    lib/compat/qmk_profile_channel.c \
+    lib/compat/qmk_profile_edit_channel.c \
+    lib/compat/qmk_profile_working.c \
+    lib/compat/qmk_profile_adjustments.c \
     lib/compat/qmk_combo_readback.c \
-    lib/compat/qmk_effective_combos.c \
-    lib/compat/qmk_contract.c \
+    lib/compat/qmk_active_profile_combos.c \
     lib/compat/qmk_mod_contract.c \
-    lib/compat/qmk_via_contract.c \
-    lib/compat/qmk_via_storage_regions.c \
-    lib/compat/qmk_via_sync_metadata.c \
-    lib/compat/qmk_via_sync_protocol.c \
-    lib/compat/qmk_via_sync_state.c \
-    lib/compat/qmk_via_logical_profile.c \
-    lib/compat/qmk_via_split_mirror.c \
-    lib/compat/qmk_via_split_sync.c \
+    lib/compat/qmk_usb_product_name.c \
+    lib/compat/qmk_keyboard_restart.c \
     lib/action/action_kind.c \
     lib/action/action_kind_dispatch.c \
     lib/action/action_lifecycle.c \
@@ -69,6 +81,7 @@ NOAH_COMMON_SOURCES := \
     lib/key/behavior/handled_key_transparency.c \
     lib/key/behavior/handled_key_materialize.c \
     lib/key/behavior/key_behavior_lookup.c \
+    lib/key/behavior/participation.c \
     lib/key/behavior/keymap_validation.c \
     lib/key/runtime/api.c \
     lib/key/runtime/preflight.c \
@@ -87,15 +100,16 @@ NOAH_COMMON_SOURCES := \
     lib/key/ownership/held_repeat.c \
     lib/action/action_dispatch.c \
     lib/action/owned_keycode.c \
+    lib/macro/macro_input_guard.c \
     lib/macro/macro_slot_provider.c \
     lib/macro/macro_payload.c \
     lib/macro/macro_payload_decode_qmk.c \
     lib/macro/macro_payload_keycodes.c \
     lib/macro/macro_payload_parse.c \
     lib/macro/macro_payload_run.c \
+    lib/macro/host_layout.c \
+    lib/macro/host_layout_tables.c \
     lib/macro/macro_payload_encode.c \
-    lib/macro/via_macro_provider.c \
-    lib/macro/via_macro_defaults.c \
     lib/key/runtime/feedback.c \
     lib/state/modifiers/keyboard_mod_state.c \
     lib/state/modifiers/keyboard_mod_policy.c \
@@ -120,34 +134,35 @@ NOAH_COMMON_SOURCES := \
     lib/key/runtime/planning/tap_series_flush.c \
     lib/key/runtime/trace/core_trace.c \
     lib/rgb/core/rgb_runtime.c \
-    lib/rgb/core/rgb_effective_config.c \
+    lib/rgb/core/rgb_active_profile_config.c \
     lib/rgb/stages/rgb_combo_feedback_stage.c \
     lib/rgb/stages/rgb_key_feedback_stage.c \
     lib/rgb/stages/rgb_layer_stage.c \
     lib/rgb/automouse/rgb_automouse_stage.c \
-    lib/rgb/stages/rgb_pd_mode_stage.c \
+    lib/rgb/stages/rgb_pointing_mode_stage.c \
     lib/rgb/stages/rgb_preview_stage.c \
     lib/rgb/core/rgb_config_defaults.c \
     lib/rgb/core/rgb_validation.c
 
 NOAH_POINTING_SOURCES := \
     lib/pointing/runtime/pd_runtime.c \
-    lib/pointing/runtime/pd_mode_snapshot.c \
-    lib/pointing/runtime/pd_mode_key_runtime_bridge.c \
-    lib/pointing/runtime/pd_mode_state.c \
-    lib/pointing/runtime/pd_mode_registry.c \
-    lib/pointing/runtime/pd_mode_lifecycle.c \
+    lib/pointing/runtime/pointing_mode_snapshot.c \
+    lib/pointing/runtime/pointing_mode_key_runtime_bridge.c \
+    lib/pointing/runtime/pointing_mode_state.c \
+    lib/pointing/runtime/pointing_mode_registry.c \
+    lib/pointing/runtime/pointing_mode_lifecycle.c \
     lib/pointing/policy/pointer_layer_policy.c \
-    lib/pointing/modes/pd_mode_dragscroll.c
+    lib/pointing/modes/pointing_mode_dragscroll.c
 
 NOAH_POINTING_CONFIGURED_SOURCES := \
-    lib/pointing/modes/pd_mode_configured.c
+    lib/pointing/modes/pointing_mode_configured.c
 
 NOAH_AUTOMOUSE_SOURCES := \
     lib/rgb/automouse/rgb_automouse.c
 
-# Allocated only by explicit side-specific engineering builds. Keeping this
-# out of NOAH_COMMON_SOURCES preserves the reviewed normal-firmware footprint.
+# Compiled into every build that knows its half, unless NOAH_LIVE_PROFILE_OWNER
+# is `no` (users/noah/rules.mk, D-F35). Kept out of NOAH_COMMON_SOURCES because
+# a build with no half cannot carry the owner.
 NOAH_LIVE_PROFILE_OWNER_SOURCES := \
     lib/profile/runtime/profile_owner.c \
     lib/profile/runtime/profile_action_placement_v1.c

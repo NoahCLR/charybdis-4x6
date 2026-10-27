@@ -22,7 +22,7 @@
 #include "../feedback_kind.h"
 #include "../planning/effect_queue.h"
 #include "../slot/slot_interaction.h"
-#include "../../../pointing/defs/pd_mode_flags.h"
+#include "../../../pointing/defs/pointing_mode_flags.h"
 #include "../../../state/modifiers/keyboard_mod_state.h"
 
 #define KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
@@ -30,8 +30,11 @@
 #define KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT ((KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY + 31u) / 32u)
 #define KEY_RUNTIME_CORE_LEASE_CAPACITY ((uint16_t)(KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY * 4u))
 #define KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY ((uint16_t)(KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY * 2u))
-#define KEY_RUNTIME_CORE_PERSISTENT_INTENT_CAPACITY 16u
-#define KEY_RUNTIME_CORE_EFFECT_PLAN_CAPACITY 14u
+// The intents the table holds: a pointing mode's lock and its pointer toggle,
+// one of each at a time, with room to spare. Layer locks and one-shot layers
+// are masks beside it (persistent_layer_locks, persistent_layer_oneshots).
+#define KEY_RUNTIME_CORE_PERSISTENT_INTENT_CAPACITY 4u
+#define KEY_RUNTIME_CORE_EFFECT_PLAN_CAPACITY 16u
 
 #ifndef KEY_RUNTIME_CORE_TOKEN_ID_MAX
 #    define KEY_RUNTIME_CORE_TOKEN_ID_MAX UINT16_MAX
@@ -58,6 +61,10 @@ typedef enum {
 typedef struct {
     uint16_t keycode;
     keypos_t key_pos;
+    // Set when participation bypasses the keycode's behaviour row for this
+    // press: it resolves as if the key had no row (participation-policy.md).
+    // Zero, the default, uses the row.
+    bool bypass_row;
 } runtime_key_event_t;
 
 typedef struct {
@@ -69,8 +76,8 @@ typedef struct {
 } runtime_pointer_report_t;
 
 typedef struct {
-    pd_mode_mask_t active_mode;
-    pd_mode_mask_t locked_mode;
+    pointing_mode_mask_t active_mode;
+    pointing_mode_mask_t locked_mode;
 } runtime_remote_snapshot_t;
 
 typedef struct {
@@ -102,18 +109,21 @@ typedef struct {
     uint16_t                       pressed_at;
     uint16_t                       released_at;
     uint16_t                       hold_term_ms;
-    uint16_t                       longer_hold_term_ms;
+    uint16_t                       long_hold_term_ms;
     uint32_t                       feedback_sequence;
     press_token_phase_t            phase;
     uint8_t                        feedback_level;
     bool                           handled_key;
     bool                           tap_outcome_available;
-    bool                           pd_mode_was_locked_on_press;
-    bool                           pd_mode_lock_consumed_on_press;
+    bool                           pointing_mode_was_locked_on_press;
+    bool                           pointing_mode_lock_consumed_on_press;
     bool                           other_press_interrupted;
     bool                           momentary_layer_tap_interrupted;
     bool                           pending_release_emission;
     bool                           release_keycode_mismatched;
+    // The press came past the deepest tap count of a quick run (D-F33): the run
+    // was sent as its first tap, and this press is a single tap of its own.
+    bool                           typing;
     key_runtime_slot_interaction_t interaction;
     key_runtime_slot_phase_t       slot_phase;
 } press_token_t;
@@ -134,10 +144,10 @@ typedef struct {
     bool     tap_branch_has_authored_tap;
     bool     has_more_taps;
     uint8_t  authored_tap_depth;
-    // Set once the tap index has cycled past the deepest authored branch. A
-    // wrapped series sits on branch one again, so tap_count alone can no longer
-    // tell an ongoing gesture from a first tap.
-    bool                 wrapped;
+    // A quick run went past the deepest branch (D-F33). Each further press in
+    // it is a single tap of its own, and sends the first tap, until the
+    // multi-tap window lapses.
+    bool                 typing;
     hold_behavior_t      hold;
     hold_behavior_t      long_hold;
     uint16_t             tap_hold_term_ms;
@@ -148,10 +158,12 @@ typedef struct {
     keyboard_mod_state_t saved_mod_state;
 } tap_series_t;
 
+// The one effect plan: the reducer plans into it and transition.c projects
+// it. A buffered plan keeps every effect for its caller; a streaming plan
+// projects what it holds when it fills (auto-drain) and between a moment's
+// steps (planning/effect_plan.h).
 typedef struct {
     KEY_RUNTIME_EFFECT_QUEUE_FIELDS(KEY_RUNTIME_CORE_EFFECT_PLAN_CAPACITY);
-    void (*sink)(void *ctx, key_runtime_effect_t effect);
-    void *sink_ctx;
 } key_runtime_core_effect_plan_t;
 
 _Static_assert(sizeof(key_runtime_core_effect_plan_t) <= 196u, "key_runtime_core_effect_plan_t must stay within the approved stack budget");
@@ -187,7 +199,7 @@ typedef enum {
     LEASE_KIND_MODIFIER,
     LEASE_KIND_HELD_ACTION,
     LEASE_KIND_REPEAT,
-    LEASE_KIND_PD_MODE,
+    LEASE_KIND_POINTING_MODE,
     LEASE_KIND_POINTER_ANCHOR,
 } lease_kind_t;
 
@@ -205,7 +217,7 @@ typedef struct {
             bool    physical;
         } modifier;
         uint16_t       action;
-        pd_mode_mask_t pd_mode;
+        pointing_mode_mask_t pointing_mode;
         struct {
             uint16_t action;
             uint8_t  repeat_hz;
@@ -223,7 +235,7 @@ typedef enum {
     PERSISTENT_INTENT_KIND_NONE = 0,
     PERSISTENT_INTENT_KIND_LAYER_LOCK,
     PERSISTENT_INTENT_KIND_LAYER_ONESHOT,
-    PERSISTENT_INTENT_KIND_PD_MODE_LOCK,
+    PERSISTENT_INTENT_KIND_POINTING_MODE_LOCK,
     PERSISTENT_INTENT_KIND_POINTER_TOGGLE,
 } persistent_intent_kind_t;
 
@@ -232,11 +244,11 @@ typedef struct {
     persistent_intent_kind_t kind;
     union {
         uint8_t        layer;
-        pd_mode_mask_t pd_mode;
+        pointing_mode_mask_t pointing_mode;
         uint8_t        pointer_layer;
         struct {
             uint8_t        pointer_layer;
-            pd_mode_mask_t mode;
+            pointing_mode_mask_t mode;
         } pointer_toggle;
     } data;
 } persistent_intent_t;
@@ -247,10 +259,10 @@ typedef struct {
     keyboard_mod_state_t keyboard_mod_state;
     uint8_t              keyboard_managed_mod_mask;
     uint8_t              keyboard_physical_mod_mask;
-    pd_mode_mask_t       pd_mode_local_active;
-    pd_mode_mask_t       pd_mode_local_locked;
+    pointing_mode_mask_t pointing_mode_local_active;
+    pointing_mode_mask_t pointing_mode_local_locked;
     bool                 pointer_anchor_active;
-    bool                 pointer_pd_mode_anchor_active;
+    bool                 pointer_pointing_mode_anchor_active;
     bool                 pointer_prefers_typing_layer;
     bool                 pointer_toggle_enabled;
 } key_runtime_core_shadow_projection_t;
@@ -261,12 +273,12 @@ typedef struct {
     keyboard_mod_state_t keyboard_mod_state;
     uint8_t              keyboard_managed_mod_mask;
     uint8_t              keyboard_physical_mod_mask;
-    pd_mode_mask_t       pd_mode_local_active;
-    pd_mode_mask_t       pd_mode_local_locked;
-    pd_mode_mask_t       pd_mode_display_active;
-    pd_mode_mask_t       pd_mode_display_locked;
+    pointing_mode_mask_t pointing_mode_local_active;
+    pointing_mode_mask_t pointing_mode_local_locked;
+    pointing_mode_mask_t pointing_mode_display_active;
+    pointing_mode_mask_t pointing_mode_display_locked;
     bool                 pointer_anchor_active;
-    bool                 pointer_pd_mode_anchor_active;
+    bool                 pointer_pointing_mode_anchor_active;
     bool                 pointer_prefers_typing_layer;
     bool                 pointer_toggle_enabled;
     bool                 pointer_sniping_layer_active;
@@ -282,10 +294,10 @@ typedef struct {
     keyboard_mod_state_t core_shadow_keyboard_mod_state;
     uint8_t              core_shadow_keyboard_managed_mod_mask;
     uint8_t              core_shadow_keyboard_physical_mod_mask;
-    pd_mode_mask_t       core_shadow_pd_mode_local_active;
-    pd_mode_mask_t       core_shadow_pd_mode_local_locked;
+    pointing_mode_mask_t core_shadow_pointing_mode_local_active;
+    pointing_mode_mask_t core_shadow_pointing_mode_local_locked;
     bool                 core_shadow_pointer_anchor_active;
-    bool                 core_shadow_pointer_pd_mode_anchor_active;
+    bool                 core_shadow_pointer_pointing_mode_anchor_active;
     bool                 core_shadow_pointer_prefers_typing_layer;
     bool                 core_shadow_pointer_toggle_enabled;
     uint8_t              core_press_token_count;
@@ -314,6 +326,8 @@ typedef struct {
     lease_t                              leases[KEY_RUNTIME_CORE_LEASE_CAPACITY];
     pending_release_slot_t               pending_releases[KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY];
     persistent_intent_t                  persistent_intents[KEY_RUNTIME_CORE_PERSISTENT_INTENT_CAPACITY];
+    layer_state_t                        persistent_layer_locks;
+    layer_state_t                        persistent_layer_oneshots;
     key_runtime_core_shadow_projection_t shadow_projection;
     uint16_t                             current_time;
     uint16_t                             next_token_id;
@@ -350,9 +364,6 @@ typedef struct {
     uint8_t                              keyboard_event_masked_real_mods;
     bool                                 keyboard_event_mask_active;
     uint8_t                              default_report_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
-    // Physical presses an active pointing mode is being offered or consumed;
-    // see key_runtime_core_offer_press_to_mode().
-    uint8_t pd_intercepted_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 } key_runtime_core_state_t;
 
 #ifdef KEY_RUNTIME_HOT_PATH_TEST_INSTRUMENTATION
@@ -392,29 +403,43 @@ static inline uint32_t key_runtime_core_state_next_feedback_sequence(key_runtime
 key_runtime_core_state_t      *key_runtime_core_state(void);
 void                           key_runtime_core_apply_event(const runtime_event_t *event, uint16_t event_time);
 __attribute__((noinline)) void key_runtime_core_observe_process_record_event(uint16_t keycode, keyrecord_t *record);
+// The same, with the press's participation: use_row false resolves a press as
+// if its keycode had no behaviour row.
+void key_runtime_core_observe_process_record_event_with_row(uint16_t keycode, keyrecord_t *record, bool use_row);
 void                           key_runtime_core_observe_scan_cycle(uint16_t now);
-// A physical press is offered to the active pointing mode before the key's
-// behavior sees it. While offered it is not a behavior press yet: an output
-// the mode emits cannot settle this key's pending fallback hold. The offer
-// ends consumed or not. Consumed, the key stays down, so its release still
-// matches its token and other keys still saw a press interrupt them, but the
-// token becomes an ordinary non-handled press: the key's own tap, hold,
-// repeat and multi-tap never run for it, and it owns no lease. Modes consume
-// only mouse buttons, which own no layer or modifier on hold. Its release
-// then belongs to the mode, which take_intercepted_release() says once.
-void                           key_runtime_core_offer_press_to_mode(keypos_t key_pos);
-void                           key_runtime_core_end_mode_offer(keypos_t key_pos, bool consumed);
-bool                           key_runtime_core_press_offered_to_mode(keypos_t key_pos);
-bool                           key_runtime_core_take_intercepted_release(keypos_t key_pos);
+// The reducer's cross-key work happens at two moments. Before a press is
+// resolved, the keys it interrupts settle, then released keys' pending taps it
+// ends are typed: every one for a press without a behaviour, a tap/hold key's
+// for a handled press. Before a release is observed, the key first reaches any
+// hold it was due while its press waited in record admission (D-F01); then a
+// modifier's or layer key's release settles the keys another key's press would
+// settle (D-F27), so their tap still gets it. Each step plans against what the
+// last one projected: a streaming plan projects between the steps.
+void                           key_runtime_core_settle_before_press(uint16_t keycode, keypos_t key_pos, bool press_is_handled, key_runtime_core_effect_plan_t *plan);
+void                           key_runtime_core_settle_before_release(uint16_t keycode, const keyrecord_t *record, uint16_t released_at, key_runtime_core_effect_plan_t *plan);
 void                           key_runtime_core_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 void                           key_runtime_core_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 void                           key_runtime_core_flush_foreign_dual_role_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
+// Settles other keys' pending layer-changing taps before key_pos's press is
+// resolved; true if any was settled. A NULL plan only asks whether one is
+// pending.
+bool                           key_runtime_core_flush_foreign_layer_multi_tap(keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 void                           key_runtime_core_flush_multi_tap(key_runtime_core_effect_plan_t *plan);
+// A modifier's or layer key's release, at its physical time, settles the keys
+// another key's press would settle (D-F27), so their tap gets it.
+void                           key_runtime_core_settle_active_keys_on_other_release(keypos_t key_pos, uint16_t released_at, key_runtime_core_effect_plan_t *plan);
+// A key's own release, at its physical time, first reaches any hold it was
+// due before then while its press waited in record admission (D-F01).
+void                           key_runtime_core_plan_missed_scans_before_release(keypos_t key_pos, uint16_t released_at, key_runtime_core_effect_plan_t *plan);
 void                           key_runtime_core_flush_active_keys_except(keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 bool                           key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
-bool                           key_runtime_core_handle_handled_key_release(uint16_t keycode, keypos_t key_pos, const handled_key_resolution_t *resolution, keyboard_mod_state_t keyboard_mod_state, key_runtime_core_effect_plan_t *plan);
+bool                           key_runtime_core_handle_handled_key_release(keypos_t key_pos, const handled_key_resolution_t *resolution, keyboard_mod_state_t keyboard_mod_state, key_runtime_core_effect_plan_t *plan);
 void                           key_runtime_core_scan(key_runtime_core_effect_plan_t *plan, uint16_t now);
-bool                           key_runtime_core_settle_pending_fallback_hold(key_runtime_core_effect_plan_t *plan);
+// The handled keys whose fallback hold is due now, as bits of their press
+// token index, decided for all of them at once; true if any. The effect that
+// registers one is key_runtime_core_fallback_hold_effect(index).
+bool                           key_runtime_core_pending_fallback_holds(uint32_t due[KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT]);
+bool                           key_runtime_core_fallback_hold_effect(uint16_t index, key_runtime_effect_t *effect);
 
 static inline void key_runtime_core_state_reset(key_runtime_core_state_t *state) {
     if (!state) {

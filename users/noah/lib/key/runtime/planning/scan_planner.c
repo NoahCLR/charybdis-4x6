@@ -129,7 +129,7 @@ static bool key_runtime_core_press_token_active_scan_should_mark_release_hold_pe
         return true;
     }
 
-    return !token->interaction.binding.hold.present && token->interaction.contract.long_hold.release_action != KC_NO && elapsed >= token->interaction.binding.longer_hold_term;
+    return !token->interaction.binding.hold.present && token->interaction.contract.long_hold.release_action != KC_NO && elapsed >= token->interaction.binding.long_hold_term;
 }
 
 static bool key_runtime_core_scan_press_token_has_pending_hold_series(const key_runtime_core_state_t *state, const press_token_t *token) {
@@ -188,7 +188,7 @@ void key_runtime_core_press_token_refresh_slot_phase_for_scan(key_runtime_core_s
 
     switch (token->slot_phase) {
         case KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW:
-            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.longer_hold_term) {
+            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.long_hold_term) {
                 key_runtime_core_press_token_commit_hold_phase(state, token, true, true);
                 return;
             }
@@ -203,7 +203,7 @@ void key_runtime_core_press_token_refresh_slot_phase_for_scan(key_runtime_core_s
             }
             return;
         case KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW:
-            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.longer_hold_term) {
+            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.long_hold_term) {
                 key_runtime_core_press_token_commit_hold_phase(state, token, true, true);
                 return;
             }
@@ -214,7 +214,7 @@ void key_runtime_core_press_token_refresh_slot_phase_for_scan(key_runtime_core_s
             return;
         case KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING:
         case KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE:
-            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.longer_hold_term) {
+            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.long_hold_term) {
                 key_runtime_core_press_token_commit_hold_phase(state, token, true, true);
             }
             return;
@@ -283,7 +283,7 @@ bool key_runtime_core_resolve_pending_multi_tap_scan(keypos_t key_pos, key_runti
         return true;
     }
 
-    if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.longer_hold_term) {
+    if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.long_hold_term) {
         *out = (key_runtime_core_pending_multi_tap_scan_resolution_t){
             .outcome        = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_LONG_HOLD,
             .hold           = token->interaction.binding.long_hold,
@@ -308,22 +308,31 @@ bool key_runtime_core_resolve_pending_multi_tap_scan(keypos_t key_pos, key_runti
     return true;
 }
 
-void key_runtime_core_plan_fallback_hold_activation(key_runtime_core_state_t *state, press_token_t *token, key_runtime_core_effect_plan_t *plan) {
-    keypos_t token_key_pos;
-
+// Whether `token`'s fallback hold is due now: it registers its resolved
+// keycode at its key.
+static bool key_runtime_core_fallback_hold_due(key_runtime_core_state_t *state, const press_token_t *token) {
     if (!(state && key_runtime_core_scan_token_hold_eligible(state, token) && key_runtime_core_scan_press_token_uses_fallback_hold(token))) {
-        return;
+        return false;
     }
 
-    if (key_runtime_core_scan_press_token_has_runtime_owned_state(state, token) || token->resolved_keycode == KC_NO) {
-        return;
-    }
+    return !(key_runtime_core_scan_press_token_has_runtime_owned_state(state, token) || token->resolved_keycode == KC_NO);
+}
 
-    token_key_pos = key_runtime_core_scan_press_token_key_pos(state, token);
-    if (key_runtime_core_press_offered_to_mode(token_key_pos)) {
-        return;
+static key_runtime_effect_t key_runtime_core_fallback_hold_register(const key_runtime_core_state_t *state, const press_token_t *token) {
+    return (key_runtime_effect_t){
+        .kind             = KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER,
+        .data.held_action = {.key_pos = key_runtime_core_scan_press_token_key_pos(state, token), .action = token->resolved_keycode},
+    };
+}
+
+bool key_runtime_core_plan_fallback_hold_activation(key_runtime_core_state_t *state, press_token_t *token, key_runtime_core_effect_plan_t *plan) {
+    if (!key_runtime_core_fallback_hold_due(state, token)) {
+        return false;
     }
-    key_runtime_core_effect_plan_push_held_action(plan, KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER, token_key_pos, token->resolved_keycode);
+    key_runtime_effect_t effect = key_runtime_core_fallback_hold_register(state, token);
+
+    key_runtime_core_effect_plan_push_held_action(plan, effect.kind, effect.data.held_action.key_pos, effect.data.held_action.action);
+    return true;
 }
 
 static void key_runtime_core_scan_clear_confirmed_tap_series_at(key_runtime_core_state_t *state, keypos_t key_pos) {
@@ -414,17 +423,14 @@ void key_runtime_core_plan_pending_multi_tap_scan_for_key(key_runtime_core_state
         case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_RELEASE_HOLD_PENDING:
             if (token) {
                 key_runtime_core_press_token_mark_release_hold_pending(state, token);
-                if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && key_runtime_core_scan_elapsed(token->pressed_at, state->current_time) >= token->interaction.binding.longer_hold_term) {
+                if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && key_runtime_core_scan_elapsed(token->pressed_at, state->current_time) >= token->interaction.binding.long_hold_term) {
                     key_runtime_core_tap_series_clear(state, series);
                     key_runtime_core_plan_threshold_hold_effects(state, token, token->interaction.binding.long_hold, token->interaction.contract.long_hold, true, true, plan);
                     return;
                 }
             }
             if (series) {
-                series->resolved     = true;
-                series->pending_hold = false;
-                series->hold         = hold_behavior_none();
-                series->long_hold    = hold_behavior_none();
+                key_runtime_core_tap_series_resolve(series);
             }
             return;
         case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_NONE:
@@ -456,7 +462,7 @@ void key_runtime_core_plan_active_scan_for_token(key_runtime_core_state_t *state
                 return;
             }
 
-            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.longer_hold_term) {
+            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.long_hold_term) {
                 key_runtime_core_scan_clear_confirmed_tap_series_at(state, token_key_pos);
                 key_runtime_core_plan_threshold_hold_effects(state, token, token->interaction.binding.long_hold, token->interaction.contract.long_hold, true, true, plan);
                 return;
@@ -478,14 +484,14 @@ void key_runtime_core_plan_active_scan_for_token(key_runtime_core_state_t *state
                 }
                 key_runtime_core_press_token_commit_hold_phase(state, token, !token->interaction.binding.long_hold.present, false);
             }
-            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.longer_hold_term) {
+            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.long_hold_term) {
                 key_runtime_core_scan_clear_confirmed_tap_series_at(state, token_key_pos);
                 key_runtime_core_plan_threshold_hold_effects(state, token, token->interaction.binding.long_hold, token->interaction.contract.long_hold, true, true, plan);
             }
             return;
         case KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING:
         case KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE:
-            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.longer_hold_term) {
+            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.long_hold_term) {
                 key_runtime_core_scan_clear_confirmed_tap_series_at(state, token_key_pos);
                 key_runtime_core_plan_threshold_hold_effects(state, token, token->interaction.binding.long_hold, token->interaction.contract.long_hold, true, true, plan);
             }
@@ -497,23 +503,67 @@ void key_runtime_core_plan_active_scan_for_token(key_runtime_core_state_t *state
     }
 }
 
-bool key_runtime_core_settle_pending_fallback_hold(key_runtime_core_effect_plan_t *plan) {
-    key_runtime_core_state_t *state       = key_runtime_core_state();
-    bool                      settled_any = false;
+// The scans a key missed while its press waited in record admission: held
+// records replay back to back, so a hold threshold the key crossed before at,
+// the physical time of the next event replayed after it, is planned now, in
+// order, as the scan at that threshold would have planned it. The hold gate
+// is read at each threshold, so a release queued after it does not undo the
+// hold, and one queued before it still ends the gesture (D-F01). A key the
+// scans have kept up with gets the same answer again.
+void key_runtime_core_plan_missed_scans_for_token(key_runtime_core_state_t *state, press_token_t *token, uint16_t at, key_runtime_core_effect_plan_t *plan) {
+    uint16_t current_time;
+    uint16_t thresholds[2];
 
-    if (!(state && plan)) {
+    if (!(state && token && token->active && token->handled_key && plan)) {
+        return;
+    }
+    current_time  = state->current_time;
+    thresholds[0] = token->interaction.binding.tap_hold_term;
+    thresholds[1] = token->interaction.binding.long_hold_term;
+    if (thresholds[1] < thresholds[0]) {
+        thresholds[0] = token->interaction.binding.long_hold_term;
+        thresholds[1] = token->interaction.binding.tap_hold_term;
+    }
+    for (uint8_t index = 0; index < 2u; index++) {
+        uint16_t since_press = key_runtime_core_scan_elapsed(token->pressed_at, at);
+
+        if (since_press < thresholds[index] || since_press > key_runtime_core_scan_elapsed(token->pressed_at, current_time)) {
+            continue;
+        }
+        state->current_time = (uint16_t)(token->pressed_at + thresholds[index]);
+        key_runtime_core_plan_active_scan_for_token(state, token, plan);
+    }
+    state->current_time = current_time;
+}
+
+// Not inlined: the reviewed stack paths name it beneath an output.
+__attribute__((noinline)) bool key_runtime_core_pending_fallback_holds(uint32_t due[KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT]) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+    bool                      any   = false;
+
+    for (uint16_t word = 0; word < KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT; word++) {
+        due[word] = 0u;
+    }
+    if (!state) {
         return false;
     }
 
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY; index++) {
-        press_token_t *token  = &state->press_tokens[index];
-        uint8_t        before = plan->count;
-
-        key_runtime_core_plan_fallback_hold_activation(state, token, plan);
-        if (plan->count != before) {
-            settled_any = true;
+        if (key_runtime_core_fallback_hold_due(state, &state->press_tokens[index])) {
+            due[index / 32u] |= UINT32_C(1) << (index % 32u);
+            any = true;
         }
     }
 
-    return settled_any;
+    return any;
+}
+
+bool key_runtime_core_fallback_hold_effect(uint16_t index, key_runtime_effect_t *effect) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+
+    if (!(state && effect && index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY)) {
+        return false;
+    }
+    *effect = key_runtime_core_fallback_hold_register(state, &state->press_tokens[index]);
+    return true;
 }

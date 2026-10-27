@@ -1,0 +1,1808 @@
+{
+ "description": "Noah's keyboard profile as the authored defaults must reproduce it, in tests/host/profile_logical_form.py's logical form. Derived from his backup of 2026-10-19 (portable document version 3: profile schema 3.0, action ABI 0x837cf479, sixteen layers, 128 macro streams) by decoding it with the schema-3 codecs; the schema-3 and schema-4 domain versions are the same, so every value carries over unchanged. The backup's empty Delete row (0x004c, no steps) is left out, as the authored defaults dropped it: a row without steps is no row (firmware D-F27), so no key changes. The Backspace row (0x002a) comes from his export of 2026-10-25, the one difference that export had from these defaults. Since pointing version 4 the backup's Arrow mouse button overrides are not carried (version 4 retired them; Noah does not use them, 2026-10-25), and settings version 9 holds its auto-sniping layer, Navigation (3), as the layer mask 8. Settings version 10 gives each custom key's shortcut a layer mask and the layer kind they act as; the backup's one shortcut turns no layer on, so its kind is Hold (0). Settings version 11 holds up to six keys in place of the one key; the backup's shortcut is its one key. tests/host/folded_keyboard_profile_test.py compares the compiled defaults with it, domain by domain.",
+ "differences": [],
+ "domains": {
+  "rgb": {
+   "stages": 31,
+   "leds": 58,
+   "bitmapBytes": 8,
+   "groups": [
+    {
+     "id": 0,
+     "bitmap": "0000000000004001"
+    },
+    {
+     "id": 1,
+     "bitmap": "0000001f0000e000"
+    }
+   ],
+   "layerColors": [
+    {
+     "layer": 0,
+     "hsv": [0, 0, 0],
+     "mode": 0
+    },
+    {
+     "layer": 1,
+     "hsv": [85, 255, 200],
+     "mode": 1
+    },
+    {
+     "layer": 2,
+     "hsv": [169, 255, 200],
+     "mode": 1
+    },
+    {
+     "layer": 3,
+     "hsv": [180, 255, 200],
+     "mode": 1
+    },
+    {
+     "layer": 4,
+     "hsv": [0, 0, 150],
+     "mode": 1
+    },
+    {
+     "layer": 5,
+     "hsv": [96, 255, 200],
+     "mode": 1
+    },
+    {
+     "layer": 6,
+     "hsv": [140, 255, 200],
+     "mode": 1
+    },
+    {
+     "layer": 7,
+     "hsv": [209, 255, 200],
+     "mode": 0
+    },
+    {
+     "layer": 8,
+     "hsv": [0, 0, 0],
+     "mode": 1
+    },
+    {
+     "layer": 9,
+     "hsv": [0, 0, 0],
+     "mode": 1
+    },
+    {
+     "layer": 10,
+     "hsv": [0, 0, 0],
+     "mode": 1
+    },
+    {
+     "layer": 11,
+     "hsv": [0, 0, 0],
+     "mode": 1
+    },
+    {
+     "layer": 12,
+     "hsv": [0, 0, 0],
+     "mode": 1
+    },
+    {
+     "layer": 13,
+     "hsv": [0, 0, 0],
+     "mode": 1
+    },
+    {
+     "layer": 14,
+     "hsv": [0, 0, 0],
+     "mode": 1
+    },
+    {
+     "layer": 15,
+     "hsv": [0, 0, 0],
+     "mode": 1
+    }
+   ],
+   "layerGroups": [],
+   "autoMouseFade": {
+    "mode": 0,
+    "endHsv": [167, 255, 199]
+   },
+   "pdColors": [
+    {
+     "slot": 0,
+     "hsv": [21, 255, 200],
+     "locality": 2
+    },
+    {
+     "slot": 1,
+     "hsv": [43, 255, 200],
+     "locality": 2
+    },
+    {
+     "slot": 2,
+     "hsv": [213, 255, 200],
+     "locality": 2
+    },
+    {
+     "slot": 3,
+     "hsv": [70, 255, 200],
+     "locality": 2
+    },
+    {
+     "slot": 4,
+     "hsv": [127, 255, 200],
+     "locality": 2
+    },
+    {
+     "slot": 5,
+     "hsv": [55, 255, 200],
+     "locality": 2
+    },
+    {
+     "slot": 6,
+     "hsv": [19, 255, 200],
+     "locality": 3
+    },
+    {
+     "slot": 7,
+     "hsv": [200, 193, 108],
+     "locality": 2
+    },
+    {
+     "slot": 8,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 9,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 10,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 11,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 12,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 13,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 14,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 15,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 16,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 17,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 18,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 19,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 20,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 21,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 22,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 23,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 24,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 25,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 26,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 27,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 28,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 29,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 30,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    },
+    {
+     "slot": 31,
+     "hsv": [0, 0, 0],
+     "locality": 2
+    }
+   ],
+   "pdGroups": [
+    {
+     "selector": 255,
+     "hsv": [0, 0, 0],
+     "group": 1
+    }
+   ],
+   "comboFeedback": {
+    "hsv": [191, 255, 200],
+    "locality": 3
+   },
+   "comboGroups": [
+    {
+     "hsv": [0, 0, 0],
+     "group": 1
+    }
+   ],
+   "tapBranchColors": [
+    [169, 255, 200],
+    [222, 255, 200],
+    [85, 255, 200],
+    [25, 255, 200]
+   ],
+   "keyFeedback": {
+    "committed": [0, 0, 150],
+    "hold": [18, 255, 200],
+    "longHold": [148, 255, 200],
+    "tapPolicy": 1,
+    "locality": 3
+   },
+   "keyFeedbackGroups": [
+    {
+     "semantic": 255,
+     "hsv": [0, 0, 0],
+     "group": 1
+    }
+   ]
+  },
+  "behaviors": [
+   {
+    "key": "0x0806",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 1,
+      "tapAction": "0x770a"
+     }
+    ]
+   },
+   {
+    "key": "0x4309",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": []
+   },
+   {
+    "key": "0x0819",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 1,
+      "tapAction": "0x7707"
+     }
+    ]
+   },
+   {
+    "key": "0x001e",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x021e"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x001f",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x021f"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x0020",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x0220"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x0021",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x0221"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x0022",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x0222"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x0023",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x0223"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x0024",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x0224"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x0025",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x0225"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x0026",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x0226"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x0027",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x0227"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x0028",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x0228"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x0029",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "longHold": {
+       "mode": 2,
+       "repeatHz": 0,
+       "action": "0x0c29"
+      }
+     },
+     {
+      "tap": 1,
+      "tapAction": "0x0235"
+     }
+    ]
+   },
+   {
+    "key": "0x002a",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 500,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 4,
+       "repeatHz": 0,
+       "action": "0x042a"
+      },
+      "longHold": {
+       "mode": 2,
+       "repeatHz": 0,
+       "action": "0x082a"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x002d",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x022d"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x002f",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x022f"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x0030",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x0230"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x0031",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x0231"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x0033",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x0233"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x0034",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x0234"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x0036",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x0236"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x0037",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x0237"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x4338",
+    "tapHoldTerm": 150,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 100,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": []
+   },
+   {
+    "key": "0x004f",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 4,
+       "repeatHz": 0,
+       "action": "0x044f"
+      },
+      "longHold": {
+       "mode": 2,
+       "repeatHz": 0,
+       "action": "0x084f"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x0050",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 4,
+       "repeatHz": 0,
+       "action": "0x0450"
+      },
+      "longHold": {
+       "mode": 2,
+       "repeatHz": 0,
+       "action": "0x0850"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x00d3",
+    "tapHoldTerm": 100,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 100,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 1,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x00d7"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x00e1",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "tapAction": "0x0039"
+     }
+    ]
+   },
+   {
+    "key": "0x00e3",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 1,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x00e2"
+      }
+     },
+     {
+      "tap": 2,
+      "tapAction": "0x52a2"
+     }
+    ]
+   },
+   {
+    "key": "0x00e6",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "tapAction": "0x7ea4"
+     },
+     {
+      "tap": 1,
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x7e86"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x7e80",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "tapAction": "0x0001"
+     },
+     {
+      "tap": 1,
+      "hold": {
+       "mode": 2,
+       "repeatHz": 0,
+       "action": "0x7ea0"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x7e81",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "tapAction": "0x0001"
+     },
+     {
+      "tap": 1,
+      "tapAction": "0x00a8"
+     }
+    ]
+   },
+   {
+    "key": "0x7e82",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "tapAction": "0x0001"
+     }
+    ]
+   },
+   {
+    "key": "0x7e85",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "tapAction": "0x0001"
+     },
+     {
+      "tap": 1,
+      "tapAction": "0x7706",
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x7e83"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x7f00",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "tapAction": "0x7ec3",
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x5223"
+      }
+     },
+     {
+      "tap": 1,
+      "tapAction": "0x00ae",
+      "hold": {
+       "mode": 4,
+       "repeatHz": 0,
+       "action": "0x0029"
+      },
+      "longHold": {
+       "mode": 2,
+       "repeatHz": 0,
+       "action": "0x7ec1"
+      }
+     },
+     {
+      "tap": 2,
+      "tapAction": "0x00ab",
+      "longHold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x00ab"
+      }
+     },
+     {
+      "tap": 3,
+      "tapAction": "0x00ac",
+      "longHold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x00ac"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x7f01",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "tapAction": "0x7ec2",
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x5222"
+      }
+     },
+     {
+      "tap": 1,
+      "tapAction": "0x7ec1",
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x5221"
+      }
+     },
+     {
+      "tap": 2,
+      "tapAction": "0x7ec5",
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x5225"
+      }
+     },
+     {
+      "tap": 3,
+      "tapAction": "0x7ec6",
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x5226"
+      }
+     },
+     {
+      "tap": 4,
+      "tapAction": "0x7ec4",
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x5224"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x7f02",
+    "tapHoldTerm": 1,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 1,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 3,
+       "repeatHz": 100,
+       "action": "0x00d1"
+      }
+     }
+    ]
+   },
+   {
+    "key": "0x7f03",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 0,
+    "multiTapTerm": 0,
+    "flags": 1,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "tapAction": "0x0001",
+      "hold": {
+       "mode": 1,
+       "repeatHz": 0,
+       "action": "0x0d2c"
+      }
+     }
+    ]
+   }
+  ],
+  "combos": {
+   "defaultTermMs": 50,
+   "holdTermMs": 200,
+   "rows": [
+    {
+     "output": "0x002b",
+     "inputs": ["0x0007", "0x4309"],
+     "flags": 0,
+     "termMs": 0,
+     "allowedLayers": 65535
+    },
+    {
+     "output": "0x7f02",
+     "inputs": ["0x7e85", "0x00d3"],
+     "flags": 0,
+     "termMs": 0,
+     "allowedLayers": 65535
+    },
+    {
+     "output": "0x00e3",
+     "inputs": ["0x0011", "0x0010"],
+     "flags": 0,
+     "termMs": 0,
+     "allowedLayers": 65535
+    },
+    {
+     "output": "0x0811",
+     "inputs": ["0x0010", "0x0036", "0x0037", "0x4338"],
+     "flags": 0,
+     "termMs": 0,
+     "allowedLayers": 65535
+    },
+    {
+     "output": "0x0811",
+     "inputs": ["0x00d1", "0x00d2", "0x7e80", "0x4338"],
+     "flags": 0,
+     "termMs": 0,
+     "allowedLayers": 65535
+    },
+    {
+     "output": "0x00e3",
+     "inputs": ["0x00d1", "0x7e81"],
+     "flags": 0,
+     "termMs": 0,
+     "allowedLayers": 65535
+    },
+    {
+     "output": "0x0804",
+     "inputs": ["0x0806", "0x0819"],
+     "flags": 0,
+     "termMs": 0,
+     "allowedLayers": 65535
+    },
+    {
+     "output": "0x0817",
+     "inputs": ["0x00d1", "0x00d2", "0x7e80"],
+     "flags": 0,
+     "termMs": 0,
+     "allowedLayers": 65535
+    },
+    {
+     "output": "0x0817",
+     "inputs": ["0x0010", "0x0036", "0x0037"],
+     "flags": 0,
+     "termMs": 0,
+     "allowedLayers": 65535
+    },
+    {
+     "output": "0x00d6",
+     "inputs": ["0x00d1", "0x00d2"],
+     "flags": 0,
+     "termMs": 0,
+     "allowedLayers": 65535
+    },
+    {
+     "output": "0x5225",
+     "inputs": ["0x7f01", "0x002a"],
+     "flags": 0,
+     "termMs": 0,
+     "allowedLayers": 65535
+    },
+    {
+     "output": "0x5221",
+     "inputs": ["0x002c", "0x004c"],
+     "flags": 0,
+     "termMs": 0,
+     "allowedLayers": 65535
+    },
+    {
+     "output": "0x0029",
+     "inputs": ["0x421d", "0x001b", "0x0006", "0x0019", "0x0010", "0x0036", "0x0037", "0x4338"],
+     "flags": 0,
+     "termMs": 0,
+     "allowedLayers": 65535
+    },
+    {
+     "output": "0x5225",
+     "inputs": ["0x7f00", "0x002a"],
+     "flags": 0,
+     "termMs": 0,
+     "allowedLayers": 65535
+    },
+    {
+     "output": "0x7f04",
+     "inputs": ["0x002a", "0x0028"],
+     "flags": 0,
+     "termMs": 0,
+     "allowedLayers": 65535
+    }
+   ]
+  },
+  "settings": {
+   "flags": 0,
+   "values": {
+    "TAPPING_TERM": 200,
+    "TAP_HOLD_TERM": 150,
+    "LONG_HOLD_TERM": 400,
+    "MULTI_TAP_TERM": 150,
+    "AUTO_MOUSE_ENABLED": 1,
+    "AUTO_MOUSE_LAYER": 4,
+    "AUTO_MOUSE_TIMEOUT": 1200,
+    "AUTO_MOUSE_DEBOUNCE": 25,
+    "AUTO_SNIPING_ENABLED": 1,
+    "AUTO_SNIPING_LAYERS": 8,
+    "DRAGSCROLL_DPI": 0,
+    "VOLUME_DPI": 0,
+    "BRIGHTNESS_DPI": 0,
+    "ZOOM_DPI": 0,
+    "ARROW_DPI": 0,
+    "FEEDBACK_PERIOD": 200,
+    "AUTO_MOUSE_DEAD_TIME": 400,
+    "RGB_TIMEOUT": 600000,
+    "DEFAULT_DPI": 400,
+    "SNIPING_DPI": 100,
+    "COMBOS_ENABLED": 1,
+    "RGB_MODE": 4280287489,
+    "RGB_COLOR": 13172480,
+    "DEFAULT_LAYERS": 1,
+    "KEYMAP_OPTIONS": 5120,
+    "AUTO_MOUSE_DELAY": 200,
+    "AUTO_MOUSE_THRESHOLD": 10,
+    "UNICODE_HOST_MODE": 131073,
+    "BEHAVIORS_ENABLED": 1,
+    "LAYER_BEHAVIORS": 65535,
+    "LAYER_COMBOS": 65535
+   },
+   "layers": [
+    {
+     "comboReference": 0,
+     "bypass": "0000000000000000",
+     "exclusion": "0000000000000000"
+    },
+    {
+     "comboReference": 1,
+     "bypass": "0000000000000000",
+     "exclusion": "0000000000000000"
+    },
+    {
+     "comboReference": 2,
+     "bypass": "0000000000000000",
+     "exclusion": "0000000000000000"
+    },
+    {
+     "comboReference": 3,
+     "bypass": "0000000000000000",
+     "exclusion": "0000000000000000"
+    },
+    {
+     "comboReference": 4,
+     "bypass": "0000000000000000",
+     "exclusion": "0000000000000000"
+    },
+    {
+     "comboReference": 5,
+     "bypass": "0000000000000000",
+     "exclusion": "0000000000000000"
+    },
+    {
+     "comboReference": 6,
+     "bypass": "0000000000000000",
+     "exclusion": "0000000000000000"
+    },
+    {
+     "comboReference": 7,
+     "bypass": "0000000000000000",
+     "exclusion": "0000000000000000"
+    },
+    {
+     "comboReference": 8,
+     "bypass": "0000000000000000",
+     "exclusion": "0000000000000000"
+    },
+    {
+     "comboReference": 9,
+     "bypass": "0000000000000000",
+     "exclusion": "0000000000000000"
+    },
+    {
+     "comboReference": 10,
+     "bypass": "0000000000000000",
+     "exclusion": "0000000000000000"
+    },
+    {
+     "comboReference": 11,
+     "bypass": "0000000000000000",
+     "exclusion": "0000000000000000"
+    },
+    {
+     "comboReference": 12,
+     "bypass": "0000000000000000",
+     "exclusion": "0000000000000000"
+    },
+    {
+     "comboReference": 13,
+     "bypass": "0000000000000000",
+     "exclusion": "0000000000000000"
+    },
+    {
+     "comboReference": 14,
+     "bypass": "0000000000000000",
+     "exclusion": "0000000000000000"
+    },
+    {
+     "comboReference": 15,
+     "bypass": "0000000000000000",
+     "exclusion": "0000000000000000"
+    }
+   ],
+   "customKeyShortcuts": {
+    "4": [5, [44], 0, 0]
+   },
+   "layerNames": ["Base", "Number", "Symbol", "Navigation", "Pointing", "Function", "Game", "Extra", "", "", "", "", "", "", "", ""],
+   "macroNames": {
+    "0": "Spotlight",
+    "1": "AI Chat",
+    "2": "Warp Terminal",
+    "3": "OCR Copy",
+    "4": "Drag Screenshot",
+    "5": "Emoji",
+    "6": "Zoom Screen",
+    "7": "Clipboard History",
+    "8": "VS Code Preview MD",
+    "9": "VS Code Run Task",
+    "10": "Select All + Copy",
+    "11": "Select All",
+    "12": "Copy",
+    "13": "Paste",
+    "14": "Cut",
+    "15": "Undo",
+    "16": "Redo",
+    "19": "T3 Code"
+   },
+   "customKeyNames": {
+    "0": "Right Thumb",
+    "1": "Left Thumb",
+    "2": "Click Spam",
+    "3": "Vorssaint Radial",
+    "4": "VoiceInk"
+   },
+   "keyboardName": "Charybdis - Home"
+  },
+  "pointing": {
+   "0": {
+    "kind": 2,
+    "pointerLayer": 0,
+    "axis": 0,
+    "dpi": 100,
+    "heldModifiers": 0,
+    "name": "Dragscroll",
+    "thresholdX": 0,
+    "thresholdY": 0,
+    "directions": [
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     }
+    ],
+    "link": {
+     "layer": 0,
+     "direction": 0,
+     "light": 0
+    },
+    "scroll": [2, 3, 6, 8, 8, 80, 55, 7, 4, 5, 4, 4, 2]
+   },
+   "1": {
+    "kind": 1,
+    "pointerLayer": 0,
+    "axis": 0,
+    "dpi": 400,
+    "heldModifiers": 0,
+    "name": "Volume",
+    "thresholdX": 0,
+    "thresholdY": 60,
+    "directions": [
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x00a9",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x00aa",
+      "policy": 0,
+      "mask": 0
+     }
+    ],
+    "link": {
+     "layer": 0,
+     "direction": 0,
+     "light": 0
+    },
+    "diagonals": [
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     }
+    ],
+    "emptyDirection": 0,
+    "directionOutput": 0
+   },
+   "2": {
+    "kind": 1,
+    "pointerLayer": 0,
+    "axis": 0,
+    "dpi": 400,
+    "heldModifiers": 0,
+    "name": "Brightness",
+    "thresholdX": 0,
+    "thresholdY": 60,
+    "directions": [
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x00bd",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x00be",
+      "policy": 0,
+      "mask": 0
+     }
+    ],
+    "link": {
+     "layer": 0,
+     "direction": 0,
+     "light": 0
+    },
+    "diagonals": [
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     }
+    ],
+    "emptyDirection": 0,
+    "directionOutput": 0
+   },
+   "3": {
+    "kind": 1,
+    "pointerLayer": 0,
+    "axis": 0,
+    "dpi": 400,
+    "heldModifiers": 0,
+    "name": "Zoom",
+    "thresholdX": 0,
+    "thresholdY": 80,
+    "directions": [
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x082e",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x082d",
+      "policy": 0,
+      "mask": 0
+     }
+    ],
+    "link": {
+     "layer": 0,
+     "direction": 0,
+     "light": 0
+    },
+    "diagonals": [
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     }
+    ],
+    "emptyDirection": 0,
+    "directionOutput": 0
+   },
+   "4": {
+    "kind": 1,
+    "pointerLayer": 1,
+    "axis": 2,
+    "dpi": 400,
+    "heldModifiers": 0,
+    "name": "Arrow",
+    "thresholdX": 40,
+    "thresholdY": 50,
+    "directions": [
+     {
+      "keycode": "0x0050",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x004f",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0052",
+      "policy": 1,
+      "mask": 68
+     },
+     {
+      "keycode": "0x0051",
+      "policy": 1,
+      "mask": 68
+     }
+    ],
+    "link": {
+     "layer": 0,
+     "direction": 0,
+     "light": 0
+    },
+    "diagonals": [
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     }
+    ],
+    "emptyDirection": 0,
+    "directionOutput": 0
+   },
+   "5": {
+    "kind": 2,
+    "pointerLayer": 0,
+    "axis": 2,
+    "dpi": 100,
+    "heldModifiers": 8,
+    "name": "Pinch",
+    "thresholdX": 0,
+    "thresholdY": 0,
+    "directions": [
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     }
+    ],
+    "link": {
+     "layer": 0,
+     "direction": 0,
+     "light": 0
+    },
+    "scroll": [2, 3, 6, 8, 8, 80, 55, 7, 4, 5, 4, 4, 2]
+   },
+   "6": {
+    "kind": 1,
+    "pointerLayer": 0,
+    "axis": 1,
+    "dpi": 100,
+    "heldModifiers": 0,
+    "name": "Undo / Redo",
+    "thresholdX": 40,
+    "thresholdY": 0,
+    "directions": [
+     {
+      "keycode": "0x081d",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0a1d",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     }
+    ],
+    "link": {
+     "layer": 0,
+     "direction": 0,
+     "light": 0
+    },
+    "diagonals": [
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     }
+    ],
+    "emptyDirection": 0,
+    "directionOutput": 0
+   },
+   "7": {
+    "kind": 1,
+    "pointerLayer": 0,
+    "axis": 1,
+    "dpi": 0,
+    "heldModifiers": 0,
+    "name": "Back / Forward",
+    "thresholdX": 60,
+    "thresholdY": 0,
+    "directions": [
+     {
+      "keycode": "0x00d4",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x00d5",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     }
+    ],
+    "link": {
+     "layer": 0,
+     "direction": 0,
+     "light": 0
+    },
+    "diagonals": [
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     },
+     {
+      "keycode": "0x0000",
+      "policy": 0,
+      "mask": 0
+     }
+    ],
+    "emptyDirection": 0,
+    "directionOutput": 1
+   }
+  },
+  "keymap": [
+   ["0x0029", "0x001e", "0x001f", "0x0020", "0x0021", "0x0022", "0x002b", "0x0014", "0x001a", "0x0008", "0x0015", "0x0017", "0x00e1", "0x0004", "0x0016", "0x0007", "0x4309", "0x000a", "0x00e0", "0x421d", "0x001b", "0x0006", "0x0019", "0x0005", "0x0000", "0x7f01", "0x002a", "0x00e3", "0x002c", "0x004c", "0x002d", "0x0027", "0x0026", "0x0025", "0x0024", "0x0023", "0x0031", "0x0013", "0x0012", "0x000c", "0x0018", "0x001c", "0x0034", "0x0033", "0x000f", "0x000e", "0x420d", "0x000b", "0x00e6", "0x4338", "0x0037", "0x0036", "0x0010", "0x0011", "0x0000", "0x7f00", "0x0000", "0x0028", "0x0000", "0x002a"],
+   ["0x0029", "0x003a", "0x003b", "0x003c", "0x003d", "0x003e", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x00e1", "0x0001", "0x0001", "0x0001", "0x5223", "0x0001", "0x00e6", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x002d", "0x0043", "0x0042", "0x0041", "0x0040", "0x003f", "0x0057", "0x0001", "0x0061", "0x0060", "0x005f", "0x0001", "0x0067", "0x0001", "0x005e", "0x005d", "0x005c", "0x0001", "0x0037", "0x0036", "0x005b", "0x005a", "0x0059", "0x0001", "0x0000", "0x0001", "0x0000", "0x0062", "0x0000", "0x0001"],
+   ["0x0029", "0x0001", "0x7e00", "0x7e01", "0x7e02", "0x7e03", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x00e1", "0x0001", "0x0001", "0x0001", "0x0029", "0x0001", "0x7705", "0x0001", "0x7704", "0x7703", "0x7708", "0x7709", "0x0000", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x002d", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0057", "0x0034", "0x0227", "0x0226", "0x0001", "0x0001", "0x0067", "0x0234", "0x0030", "0x002f", "0x0001", "0x0001", "0x0001", "0x0001", "0x0230", "0x022f", "0x0001", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001"],
+   ["0x0001", "0x0001", "0x0001", "0x7707", "0x0001", "0x0001", "0x0001", "0x0814", "0x081a", "0x770b", "0x0001", "0x0001", "0x00e1", "0x7710", "0x0001", "0x770c", "0x0001", "0x0001", "0x00e2", "0x770f", "0x770e", "0x770d", "0x0001", "0x0001", "0x0000", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0819", "0x0052", "0x0806", "0x7702", "0x0001", "0x0001", "0x004f", "0x0051", "0x0050", "0x7701", "0x0001", "0x0001", "0x7e80", "0x00d2", "0x00d1", "0x7700", "0x0000", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001"],
+   ["0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x7e87", "0x7f03", "0x00d3", "0x7e85", "0x7e82", "0x0001", "0x0001", "0x7e80", "0x00d2", "0x00d1", "0x7e81", "0x0000", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001"],
+   ["0x0001", "0x003a", "0x003b", "0x003c", "0x003d", "0x003e", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0044", "0x0043", "0x0042", "0x0041", "0x0040", "0x003f", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x7702", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0818", "0x0822", "0x0821", "0x0820", "0x081f", "0x081e", "0x7713", "0x0000", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001"],
+   ["0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0014", "0x001a", "0x0008", "0x0015", "0x0001", "0x0001", "0x0004", "0x0016", "0x0007", "0x0009", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001"],
+   ["0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001"],
+   ["0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001"],
+   ["0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001"],
+   ["0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001"],
+   ["0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001"],
+   ["0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001"],
+   ["0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001"],
+   ["0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001"],
+   ["0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001"]
+  ],
+  "macros": ["0102e301012c0103e3", "0102e201012c0103e2", "0102e20102e301012c0103e30103e2", "0102e00102e20102e30101060103e30103e20103e0", "0102e00102e20102e301011b0103e30103e20103e0", "0102e00102e301012c0103e30103e0", "0102e20102e30101250103e30103e2", "0102e00102e20102e30101190103e30103e20103e0", "0102e10102e30101190103e30103e1", "0102e10102e30101130103e30103e1", "0102e30101040103e3010435307c0102e30101060103e3", "0102e30101040103e3", "0102e30101060103e3", "0102e30101190103e3", "0102e301011b0103e3", "0102e301011d0103e3", "0102e10102e301011d0103e30103e1", "", "", "0102e301012b01043132307c743320636f64650103e3", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+ }
+}

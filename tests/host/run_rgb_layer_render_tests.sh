@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 
@@ -10,10 +11,11 @@ noah_host_require_tool rg
 BUILD_DIR="$(mktemp -d)"
 BIN="$BUILD_DIR/rgb_layer_render_test"
 BIN_WORKLOAD="$BUILD_DIR/rgb_render_workload_test"
+BIN_IDLE_TIMEOUT="$BUILD_DIR/rgb_layer_render_test_idle_timeout"
 BIN_BASE_UNDERLAY="$BUILD_DIR/rgb_base_underlay_test"
-BIN_PD_EFFECTIVE="$BUILD_DIR/rgb_pd_effective_test"
-BIN_COMBO_EFFECTIVE="$BUILD_DIR/rgb_combo_effective_test"
-BIN_KEY_EFFECTIVE="$BUILD_DIR/rgb_key_effective_test"
+BIN_PD_ACTIVE_PROFILE="$BUILD_DIR/rgb_pd_active_profile_test"
+BIN_COMBO_ACTIVE_PROFILE="$BUILD_DIR/rgb_combo_active_profile_test"
+BIN_KEY_ACTIVE_PROFILE="$BUILD_DIR/rgb_key_active_profile_test"
 BIN_END_FILL_UNPAINTED="$BUILD_DIR/rgb_layer_render_test_end_fill_unpainted"
 BIN_END_OVERRIDE="$BUILD_DIR/rgb_layer_render_test_end_override"
 BIN_KEY_HALF="$BUILD_DIR/rgb_layer_render_test_key_half"
@@ -39,14 +41,17 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DRGB_MATRIX_WS2812 \
     -DAUTO_MOUSE_TIME=900 \
     -DRGB_MATRIX_LED_COUNT=4 \
+    -DNOAH_ACTIVE_PROFILE_RGB_RUNTIME_TEST_BACKEND \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_base_underlay_test.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
-    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
-    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_active_profile_config.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_rgb_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     -o "$BIN_BASE_UNDERLAY"
@@ -61,26 +66,28 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DMATRIX_COLS=2 \
     -DRGB_MATRIX_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
-    -DRGB_PD_MODE_FEEDBACK_ENABLE \
-    -DRGB_PD_MODE_ACTIVE_HALF_ENABLE \
-    -DPD_MODE_VOLUME_DPI=0 \
-    -DPD_MODE_BRIGHTNESS_DPI=0 \
-    -DPD_MODE_ZOOM_DPI=400 \
-    -DPD_MODE_ARROW_DPI=400 \
+    -DRGB_POINTING_MODE_FEEDBACK_ENABLE \
+    -DRGB_POINTING_MODE_ACTIVE_HALF_ENABLE \
+    -DPOINTING_MODE_VOLUME_DPI=0 \
+    -DPOINTING_MODE_BRIGHTNESS_DPI=0 \
+    -DPOINTING_MODE_ZOOM_DPI=400 \
+    -DPOINTING_MODE_ARROW_DPI=400 \
     -DRGB_MATRIX_LED_COUNT=8 \
     -DRGB_LEFT_LED_COUNT=4 \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
-    "$ROOT/tests/host/rgb_pd_effective_test.c" \
-    "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
-    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
-    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/tests/host/rgb_pd_active_profile_test.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_pointing_mode_stage.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_active_profile_config.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_rgb_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
-    -o "$BIN_PD_EFFECTIVE"
+    -o "$BIN_PD_ACTIVE_PROFILE"
 
-"$BIN_PD_EFFECTIVE" "$ROOT/tests/fixtures/rgb_domain_v1.fixture"
+"$BIN_PD_ACTIVE_PROFILE" "$ROOT/tests/fixtures/rgb_domain_v1.fixture"
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
@@ -96,15 +103,17 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
-    "$ROOT/tests/host/rgb_combo_effective_test.c" \
+    "$ROOT/tests/host/rgb_combo_active_profile_test.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
-    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
-    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_active_profile_config.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_rgb_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
-    -o "$BIN_COMBO_EFFECTIVE"
+    -o "$BIN_COMBO_ACTIVE_PROFILE"
 
-"$BIN_COMBO_EFFECTIVE" "$ROOT/tests/fixtures/rgb_domain_v1.fixture"
+"$BIN_COMBO_ACTIVE_PROFILE" "$ROOT/tests/fixtures/rgb_domain_v1.fixture"
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
@@ -120,15 +129,17 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
-    "$ROOT/tests/host/rgb_key_effective_test.c" \
+    "$ROOT/tests/host/rgb_key_active_profile_test.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
-    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
-    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_active_profile_config.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_rgb_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
-    -o "$BIN_KEY_EFFECTIVE"
+    -o "$BIN_KEY_ACTIVE_PROFILE"
 
-"$BIN_KEY_EFFECTIVE" "$ROOT/tests/fixtures/rgb_domain_v1.fixture"
+"$BIN_KEY_ACTIVE_PROFILE" "$ROOT/tests/fixtures/rgb_domain_v1.fixture"
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
@@ -138,36 +149,37 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DCOMBO_ENABLE \
     -DRGB_COMBO_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
-    -DRGB_PD_MODE_FEEDBACK_ENABLE \
+    -DRGB_POINTING_MODE_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
-    -DRGB_PD_MODE_ACTIVE_HALF_ENABLE \
+    -DRGB_POINTING_MODE_ACTIVE_HALF_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS=200 \
     -DSPLIT_TRANSACTION_IDS_USER \
     -DRGB_LEFT_LED_COUNT=4 \
     -DAUTO_MOUSE_TIME=120u \
     -DAUTOMOUSE_RGB_DEAD_TIME=20u \
-    -DPD_MODE_VOLUME_DPI=0 \
-    -DPD_MODE_BRIGHTNESS_DPI=0 \
-    -DPD_MODE_ZOOM_DPI=400 \
-    -DPD_MODE_ARROW_DPI=400 \
+    -DPOINTING_MODE_VOLUME_DPI=0 \
+    -DPOINTING_MODE_BRIGHTNESS_DPI=0 \
+    -DPOINTING_MODE_ZOOM_DPI=400 \
+    -DPOINTING_MODE_ARROW_DPI=400 \
     -DRGB_MATRIX_LED_COUNT=8 \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
-    "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_pointing_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
-    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
-    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_active_profile_config.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_rgb_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
@@ -176,6 +188,56 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -o "$BIN"
 
 "$BIN"
+
+cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+    -DNOAH_PORTABLE_PROFILE_ENABLE \
+    -DRGB_LAYER_RENDER_TEST_IDLE_TIMEOUT=1 \
+    -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -DNOAH_RUNTIME_DIAG_TEST_BACKEND \
+    -DRGB_MATRIX_ENABLE \
+    -DRGB_MATRIX_WS2812 \
+    -DCOMBO_ENABLE \
+    -DRGB_COMBO_FEEDBACK_ENABLE \
+    -DPOINTING_DEVICE_ENABLE \
+    -DRGB_POINTING_MODE_FEEDBACK_ENABLE \
+    -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
+    -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
+    -DRGB_POINTING_MODE_ACTIVE_HALF_ENABLE \
+    -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE \
+    -DRGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS=200 \
+    -DSPLIT_TRANSACTION_IDS_USER \
+    -DRGB_LEFT_LED_COUNT=4 \
+    -DAUTO_MOUSE_TIME=120u \
+    -DAUTOMOUSE_RGB_DEAD_TIME=20u \
+    -DPOINTING_MODE_VOLUME_DPI=0 \
+    -DPOINTING_MODE_BRIGHTNESS_DPI=0 \
+    -DPOINTING_MODE_ZOOM_DPI=400 \
+    -DPOINTING_MODE_ARROW_DPI=400 \
+    -DRGB_MATRIX_LED_COUNT=8 \
+    -I"$ROOT" \
+    -I"$ROOT/users/noah" \
+    -I"$ROOT/tests/host/include" \
+    "$ROOT/tests/host/rgb_layer_render_test.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
+    "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
+    "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_pointing_mode_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_active_profile_config.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c" \
+    "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
+    -o "$BIN_IDLE_TIMEOUT"
+
+"$BIN_IDLE_TIMEOUT"
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
@@ -188,37 +250,38 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DCOMBO_ENABLE \
     -DRGB_COMBO_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
-    -DRGB_PD_MODE_FEEDBACK_ENABLE \
+    -DRGB_POINTING_MODE_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
-    -DRGB_PD_MODE_ACTIVE_HALF_ENABLE \
+    -DRGB_POINTING_MODE_ACTIVE_HALF_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS=200 \
     -DSPLIT_TRANSACTION_IDS_USER \
     -DRGB_LEFT_LED_COUNT=29 \
     -DAUTO_MOUSE_TIME=120u \
     -DAUTOMOUSE_RGB_DEAD_TIME=20u \
-    -DPD_MODE_VOLUME_DPI=0 \
-    -DPD_MODE_BRIGHTNESS_DPI=0 \
-    -DPD_MODE_ZOOM_DPI=400 \
-    -DPD_MODE_ARROW_DPI=400 \
+    -DPOINTING_MODE_VOLUME_DPI=0 \
+    -DPOINTING_MODE_BRIGHTNESS_DPI=0 \
+    -DPOINTING_MODE_ZOOM_DPI=400 \
+    -DPOINTING_MODE_ARROW_DPI=400 \
     -DRGB_MATRIX_LED_COUNT=58 \
     -DRGB_LAYER_RENDER_TEST_WORKLOAD=1 \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
-    "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_pointing_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
-    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
-    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_active_profile_config.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_rgb_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
@@ -236,37 +299,38 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DCOMBO_ENABLE \
     -DRGB_COMBO_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
-    -DRGB_PD_MODE_FEEDBACK_ENABLE \
+    -DRGB_POINTING_MODE_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
-    -DRGB_PD_MODE_ACTIVE_HALF_ENABLE \
+    -DRGB_POINTING_MODE_ACTIVE_HALF_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS=200 \
     -DSPLIT_TRANSACTION_IDS_USER \
     -DRGB_LEFT_LED_COUNT=4 \
     -DAUTO_MOUSE_TIME=120u \
     -DAUTOMOUSE_RGB_DEAD_TIME=20u \
-    -DPD_MODE_VOLUME_DPI=0 \
-    -DPD_MODE_BRIGHTNESS_DPI=0 \
-    -DPD_MODE_ZOOM_DPI=400 \
-    -DPD_MODE_ARROW_DPI=400 \
+    -DPOINTING_MODE_VOLUME_DPI=0 \
+    -DPOINTING_MODE_BRIGHTNESS_DPI=0 \
+    -DPOINTING_MODE_ZOOM_DPI=400 \
+    -DPOINTING_MODE_ARROW_DPI=400 \
     -DRGB_MATRIX_LED_COUNT=8 \
     -DRGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS=1 \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
-    "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_pointing_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
-    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
-    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_active_profile_config.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_rgb_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
@@ -284,20 +348,20 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DCOMBO_ENABLE \
     -DRGB_COMBO_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
-    -DRGB_PD_MODE_FEEDBACK_ENABLE \
+    -DRGB_POINTING_MODE_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
-    -DRGB_PD_MODE_ACTIVE_HALF_ENABLE \
+    -DRGB_POINTING_MODE_ACTIVE_HALF_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS=200 \
     -DSPLIT_TRANSACTION_IDS_USER \
     -DRGB_LEFT_LED_COUNT=4 \
     -DAUTO_MOUSE_TIME=120u \
     -DAUTOMOUSE_RGB_DEAD_TIME=20u \
-    -DPD_MODE_VOLUME_DPI=0 \
-    -DPD_MODE_BRIGHTNESS_DPI=0 \
-    -DPD_MODE_ZOOM_DPI=400 \
-    -DPD_MODE_ARROW_DPI=400 \
+    -DPOINTING_MODE_VOLUME_DPI=0 \
+    -DPOINTING_MODE_BRIGHTNESS_DPI=0 \
+    -DPOINTING_MODE_ZOOM_DPI=400 \
+    -DPOINTING_MODE_ARROW_DPI=400 \
     -DRGB_MATRIX_LED_COUNT=8 \
     -DRGB_LAYER_RENDER_TEST_LAYER_GROUPS=1 \
     -DRGB_LAYER_STAGE_TEST_BACKEND \
@@ -305,17 +369,18 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
-    "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_pointing_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
-    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
-    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_active_profile_config.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_rgb_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
@@ -341,37 +406,38 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DCOMBO_ENABLE \
     -DRGB_COMBO_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
-    -DRGB_PD_MODE_FEEDBACK_ENABLE \
+    -DRGB_POINTING_MODE_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
-    -DRGB_PD_MODE_ACTIVE_HALF_ENABLE \
+    -DRGB_POINTING_MODE_ACTIVE_HALF_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS=200 \
     -DSPLIT_TRANSACTION_IDS_USER \
     -DRGB_LEFT_LED_COUNT=4 \
     -DAUTO_MOUSE_TIME=120u \
     -DAUTOMOUSE_RGB_DEAD_TIME=20u \
-    -DPD_MODE_VOLUME_DPI=0 \
-    -DPD_MODE_BRIGHTNESS_DPI=0 \
-    -DPD_MODE_ZOOM_DPI=400 \
-    -DPD_MODE_ARROW_DPI=400 \
+    -DPOINTING_MODE_VOLUME_DPI=0 \
+    -DPOINTING_MODE_BRIGHTNESS_DPI=0 \
+    -DPOINTING_MODE_ZOOM_DPI=400 \
+    -DPOINTING_MODE_ARROW_DPI=400 \
     -DRGB_MATRIX_LED_COUNT=8 \
     -DRGB_LAYER_RENDER_TEST_AUTOMOUSE_END_FILL_UNPAINTED=1 \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
-    "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_pointing_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
-    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
-    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_active_profile_config.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_rgb_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
@@ -389,37 +455,38 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DCOMBO_ENABLE \
     -DRGB_COMBO_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
-    -DRGB_PD_MODE_FEEDBACK_ENABLE \
+    -DRGB_POINTING_MODE_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
-    -DRGB_PD_MODE_ACTIVE_HALF_ENABLE \
+    -DRGB_POINTING_MODE_ACTIVE_HALF_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS=200 \
     -DSPLIT_TRANSACTION_IDS_USER \
     -DRGB_LEFT_LED_COUNT=4 \
     -DAUTO_MOUSE_TIME=120u \
     -DAUTOMOUSE_RGB_DEAD_TIME=20u \
-    -DPD_MODE_VOLUME_DPI=0 \
-    -DPD_MODE_BRIGHTNESS_DPI=0 \
-    -DPD_MODE_ZOOM_DPI=400 \
-    -DPD_MODE_ARROW_DPI=400 \
+    -DPOINTING_MODE_VOLUME_DPI=0 \
+    -DPOINTING_MODE_BRIGHTNESS_DPI=0 \
+    -DPOINTING_MODE_ZOOM_DPI=400 \
+    -DPOINTING_MODE_ARROW_DPI=400 \
     -DRGB_MATRIX_LED_COUNT=8 \
     -DRGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE=1 \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
-    "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_pointing_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
-    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
-    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_active_profile_config.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_rgb_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
@@ -437,37 +504,38 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DCOMBO_ENABLE \
     -DRGB_COMBO_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
-    -DRGB_PD_MODE_FEEDBACK_ENABLE \
+    -DRGB_POINTING_MODE_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
-    -DRGB_PD_MODE_ACTIVE_HALF_ENABLE \
+    -DRGB_POINTING_MODE_ACTIVE_HALF_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS=200 \
     -DSPLIT_TRANSACTION_IDS_USER \
     -DRGB_LEFT_LED_COUNT=4 \
     -DAUTO_MOUSE_TIME=120u \
     -DAUTOMOUSE_RGB_DEAD_TIME=20u \
-    -DPD_MODE_VOLUME_DPI=0 \
-    -DPD_MODE_BRIGHTNESS_DPI=0 \
-    -DPD_MODE_ZOOM_DPI=400 \
-    -DPD_MODE_ARROW_DPI=400 \
+    -DPOINTING_MODE_VOLUME_DPI=0 \
+    -DPOINTING_MODE_BRIGHTNESS_DPI=0 \
+    -DPOINTING_MODE_ZOOM_DPI=400 \
+    -DPOINTING_MODE_ARROW_DPI=400 \
     -DRGB_MATRIX_LED_COUNT=8 \
     -DRGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF=1 \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
-    "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_pointing_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
-    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
-    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_active_profile_config.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_rgb_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
@@ -485,37 +553,38 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DCOMBO_ENABLE \
     -DRGB_COMBO_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
-    -DRGB_PD_MODE_FEEDBACK_ENABLE \
+    -DRGB_POINTING_MODE_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
-    -DRGB_PD_MODE_ACTIVE_HALF_ENABLE \
+    -DRGB_POINTING_MODE_ACTIVE_HALF_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS=200 \
     -DSPLIT_TRANSACTION_IDS_USER \
     -DRGB_LEFT_LED_COUNT=4 \
     -DAUTO_MOUSE_TIME=120u \
     -DAUTOMOUSE_RGB_DEAD_TIME=20u \
-    -DPD_MODE_VOLUME_DPI=0 \
-    -DPD_MODE_BRIGHTNESS_DPI=0 \
-    -DPD_MODE_ZOOM_DPI=400 \
-    -DPD_MODE_ARROW_DPI=400 \
+    -DPOINTING_MODE_VOLUME_DPI=0 \
+    -DPOINTING_MODE_BRIGHTNESS_DPI=0 \
+    -DPOINTING_MODE_ZOOM_DPI=400 \
+    -DPOINTING_MODE_ARROW_DPI=400 \
     -DRGB_MATRIX_LED_COUNT=8 \
     -DRGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY=1 \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
-    "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_pointing_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
-    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
-    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_active_profile_config.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_rgb_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
@@ -533,37 +602,38 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DCOMBO_ENABLE \
     -DRGB_COMBO_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
-    -DRGB_PD_MODE_FEEDBACK_ENABLE \
+    -DRGB_POINTING_MODE_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
-    -DRGB_PD_MODE_ACTIVE_HALF_ENABLE \
+    -DRGB_POINTING_MODE_ACTIVE_HALF_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS=200 \
     -DSPLIT_TRANSACTION_IDS_USER \
     -DRGB_LEFT_LED_COUNT=4 \
     -DAUTO_MOUSE_TIME=120u \
     -DAUTOMOUSE_RGB_DEAD_TIME=20u \
-    -DPD_MODE_VOLUME_DPI=0 \
-    -DPD_MODE_BRIGHTNESS_DPI=0 \
-    -DPD_MODE_ZOOM_DPI=400 \
-    -DPD_MODE_ARROW_DPI=400 \
+    -DPOINTING_MODE_VOLUME_DPI=0 \
+    -DPOINTING_MODE_BRIGHTNESS_DPI=0 \
+    -DPOINTING_MODE_ZOOM_DPI=400 \
+    -DPOINTING_MODE_ARROW_DPI=400 \
     -DRGB_MATRIX_LED_COUNT=8 \
     -DRGB_LAYER_RENDER_TEST_KEY_FEEDBACK_LEFT_HALF=1 \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
-    "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_pointing_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
-    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
-    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_active_profile_config.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_rgb_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
@@ -581,37 +651,38 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DCOMBO_ENABLE \
     -DRGB_COMBO_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
-    -DRGB_PD_MODE_FEEDBACK_ENABLE \
+    -DRGB_POINTING_MODE_FEEDBACK_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
-    -DRGB_PD_MODE_ACTIVE_HALF_ENABLE \
+    -DRGB_POINTING_MODE_ACTIVE_HALF_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS=200 \
     -DSPLIT_TRANSACTION_IDS_USER \
     -DRGB_LEFT_LED_COUNT=4 \
     -DAUTO_MOUSE_TIME=120u \
     -DAUTOMOUSE_RGB_DEAD_TIME=20u \
-    -DPD_MODE_VOLUME_DPI=0 \
-    -DPD_MODE_BRIGHTNESS_DPI=0 \
-    -DPD_MODE_ZOOM_DPI=400 \
-    -DPD_MODE_ARROW_DPI=400 \
+    -DPOINTING_MODE_VOLUME_DPI=0 \
+    -DPOINTING_MODE_BRIGHTNESS_DPI=0 \
+    -DPOINTING_MODE_ZOOM_DPI=400 \
+    -DPOINTING_MODE_ARROW_DPI=400 \
     -DRGB_MATRIX_LED_COUNT=8 \
     -DRGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF=1 \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
-    "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_pointing_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
-    "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
-    "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_active_profile_config.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_rgb_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
@@ -621,15 +692,15 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 
 "$BIN_KEY_RIGHT"
 
-if rg -n '\b(layer_colors|layer_led_groups|layer_led_group_count|automouse_fade_end_config|pd_mode_colors|pd_mode_color_count|pd_mode_led_groups|pd_mode_led_group_count|combo_feedback_colors|combo_feedback_led_groups|combo_feedback_led_group_count|key_behavior_feedback_colors|key_behavior_feedback_led_groups|key_behavior_feedback_led_group_count)\b' \
+if rg -n '\b(layer_colors|layer_led_groups|layer_led_group_count|automouse_fade_end_config|pointing_mode_colors|pointing_mode_color_count|pointing_mode_led_groups|pointing_mode_led_group_count|combo_feedback_colors|combo_feedback_led_groups|combo_feedback_led_group_count|key_behavior_feedback_colors|key_behavior_feedback_led_groups|key_behavior_feedback_led_group_count)\b' \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
-    "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_pointing_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_preview_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_runtime.c"
 then
-    echo "direct authored RGB reads escaped the effective config adapter" >&2
+    echo "direct authored RGB reads escaped the active-profile config adapter" >&2
     exit 1
 fi

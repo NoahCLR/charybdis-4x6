@@ -1,17 +1,32 @@
-#include "lib/profile/runtime/effective_settings_runtime.h"
+#include "lib/profile/runtime/active_profile_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // Pointer Layer Policy
 // ────────────────────────────────────────────────────────────────────────────
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "pd_mode_policy.h"
-#include "../defs/pd_modes.h"
+#include "pointing_mode_policy.h"
+#include "../defs/pointing_modes.h"
 #include "pointer_layer_policy.h"
 #include "../../action/action_dispatch.h"
+#include "../../action/custom_key_shortcut.h"
 #include "../../compat/qmk_auto_mouse_contract.h"
 #include "../../key/behavior/key_behavior_lookup.h"
 #include "../../state/ownership/layer_ownership.h"
+
+#ifdef CHARYBDIS_AUTO_SNIPING_LAYER
+#    define POINTER_LAYER_POLICY_COMPILED_SNIPING_LAYERS ((uint32_t)1u << CHARYBDIS_AUTO_SNIPING_LAYER)
+#else
+#    define POINTER_LAYER_POLICY_COMPILED_SNIPING_LAYERS 0u
+#endif
+
+static layer_state_t pointer_layer_policy_sniping_layers(void) {
+    return (layer_state_t)noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYERS, POINTER_LAYER_POLICY_COMPILED_SNIPING_LAYERS);
+}
+
+layer_state_t pointer_layer_policy_sniping_layers_on(layer_state_t state) {
+    return noah_setting(NOAH_SETTING_AUTO_SNIPING_ENABLED, 1) ? state & pointer_layer_policy_sniping_layers() : 0u;
+}
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 static inline bool pointer_layer_policy_is_layer_hold_key(uint16_t keycode) {
@@ -22,22 +37,31 @@ static inline bool pointer_layer_policy_is_mouse_button_action(uint16_t action) 
     return IS_MOUSEKEY_BUTTON(action);
 }
 
-static bool pointer_layer_policy_pd_mode_key_keeps_auto_mouse_anchored(uint16_t keycode) {
-    return pd_mode_policy_key_keeps_auto_mouse_anchored(keycode);
+static bool pointer_layer_policy_pointing_mode_key_keeps_auto_mouse_anchored(uint16_t keycode) {
+    return pointing_mode_policy_key_keeps_auto_mouse_anchored(keycode);
 }
 
-static inline bool pointer_layer_policy_auto_mouse_anchored(pd_mode_snapshot_t snapshot) {
-    return noah_qmk_contract_auto_mouse_toggle_enabled() || noah_qmk_contract_auto_mouse_key_tracker() != 0 || pd_mode_policy_snapshot_keeps_auto_mouse_anchored(snapshot);
+static inline bool pointer_layer_policy_auto_mouse_anchored(pointing_mode_snapshot_t snapshot) {
+    return noah_qmk_contract_auto_mouse_toggle_enabled() || noah_qmk_contract_auto_mouse_key_tracker() != 0 || pointing_mode_policy_snapshot_keeps_auto_mouse_anchored(snapshot);
 }
 
 bool pointer_layer_policy_is_mouse_record(uint16_t keycode) {
-    pd_mode_snapshot_t snapshot = pd_mode_snapshot();
+    pointing_mode_snapshot_t snapshot = pointing_mode_snapshot();
 
-    if (pd_mode_policy_snapshot_keeps_auto_mouse_anchored(snapshot) && pointer_layer_policy_is_layer_hold_key(keycode)) {
+    if (pointing_mode_policy_snapshot_keeps_auto_mouse_anchored(snapshot) && pointer_layer_policy_is_layer_hold_key(keycode)) {
         return true;
     }
 
-    if (pointer_layer_policy_pd_mode_key_keeps_auto_mouse_anchored(keycode)) {
+    if (pointer_layer_policy_pointing_mode_key_keeps_auto_mouse_anchored(keycode)) {
+        return true;
+    }
+
+    // A custom key whose shortcut turns layers on is a layer key (D-F26), and
+    // QMK's process_auto_mouse() lets a layer key pass without tearing the
+    // pointer layer down. It cannot see a custom key as one, so the key counts
+    // as a mouse key for its record instead: the pointer layer stays while it
+    // is held, as it would under MO() of another layer.
+    if (noah_custom_key_has_layers(keycode)) {
         return true;
     }
 
@@ -62,8 +86,8 @@ bool pointer_layer_policy_is_mouse_record(uint16_t keycode) {
 
 // QMK resolves a record's keycode, process_auto_mouse() then turns its layer
 // off for a non-mouse press, and the default handler looks the action up a
-// second time. A press resolved from the auto-mouse layer would run the key
-// beneath it while every hook before that saw the auto-mouse layer's key. It
+// second time. A press resolved from the pointer layer would run the key
+// beneath it while every hook before that saw the pointer layer's key. It
 // counts as a mouse key for its own record instead, so both lookups agree,
 // and settles as soon as the record is processed with the reset QMK skipped.
 static bool deferred_reset_pending;
@@ -118,17 +142,22 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
 }
 
 // One count on QMK's key tracker while the runtime locks or holds the
-// auto-mouse layer, so neither QMK's timeout nor its reset on the next
+// pointer layer, so neither QMK's timeout nor its reset on the next
 // non-mouse key turns off a layer the runtime still owns. QMK counts its own
 // MO()/TT() keys, but a behaviour's MO() hold never reaches it as a keycode.
-// QMK zeroes the tracker when auto-mouse is switched off or retargeted, so the
-// count is only taken back while one is there to take.
+// QMK zeroes the tracker whenever it resets auto-mouse: switched off,
+// retargeted, or given another timeout or debounce (a live settings edit,
+// D-F32). So the count is only taken back while one is there to take, and
+// one found gone while the layer is still owned is taken again.
 static bool layer_ownership_anchor_active;
 
 void pointer_layer_policy_sync_layer_ownership_anchor(void) {
     uint8_t auto_mouse_layer = noah_qmk_contract_auto_mouse_layer();
     bool    should_anchor    = noah_qmk_contract_auto_mouse_enabled() && (layer_ownership_is_locked(auto_mouse_layer) || layer_ownership_is_held(auto_mouse_layer));
 
+    if (layer_ownership_anchor_active && noah_qmk_contract_auto_mouse_key_tracker() <= 0) {
+        layer_ownership_anchor_active = false;
+    }
     if (should_anchor == layer_ownership_anchor_active) {
         return;
     }
@@ -148,31 +177,32 @@ void pointer_layer_policy_take_back_qmk_toggle(uint16_t keycode, const keyrecord
 layer_state_t pointer_layer_policy_apply(layer_state_t state) {
     pointer_layer_policy_sync_layer_ownership_anchor();
 
-    pd_mode_snapshot_t snapshot             = pd_mode_snapshot();
-    bool               prefers_typing_layer = pd_mode_policy_snapshot_prefers_typing_layer(snapshot);
-    bool               auto_mouse_anchored  = pointer_layer_policy_auto_mouse_anchored(snapshot);
-    uint8_t            auto_mouse_layer     = noah_qmk_contract_auto_mouse_layer();
-    layer_state_t      auto_mouse_mask      = (layer_state_t)1 << auto_mouse_layer;
-    bool               sniping_layer_active = (noah_setting(NOAH_SETTING_AUTO_SNIPING_ENABLED, 1) && layer_state_cmp(state, noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYER, CHARYBDIS_AUTO_SNIPING_LAYER)));
+    pointing_mode_snapshot_t snapshot             = pointing_mode_snapshot();
+    bool                     prefers_typing_layer = pointing_mode_policy_snapshot_prefers_typing_layer(snapshot);
+    bool                     auto_mouse_anchored  = pointer_layer_policy_auto_mouse_anchored(snapshot);
+    uint8_t                  auto_mouse_layer     = noah_qmk_contract_auto_mouse_layer();
+    layer_state_t            auto_mouse_mask      = (layer_state_t)1 << auto_mouse_layer;
 
     // Arrow mode consumes trackball motion as arrows, so keep the keyboard on
     // the current typing/nav surface instead of forcing the pointer layer back
     // underneath it. Holding NAV can still expose the pointer-button layout.
-    if (prefers_typing_layer && auto_mouse_layer != noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYER, CHARYBDIS_AUTO_SNIPING_LAYER)) {
+    if (prefers_typing_layer && !(pointer_layer_policy_sniping_layers() & auto_mouse_mask)) {
         state &= ~auto_mouse_mask;
         return state;
     }
 
-    // Auto-sniping must stay authoritative while mousing. If the sniping
-    // layer is active and auto-mouse targets some other layer, strip that
-    // separate pointer layer regardless of anchors so NAV keeps keymap
-    // precedence and sniping stays enabled.
-    if (sniping_layer_active && auto_mouse_layer != noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYER, CHARYBDIS_AUTO_SNIPING_LAYER)) {
+    // Auto-sniping must stay authoritative while mousing. If a sniping layer
+    // other than the pointer layer is on, strip that separate pointer layer
+    // regardless of anchors so NAV keeps keymap precedence and sniping stays
+    // enabled. A mode its layer started strips it the same way, so its layer
+    // keeps its keys while the ball moves (D-F62); a link never names the
+    // pointer layer.
+    if ((pointer_layer_policy_sniping_layers_on(state) & ~auto_mouse_mask) || pointing_mode_policy_snapshot_layer_started(snapshot)) {
         state &= ~auto_mouse_mask;
         return state;
     }
 
-    // Keep the configured auto-mouse layer alive while anchored. Outside the
+    // Keep the configured pointer layer alive while anchored. Outside the
     // sniping exception above, overlap with other keyboard layers is allowed.
     if (auto_mouse_anchored) {
         state |= auto_mouse_mask;
@@ -182,20 +212,21 @@ layer_state_t pointer_layer_policy_apply(layer_state_t state) {
 }
 
 void pointer_layer_policy_debug_snapshot(layer_state_t state, pointer_layer_policy_debug_snapshot_t *out) {
-    pd_mode_snapshot_t snapshot = pd_mode_snapshot();
+    pointing_mode_snapshot_t snapshot = pointing_mode_snapshot();
 
     if (!out) {
         return;
     }
 
     *out = (pointer_layer_policy_debug_snapshot_t){
-        .auto_mouse_anchored       = pointer_layer_policy_auto_mouse_anchored(snapshot),
-        .pd_mode_anchor_active     = pd_mode_policy_snapshot_keeps_auto_mouse_anchored(snapshot),
-        .prefers_typing_layer      = pd_mode_policy_snapshot_prefers_typing_layer(snapshot),
-        .auto_mouse_toggle_enabled = noah_qmk_contract_auto_mouse_toggle_enabled(),
-        .sniping_layer_active      = (noah_setting(NOAH_SETTING_AUTO_SNIPING_ENABLED, 1) && layer_state_cmp(state, noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYER, CHARYBDIS_AUTO_SNIPING_LAYER))),
-        .auto_mouse_key_tracker    = noah_qmk_contract_auto_mouse_key_tracker(),
-        .auto_mouse_layer          = noah_qmk_contract_auto_mouse_layer(),
+        .auto_mouse_anchored         = pointer_layer_policy_auto_mouse_anchored(snapshot),
+        .pointing_mode_anchor_active = pointing_mode_policy_snapshot_keeps_auto_mouse_anchored(snapshot),
+        .prefers_typing_layer        = pointing_mode_policy_snapshot_prefers_typing_layer(snapshot),
+        .auto_mouse_toggle_enabled   = noah_qmk_contract_auto_mouse_toggle_enabled(),
+        .sniping_layer_active        = pointer_layer_policy_sniping_layers_on(state) != 0u,
+        .layer_started_mode_active   = pointing_mode_policy_snapshot_layer_started(snapshot),
+        .auto_mouse_key_tracker      = noah_qmk_contract_auto_mouse_key_tracker(),
+        .auto_mouse_layer            = noah_qmk_contract_auto_mouse_layer(),
     };
 }
 

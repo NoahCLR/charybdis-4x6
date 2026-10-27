@@ -4,7 +4,9 @@
 
 #include "key_runtime_scenario_harness.h"
 #include "users/noah/lib/action/action_dispatch.h"
+#include "users/noah/lib/action/custom_key_shortcut.h"
 #include "users/noah/lib/action/owned_keycode.h"
+#include "users/noah/lib/key/runtime/reducer/ownership_state.h"
 #include "users/noah/lib/key/runtime/reducer/runtime.h"
 #include "users/noah/lib/state/diagnostics/runtime_debug.h"
 #include "users/noah/noah_keymap_ids.h"
@@ -21,15 +23,23 @@ enum {
     TEST_HOLD_KEY_THREE    = CUSTOM_KEY_0 + 0x36,
     TEST_HOLD_ACTION_TWO   = CUSTOM_KEY_0 + 0x37,
     TEST_HOLD_ACTION_THREE = CUSTOM_KEY_0 + 0x38,
-    TEST_PD_MODE_KEY       = CUSTOM_KEY_0 + 0x39,
+    TEST_POINTING_MODE_KEY = CUSTOM_KEY_0 + 0x39,
     TEST_MULTI_TAP_KEY_TWO = CUSTOM_KEY_0 + 0x3A,
     TEST_TAP_ACTION_TWO    = CUSTOM_KEY_0 + 0x3B,
     TEST_ALT_ACTION_TWO    = CUSTOM_KEY_0 + 0x3C,
+    // Custom keys whose shortcut is layers alone, and modifiers alone (D-F26).
+    TEST_LAYER_SHORTCUT    = CUSTOM_KEY_0 + 0x3D,
+    TEST_HYPER_SHORTCUT    = CUSTOM_KEY_0 + 0x3E,
     // Charybdis's SNIPING_MODE: a QMK function only QMK's key processing runs.
     TEST_SNIPING_KEY       = QK_KB_4,
     TEST_NUM_LAYER         = 1,
     TEST_OTHER_LAYER       = 2,
 };
+
+noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
+    if (slot == (uint8_t)(TEST_HYPER_SHORTCUT - CUSTOM_KEY_0)) return (noah_custom_key_shortcut_t){.mods = 0x0f};
+    return slot == (uint8_t)(TEST_LAYER_SHORTCUT - CUSTOM_KEY_0) ? (noah_custom_key_shortcut_t){.layers = (uint16_t)(1u << TEST_OTHER_LAYER)} : (noah_custom_key_shortcut_t){0};
+}
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -64,9 +74,9 @@ static void test_check_feedback_pulse(uint8_t index, key_feedback_pulse_kind_t k
 static key_behavior_view_t test_pressable_handled_key(uint16_t keycode) {
     key_behavior_view_t behavior = key_runtime_scenario_pressable_handled_key(keycode);
 
-    behavior.tap_hold_term    = 150;
-    behavior.longer_hold_term = 350;
-    behavior.multi_tap_term   = 120;
+    behavior.tap_hold_term  = 150;
+    behavior.long_hold_term = 350;
+    behavior.multi_tap_term = 120;
     return behavior;
 }
 
@@ -163,7 +173,7 @@ static void test_configure_immediate_hold_key(uint16_t keycode, uint16_t hold_ac
     behavior.single.hold = (hold_behavior_t){
         .present = true,
         .action  = hold_action,
-        .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+        .style   = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
     };
     behavior.single.long_hold = long_hold;
     key_runtime_scenario_add_behavior_view(behavior);
@@ -269,55 +279,256 @@ static void test_non_base_release_resolved_tap_commit_feedback_still_pulses(void
     test_check_feedback_pulse(1, KEY_FEEDBACK_PULSE_TAP_COMMITTED, 2, 3, 0);
 }
 
-// A third tap on a two-branch row wraps back to the base branch instead of firing
-// the second branch and starting a partial gesture, so one run of taps resolves to
-// exactly one action.
-static void test_tap_index_wraps_past_the_deepest_authored_branch(void) {
-    static const key_runtime_scenario_step_t first_two_taps[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 2),
-    };
-    static const key_runtime_scenario_step_t third_press_only[] = {
-        KEY_RUNTIME_SCENARIO_ADVANCE(40),
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2),
-    };
-    static const key_runtime_scenario_step_t third_release_only[] = {
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 2),
-    };
-    const keypos_t key_pos = test_keypos(2, 2);
+// Quick runs of taps (D-F33). A run counts its taps up to the deepest tap count
+// and fires that count's branch; past it, every press in the run sends the
+// first tap once. The tests count what one run sends in total.
+static uint16_t test_sent_count(uint16_t action) {
+    uint16_t sent = 0u;
 
-    key_runtime_scenario_reset();
-    test_configure_multi_tap_key();
-    key_runtime_scenario_run(first_two_taps, ARRAY_SIZE(first_two_taps));
+    for (uint8_t index = 0u; index < key_runtime_scenario_effect_count(); index++) {
+        const key_runtime_scenario_effect_t *effect = key_runtime_scenario_effect_at(index);
 
-    CHECK(key_runtime_scenario_effect_count() == 0);
-    CHECK(key_runtime_scenario_slot_has_pending_multi_tap(key_pos));
-    CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 2u);
-
-    key_runtime_scenario_clear_effects();
-    key_runtime_scenario_run(third_press_only, ARRAY_SIZE(third_press_only));
-    key_runtime_scenario_run(third_release_only, ARRAY_SIZE(third_release_only));
-
-    // Nothing fires on the third tap: the series stays alive on the wrapped base
-    // branch and resolves once, at the flush.
-    CHECK(key_runtime_scenario_effect_count() == 0);
-    CHECK(key_runtime_scenario_slot_has_pending_multi_tap(key_pos));
-    CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 1u);
+        if (effect->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION && effect->data.delayed_action.action == action) {
+            sent = (uint16_t)(sent + (effect->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_REPEAT_COUNT_MASK));
+        }
+    }
+    return sent;
 }
 
-// There is no interruption to defer any more: a third press on a two-branch row
-// wraps the index rather than ending the gesture, so nothing is held over.
-static void test_same_key_wrapped_tap_does_not_defer_a_previous_branch_action(void) {
+static bool test_hold_registered(uint16_t action) {
+    for (uint8_t index = 0u; index < key_runtime_scenario_effect_count(); index++) {
+        const key_runtime_scenario_effect_t *effect = key_runtime_scenario_effect_at(index);
+
+        if (effect->kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER && effect->data.held_action.action == action) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Three tap counts deep, holds only at the second and third, like Delete with
+// its Double tap holds. `first_tap` sets the first tap count's tap, or none.
+static key_behavior_view_t test_repeat_row(uint16_t keycode, uint16_t first_tap) {
+    key_behavior_view_t behavior = test_pressable_handled_key(keycode);
+
+    behavior.has_multi_tap      = true;
+    behavior.authored_tap_depth = 3u;
+    if (first_tap != KC_NO) {
+        behavior.single.tap = (tap_behavior_t)TAP_SENDS(first_tap);
+    }
+    return behavior;
+}
+
+static const key_runtime_scenario_multi_tap_entry_t test_repeat_row_entries[] = {
+    {.tap_count = 2, .step = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HOLD_ACTION)}},
+    {.tap_count = 3, .step = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HOLD_ACTION_TWO)}},
+};
+
+static void test_configure_repeat_row(uint16_t keycode, uint16_t first_tap) {
+    key_runtime_scenario_add_pending_multi_tap_behavior(test_repeat_row(keycode, first_tap), test_repeat_row_entries, ARRAY_SIZE(test_repeat_row_entries));
+}
+
+// Taps `taps` times quickly at (2, 3), lets the run's window lapse, and counts
+// what the run sent of `action` and, through `other_sent`, of `other`.
+static uint16_t test_tap_run_both(uint16_t keycode, uint8_t taps, uint16_t action, uint16_t other, uint16_t *other_sent) {
+    static const key_runtime_scenario_step_t gap[] = {
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+    };
+    static const key_runtime_scenario_step_t flush[] = {
+        KEY_RUNTIME_SCENARIO_ADVANCE(121),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+        KEY_RUNTIME_SCENARIO_ADVANCE(1),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+    uint16_t sent = 0u;
+
+    if (other_sent) {
+        *other_sent = 0u;
+    }
+    for (uint8_t tap = 0u; tap <= taps; tap++) {
+        const key_runtime_scenario_step_t press_release[] = {
+            KEY_RUNTIME_SCENARIO_PRESS(keycode, 2, 3),
+            KEY_RUNTIME_SCENARIO_RELEASE(keycode, 2, 3),
+        };
+
+        key_runtime_scenario_clear_effects();
+        if (tap < taps) {
+            key_runtime_scenario_run(press_release, ARRAY_SIZE(press_release));
+            key_runtime_scenario_run(gap, ARRAY_SIZE(gap));
+        } else {
+            key_runtime_scenario_run(flush, ARRAY_SIZE(flush));
+        }
+        sent = (uint16_t)(sent + test_sent_count(action));
+        if (other_sent && other != KC_NO) {
+            *other_sent = (uint16_t)(*other_sent + test_sent_count(other));
+        }
+    }
+    CHECK(!key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(2, 3)));
+    return sent;
+}
+
+static uint16_t test_tap_run(uint16_t keycode, uint8_t taps, uint16_t action) {
+    return test_tap_run_both(keycode, taps, action, KC_NO, NULL);
+}
+
+// Backspace whose Double tap types V: one tap is a Backspace, two a V, and
+// three or more as many Backspaces, never a V.
+static void test_run_past_the_deepest_tap_count_types_the_first_tap(void) {
+    for (uint8_t taps = 1u; taps <= 8u; taps++) {
+        uint16_t alt_sent;
+        uint16_t first_sent;
+
+        key_runtime_scenario_reset();
+        test_configure_multi_tap_key();
+        first_sent = test_tap_run_both(TEST_MULTI_TAP_KEY, taps, TEST_TAP_ACTION, TEST_ALT_ACTION, &alt_sent);
+        CHECK(first_sent == (taps == 2u ? 0u : taps));
+        CHECK(alt_sent == (taps == 2u ? 1u : 0u));
+    }
+}
+
+// A row at the shared depth (five, or eight in the second configuration):
+// every tap count up to the depth fires its own branch, and one tap more types
+// the first tap once per press.
+static void test_full_depth_row_selects_each_branch_and_types_past_it(void) {
+    key_runtime_scenario_multi_tap_entry_t entries[KEY_BEHAVIOR_MAX_TAP_COUNT - 1u];
+    key_behavior_view_t                    behavior = test_pressable_handled_key(TEST_MULTI_TAP_KEY);
+
+    for (uint8_t index = 0u; index < ARRAY_SIZE(entries); index++) {
+        entries[index] = (key_runtime_scenario_multi_tap_entry_t){.tap_count = (uint8_t)(index + 2u), .step = {.tap = TAP_SENDS(KC_A + index)}};
+    }
+    behavior.has_multi_tap      = true;
+    behavior.authored_tap_depth = KEY_BEHAVIOR_MAX_TAP_COUNT;
+    behavior.single.tap         = (tap_behavior_t)TAP_SENDS(TEST_TAP_ACTION);
+    for (uint8_t taps = 2u; taps <= KEY_BEHAVIOR_MAX_TAP_COUNT; taps++) {
+        uint16_t branch_sent;
+
+        key_runtime_scenario_reset();
+        key_runtime_scenario_add_pending_multi_tap_behavior(behavior, entries, ARRAY_SIZE(entries));
+        CHECK(test_tap_run_both(TEST_MULTI_TAP_KEY, taps, TEST_TAP_ACTION, KC_A + taps - 2u, &branch_sent) == 0u);
+        CHECK(branch_sent == 1u);
+    }
+    for (uint8_t extra = 1u; extra <= 2u; extra++) {
+        uint16_t deepest_sent;
+
+        key_runtime_scenario_reset();
+        key_runtime_scenario_add_pending_multi_tap_behavior(behavior, entries, ARRAY_SIZE(entries));
+        CHECK(test_tap_run_both(TEST_MULTI_TAP_KEY, KEY_BEHAVIOR_MAX_TAP_COUNT + extra, TEST_TAP_ACTION, KC_A + KEY_BEHAVIOR_MAX_TAP_COUNT - 2u, &deepest_sent) == KEY_BEHAVIOR_MAX_TAP_COUNT + extra);
+        CHECK(deepest_sent == 0u);
+    }
+}
+
+static void test_repeat_row_sends_one_tap_per_press(void) {
+    for (uint8_t taps = 1u; taps <= 8u; taps++) {
+        key_runtime_scenario_reset();
+        test_configure_repeat_row(KC_BSPC, KC_NO);
+        CHECK(test_tap_run(KC_BSPC, taps, KC_BSPC) == taps);
+    }
+}
+
+// The first tap count's own tap is what every press repeats, set or built in.
+static void test_repeat_row_repeats_a_set_first_tap(void) {
+    for (uint8_t taps = 1u; taps <= 7u; taps++) {
+        key_runtime_scenario_reset();
+        test_configure_repeat_row(KC_BSPC, TEST_TAP_ACTION);
+        CHECK(test_tap_run(KC_BSPC, taps, TEST_TAP_ACTION) == taps);
+    }
+}
+
+static void test_repeat_row_hold_at_a_set_tap_count_takes_that_hold(void) {
+    static const key_runtime_scenario_step_t tap_then_hold[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(KC_BSPC, 2, 3),
+        KEY_RUNTIME_SCENARIO_RELEASE(KC_BSPC, 2, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+        KEY_RUNTIME_SCENARIO_PRESS(KC_BSPC, 2, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(151),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+
+    key_runtime_scenario_reset();
+    test_configure_repeat_row(KC_BSPC, KC_NO);
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(tap_then_hold, ARRAY_SIZE(tap_then_hold));
+    CHECK(test_hold_registered(TEST_HOLD_ACTION));
+    CHECK(test_sent_count(KC_BSPC) == 0u);
+}
+
+// Past the deepest tap count a held press is a first press: the taps so far go
+// out as the first tap, then the press takes the Single tap hold, never a
+// later count's hold.
+static void test_hold_past_the_deepest_tap_count_takes_the_single_tap_hold(void) {
+    key_runtime_scenario_step_t three_taps_then_hold[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(KC_BSPC, 2, 3),
+        KEY_RUNTIME_SCENARIO_RELEASE(KC_BSPC, 2, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+        KEY_RUNTIME_SCENARIO_PRESS(KC_BSPC, 2, 3),
+        KEY_RUNTIME_SCENARIO_RELEASE(KC_BSPC, 2, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+        KEY_RUNTIME_SCENARIO_PRESS(KC_BSPC, 2, 3),
+        KEY_RUNTIME_SCENARIO_RELEASE(KC_BSPC, 2, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+        KEY_RUNTIME_SCENARIO_PRESS(KC_BSPC, 2, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(151),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+        KEY_RUNTIME_SCENARIO_RELEASE(KC_BSPC, 2, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(200),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+
+    for (uint8_t later_tap = 0u; later_tap <= 1u; later_tap++) {
+        key_runtime_scenario_multi_tap_entry_t entries[ARRAY_SIZE(test_repeat_row_entries)];
+        key_behavior_view_t                    behavior = test_repeat_row(KC_BSPC, KC_NO);
+
+        for (uint8_t index = 0u; index < ARRAY_SIZE(entries); index++) {
+            entries[index] = test_repeat_row_entries[index];
+        }
+        if (later_tap) {
+            entries[0].step.tap = (tap_behavior_t)TAP_SENDS(TEST_ALT_ACTION);
+        }
+        behavior.single.hold = (hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HOLD_ACTION_THREE);
+        key_runtime_scenario_reset();
+        key_runtime_scenario_add_pending_multi_tap_behavior(behavior, entries, ARRAY_SIZE(entries));
+        key_runtime_scenario_clear_effects();
+        key_runtime_scenario_run(three_taps_then_hold, ARRAY_SIZE(three_taps_then_hold));
+        CHECK(test_sent_count(KC_BSPC) == 3u);
+        CHECK(test_sent_count(TEST_ALT_ACTION) == 0u);
+        CHECK(test_hold_registered(TEST_HOLD_ACTION_THREE));
+        CHECK(!test_hold_registered(TEST_HOLD_ACTION));
+        CHECK(!test_hold_registered(TEST_HOLD_ACTION_TWO));
+    }
+}
+
+// An empty tap count on a row with a later tap of its own repeats the first
+// tap rather than the key's own, and past the depth the run types it.
+static void test_empty_tap_count_repeats_the_first_tap(void) {
+    static const key_runtime_scenario_multi_tap_entry_t entries[] = {
+        {.tap_count = 2, .step = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HOLD_ACTION)}},
+        {.tap_count = 3, .step = {.tap = TAP_SENDS(TEST_ALT_ACTION)}},
+    };
+    key_behavior_view_t behavior = test_pressable_handled_key(KC_BSPC);
+
+    behavior.has_multi_tap      = true;
+    behavior.authored_tap_depth = 3u;
+    behavior.single.tap         = (tap_behavior_t)TAP_SENDS(TEST_TAP_ACTION);
+    key_runtime_scenario_reset();
+    key_runtime_scenario_add_pending_multi_tap_behavior(behavior, entries, ARRAY_SIZE(entries));
+    CHECK(test_tap_run(KC_BSPC, 2u, TEST_TAP_ACTION) == 2u);
+    CHECK(test_sent_count(KC_BSPC) == 0u);
+
+    key_runtime_scenario_reset();
+    key_runtime_scenario_add_pending_multi_tap_behavior(behavior, entries, ARRAY_SIZE(entries));
+    CHECK(test_tap_run(KC_BSPC, 4u, TEST_TAP_ACTION) == 4u);
+}
+
+// A press past the deepest tap count sends the run so far before it is resolved
+// itself, so the run's taps come out in order, ahead of the press's own.
+static void test_press_past_the_deepest_tap_count_sends_the_run_first(void) {
     static const key_runtime_scenario_step_t first_two_taps[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 1), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 1), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 1), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 1),
     };
-    static const key_runtime_scenario_step_t third_press[] = {
+    static const key_runtime_scenario_step_t third_tap[] = {
         KEY_RUNTIME_SCENARIO_ADVANCE(40),
         KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 1),
-    };
-    static const key_runtime_scenario_step_t third_release[] = {
         KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 1),
-    };
-    static const key_runtime_scenario_step_t follow_up_scan[] = {
         KEY_RUNTIME_SCENARIO_SCAN(),
     };
     const keypos_t key_pos = test_keypos(2, 1);
@@ -327,27 +538,60 @@ static void test_same_key_wrapped_tap_does_not_defer_a_previous_branch_action(vo
     key_runtime_scenario_run(first_two_taps, ARRAY_SIZE(first_two_taps));
 
     CHECK(key_runtime_scenario_effect_count() == 0);
-    CHECK(key_runtime_scenario_slot_has_pending_multi_tap(key_pos));
     CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 2u);
 
     key_runtime_scenario_clear_effects();
-    key_runtime_scenario_run(third_press, ARRAY_SIZE(third_press));
+    key_runtime_scenario_run(third_tap, ARRAY_SIZE(third_tap));
 
-    CHECK(key_runtime_scenario_effect_count() == 0);
-    CHECK(noah_runtime_debug_deferred_release_count() == 0u);
-    CHECK(key_runtime_scenario_slot_owner_keycode(key_pos) == TEST_MULTI_TAP_KEY);
-
-    key_runtime_scenario_run(third_release, ARRAY_SIZE(third_release));
-
-    CHECK(key_runtime_scenario_effect_count() == 0);
-    CHECK(noah_runtime_debug_deferred_release_count() == 0u);
+    CHECK(test_sent_count(TEST_TAP_ACTION) == 2u);
+    CHECK(test_sent_count(TEST_ALT_ACTION) == 0u);
     CHECK(key_runtime_scenario_slot_has_pending_multi_tap(key_pos));
     CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 1u);
+}
 
+// How long a tap in the run is held does not change what the run types: a
+// middle tap held past the multi-tap window, still short of the hold, keeps
+// the series it joined, so a run past the deepest tap count still types the
+// first tap, never the middle tap count's.
+static void test_long_middle_tap_keeps_the_run_typing_the_first_tap(void) {
+    static const key_runtime_scenario_multi_tap_entry_t entries[] = {
+        {.tap_count = 2, .step = {.tap = TAP_SENDS(TEST_ALT_ACTION), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HOLD_ACTION)}},
+        {.tap_count = 3, .step = {.tap = TAP_SENDS(TEST_ALT_ACTION_TWO)}},
+    };
+    static const key_runtime_scenario_step_t run[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+        // Held 130 ms: past the 120 ms multi-tap window, short of the 150 ms hold.
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(65),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+        KEY_RUNTIME_SCENARIO_ADVANCE(65),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(121),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+    key_behavior_view_t behavior = test_pressable_handled_key(TEST_MULTI_TAP_KEY);
+
+    behavior.has_multi_tap      = true;
+    behavior.authored_tap_depth = 3u;
+    behavior.single.tap         = (tap_behavior_t)TAP_SENDS(TEST_TAP_ACTION);
+    key_runtime_scenario_reset();
+    key_runtime_scenario_add_pending_multi_tap_behavior(behavior, entries, ARRAY_SIZE(entries));
     key_runtime_scenario_clear_effects();
-    key_runtime_scenario_run(follow_up_scan, ARRAY_SIZE(follow_up_scan));
-    CHECK(key_runtime_scenario_effect_count() == 0u);
-    CHECK(noah_runtime_debug_deferred_release_count() == 0u);
+    key_runtime_scenario_run(run, ARRAY_SIZE(run));
+
+    CHECK(test_sent_count(TEST_TAP_ACTION) == 4u);
+    CHECK(test_sent_count(TEST_ALT_ACTION) == 0u);
+    CHECK(test_sent_count(TEST_ALT_ACTION_TWO) == 0u);
+    CHECK(!key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(2, 3)));
 }
 
 static void test_momentary_layer_key_tracks_press_and_release_events(void) {
@@ -379,11 +623,11 @@ static void test_threshold_hold_registers_and_releases_owned_state(void) {
 
     key_runtime_scenario_reset();
     key_runtime_scenario_add_behavior_view((key_behavior_view_t){
-        .keycode          = TEST_HOLD_KEY,
-        .handled          = true,
-        .tap_hold_term    = 150,
-        .longer_hold_term = 350,
-        .multi_tap_term   = 120,
+        .keycode        = TEST_HOLD_KEY,
+        .handled        = true,
+        .tap_hold_term  = 150,
+        .long_hold_term = 350,
+        .multi_tap_term = 120,
         .single =
             {
                 .hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HOLD_ACTION),
@@ -418,11 +662,11 @@ static void test_replaced_press_token_still_releases_owned_state(void) {
 
     key_runtime_scenario_reset();
     key_runtime_scenario_add_behavior_view((key_behavior_view_t){
-        .keycode          = TEST_HOLD_KEY,
-        .handled          = true,
-        .tap_hold_term    = 150,
-        .longer_hold_term = 350,
-        .multi_tap_term   = 120,
+        .keycode        = TEST_HOLD_KEY,
+        .handled        = true,
+        .tap_hold_term  = 150,
+        .long_hold_term = 350,
+        .multi_tap_term = 120,
         .single =
             {
                 .hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HOLD_ACTION),
@@ -476,7 +720,11 @@ static void test_press_on_other_handled_position_keeps_foreign_pending_multi_tap
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(1, 3)) == TEST_HOLD_KEY_TWO);
 }
 
-static void test_other_press_does_not_flush_active_same_key_multi_tap_chain(void) {
+// Another key's press settles a down key's repeated tap when its hold is an
+// output of its own, typing it first (D-F27). A hold that changes other keys,
+// here a modifier or a custom key whose shortcut turns a layer on or is
+// modifiers alone, keeps the chain waiting for its own decision.
+static void test_other_press_settles_active_same_key_multi_tap_chain(void) {
     static const key_runtime_scenario_step_t setup[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 1, 1),
         KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 1, 1),
@@ -486,26 +734,51 @@ static void test_other_press_does_not_flush_active_same_key_multi_tap_chain(void
     static const key_runtime_scenario_step_t overlap_press[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY_TWO, 1, 3),
     };
+    static const key_runtime_scenario_step_t release_chain[] = {
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 1, 1),
+    };
 
-    key_runtime_scenario_reset();
-    test_configure_multi_tap_hold_key((hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HOLD_ACTION), hold_behavior_none());
-    test_configure_fallback_tap_key(TEST_HOLD_KEY_TWO, TEST_HOLD_ACTION_TWO);
-    key_runtime_scenario_run(setup, ARRAY_SIZE(setup));
+    static const uint16_t holds[] = {TEST_HOLD_ACTION, KC_LEFT_SHIFT, TEST_LAYER_SHORTCUT, TEST_HYPER_SHORTCUT};
 
-    CHECK(noah_runtime_debug_active_slot_count() == 1);
-    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1);
-    CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == TEST_MULTI_TAP_KEY);
-    CHECK(key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(1, 1)));
+    for (uint8_t variant = 0; variant < ARRAY_SIZE(holds); variant++) {
+        bool hold_changes_keys = variant != 0u;
 
-    key_runtime_scenario_clear_effects();
-    key_runtime_scenario_run(overlap_press, ARRAY_SIZE(overlap_press));
+        key_runtime_scenario_reset();
+        test_configure_multi_tap_hold_key((hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(holds[variant]), hold_behavior_none());
+        test_configure_fallback_tap_key(TEST_HOLD_KEY_TWO, TEST_HOLD_ACTION_TWO);
+        key_runtime_scenario_run(setup, ARRAY_SIZE(setup));
 
-    CHECK(key_runtime_scenario_effect_count() == 0);
-    CHECK(noah_runtime_debug_active_slot_count() == 2);
-    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1);
-    CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == TEST_MULTI_TAP_KEY);
-    CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(1, 3)) == TEST_HOLD_KEY_TWO);
-    CHECK(key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(1, 1)));
+        CHECK(noah_runtime_debug_active_slot_count() == 1);
+        CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1);
+        CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == TEST_MULTI_TAP_KEY);
+        CHECK(key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(1, 1)));
+
+        key_runtime_scenario_clear_effects();
+        key_runtime_scenario_run(overlap_press, ARRAY_SIZE(overlap_press));
+
+        CHECK(noah_runtime_debug_active_slot_count() == 2);
+        CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == TEST_MULTI_TAP_KEY);
+        CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(1, 3)) == TEST_HOLD_KEY_TWO);
+        if (hold_changes_keys) {
+            CHECK(key_runtime_scenario_effect_count() == 0);
+            CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1);
+            CHECK(key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(1, 1)));
+            continue;
+        }
+        CHECK(key_runtime_scenario_effect_count() >= 1);
+        CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+        CHECK(key_runtime_scenario_effect_at(0)->data.delayed_action.action == TEST_ALT_ACTION);
+        CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
+
+        // The settled key's release sends nothing more.
+        key_runtime_scenario_clear_effects();
+        key_runtime_scenario_run(release_chain, ARRAY_SIZE(release_chain));
+        for (uint8_t index = 0; index < key_runtime_scenario_effect_count(); index++) {
+            CHECK(key_runtime_scenario_effect_at(index)->kind != KEY_RUNTIME_EFFECT_DISPATCH_ACTION && key_runtime_scenario_effect_at(index)->kind != KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+        }
+        CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(1, 1)) == KC_NO);
+        CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
+    }
 }
 
 static void test_independent_pending_multi_tap_chains_can_coexist_and_flush_independently(void) {
@@ -701,6 +974,68 @@ static void test_double_tap_threshold_hold_with_intermediate_scan_registers_once
     CHECK(!key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(3, 1)));
 }
 
+// A later tap's press that holds an action, released while its tap series is
+// pending, lets go of it with the release, as the first tap's release would:
+// the pending multi-tap release plans the owned-state release whatever its
+// outcome. Here the second tap's hold goes down at the press.
+static void test_pending_multi_tap_release_lets_go_of_an_action_held_at_the_press(void) {
+    static const key_runtime_scenario_step_t press_steps[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 3, 2), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 3, 2), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 3, 2), KEY_RUNTIME_SCENARIO_ADVANCE(20),
+    };
+    static const key_runtime_scenario_step_t release_steps[] = {
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 3, 2),
+    };
+    bool released = false;
+
+    key_runtime_scenario_reset();
+    test_configure_multi_tap_hold_key((hold_behavior_t){.present = true, .action = TEST_HOLD_ACTION, .style = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE}, hold_behavior_none());
+    key_runtime_scenario_run(press_steps, ARRAY_SIZE(press_steps));
+    CHECK(key_runtime_scenario_slot_held_action_keycode(test_keypos(3, 2)) == TEST_HOLD_ACTION);
+    CHECK(key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(3, 2)));
+
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
+    for (uint8_t index = 0u; index < key_runtime_scenario_effect_count(); index++) {
+        const key_runtime_scenario_effect_t *effect = key_runtime_scenario_effect_at(index);
+
+        if (effect->kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY && effect->data.key_pos.row == 3 && effect->data.key_pos.col == 2) released = true;
+    }
+    CHECK(released);
+    CHECK(key_runtime_scenario_slot_held_action_keycode(test_keypos(3, 2)) == KC_NO);
+}
+
+// The same for a repeat the press holds: its release ends it. No authored hold
+// starts a repeat on a later tap before its tap series is settled (a repeat
+// starts at the hold threshold, which ends the series), so the repeat is
+// started here through the reducer's own entry for one, as the projection
+// does.
+static void test_pending_multi_tap_release_lets_go_of_a_repeat_its_press_holds(void) {
+    static const key_runtime_scenario_step_t press_steps[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 3, 3), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 3, 3), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 3, 3), KEY_RUNTIME_SCENARIO_ADVANCE(20),
+    };
+    static const key_runtime_scenario_step_t release_steps[] = {
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 3, 3),
+    };
+    bool released = false;
+
+    key_runtime_scenario_reset();
+    test_configure_multi_tap_key();
+    key_runtime_scenario_run(press_steps, ARRAY_SIZE(press_steps));
+    key_runtime_core_observe_repeat_start(test_keypos(3, 3), TEST_HOLD_ACTION, 25);
+    CHECK(key_runtime_core_repeat_active_at(test_keypos(3, 3)));
+    CHECK(key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(3, 3)));
+
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
+    for (uint8_t index = 0u; index < key_runtime_scenario_effect_count(); index++) {
+        const key_runtime_scenario_effect_t *effect = key_runtime_scenario_effect_at(index);
+
+        if (effect->kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY && effect->data.key_pos.row == 3 && effect->data.key_pos.col == 3) released = true;
+    }
+    CHECK(released);
+    CHECK(!key_runtime_core_repeat_active_at(test_keypos(3, 3)));
+}
+
 static void test_repeat_hold_with_intermediate_scans_starts_once_and_releases_once(void) {
     static const key_runtime_scenario_step_t scenario[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY_THREE, 6, 0), KEY_RUNTIME_SCENARIO_ADVANCE(100), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(60), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(100), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_RELEASE(TEST_HOLD_KEY_THREE, 6, 0),
@@ -723,25 +1058,25 @@ static void test_repeat_hold_with_intermediate_scans_starts_once_and_releases_on
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(6, 0)) == KC_NO);
 }
 
-static void test_same_locked_pd_mode_quick_tap_unlocks_on_press_without_tap_release(void) {
+static void test_same_locked_pointing_mode_quick_tap_unlocks_on_press_without_tap_release(void) {
     static const key_runtime_scenario_step_t press_steps[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_PD_MODE_KEY, 6, 1),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_POINTING_MODE_KEY, 6, 1),
     };
     static const key_runtime_scenario_step_t release_steps[] = {
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_PD_MODE_KEY, 6, 1),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_POINTING_MODE_KEY, 6, 1),
     };
 
     key_runtime_scenario_reset();
-    key_runtime_scenario_define_pd_mode_key(TEST_PD_MODE_KEY, PD_MODE_VOLUME, true);
+    key_runtime_scenario_define_pointing_mode_key(TEST_POINTING_MODE_KEY, POINTING_MODE_VOLUME, true);
 
     key_runtime_scenario_run(press_steps, ARRAY_SIZE(press_steps));
-    CHECK(!pd_mode_local_locked(PD_MODE_VOLUME));
+    CHECK(!pointing_mode_local_locked(POINTING_MODE_VOLUME));
     CHECK(key_runtime_scenario_effect_count() == 2);
-    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_PD_MODE_LOCK_STATE);
-    CHECK(key_runtime_scenario_effect_at(0)->data.pd_mode_lock_state.pd_mode == PD_MODE_VOLUME);
-    CHECK(!key_runtime_scenario_effect_at(0)->data.pd_mode_lock_state.locked);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_POINTING_MODE_LOCK_STATE);
+    CHECK(key_runtime_scenario_effect_at(0)->data.pointing_mode_lock_state.pointing_mode == POINTING_MODE_VOLUME);
+    CHECK(!key_runtime_scenario_effect_at(0)->data.pointing_mode_lock_state.locked);
     CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER);
-    CHECK(key_runtime_scenario_effect_at(1)->data.held_action.action == TEST_PD_MODE_KEY);
+    CHECK(key_runtime_scenario_effect_at(1)->data.held_action.action == TEST_POINTING_MODE_KEY);
 
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
@@ -752,32 +1087,32 @@ static void test_same_locked_pd_mode_quick_tap_unlocks_on_press_without_tap_rele
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(6, 1)) == KC_NO);
 }
 
-static void test_same_locked_pd_mode_hold_becomes_momentary_until_release(void) {
+static void test_same_locked_pointing_mode_hold_becomes_momentary_until_release(void) {
     static const key_runtime_scenario_step_t press_steps[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_PD_MODE_KEY, 6, 2),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_POINTING_MODE_KEY, 6, 2),
     };
     static const key_runtime_scenario_step_t hold_steps[] = {
         KEY_RUNTIME_SCENARIO_ADVANCE(CUSTOM_TAP_HOLD_TERM + 1),
         KEY_RUNTIME_SCENARIO_SCAN(),
     };
     static const key_runtime_scenario_step_t release_steps[] = {
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_PD_MODE_KEY, 6, 2),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_POINTING_MODE_KEY, 6, 2),
     };
 
     key_runtime_scenario_reset();
-    key_runtime_scenario_define_pd_mode_key(TEST_PD_MODE_KEY, PD_MODE_VOLUME, true);
+    key_runtime_scenario_define_pointing_mode_key(TEST_POINTING_MODE_KEY, POINTING_MODE_VOLUME, true);
 
     key_runtime_scenario_run(press_steps, ARRAY_SIZE(press_steps));
-    CHECK(!pd_mode_local_locked(PD_MODE_VOLUME));
-    CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(6, 2)) == TEST_PD_MODE_KEY);
+    CHECK(!pointing_mode_local_locked(POINTING_MODE_VOLUME));
+    CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(6, 2)) == TEST_POINTING_MODE_KEY);
     CHECK(key_runtime_scenario_effect_count() == 2);
-    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_PD_MODE_LOCK_STATE);
-    CHECK(!key_runtime_scenario_effect_at(0)->data.pd_mode_lock_state.locked);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_POINTING_MODE_LOCK_STATE);
+    CHECK(!key_runtime_scenario_effect_at(0)->data.pointing_mode_lock_state.locked);
     CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER);
 
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(hold_steps, ARRAY_SIZE(hold_steps));
-    CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(6, 2)) == TEST_PD_MODE_KEY);
+    CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(6, 2)) == TEST_POINTING_MODE_KEY);
     CHECK(key_runtime_scenario_effect_count() == 0);
 
     key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
@@ -929,20 +1264,81 @@ static void test_qmk_function_key_with_only_a_double_tap_branch_taps_and_double_
     CHECK(test_effects_with_action(KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER, TEST_SNIPING_KEY) == 0);
 }
 
+// Overlap suppresses a report edge, never the remaining owner's press.
+static void test_overlapping_native_owners_survive_either_release_order(void) {
+    const uint16_t usages[] = {KC_C, MS_BTN1};
+    for (uint8_t i = 0; i < ARRAY_SIZE(usages); i++) {
+        for (uint8_t managed_first = 0; managed_first < 2; managed_first++) {
+            owned_keycode_lease_t lease = {0};
+            const key_runtime_scenario_step_t press[] = {KEY_RUNTIME_SCENARIO_PRESS(usages[i], 7, 1)};
+            const key_runtime_scenario_step_t release[] = {KEY_RUNTIME_SCENARIO_RELEASE(usages[i], 7, 1)};
+            key_runtime_scenario_reset();
+            if (managed_first) CHECK(owned_keycode_acquire(usages[i], &lease));
+            key_runtime_scenario_run(press, ARRAY_SIZE(press));
+            if (!managed_first) CHECK(owned_keycode_acquire(usages[i], &lease));
+            CHECK(key_runtime_scenario_register_code_count() == 1u);
+            CHECK(owned_keycode_release(&lease));
+            CHECK(key_runtime_scenario_unregister_code_count() == 0u);
+            key_runtime_scenario_run(release, ARRAY_SIZE(release));
+            CHECK(key_runtime_scenario_unregister_code_count() == 1u);
+            owned_keycode_debug_snapshot_t snapshot;
+            owned_keycode_debug_snapshot(usages[i], &snapshot);
+            CHECK(snapshot.physical_count == 0u && snapshot.managed_count == 0u && snapshot.underflow_count == 0u);
+        }
+        const key_runtime_scenario_step_t first[] = {KEY_RUNTIME_SCENARIO_PRESS(usages[i], 7, 0)};
+        const key_runtime_scenario_step_t second[] = {KEY_RUNTIME_SCENARIO_PRESS(usages[i], 7, 1)};
+        const key_runtime_scenario_step_t first_up[] = {KEY_RUNTIME_SCENARIO_RELEASE(usages[i], 7, 0)};
+        const key_runtime_scenario_step_t second_up[] = {KEY_RUNTIME_SCENARIO_RELEASE(usages[i], 7, 1)};
+        key_runtime_scenario_reset();
+        key_runtime_scenario_run(first, ARRAY_SIZE(first));
+        key_runtime_scenario_run(second, ARRAY_SIZE(second));
+        CHECK(key_runtime_scenario_register_code_count() == 1u);
+        key_runtime_scenario_run(first_up, ARRAY_SIZE(first_up));
+        CHECK(key_runtime_scenario_unregister_code_count() == 0u);
+        key_runtime_scenario_run(second_up, ARRAY_SIZE(second_up));
+        CHECK(key_runtime_scenario_unregister_code_count() == 1u);
+    }
+}
+
+static void test_owned_usage_does_not_suppress_its_authored_behavior(void) {
+    owned_keycode_lease_t lease = {0};
+    const key_runtime_scenario_step_t tap[] = {KEY_RUNTIME_SCENARIO_PRESS(KC_C, 7, 1), KEY_RUNTIME_SCENARIO_RELEASE(KC_C, 7, 1)};
+    key_runtime_scenario_reset();
+    test_configure_fallback_tap_key(KC_C, TEST_TAP_ACTION);
+    CHECK(owned_keycode_acquire(KC_C, &lease));
+    key_runtime_scenario_run(tap, ARRAY_SIZE(tap));
+    CHECK(key_runtime_scenario_effect_count() != 0u);
+    CHECK(key_runtime_scenario_unregister_code_count() == 0u);
+    CHECK(owned_keycode_release(&lease));
+    CHECK(key_runtime_scenario_unregister_code_count() == 1u);
+}
+
+
 int main(void) {
+    test_overlapping_native_owners_survive_either_release_order();
+    test_owned_usage_does_not_suppress_its_authored_behavior();
     test_qmk_function_key_with_only_a_double_tap_branch_still_holds();
+    test_pending_multi_tap_release_lets_go_of_an_action_held_at_the_press();
+    test_pending_multi_tap_release_lets_go_of_a_repeat_its_press_holds();
     test_qmk_function_key_with_only_a_double_tap_branch_taps_and_double_taps();
     test_single_tap_waits_for_multi_tap_timeout_before_dispatching();
     test_base_tap_commit_feedback_can_be_suppressed();
     test_non_base_tap_commit_feedback_still_pulses();
     test_non_base_release_resolved_tap_commit_feedback_still_pulses();
-    test_tap_index_wraps_past_the_deepest_authored_branch();
-    test_same_key_wrapped_tap_does_not_defer_a_previous_branch_action();
+    test_run_past_the_deepest_tap_count_types_the_first_tap();
+    test_full_depth_row_selects_each_branch_and_types_past_it();
+    test_repeat_row_sends_one_tap_per_press();
+    test_repeat_row_repeats_a_set_first_tap();
+    test_repeat_row_hold_at_a_set_tap_count_takes_that_hold();
+    test_hold_past_the_deepest_tap_count_takes_the_single_tap_hold();
+    test_empty_tap_count_repeats_the_first_tap();
+    test_press_past_the_deepest_tap_count_sends_the_run_first();
+    test_long_middle_tap_keeps_the_run_typing_the_first_tap();
     test_momentary_layer_key_tracks_press_and_release_events();
     test_threshold_hold_registers_and_releases_owned_state();
     test_replaced_press_token_still_releases_owned_state();
     test_press_on_other_handled_position_keeps_foreign_pending_multi_tap_until_timeout();
-    test_other_press_does_not_flush_active_same_key_multi_tap_chain();
+    test_other_press_settles_active_same_key_multi_tap_chain();
     test_independent_pending_multi_tap_chains_can_coexist_and_flush_independently();
     test_interrupt_other_press_activates_fallback_hold();
     test_interrupted_layer_tap_with_intermediate_scan_releases_without_tap();
@@ -952,8 +1348,8 @@ int main(void) {
     test_double_tap_hold_can_toggle_same_layer_lock_twice();
     test_double_tap_threshold_hold_with_intermediate_scan_registers_once();
     test_repeat_hold_with_intermediate_scans_starts_once_and_releases_once();
-    test_same_locked_pd_mode_quick_tap_unlocks_on_press_without_tap_release();
-    test_same_locked_pd_mode_hold_becomes_momentary_until_release();
+    test_same_locked_pointing_mode_quick_tap_unlocks_on_press_without_tap_release();
+    test_same_locked_pointing_mode_hold_becomes_momentary_until_release();
     test_physical_basic_key_survives_synthetic_tap_at_real_hook_order();
     test_managed_basic_key_suppresses_overlapping_physical_defaults();
 

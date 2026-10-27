@@ -28,6 +28,19 @@
 #    undef SERIAL_USART_TIMEOUT
 #    define SERIAL_USART_TIMEOUT 5
 
+// Profile Apply copies the profile to the other half in split RPC frames, and
+// the master half pulls the other half's newer profile in them. QMK sends each
+// RPC's own request and reply lengths, so these raise the ceiling for the
+// profile copy's payload chunks only (up to 106 profile bytes a frame, pushed
+// or pulled, instead of 10); every other split RPC keeps its 32-byte frames.
+// Each costs 96 bytes of its shared RPC buffer on each half; the transport
+// CRC's staging buffer, sized by the larger of the two, adds 96 once. A full
+// frame alone takes about 2.8 ms on the 460,800-baud link, before the rest of
+// its RPC; QMK's serial timeout applies to each wait for the FIFO, not the
+// whole frame.
+#    define RPC_M2S_BUFFER_SIZE 128
+#    define RPC_S2M_BUFFER_SIZE 128
+
 // A failed userspace runtime RPC stops the current send pass. Retry probes use
 // a short exponential backoff so an unplugged half cannot spend every scan in
 // repeated serial timeouts, while reconnect recovery remains prompt.
@@ -52,20 +65,34 @@
 // - base runtime-visible state (automouse / pd / preview)
 // - combo feedback locality
 // - truthful key-feedback semantics and tap branch state
-// - durable committed VIA-storage reconciliation
+// - the profile copy and commit between halves
+// - the profile store's flash timing on the other half (diagnostics only)
+// - the working copy's live edits and the edit mode (D-F32)
+// - a client's restart of both halves (D-F34)
 // so both halves render layer-owned RGB from the same runtime and keymap data.
-#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_BASE_SYNC, PUT_SPLIT_COMBO_FEEDBACK_SYNC, PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC, PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC, PUT_VIA_KEYMAP_SYNC, PUT_VIA_KEYMAP_MIRROR, PUT_PROFILE_SPLIT_SYNC
+#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_BASE_SYNC, PUT_SPLIT_COMBO_FEEDBACK_SYNC, PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC, PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC, PUT_PROFILE_SPLIT_SYNC, PUT_PROFILE_FLASH_DIAGNOSTICS, PUT_PROFILE_WORKING_SYNC, PUT_KEYBOARD_RESTART
 
-// Dynamic key-local placement for PD-mode RGB overlays.
-// Required only when a pd_mode_colors[] row uses RGB_KEY_HALF or
+// Dynamic key-local placement for pointing-mode RGB overlays.
+// Required only when a pointing_mode_colors[] row uses RGB_KEY_HALF or
 // RGB_KEYS_ONLY.
-// Comment out RGB_PD_MODE_ACTIVE_HALF_ENABLE to keep the split runtime packet
-// smaller and limit PD overlays to fixed left/right/both placement modes.
+// Comment out RGB_POINTING_MODE_ACTIVE_HALF_ENABLE to keep the split runtime
+// packet smaller and limit PD overlays to fixed left/right/both placement
+// modes.
 #    ifdef POINTING_DEVICE_ENABLE
-#        define RGB_PD_MODE_ACTIVE_HALF_ENABLE
+#        define RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
 #    endif
 
 #endif // SPLIT_KEYBOARD
+
+// ─── Edit mode ─────────────────────────────────────────────────────────────
+//
+// The edit mode (Live edit, Live preview + save, Review and save; D-F32)
+// lives in QMK's EEPROM user datablock on each half, outside every profile:
+// two 16-byte records, so a write cut short leaves the previous one
+// (qmk_profile_working.c). The version is this layout's, so a datablock QMK
+// formatted for anything else reads as never set.
+#define EECONFIG_USER_DATA_SIZE 32
+#define EECONFIG_USER_DATA_VERSION 0x4E450132u
 
 // ─── Matrix scan ───────────────────────────────────────────────────────────
 //
@@ -128,11 +155,11 @@
 // report and retain at most this many whole-tap steps for later zero-motion
 // polls. Excess same-direction intent is dropped with diagnostics instead of
 // monopolizing the firmware loop.
-#    ifndef NOAH_PD_MODE_MAX_TAPS_PER_TICK
-#        define NOAH_PD_MODE_MAX_TAPS_PER_TICK 4
+#    ifndef NOAH_POINTING_MODE_MAX_TAPS_PER_TICK
+#        define NOAH_POINTING_MODE_MAX_TAPS_PER_TICK 4
 #    endif
-#    ifndef NOAH_PD_MODE_MAX_BACKLOG_TAPS
-#        define NOAH_PD_MODE_MAX_BACKLOG_TAPS 32
+#    ifndef NOAH_POINTING_MODE_MAX_BACKLOG_TAPS
+#        define NOAH_POINTING_MODE_MAX_BACKLOG_TAPS 32
 #    endif
 
 // Hi-res scroll: each scroll unit = 1/120th of a notch.
@@ -161,7 +188,8 @@
 #    define NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ABS_MAX 2
 
 // Local drag-scroll tuning (DPI for the scroll speed lives in the keymap config).
-// The repo-owned NOAH_DRAGSCROLL_* surface controls the local gesture handler.
+// The repo-owned NOAH_DRAGSCROLL_* surface is the compiled scrolling slots'
+// tuning (pd_config.c); a profile's slots carry their own.
 //   Thresholds     = start moving one axis intentionally before it scrolls
 //   Divisors       = counts per emitted scroll unit
 //   Start ratio    = dominance needed to begin a one-axis gesture
@@ -184,37 +212,14 @@
 
 #endif // POINTING_DEVICE_ENABLE
 
-// ─── VIA ────────────────────────────────────────────────────────────────────
+// ─── Firmware identity and EEPROM ─────────────────────────────────────────
 
-#ifdef VIA_ENABLE
-// Profile Wire v1-capable firmware. Standard VIA reports this numeric value in
-// big-endian byte order while the custom Profile Wire capability page encodes
-// the same uint32 value little-endian; clients compare the decoded values.
-#    define VIA_FIRMWARE_VERSION 0x00010000u
-#    define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
-#    define DYNAMIC_KEYMAP_MACRO_COUNT 64
-// RP2040 wear-leveling exposes half of this backing region as logical EEPROM.
-// Firmware uses 18 KiB of logical EEPROM. VIA owns the lower 8 KiB; the upper
-// 10 KiB holds two last-known-good live-profile slots. The storage
-// layout contract validates these exact inclusive address ranges without
-// reading or writing them.
-#    if defined(MCU_RP)
-#        ifdef NOAH_PD_PROFILE_ENABLE
-#            define WEAR_LEVELING_BACKING_SIZE 36864
-#        else
-// Host schema-1 compatibility fixtures only; rules.mk rejects old firmware.
-#            define WEAR_LEVELING_BACKING_SIZE 32768
-#        endif
-#    endif
-#    define DYNAMIC_KEYMAP_EEPROM_MAX_ADDR 0x1FFFu
-#    define NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR 0x2000u
-#    ifdef NOAH_PD_PROFILE_ENABLE
-#        define NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR 0x33FFu
-#        define NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR 0x3400u
-#        define NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR 0x47FFu
-#    else
-#        define NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR 0x2FFFu
-#        define NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR 0x3000u
-#        define NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR 0x3FFFu
-#    endif
-#endif
+// The firmware version the Profile Wire capability page reports (D-F31).
+#define NOAH_FIRMWARE_VERSION 0x00010000u
+// VIA is not supported (D-F31). QMK's logical EEPROM holds only its eeconfig,
+// with room for a user datablock: the wear-leveling backing is QMK's RP2040
+// default of 8 KiB, so the RAM mirror of logical EEPROM is 4 KiB per half. The
+// profile slots live in a flash region of their own (profile_storage_layout.h).
+
+// Preserve participation through native tapping/combo and userspace queues.
+#define KEYRECORD_USER_DATA

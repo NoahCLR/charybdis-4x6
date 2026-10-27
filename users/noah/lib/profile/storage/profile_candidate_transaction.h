@@ -8,12 +8,19 @@
 #include <stdint.h>
 
 #include "../protocol/profile_candidate_v1.h"
+#include "profile_storage_layout.h"
 
 enum {
     // The whole-profile validator guarantees one reader operation and at most
-    // this many newly observed bytes per scan call. Checksum reads also honor
-    // a smaller nonzero budget supplied by the owner.
+    // this many newly observed bytes per call. Checksum reads also honor a
+    // smaller nonzero budget supplied by the owner.
     NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET = NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX,
+    // A storage step works through up to a flash page of bytes, in reads and
+    // writes of at most the budget above: a REUSE step copies this much of
+    // its range, so it programs at most one page (D-F29, "Pacing").
+    NOAH_PROFILE_CANDIDATE_STEP_BYTES = NOAH_PROFILE_STORAGE_PAGE_SIZE,
+    // ...and a validation step takes this many validator calls.
+    NOAH_PROFILE_CANDIDATE_VALIDATION_CALLS = NOAH_PROFILE_CANDIDATE_STEP_BYTES / NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET,
 };
 
 typedef enum {
@@ -29,8 +36,14 @@ typedef enum {
 typedef struct {
     void *context;
     noah_profile_candidate_backend_result_t (*begin)(void *context, const noah_profile_candidate_v1_metadata_t *metadata);
-    noah_profile_candidate_backend_result_t (*write)(void *context, uint16_t offset, const uint8_t *bytes, uint8_t length);
-    noah_profile_candidate_backend_result_t (*read)(void *context, uint16_t offset, uint8_t *bytes, uint8_t length);
+    noah_profile_candidate_backend_result_t (*write)(void *context, uint32_t offset, const uint8_t *bytes, uint8_t length);
+    noah_profile_candidate_backend_result_t (*read)(void *context, uint32_t offset, uint8_t *bytes, uint8_t length);
+    // Reads the immutable active source only when its entire supplied identity
+    // still matches. Called from scan context, with at most 20 bytes.
+    noah_profile_candidate_backend_result_t (*read_source)(void *context, const noah_profile_candidate_v1_source_t *source, uint32_t offset, uint8_t *bytes, uint8_t length);
+    // Optional. Told each REUSE step that was copied: `length` bytes at
+    // candidate `offset` came from `source` at `source_offset`.
+    void (*note_reuse)(void *context, const noah_profile_candidate_v1_source_t *source, uint32_t offset, uint32_t source_offset, uint8_t length);
     noah_profile_candidate_backend_result_t (*validation_begin)(void *context, const noah_profile_candidate_v1_metadata_t *metadata, noah_profile_candidate_v1_error_t *error);
     // Each step must return IN_PROGRESS, VALID, REJECTED, or IO_ERROR and obey
     // the per-step reader-work contract above. OK is deliberately not a
@@ -50,7 +63,7 @@ typedef struct {
     uint8_t  schema_major;
     uint8_t  schema_minor;
     uint8_t  supported_domain_mask;
-    uint16_t max_payload_length;
+    uint32_t max_payload_length;
     uint32_t action_abi_digest;
 } noah_profile_candidate_compatibility_t;
 
@@ -70,6 +83,7 @@ typedef struct {
     bool                                   split_commit_authorization_required;
     uint16_t                               last_aborted_transaction_id;
     uint16_t                               last_committed_transaction_id;
+    uint8_t                                reuse_bytes[NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX];
 } noah_profile_candidate_transaction_t;
 
 typedef enum {
@@ -103,6 +117,11 @@ bool noah_profile_candidate_transaction_authorize_activation(noah_profile_candid
 // frame is replaced in place with its immediate admission acknowledgement.
 bool noah_profile_candidate_transaction_receive(noah_profile_candidate_transaction_t *transaction, uint8_t *frame, size_t length);
 
+// Firmware side: queues one already decoded command, as receive would after
+// decoding it. Save (D-F32) drives a candidate made of REUSE from the working
+// copy this way. False while the mailbox holds a command.
+bool noah_profile_candidate_transaction_submit(noah_profile_candidate_transaction_t *transaction, const noah_profile_candidate_v1_command_t *command);
+
 // Scan side: processes at most one mailbox item, validation step, commit step,
 // or activation step. Validation and commit obey the bounded-work contracts
 // above; provider activation remains a separate safe-boundary poll.
@@ -114,15 +133,16 @@ bool noah_profile_candidate_transaction_scan(noah_profile_candidate_transaction_
 noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_expire_precommit(noah_profile_candidate_transaction_t *transaction);
 
 // Split-authority cleanup for a host candidate that lost to an already newer
-// peer before marker-last commit began. Unlike inactivity expiry, this scan-
-// owned operation may discard one acknowledged but unprocessed mailbox item so
-// a queued commit cannot cross the newly observed durable-authority boundary.
+// other half before marker-last commit began. Unlike inactivity expiry, this
+// scan-owned operation may discard one acknowledged but unprocessed mailbox
+// item so a queued commit cannot cross the newly observed durable-authority
+// boundary.
 noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_supersede_precommit(noah_profile_candidate_transaction_t *transaction);
 // Deterministic simultaneous-host arbitration. The losing physical origin
 // aborts only its still-provisional candidate and reports a distinct status.
 noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_yield_precommit(noah_profile_candidate_transaction_t *transaction);
 // The copy to the other half stopped for good before any commit.
-noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_peer_failed_precommit(noah_profile_candidate_transaction_t *transaction);
+noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_other_half_failed_precommit(noah_profile_candidate_transaction_t *transaction);
 
 // Fail closed after local marker-last durability. This retains the candidate
 // and backend lease/backing so a two-slot runtime cannot overwrite the active
@@ -132,8 +152,8 @@ bool noah_profile_candidate_transaction_fail_postcommit(noah_profile_candidate_t
 
 // Releases a candidate whose local commit failed before marker durability was
 // possible while retaining its terminal STORAGE_FAILURE status for the host.
-// The split owner calls this only after confirming that any provisional peer
-// copy has been aborted. Durable/ambiguous states are refused.
+// The split owner calls this only after confirming that any provisional copy
+// to the other half has been aborted. Durable/ambiguous states are refused.
 noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_cleanup_failed_precommit(noah_profile_candidate_transaction_t *transaction);
 
 void noah_profile_candidate_transaction_status(const noah_profile_candidate_transaction_t *transaction, noah_profile_candidate_v1_status_t *status);

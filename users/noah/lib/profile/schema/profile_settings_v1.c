@@ -1,19 +1,22 @@
 #include "profile_settings_v1.h"
 #include <string.h>
 
+#include "../../compat/qmk_host_setting.h"
+
 bool noah_profile_setting_v1_valid(uint8_t id, uint32_t v, uint8_t layers) {
-#ifdef NOAH_PD_PROFILE_ENABLE
     if (id >= NOAH_SETTING_DRAGSCROLL_DPI && id <= NOAH_SETTING_ARROW_DPI) return v == 0;
-#endif
+    uint32_t bank = layers >= 32u ? UINT32_MAX : (UINT32_C(1) << layers) - 1u;
     switch (id) {
+        case NOAH_SETTING_UNICODE_HOST_MODE:
+            return (v & ~NOAH_HOST_SETTING_BITS) == 0u && noah_host_layout_id(v) < NOAH_HOST_LAYOUT_LIMIT;
         case NOAH_SETTING_FEEDBACK_PERIOD:
             return v > 0 && v <= 65535;
         case NOAH_SETTING_AUTO_MOUSE_ENABLED:
         case NOAH_SETTING_AUTO_SNIPING_ENABLED:
         case NOAH_SETTING_COMBOS_ENABLED:
+        case NOAH_SETTING_BEHAVIORS_ENABLED:
             return v <= 1;
         case NOAH_SETTING_AUTO_MOUSE_LAYER:
-        case NOAH_SETTING_AUTO_SNIPING_LAYER:
             return v < layers;
         case NOAH_SETTING_AUTO_MOUSE_DEBOUNCE:
             return v <= 255;
@@ -24,11 +27,12 @@ bool noah_profile_setting_v1_valid(uint8_t id, uint32_t v, uint8_t layers) {
         case NOAH_SETTING_RGB_COLOR:
             return !(v >> 24);
         case NOAH_SETTING_DEFAULT_LAYERS:
-            return v && !(v >> layers);
-        case NOAH_SETTING_COMBO_REFERENCES:
-            for (uint8_t i = 0; i < 8; i++)
-                if (((v >> (i * 4)) & 15) >= layers) return false;
-            return true;
+            return v && !(v & ~bank);
+        case NOAH_SETTING_AUTO_SNIPING_LAYERS:
+        case NOAH_SETTING_LAYER_BEHAVIORS:
+        case NOAH_SETTING_LAYER_COMBOS:
+            return !(v & ~bank);
+
         case NOAH_SETTING_DEFAULT_DPI:
             return v >= 400 && v <= 3400 && v % 200 == 0;
         case NOAH_SETTING_SNIPING_DPI:
@@ -37,193 +41,128 @@ bool noah_profile_setting_v1_valid(uint8_t id, uint32_t v, uint8_t layers) {
             return id < NOAH_SETTINGS_COUNT && v <= 65535;
     }
 }
-static bool key(uint8_t v) {
-    return (v >= 4 && v <= 0xa4) || (v >= 0xe0 && v <= 0xe7);
+
+static bool layer_record_byte(uint8_t b, uint16_t offset, uint8_t layers, uint8_t positions) {
+    uint8_t field = (uint8_t)((offset - NOAH_SETTINGS_LAYER_RECORDS_OFFSET) % NOAH_SETTINGS_LAYER_RECORD_SIZE);
+    if (field == NOAH_SETTINGS_LAYER_REFERENCE) return b < layers;
+    uint8_t bitmap_byte = (uint8_t)((field - NOAH_SETTINGS_LAYER_BYPASS) % NOAH_SETTINGS_PLACEMENT_BYTES);
+    uint8_t first_bit   = (uint8_t)(bitmap_byte * 8u);
+    if (first_bit >= positions) return b == 0;
+    uint8_t used = positions - first_bit;
+    return used >= 8u || !(b >> used);
 }
-static bool ir_byte(noah_profile_settings_v1_validation_t *s, uint8_t b) {
-    if (!s->opcode) {
-        if (b < 1 || b > 5) return false;
-        s->opcode    = b;
-        s->remaining = b == 2 ? 2 : 0;
-        s->tap_count = 0;
-        return true;
+
+// A shortcut's key at `index` of its record, given the keys before it: a
+// key from the shortcut vocabulary (custom_key_shortcut.h), packed after the
+// keys before it, never one of them, and never a second system or consumer
+// key; or zero, after the last. The candidate arrives a byte at a time, so this
+// holds a record to the key-list form noah_custom_key_shortcut_key_count()
+// reads (zero ends the keys) one byte at a time instead of counting a whole
+// list: a record it accepts is one that function counts correctly.
+static bool shortcut_key_byte(noah_profile_settings_v1_validation_t *s, uint8_t b, uint8_t index) {
+    bool system = NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_SYSTEM(b), consumer = NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_CONSUMER(b);
+    if (!noah_custom_key_shortcut_key_valid(b)) return false;
+    for (uint8_t before = 0u; before < index; before++) {
+        uint8_t earlier = s->shortcut_keys[before];
+        if (b != 0u && (earlier == 0u || earlier == b || (system && NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_SYSTEM(earlier)) || (consumer && NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_CONSUMER(earlier)))) return false;
     }
-    if (s->opcode == 2) {
-        if (!--s->remaining) s->opcode = 0;
-        return true;
-    }
-    if (s->opcode == 3 || s->opcode == 4) {
-        if (!key(b)) return false;
-        uint8_t i = 0;
-        while (i < s->held_count && s->held[i] != b)
-            i++;
-        if (s->opcode == 3) {
-            if (i != s->held_count || s->held_count == 16) return false;
-            s->held[s->held_count++] = b;
-        } else {
-            if (i == s->held_count) return false;
-            memmove(&s->held[i], &s->held[i + 1], s->held_count - i - 1);
-            s->held_count--;
-        }
-        s->opcode = 0;
-        return true;
-    }
-    if (!s->remaining) {
-        if (!b || (s->opcode == 5 && b > 16)) return false;
-        s->remaining = b;
-        return true;
-    }
-    if (s->opcode == 1) {
-        if (!(b == 9 || b == 10 || (b >= 32 && b <= 126))) return false;
-    } else {
-        if (!key(b)) return false;
-        for (uint8_t i = 0; i < s->tap_count; i++)
-            if (s->tap[i] == b) return false;
-        for (uint8_t i = 0; i < s->held_count; i++)
-            if (s->held[i] == b) return false;
-        s->tap[s->tap_count++] = b;
-    }
-    if (!--s->remaining) s->opcode = 0;
+    if (index < NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT - 1) s->shortcut_keys[index] = b;
     return true;
 }
-// One byte of printable UTF-8: no NUL, controls or DEL, no overlong or
-// surrogate encodings.
-static bool utf8_byte(noah_profile_settings_v1_validation_t *s, uint8_t b) {
-    if (s->utf8_remaining) {
-        if (b < s->utf8_min || b > s->utf8_max) return false;
-        s->utf8_remaining--;
-        s->utf8_min = 0x80;
-        s->utf8_max = 0xbf;
-        return true;
-    }
-    if (b < 0x20 || b == 0x7f) return false;
-    if (b < 0x80) return true;
-    s->utf8_min = 0x80;
-    s->utf8_max = 0xbf;
-    if (b >= 0xc2 && b <= 0xdf)
-        s->utf8_remaining = 1;
-    else if (b >= 0xe0 && b <= 0xef) {
-        s->utf8_remaining = 2;
-        if (b == 0xe0) s->utf8_min = 0xa0;
-        if (b == 0xed) s->utf8_max = 0x9f;
-    } else if (b >= 0xf0 && b <= 0xf4) {
-        s->utf8_remaining = 3;
-        if (b == 0xf0) s->utf8_min = 0x90;
-        if (b == 0xf4) s->utf8_max = 0x8f;
-    } else
-        return false;
-    return true;
-}
-// v3: one byte of the 64 length-prefixed VIA macro names; v5 continues with
-// the 64 custom-key names, one slot count past them.
-static uint8_t name_slots(uint8_t version) {
-    return version >= 5u ? NOAH_SETTINGS_MACRO_NAMES + NOAH_SETTINGS_CUSTOM_KEY_NAMES : version >= 3u ? NOAH_SETTINGS_MACRO_NAMES : NOAH_SETTINGS_MACROS;
-}
-static bool macro_name_byte(noah_profile_settings_v1_validation_t *s, uint8_t b) {
-    if (s->slot >= name_slots(s->version)) return false;
-    if (!s->macro_offset) {
-        if (b > (s->version >= 4u ? NOAH_SETTINGS_MACRO_NAME_ASCII_MAX : NOAH_SETTINGS_MACRO_NAME_MAX)) return false;
-        s->macro_length   = b;
-        s->utf8_remaining = 0;
-        if (b)
-            s->macro_offset = 1;
-        else
-            s->slot++;
-        return true;
-    }
-    if (s->version >= 4u ? b < 0x20 || b > 0x7e : !utf8_byte(s, b)) return false;
-    if (s->macro_offset++ == s->macro_length) {
-        if (s->utf8_remaining) return false;
-        s->slot++;
-        s->macro_offset = 0;
-    }
-    return true;
-}
-static bool name_byte(noah_profile_settings_v1_validation_t *s, uint8_t b, uint8_t column) {
-    if (!column) {
-        s->name_ended     = false;
-        s->utf8_remaining = 0;
-    }
-    if (s->name_ended) return b == 0;
-    if (s->utf8_remaining) {
-        if (b < s->utf8_min || b > s->utf8_max) return false;
-        s->utf8_remaining--;
-        s->utf8_min = 0x80;
-        s->utf8_max = 0xbf;
-    } else if (!b)
-        s->name_ended = true;
-    else if (b < 0x20 || b == 0x7f)
-        return false;
-    else if (b >= 0x80) {
-        s->utf8_min = 0x80;
-        s->utf8_max = 0xbf;
-        if (b >= 0xc2 && b <= 0xdf)
-            s->utf8_remaining = 1;
-        else if (b >= 0xe0 && b <= 0xef) {
-            s->utf8_remaining = 2;
-            if (b == 0xe0) s->utf8_min = 0xa0;
-            if (b == 0xed) s->utf8_max = 0x9f;
-        } else if (b >= 0xf0 && b <= 0xf4) {
-            s->utf8_remaining = 3;
-            if (b == 0xf0) s->utf8_min = 0x90;
-            if (b == 0xf4) s->utf8_max = 0x8f;
-        } else
-            return false;
-    }
-    return column != 23 || s->name_ended;
-}
-bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, uint8_t b, uint16_t length, uint8_t layers) {
-    if (!s || length < NOAH_SETTINGS_FIXED_SIZE + 32 || length > NOAH_SETTINGS_MAX_SIZE || s->offset >= length) return false;
-    uint16_t offset = s->offset++;
-    if (offset < 8) {
-        static const uint8_t header[8] = {0, 8, 28, 0, 0, 0, 0, 0};
-        if (!offset) {
-            if (!NOAH_PROFILE_SETTINGS_VERSION_ACCEPTED(b) || (s->expected_version && b != s->expected_version)) return false;
-            // Each version keeps its own ceiling: v3's also bounds its names.
-            if (length > (b >= 5u ? NOAH_SETTINGS_V5_MAX_SIZE : b >= 4u ? NOAH_SETTINGS_V4_MAX_SIZE : NOAH_SETTINGS_V3_MAX_SIZE)) return false;
-            s->version = b;
+
+// A shortcut record is its report modifier mask, any eight bits, its keys,
+// its layer mask, which names neither the base layer nor a default layer
+// (those are always on), and the layer key its layers act as: Hold without
+// layers, so one shortcut has one record.
+static bool shortcut_byte(noah_profile_settings_v1_validation_t *s, uint8_t b, uint16_t offset) {
+    uint16_t always_on = (uint16_t)(s->default_layers | 1u);
+    uint8_t  field     = (uint8_t)((offset - NOAH_SETTINGS_SHORTCUTS_OFFSET) % NOAH_SETTINGS_SHORTCUT_SIZE);
+    if (field >= NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET && field < NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET + NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT) return shortcut_key_byte(s, b, (uint8_t)(field - NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET));
+    switch (field) {
+        case NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_LO:
+            s->shortcut_has_layers = b != 0u;
+            return !(b & (uint8_t)always_on);
+        case NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_HI:
+            s->shortcut_has_layers |= b != 0u;
+            return !(b & (uint8_t)(always_on >> 8));
+        case NOAH_CUSTOM_KEY_SHORTCUT_LAYER_KIND:
+            return b < NOAH_SHORTCUT_LAYER_KIND_COUNT && (s->shortcut_has_layers || b == NOAH_SHORTCUT_LAYERS_HOLD);
+        default:
             return true;
-        }
-        if (offset == 3) return b == (s->version >= 3u ? NOAH_SETTINGS_MACRO_NAMES : NOAH_SETTINGS_MACROS);
-        if (offset == 4) return b == (s->version >= 5u ? NOAH_SETTINGS_CUSTOM_KEY_NAMES : 0u);
-        return b == header[offset];
     }
-    if (offset < 8 + 28 * 4) {
-        uint8_t id = (offset - 8) / 4, part = (offset - 8) % 4;
+}
+
+static bool name_byte(noah_profile_settings_v1_validation_t *s, uint8_t b) {
+    if (s->name >= NOAH_SETTINGS_NAME_COUNT) return false;
+    if (!s->in_name) {
+        if (!noah_profile_name_v1_begin(&s->current, b)) return false;
+        if (b)
+            s->in_name = true;
+        else
+            s->name++;
+        return true;
+    }
+    if (!noah_profile_name_v1_byte(&s->current, b)) return false;
+    if (!s->current.remaining) {
+        if (!noah_profile_name_v1_complete(&s->current)) return false;
+        s->in_name = false;
+        s->name++;
+    }
+    return true;
+}
+
+bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, uint8_t b, uint32_t length, uint8_t layers, uint8_t positions) {
+    if (!s || layers != NOAH_SETTINGS_LAYERS || positions > NOAH_SETTINGS_PLACEMENT_MAX_POSITIONS || length < NOAH_SETTINGS_MIN_SIZE || length > NOAH_SETTINGS_MAX_SIZE || s->offset >= length) return false;
+    uint16_t offset = s->offset++;
+    if (offset < NOAH_SETTINGS_HEADER_SIZE) {
+        static const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
+        return offset == NOAH_SETTINGS_FLAGS_OFFSET ? !(b & (uint8_t)~NOAH_SETTINGS_KNOWN_FLAGS) : b == header[offset];
+    }
+    uint8_t id, part;
+    if (noah_profile_settings_v1_scalar_at(offset, &id, &part)) {
         if (!part) s->value = 0;
-        s->value |= (uint32_t)b << (part * 8);
-        if (part != 3) return true;
+        s->value |= noah_profile_settings_v1_scalar_bits(b, part);
+        if (part != NOAH_SETTINGS_SCALAR_SIZE - 1) return true;
         if (!noah_profile_setting_v1_valid(id, s->value, layers)) return false;
         if (id == NOAH_SETTING_AUTO_MOUSE_TIMEOUT) s->timeout = s->value;
+        if (id == NOAH_SETTING_DEFAULT_LAYERS) s->default_layers = (uint16_t)s->value;
         if (id == NOAH_SETTING_AUTO_MOUSE_DEAD_TIME) {
             s->dead_time = s->value;
             if (!s->timeout || s->dead_time >= s->timeout) return false;
         }
         return true;
     }
-    if (offset < NOAH_SETTINGS_FIXED_SIZE) return name_byte(s, b, (offset - 120) % 24);
-    if (s->version >= 3u) return macro_name_byte(s, b);
-    if (s->slot >= 16) return false;
-    if (s->macro_offset < 2) {
-        if (!s->macro_offset)
-            s->macro_length = b;
-        else {
-            s->macro_length |= (uint16_t)b << 8;
-            s->macro_total += s->macro_length;
-            if (s->macro_length > 512 || s->macro_total > 1024) return false;
-        }
-        s->macro_offset++;
-    } else {
-        if (!ir_byte(s, b)) return false;
-        s->macro_offset++;
+    if (offset < NOAH_SETTINGS_SHORTCUTS_OFFSET) return layer_record_byte(b, offset, layers, positions);
+    if (offset < NOAH_SETTINGS_FIXED_SIZE) return shortcut_byte(s, b, offset);
+    return name_byte(s, b);
+}
+
+bool noah_profile_settings_v1_complete(const noah_profile_settings_v1_validation_t *s, uint32_t length) {
+    return s && s->offset == length && s->name == NOAH_SETTINGS_NAME_COUNT && !s->in_name;
+}
+
+bool noah_profile_settings_v1_keyboard_name(const noah_profile_reader_t *reader, size_t offset, size_t length, noah_profile_keyboard_name_t *name) {
+    if (!name) return false;
+    memset(name, 0, sizeof(*name));
+    uint8_t byte;
+    if (length < NOAH_SETTINGS_MIN_SIZE || length > NOAH_SETTINGS_MAX_SIZE || !noah_profile_reader_read(reader, offset, &byte, 1) || byte != NOAH_SETTINGS_VERSION) return false;
+    // Skip every name before the keyboard's: each is its length byte and bytes.
+    size_t at = NOAH_SETTINGS_FIXED_SIZE;
+    for (uint16_t record = 0; record < NOAH_SETTINGS_KEYBOARD_NAME_RECORD; record++) {
+        if (at >= length || !noah_profile_reader_read(reader, offset + at, &byte, 1)) return false;
+        at += 1u + byte;
     }
-    if (s->macro_offset == s->macro_length + 2) {
-        if (s->opcode || s->held_count) return false;
-        s->slot++;
-        s->macro_offset = 0;
-    }
+    noah_profile_name_v1_t rule;
+    uint8_t                bytes[NOAH_SETTINGS_NAME_MAX];
+    if (at >= length || !noah_profile_reader_read(reader, offset + at, &byte, 1) || !noah_profile_name_v1_begin(&rule, byte) || at + 1u + byte != length || !noah_profile_reader_read(reader, offset + at + 1u, bytes, byte)) return false;
+    for (uint8_t i = 0; i < byte; i++)
+        if (!noah_profile_name_v1_byte(&rule, bytes[i])) return false;
+    if (!noah_profile_name_v1_complete(&rule)) return false;
+    name->length = byte;
+    memcpy(name->bytes, bytes, byte);
     return true;
 }
-bool noah_profile_settings_v1_complete(const noah_profile_settings_v1_validation_t *s, uint16_t length) {
-    return s && s->offset == length && s->slot == name_slots(s->version) && !s->macro_offset;
+
+bool noah_profile_keyboard_name_equal(const noah_profile_keyboard_name_t *a, const noah_profile_keyboard_name_t *b) {
+    return a && b && a->length == b->length && !memcmp(a->bytes, b->bytes, a->length);
 }

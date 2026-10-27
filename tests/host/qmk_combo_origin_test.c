@@ -6,6 +6,8 @@
 
 #include "noah_real_profile_keyboard.h"
 #include "users/noah/lib/compat/qmk_combo_origin.h"
+#include "users/noah/lib/key/behavior/participation.h"
+#include "users/noah/lib/profile/runtime/active_profile_settings_runtime.h"
 
 enum {
     TEST_BURST_COMBOS     = 5,
@@ -21,6 +23,24 @@ layer_state_t default_layer_state = (layer_state_t)1u << LAYER_BASE;
 
 static uint16_t test_keymaps[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 static uint16_t fake_time;
+static uint16_t timer_read_count;
+static uint8_t test_source_layer;
+#ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+extern const uint8_t noah_combo_count;
+extern combo_t key_combos[];
+static uint8_t test_combo_flags[6];
+static bool test_combo_output_behaviors = true;
+bool noah_setting_combo_output_behaviors(void) { return test_combo_output_behaviors; }
+uint32_t noah_setting(uint8_t id, uint32_t fallback) { (void)id; return fallback; }
+uint8_t noah_setting_layer_record(uint8_t layer, uint8_t field) { return field == NOAH_SETTINGS_LAYER_REFERENCE ? layer : 0; }
+uint16_t noah_active_profile_combo_count(void) { return noah_combo_count; }
+combo_t *noah_active_profile_combo_get(uint16_t index) { return index < noah_combo_count ? &key_combos[index] : NULL; }
+bool noah_active_profile_combo_enabled(uint16_t index) { return index < noah_combo_count; }
+uint32_t noah_active_profile_combo_allowed_layers(uint16_t index) { (void)index; return 0xffff; }
+uint8_t noah_active_profile_combo_flags(uint16_t index) { return test_combo_flags[index]; }
+uint16_t get_combo_term(uint16_t index, combo_t *combo) { (void)index; (void)combo; return COMBO_TERM; }
+uint16_t noah_qmk_combo_hold_term(void) { return TAPPING_TERM; }
+#endif
 
 static const uint16_t combo_keys_left[] = {
     KC_A,
@@ -151,6 +171,11 @@ static void test_reset(void) {
     layer_state         = 0;
     default_layer_state = (layer_state_t)1u << LAYER_BASE;
     fake_time           = 1000u;
+    test_source_layer = 0;
+#ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+    memset(test_combo_flags, 0, sizeof(test_combo_flags));
+    test_combo_output_behaviors = true;
+#endif
     test_reset_keymaps();
     test_reset_combo_state();
     key_origin_registry_reset();
@@ -158,6 +183,7 @@ static void test_reset(void) {
 }
 
 uint16_t timer_read(void) {
+    timer_read_count++;
     return fake_time;
 }
 
@@ -216,6 +242,7 @@ static keyrecord_t test_combo_record(bool pressed) {
 static void test_observe_physical_key(keypos_t key_pos, bool pressed) {
     keyrecord_t record = test_physical_record(key_pos, pressed);
 
+    noah_participation_record_capture(&record, test_source_layer);
     noah_qmk_combo_origin_observe_physical_key_event(KC_NO, &record);
 }
 
@@ -437,6 +464,7 @@ static void test_pending_combo_press_uses_exact_pending_footprint(void) {
 
     test_observe_physical_key(test_key(0, 1), true);
     test_observe_physical_key(test_key(4, 0), true);
+    test_set_combo_active(1, true); // Pinned QMK activates before emission.
 
     noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_BOTH, &combo_record);
 
@@ -457,12 +485,14 @@ static void test_pending_combo_release_uses_cached_exact_footprint(void) {
 
     test_observe_physical_key(test_key(0, 1), true);
     test_observe_physical_key(test_key(4, 0), true);
+    test_set_combo_active(1, true);
 
     noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_BOTH, &combo_press);
 
     test_observe_physical_key(test_key(4, 0), false);
     test_observe_physical_key(test_key(0, 1), false);
     noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_BOTH, &combo_release);
+    test_set_combo_active(1, false); // QMK deactivates after emitting release.
 
     CHECK(combo_release.event.key.row == 4);
     CHECK(combo_release.event.key.col == 0);
@@ -470,6 +500,244 @@ static void test_pending_combo_release_uses_cached_exact_footprint(void) {
     CHECK(test_bitmap_has(bitmap, 0, 1));
     CHECK(test_bitmap_has(bitmap, 4, 0));
     CHECK(noah_qmk_combo_origin_event_side_mask(&combo_release) == SPLIT_SIDE_MASK_BOTH);
+}
+
+static void test_inactive_combo_output_does_not_promote_an_exact_candidate(void) {
+    keyrecord_t combo_record = test_combo_record(true);
+    noah_qmk_combo_origin_debug_snapshot_t snapshot;
+    uint8_t bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset();
+    test_observe_physical_key(test_key(0, 1), true);
+    test_observe_physical_key(test_key(4, 0), true);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_BOTH, &combo_record);
+    noah_qmk_combo_origin_debug_snapshot(&snapshot);
+
+    CHECK(snapshot.pending_count == 1u);
+    CHECK(snapshot.unmatched_delayed_output_count == 1u);
+    CHECK(noah_qmk_combo_origin_event_bitmap(&combo_record, bitmap));
+    CHECK(test_bitmap_has(bitmap, 0, 1));
+    CHECK(test_bitmap_has(bitmap, 4, 0));
+    CHECK(test_bitmap_has(bitmap, 2, 2)); // Unproven origin stays conservative.
+}
+
+// QMK marks a fired combo active and disabled. If the output waits behind a
+// tap-hold decision, the chord can be released and the combo deactivated
+// before delivery; the fired completion still names exactly its members.
+static void test_fired_combo_delivered_after_deactivation_keeps_footprint(void) {
+    keyrecord_t combo_press   = test_combo_record(true);
+    keyrecord_t combo_release = test_combo_record(false);
+    noah_qmk_combo_origin_debug_snapshot_t snapshot;
+    uint8_t bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset();
+    test_observe_physical_key(test_key(0, 1), true);
+    test_observe_physical_key(test_key(4, 0), true);
+    test_set_combo_active(1, true); // apply_combo
+    test_set_combo_disabled(1, true); // drop_combo_from_buffer
+    noah_qmk_combo_origin_scan();
+    fake_time = (uint16_t)(fake_time + COMBO_TERM + 1u);
+    test_observe_physical_key(test_key(4, 0), false);
+    test_observe_physical_key(test_key(0, 1), false);
+    test_set_combo_active(1, false); // release_combo; output still queued
+    noah_qmk_combo_origin_scan();
+    noah_qmk_combo_origin_scan();
+
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_BOTH, &combo_press);
+    noah_qmk_combo_origin_debug_snapshot(&snapshot);
+    CHECK(snapshot.suppressed_retirement_count == 0u);
+    CHECK(snapshot.deadline_expiry_count == 0u);
+    CHECK(snapshot.unmatched_delayed_output_count == 0u);
+    CHECK(snapshot.pending_count == 0u);
+    CHECK(noah_qmk_combo_origin_event_bitmap(&combo_press, bitmap));
+    CHECK(test_bitmap_has(bitmap, 0, 1));
+    CHECK(test_bitmap_has(bitmap, 4, 0));
+    CHECK(!test_bitmap_has(bitmap, 2, 2));
+    CHECK(combo_press.event.key.row == 4 && combo_press.event.key.col == 0);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_BOTH, &combo_release);
+    CHECK(combo_release.event.key.row == 4 && combo_release.event.key.col == 0);
+}
+
+// A completion QMK disabled without firing (overlap, timeout) is still
+// retired at once and never pairs with a later output.
+static void test_disabled_unfired_completion_is_retired(void) {
+    noah_qmk_combo_origin_debug_snapshot_t snapshot;
+
+    test_reset();
+    test_observe_physical_key(test_key(0, 1), true);
+    test_observe_physical_key(test_key(4, 0), true);
+    test_set_combo_disabled(1, true);
+    noah_qmk_combo_origin_scan();
+    noah_qmk_combo_origin_debug_snapshot(&snapshot);
+    CHECK(snapshot.pending_count == 0u);
+    CHECK(snapshot.suppressed_retirement_count == 1u);
+}
+
+// Queued outputs leave QMK in firing order; two fired completions with one
+// output keycode pair oldest first. A fired output that never arrives retires
+// one tapping term after it was seen firing, not one combo term.
+static void test_fired_outputs_pair_in_order_and_expire_after_tapping_term(void) {
+    keyrecord_t first  = test_combo_record(true);
+    keyrecord_t second = test_combo_record(true);
+    noah_qmk_combo_origin_debug_snapshot_t snapshot;
+    uint8_t bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset();
+    test_observe_physical_key(test_key(0, 2), true); // H
+    test_observe_physical_key(test_key(1, 2), true); // I -> DUP (left)
+    test_set_combo_active(3, true);
+    test_set_combo_disabled(3, true);
+    noah_qmk_combo_origin_scan();
+    test_observe_physical_key(test_key(4, 2), true); // J
+    test_observe_physical_key(test_key(5, 2), true); // K -> DUP (right)
+    test_set_combo_active(4, true);
+    test_set_combo_disabled(4, true);
+    noah_qmk_combo_origin_scan();
+    test_set_combo_active(3, false);
+    test_set_combo_active(4, false);
+    noah_qmk_combo_origin_scan();
+
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_DUP, &first);
+    CHECK(noah_qmk_combo_origin_event_bitmap(&first, bitmap));
+    CHECK(test_bitmap_has(bitmap, 0, 2) && test_bitmap_has(bitmap, 1, 2) && !test_bitmap_has(bitmap, 4, 2));
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_DUP, &second);
+    CHECK(noah_qmk_combo_origin_event_bitmap(&second, bitmap));
+    CHECK(test_bitmap_has(bitmap, 4, 2) && test_bitmap_has(bitmap, 5, 2) && !test_bitmap_has(bitmap, 0, 2));
+
+    test_reset();
+    test_observe_physical_key(test_key(0, 1), true);
+    test_observe_physical_key(test_key(4, 0), true);
+    test_set_combo_active(1, true);
+    test_set_combo_disabled(1, true);
+    noah_qmk_combo_origin_scan(); // seen firing at 1000
+    test_set_combo_active(1, false);
+    fake_time = (uint16_t)(1000u + TAPPING_TERM);
+    noah_qmk_combo_origin_scan();
+    noah_qmk_combo_origin_scan();
+    noah_qmk_combo_origin_debug_snapshot(&snapshot);
+    CHECK(snapshot.pending_count == 1u);
+    fake_time = (uint16_t)(1000u + TAPPING_TERM + 1u);
+    noah_qmk_combo_origin_scan();
+    noah_qmk_combo_origin_debug_snapshot(&snapshot);
+    CHECK(snapshot.pending_count == 1u); // first crossing is the final grace scan
+    noah_qmk_combo_origin_scan();
+    noah_qmk_combo_origin_debug_snapshot(&snapshot);
+    CHECK(snapshot.pending_count == 0u);
+    CHECK(snapshot.deadline_expiry_count == 1u);
+}
+
+// Two chords with one output keycode fire, and QMK delivers both presses
+// before either is dispatched (an undecided tap-hold key holds them back).
+// Each press pairs with its own completion, in firing order, whether the first
+// chord is still held or was let go; each release pairs with its press, in
+// the order QMK delivered them, even after later physical releases.
+static void test_same_output_deliveries_pair_before_dispatch(void) {
+    noah_qmk_combo_origin_debug_snapshot_t snapshot;
+    uint8_t                                bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+    for (unsigned first_held = 0; first_held < 2; first_held++) {
+        keyrecord_t first_press    = test_combo_record(true);
+        keyrecord_t second_press   = test_combo_record(true);
+        keyrecord_t first_release  = test_combo_record(false);
+        keyrecord_t second_release = test_combo_record(false);
+
+        test_reset();
+        test_observe_physical_key(test_key(0, 2), true); // H
+        test_observe_physical_key(test_key(1, 2), true); // I -> DUP (left)
+        test_set_combo_active(3, true);
+        test_set_combo_disabled(3, true);
+        noah_qmk_combo_origin_capture_record(TEST_COMBO_OUT_DUP, &first_press);
+        noah_qmk_combo_origin_scan();
+        if (!first_held) {
+            test_observe_physical_key(test_key(1, 2), false);
+            test_observe_physical_key(test_key(0, 2), false);
+            noah_qmk_combo_origin_capture_record(TEST_COMBO_OUT_DUP, &first_release);
+            test_set_combo_active(3, false);
+        }
+        test_observe_physical_key(test_key(4, 2), true); // J
+        test_observe_physical_key(test_key(5, 2), true); // K -> DUP (right)
+        test_set_combo_active(4, true);
+        test_set_combo_disabled(4, true);
+        noah_qmk_combo_origin_capture_record(TEST_COMBO_OUT_DUP, &second_press);
+        noah_qmk_combo_origin_scan();
+        if (first_held) {
+            // The second chord is let go first.
+            test_observe_physical_key(test_key(5, 2), false);
+            test_observe_physical_key(test_key(4, 2), false);
+            noah_qmk_combo_origin_capture_record(TEST_COMBO_OUT_DUP, &second_release);
+            test_set_combo_active(4, false);
+            test_observe_physical_key(test_key(1, 2), false);
+            test_observe_physical_key(test_key(0, 2), false);
+            noah_qmk_combo_origin_capture_record(TEST_COMBO_OUT_DUP, &first_release);
+            test_set_combo_active(3, false);
+        }
+
+        noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_DUP, &first_press);
+        CHECK(first_press.event.key.row == 1u && first_press.event.key.col == 2u);
+        CHECK(noah_qmk_combo_origin_event_bitmap(&first_press, bitmap));
+        CHECK(test_bitmap_has(bitmap, 0, 2) && !test_bitmap_has(bitmap, 4, 2));
+        if (!first_held) {
+            noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_DUP, &first_release);
+            CHECK(first_release.event.key.row == 1u && first_release.event.key.col == 2u);
+        }
+        noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_DUP, &second_press);
+        CHECK(second_press.event.key.row == 5u && second_press.event.key.col == 2u);
+        CHECK(noah_qmk_combo_origin_event_bitmap(&second_press, bitmap));
+        CHECK(test_bitmap_has(bitmap, 4, 2) && !test_bitmap_has(bitmap, 0, 2));
+        if (first_held) {
+            noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_DUP, &second_release);
+            CHECK(second_release.event.key.row == 5u && second_release.event.key.col == 2u);
+            noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_DUP, &first_release);
+            CHECK(first_release.event.key.row == 1u && first_release.event.key.col == 2u);
+        } else {
+            test_observe_physical_key(test_key(5, 2), false);
+            test_observe_physical_key(test_key(4, 2), false);
+            noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_DUP, &second_release);
+            CHECK(second_release.event.key.row == 5u && second_release.event.key.col == 2u);
+            test_set_combo_active(4, false);
+        }
+        noah_qmk_combo_origin_debug_snapshot(&snapshot);
+        CHECK(snapshot.pending_count == 0u && snapshot.active_count == 0u);
+        CHECK(snapshot.unmatched_delayed_output_count == 0u && snapshot.deadline_expiry_count == 0u);
+    }
+}
+
+// QMK restarts its combo timer at every combo key press, so a chord that
+// completed first can wait out a later press's window before it fires: its
+// completion waits from the latest press, not from its own.
+static void test_unfired_completion_waits_from_latest_press(void) {
+    keyrecord_t                            combo_press = test_combo_record(true);
+    noah_qmk_combo_origin_debug_snapshot_t snapshot;
+
+    test_reset();
+    test_observe_physical_key(test_key(0, 0), true);
+    test_observe_physical_key(test_key(1, 0), true); // A + B complete at 1000
+    fake_time = 1040u;
+    test_observe_physical_key(test_key(0, 1), true); // C, a member of another combo
+    fake_time = (uint16_t)(1000u + COMBO_TERM + 1u);
+    noah_qmk_combo_origin_scan();
+    noah_qmk_combo_origin_scan();
+    fake_time = (uint16_t)(1040u + COMBO_TERM);
+    noah_qmk_combo_origin_scan();
+    test_set_combo_active(0, true);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_LEFT, &combo_press);
+    CHECK(combo_press.event.key.row == 1u && combo_press.event.key.col == 0u);
+    noah_qmk_combo_origin_debug_snapshot(&snapshot);
+    CHECK(snapshot.deadline_expiry_count == 0u && snapshot.unmatched_delayed_output_count == 0u);
+
+    // Never fired, it retires on the second scan past the latest press's term.
+    test_reset();
+    test_observe_physical_key(test_key(0, 0), true);
+    test_observe_physical_key(test_key(1, 0), true);
+    fake_time = 1040u;
+    test_observe_physical_key(test_key(0, 1), true);
+    fake_time = (uint16_t)(1040u + COMBO_TERM + 1u);
+    noah_qmk_combo_origin_scan();
+    noah_qmk_combo_origin_debug_snapshot(&snapshot);
+    CHECK(snapshot.pending_count == 1u);
+    noah_qmk_combo_origin_scan();
+    noah_qmk_combo_origin_debug_snapshot(&snapshot);
+    CHECK(snapshot.pending_count == 0u && snapshot.deadline_expiry_count == 1u);
 }
 
 static void test_reset_clears_cached_combo_origin_state(void) {
@@ -510,7 +778,7 @@ static void test_active_combo_partition_routes_preview_owner_to_underlay(void) {
     test_set_combo_active(1, true);
     noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_BOTH, &both_combo_record);
 
-    noah_qmk_combo_origin_active_bitmaps_partitioned(left_owner_key_pos, (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, underlay_bitmap, overlay_bitmap);
+    noah_qmk_combo_origin_active_bitmaps_partitioned(left_owner_key_pos, (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, NULL, underlay_bitmap, overlay_bitmap);
 
     CHECK(test_bitmap_has(underlay_bitmap, 0, 0));
     CHECK(test_bitmap_has(underlay_bitmap, 1, 0));
@@ -545,13 +813,55 @@ static void test_active_combo_partition_routes_preview_and_pd_owners_to_underlay
     noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_BOTH, &both_combo_record);
     CHECK(noah_qmk_combo_origin_event_owner_keypos(&both_combo_record, &both_owner_key_pos));
 
-    noah_qmk_combo_origin_active_bitmaps_partitioned(left_owner_key_pos, both_owner_key_pos, underlay_bitmap, overlay_bitmap);
+    noah_qmk_combo_origin_active_bitmaps_partitioned(left_owner_key_pos, both_owner_key_pos, NULL, underlay_bitmap, overlay_bitmap);
 
     CHECK(test_bitmap_has(underlay_bitmap, 0, 0));
     CHECK(test_bitmap_has(underlay_bitmap, 1, 0));
     CHECK(test_bitmap_has(underlay_bitmap, 0, 1));
     CHECK(test_bitmap_has(underlay_bitmap, 4, 0));
     CHECK(!key_origin_bitmap_has_any(overlay_bitmap));
+}
+
+// A combo whose owner is quiet (its output holds a momentary layer) leaves both
+// substages, even as the preview owner, while the other combo keeps its light.
+// The quiet entry is still there for its release to find.
+static void test_active_combo_partition_drops_quiet_owner(void) {
+    keyrecord_t left_combo_record  = test_combo_record(true);
+    keyrecord_t left_release       = test_combo_record(false);
+    keyrecord_t both_combo_record  = test_combo_record(true);
+    keypos_t    left_owner_key_pos = {0};
+    uint8_t     quiet_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t     underlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t     overlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset();
+
+    test_observe_physical_key(test_key(0, 0), true);
+    test_observe_physical_key(test_key(1, 0), true);
+    test_set_combo_active(0, true);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_LEFT, &left_combo_record);
+    CHECK(noah_qmk_combo_origin_event_owner_keypos(&left_combo_record, &left_owner_key_pos));
+
+    test_observe_physical_key(test_key(0, 1), true);
+    test_observe_physical_key(test_key(4, 0), true);
+    test_set_combo_active(1, true);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_BOTH, &both_combo_record);
+
+    key_origin_bitmap_clear(quiet_owner_bitmap);
+    key_origin_bitmap_add_keypos(quiet_owner_bitmap, left_owner_key_pos);
+    noah_qmk_combo_origin_active_bitmaps_partitioned(left_owner_key_pos, (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, quiet_owner_bitmap, underlay_bitmap, overlay_bitmap);
+
+    CHECK(!key_origin_bitmap_has_any(underlay_bitmap));
+    CHECK(!test_bitmap_has(overlay_bitmap, 0, 0));
+    CHECK(!test_bitmap_has(overlay_bitmap, 1, 0));
+    CHECK(test_bitmap_has(overlay_bitmap, 0, 1));
+    CHECK(test_bitmap_has(overlay_bitmap, 4, 0));
+
+    test_set_combo_active(0, false);
+    test_observe_physical_key(test_key(1, 0), false);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_LEFT, &left_release);
+    CHECK(left_release.event.key.row == left_owner_key_pos.row);
+    CHECK(left_release.event.key.col == left_owner_key_pos.col);
 }
 
 static void test_overlap_disabled_candidate_retires_before_feedback_bitmap(void) {
@@ -634,6 +944,99 @@ static void test_deadline_expiry_boundaries_and_timer_wrap(void) {
     noah_qmk_combo_origin_scan();
     noah_qmk_combo_origin_pressed_combo_bitmap(bitmap);
     CHECK(!key_origin_bitmap_has_any(bitmap));
+}
+
+// The scan runs every matrix pass. With no completion waiting it has nothing to
+// reconcile, so it reads no clock and looks at no pending slot.
+static void test_idle_scan_reads_no_clock_and_visits_no_slot(void) {
+    test_reset();
+    timer_read_count = 0u;
+    noah_qmk_combo_origin_test_pending_slot_visits_reset();
+
+    for (uint8_t pass = 0u; pass < 3u; pass++) {
+        noah_qmk_combo_origin_scan();
+    }
+
+    CHECK(timer_read_count == 0u);
+    CHECK(noah_qmk_combo_origin_test_pending_slot_visits() == 0u);
+}
+
+// A scan with completions waiting looks only at their slots, still retires an
+// expired one on the scan, and goes back to costing nothing once none waits.
+static void test_scan_visits_only_used_slots_and_still_expires_them(void) {
+    noah_qmk_combo_origin_debug_snapshot_t snapshot;
+    uint8_t                                bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset();
+    test_observe_physical_key(test_key(0, 0), true); // A + B: combo 0
+    test_observe_physical_key(test_key(1, 0), true);
+    test_observe_physical_key(test_key(2, 0), true); // E + F + G: combo 2
+    test_observe_physical_key(test_key(4, 1), true);
+    test_observe_physical_key(test_key(5, 1), true);
+    for (uint8_t row = 0u; row < 6u; row++) {
+        for (uint8_t col = 0u; col < 2u; col++) {
+            test_observe_physical_key(test_key(row, col), false);
+        }
+    }
+    noah_qmk_combo_origin_debug_snapshot(&snapshot);
+    CHECK(snapshot.pending_count == 2u);
+
+    timer_read_count = 0u;
+    noah_qmk_combo_origin_test_pending_slot_visits_reset();
+    noah_qmk_combo_origin_scan();
+    CHECK(noah_qmk_combo_origin_test_pending_slot_visits() == 2u);
+    CHECK(timer_read_count == 1u);
+
+    fake_time = (uint16_t)(fake_time + COMBO_TERM + 1u);
+    noah_qmk_combo_origin_scan();
+    noah_qmk_combo_origin_pressed_combo_bitmap(bitmap);
+    CHECK(test_bitmap_has(bitmap, 0, 0) && test_bitmap_has(bitmap, 5, 1));
+    noah_qmk_combo_origin_scan();
+    noah_qmk_combo_origin_pressed_combo_bitmap(bitmap);
+    CHECK(!key_origin_bitmap_has_any(bitmap));
+    noah_qmk_combo_origin_debug_snapshot(&snapshot);
+    CHECK(snapshot.pending_count == 0u && snapshot.deadline_expiry_count == 2u);
+
+    timer_read_count = 0u;
+    noah_qmk_combo_origin_test_pending_slot_visits_reset();
+    noah_qmk_combo_origin_scan();
+    CHECK(timer_read_count == 0u);
+    CHECK(noah_qmk_combo_origin_test_pending_slot_visits() == 0u);
+}
+
+// A completion dispatched as a press leaves its slot, and one superseded by a
+// newer completion of the same combo keeps a single slot. The held output is
+// what the combo feedback reads; its release leaves no combo held.
+static void test_dispatched_and_superseded_completions_free_their_slot(void) {
+    keyrecord_t                            combo_press   = test_combo_record(true);
+    keyrecord_t                            combo_release = test_combo_record(false);
+    noah_qmk_combo_origin_debug_snapshot_t snapshot;
+
+    test_reset();
+    test_observe_physical_key(test_key(0, 0), true);
+    test_observe_physical_key(test_key(1, 0), true);
+    test_observe_physical_key(test_key(1, 0), false);
+    test_observe_physical_key(test_key(1, 0), true); // completes combo 0 again
+    noah_qmk_combo_origin_test_pending_slot_visits_reset();
+    noah_qmk_combo_origin_scan();
+    CHECK(noah_qmk_combo_origin_test_pending_slot_visits() == 1u);
+
+    CHECK(!noah_qmk_combo_origin_any_active());
+    test_set_combo_active(0, true);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_LEFT, &combo_press);
+    noah_qmk_combo_origin_debug_snapshot(&snapshot);
+    CHECK(snapshot.pending_count == 0u && snapshot.active_count == 1u);
+    CHECK(noah_qmk_combo_origin_any_active());
+
+    timer_read_count = 0u;
+    noah_qmk_combo_origin_test_pending_slot_visits_reset();
+    noah_qmk_combo_origin_scan();
+    CHECK(timer_read_count == 0u);
+    CHECK(noah_qmk_combo_origin_test_pending_slot_visits() == 0u);
+
+    test_set_combo_active(0, false);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_LEFT, &combo_release);
+    CHECK(!noah_qmk_combo_origin_any_active());
 }
 
 // Candidates are keyed by combo, so a burst of complete chords cannot crowd
@@ -763,7 +1166,122 @@ static void test_reset_clears_candidate_diagnostics(void) {
     CHECK(snapshot.unmatched_delayed_output_count == 0u);
 }
 
+bool           combo_key_record_allowed(uint16_t combo_index, combo_t *combo, uint16_t keycode, keyrecord_t *record);
+uint8_t        read_source_layers_cache(keypos_t key) {
+    (void)key;
+    return test_source_layer;
+}
+
+// combo_key_record_allowed answers with the press's stored decision and the
+// combo's own: a member pressed outside combos, or from a layer the combo does
+// not allow, does not count; a press from another source layer does.
+static void test_combo_participation_hook(void) {
+    keyrecord_t record = {.event = {.key = {.row = 1, .col = 2}, .pressed = true, .type = KEY_EVENT}};
+    keyrecord_t combo  = {.event = {.type = COMBO_EVENT, .pressed = true}};
+
+    noah_participation_press_store(record.event.key, true, true);
+    test_source_layer = 3;
+    CHECK(combo_key_record_allowed(0, NULL, KC_A, &record));
+    record.event.pressed = false; // the release reuses the press's answer
+    CHECK(combo_key_record_allowed(0, NULL, KC_A, &record));
+    noah_participation_press_store(record.event.key, true, false);
+    CHECK(!combo_key_record_allowed(0, NULL, KC_A, &record));
+    record.event.pressed = true;
+    CHECK(!combo_key_record_allowed(0, NULL, KC_A, &record));
+    // Another position keeps its own decision.
+    record.event.key = (keypos_t){.row = 2, .col = 2};
+    noah_participation_press_store(record.event.key, false, true);
+    CHECK(combo_key_record_allowed(0, NULL, KC_A, &record));
+    // Only physical member presses are asked.
+    CHECK(combo_key_record_allowed(0, NULL, KC_A, &combo));
+    noah_participation_press_store((keypos_t){.row = 1, .col = 2}, true, true);
+}
+
+static void test_origin_mirror_keeps_captured_duplicate_exclusion(void) {
+    keypos_t duplicate = test_key(2, 3);
+    uint8_t  bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset();
+    test_set_key(LAYER_BASE, duplicate.row, duplicate.col, KC_B);
+    noah_participation_press_store(duplicate, true, false);
+    test_observe_physical_key(duplicate, true);
+    // Later policy/position bookkeeping cannot rewrite the observed press.
+    noah_participation_press_store(duplicate, true, true);
+    test_observe_physical_key(test_key(1, 0), true); // declared owner first
+    test_observe_physical_key(test_key(0, 0), true);
+    noah_qmk_combo_origin_pressed_combo_bitmap(bitmap);
+    CHECK(test_bitmap_has(bitmap, 0, 0));
+    CHECK(test_bitmap_has(bitmap, 1, 0));
+    CHECK(!test_bitmap_has(bitmap, duplicate.row, duplicate.col));
+
+    // Two genuinely eligible occurrences remain ambiguous.
+    test_reset();
+    test_set_key(LAYER_BASE, duplicate.row, duplicate.col, KC_B);
+    test_observe_physical_key(duplicate, true);
+    test_observe_physical_key(test_key(1, 0), true);
+    test_observe_physical_key(test_key(0, 0), true);
+    noah_qmk_combo_origin_pressed_combo_bitmap(bitmap);
+    CHECK(!key_origin_bitmap_has_any(bitmap));
+}
+
+#ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+// Same output, distinct combo definitions, source layers and queued decisions.
+// Releases may be classified before the matching press reaches dispatch.
+static void test_output_permission_survives_queues_and_release(void) {
+    for (unsigned allowed = 0; allowed < 2; allowed++) {
+        test_reset();
+        test_combo_flags[3] = allowed ? 0 : NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS;
+        test_combo_flags[4] = allowed ? NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS : 0;
+        test_source_layer = 2;
+        test_observe_physical_key(test_key(1, 2), true); // last declared input, first press
+        test_source_layer = 7;
+        test_observe_physical_key(test_key(0, 2), true);
+        test_set_combo_active(3, true);
+        keyrecord_t first = test_combo_record(true);
+        noah_qmk_combo_origin_capture_record(TEST_COMBO_OUT_DUP, &first);
+        CHECK(noah_participation_record_behavior(&first) == (bool)allowed);
+        CHECK(noah_participation_record_source(&first) == 2);
+        test_set_combo_disabled(3, true);
+        noah_qmk_combo_origin_scan(); // fired completion remains pending
+        test_observe_physical_key(test_key(1, 2), false);
+        test_set_combo_active(3, false);
+        test_combo_flags[3] ^= NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS;
+        test_combo_output_behaviors = !allowed;
+        keyrecord_t first_release = test_combo_record(false);
+        noah_qmk_combo_origin_capture_record(TEST_COMBO_OUT_DUP, &first_release);
+        CHECK(noah_participation_record_behavior(&first_release) == (bool)allowed);
+        CHECK(noah_participation_record_source(&first_release) == 2);
+        noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_DUP, &first);
+        CHECK(noah_participation_record_behavior(&first) == (bool)allowed);
+        noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_DUP, &first_release);
+        CHECK(noah_participation_record_behavior(&first_release) == (bool)allowed);
+
+        test_combo_output_behaviors = true;
+        test_source_layer = 5;
+        test_observe_physical_key(test_key(4, 2), true);
+        test_observe_physical_key(test_key(5, 2), true);
+        test_set_combo_active(4, true);
+        keyrecord_t second = test_combo_record(true);
+        noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_DUP, &second);
+        CHECK(noah_participation_record_behavior(&second) == !(bool)allowed);
+        test_combo_output_behaviors = false;
+        keyrecord_t second_release = test_combo_record(false);
+        noah_qmk_combo_origin_capture_record(TEST_COMBO_OUT_DUP, &second_release);
+        CHECK(noah_participation_record_behavior(&second_release) == !(bool)allowed);
+        noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_DUP, &second_release);
+        CHECK(noah_participation_record_behavior(&second_release) == !(bool)allowed);
+    }
+}
+#endif
+
 int main(void) {
+#ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+    test_output_permission_survives_queues_and_release();
+    puts("combo output permission queue and release tests passed");
+    return 0;
+#endif
+    test_combo_participation_hook();
+    test_origin_mirror_keeps_captured_duplicate_exclusion();
     test_single_half_combo_uses_last_key_from_combo_ref_layer();
     test_combo_owner_is_stable_when_member_press_order_changes();
     test_pressed_combo_bitmap_reports_complete_physical_combo();
@@ -775,12 +1293,22 @@ int main(void) {
     test_duplicate_output_active_combos_keep_exact_origins();
     test_pending_combo_press_uses_exact_pending_footprint();
     test_pending_combo_release_uses_cached_exact_footprint();
+    test_inactive_combo_output_does_not_promote_an_exact_candidate();
+    test_fired_combo_delivered_after_deactivation_keeps_footprint();
+    test_disabled_unfired_completion_is_retired();
+    test_fired_outputs_pair_in_order_and_expire_after_tapping_term();
+    test_same_output_deliveries_pair_before_dispatch();
+    test_unfired_completion_waits_from_latest_press();
     test_reset_clears_cached_combo_origin_state();
     test_active_combo_partition_routes_preview_owner_to_underlay();
     test_active_combo_partition_routes_preview_and_pd_owners_to_underlay();
+    test_active_combo_partition_drops_quiet_owner();
     test_overlap_disabled_candidate_retires_before_feedback_bitmap();
     test_delayed_output_gets_final_deadline_scan_opportunity();
     test_deadline_expiry_boundaries_and_timer_wrap();
+    test_idle_scan_reads_no_clock_and_visits_no_slot();
+    test_scan_visits_only_used_slots_and_still_expires_them();
+    test_dispatched_and_superseded_completions_free_their_slot();
     test_chord_burst_keeps_every_candidate();
     test_recompleted_combo_supersedes_its_candidate();
     test_unmatched_output_is_observable_and_does_not_create_origin();

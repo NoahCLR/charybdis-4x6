@@ -13,12 +13,12 @@ static uint8_t key_runtime_trace_stage_id(const char *stage) {
         return NOAH_TRACE_KEY_RUNTIME_STAGE_UNKNOWN;
     }
 
-    if (strcmp(stage, "preflight:interrupt_active_key") == 0) {
-        return NOAH_TRACE_KEY_RUNTIME_STAGE_INTERRUPT_ACTIVE_KEY;
+    if (strcmp(stage, "preflight:before_press") == 0) {
+        return NOAH_TRACE_KEY_RUNTIME_STAGE_BEFORE_PRESS;
     }
 
-    if (strcmp(stage, "preflight:flush_multi_tap") == 0) {
-        return NOAH_TRACE_KEY_RUNTIME_STAGE_FLUSH_MULTI_TAP;
+    if (strcmp(stage, "preflight:before_release") == 0) {
+        return NOAH_TRACE_KEY_RUNTIME_STAGE_BEFORE_RELEASE;
     }
 
     if (strcmp(stage, "press") == 0) {
@@ -36,7 +36,7 @@ static uint8_t key_runtime_trace_stage_id(const char *stage) {
     return NOAH_TRACE_KEY_RUNTIME_STAGE_UNKNOWN;
 }
 
-static void key_runtime_trace_emit_plan_event(const char *stage, const key_runtime_transition_plan_t *plan) {
+static void key_runtime_trace_emit_plan_event(const char *stage, const key_runtime_core_effect_plan_t *plan) {
     uint16_t detail = 0;
 
     if (plan) {
@@ -89,12 +89,14 @@ static const char *key_runtime_trace_effect_name(key_runtime_effect_kind_t kind)
             return "layer_release";
         case KEY_RUNTIME_EFFECT_FEEDBACK_PULSE:
             return "feedback_pulse";
-        case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
-            return "pd_mode_lock_tap";
-        case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_STATE:
-            return "pd_mode_lock_state";
+        case KEY_RUNTIME_EFFECT_POINTING_MODE_LOCK_TAP:
+            return "pointing_mode_lock_tap";
+        case KEY_RUNTIME_EFFECT_POINTING_MODE_LOCK_STATE:
+            return "pointing_mode_lock_state";
         case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
             return "delayed_action";
+        case KEY_RUNTIME_EFFECT_LAYER_ONESHOT_CONSUME:
+            return "layer_oneshot_consume";
         case KEY_RUNTIME_EFFECT_NONE:
         default:
             return "none";
@@ -107,8 +109,8 @@ static const char *key_runtime_trace_release_outcome_name(key_runtime_trace_rele
             return "tap";
         case KEY_RUNTIME_TRACE_RELEASE_OUTCOME_ACTION:
             return "action";
-        case KEY_RUNTIME_TRACE_RELEASE_OUTCOME_PD_MODE_LOCK_TAP:
-            return "pd_mode_lock_tap";
+        case KEY_RUNTIME_TRACE_RELEASE_OUTCOME_POINTING_MODE_LOCK_TAP:
+            return "pointing_mode_lock_tap";
         case KEY_RUNTIME_TRACE_RELEASE_OUTCOME_NONE:
         default:
             return "none";
@@ -191,7 +193,7 @@ void key_runtime_trace_message(const char *stage, const char *message) {
     uprintf("Key runtime trace [%s] %s\n", stage, message);
 }
 
-void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan_t *plan) {
+void key_runtime_trace_plan(const char *stage, const key_runtime_core_effect_plan_t *plan) {
     key_runtime_trace_emit_plan_event(stage, plan);
 
     if (!plan) {
@@ -225,11 +227,11 @@ void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan
             case KEY_RUNTIME_EFFECT_FEEDBACK_PULSE:
                 uprintf("  [%u] %s key=(%u,%u) kind=%u\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.feedback_pulse.key_pos.row, (unsigned int)effect->data.feedback_pulse.key_pos.col, (unsigned int)effect->data.feedback_pulse.kind);
                 break;
-            case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
-                uprintf("  [%u] %s key=(%u,%u) mode=0x%04X\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.pd_mode_lock_tap.key_pos.row, (unsigned int)effect->data.pd_mode_lock_tap.key_pos.col, (unsigned int)effect->data.pd_mode_lock_tap.pd_mode);
+            case KEY_RUNTIME_EFFECT_POINTING_MODE_LOCK_TAP:
+                uprintf("  [%u] %s key=(%u,%u) mode=0x%04X\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.pointing_mode_lock_tap.key_pos.row, (unsigned int)effect->data.pointing_mode_lock_tap.key_pos.col, (unsigned int)effect->data.pointing_mode_lock_tap.pointing_mode);
                 break;
-            case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_STATE:
-                uprintf("  [%u] %s key=(%u,%u) mode=0x%04X locked=%u\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.pd_mode_lock_state.key_pos.row, (unsigned int)effect->data.pd_mode_lock_state.key_pos.col, (unsigned int)effect->data.pd_mode_lock_state.pd_mode, effect->data.pd_mode_lock_state.locked ? 1u : 0u);
+            case KEY_RUNTIME_EFFECT_POINTING_MODE_LOCK_STATE:
+                uprintf("  [%u] %s key=(%u,%u) mode=0x%04X locked=%u\n", (unsigned int)i, key_runtime_trace_effect_name(effect->kind), (unsigned int)effect->data.pointing_mode_lock_state.key_pos.row, (unsigned int)effect->data.pointing_mode_lock_state.key_pos.col, (unsigned int)effect->data.pointing_mode_lock_state.pointing_mode, effect->data.pointing_mode_lock_state.locked ? 1u : 0u);
                 break;
             case KEY_RUNTIME_EFFECT_DELAYED_ACTION: {
                 uint8_t repeat_count        = (uint8_t)(effect->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_REPEAT_COUNT_MASK);
@@ -293,7 +295,7 @@ void key_runtime_trace_message(const char *stage, const char *message) {
     (void)message;
 }
 
-void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan_t *plan) {
+void key_runtime_trace_plan(const char *stage, const key_runtime_core_effect_plan_t *plan) {
     key_runtime_trace_emit_plan_event(stage, plan);
 }
 

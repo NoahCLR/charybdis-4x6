@@ -1,11 +1,11 @@
-# Shared Profile Wire v1.0 blob/action golden vectors.
+# Shared schema 4.3 blob/action golden vectors (D-F28, D-F62, D-F26).
 # Consumed by both the firmware C host suite and the Charybdis Ark JavaScript suite.
-blob.empty.hex=4e4c503101000001
-blob.empty.fnv1a32=2051f0aa
-blob.empty.crc32=85eade89
-blob.ordered.hex=4e4c50310100020110010400deadbeef20010300000102
-blob.ordered.fnv1a32=cf2dcd54
-blob.ordered.crc32=4e023ea1
+blob.empty.hex=4e4c503104030001
+blob.empty.fnv1a32=4c28cf36
+blob.empty.crc32=b07290e2
+blob.ordered.hex=4e4c503104030201100404000000deadbeef200203000000000102
+blob.ordered.fnv1a32=c5f2aa1a
+blob.ordered.crc32=35c06c01
 action.NONE.operand=0
 action.NONE.hex=00000000
 action.QMK_KEYCODE.operand=4660
@@ -18,7 +18,7 @@ action.PD_MODE_MOMENTARY.operand=5
 action.PD_MODE_MOMENTARY.hex=04000500
 action.PD_MODE_LOCK.operand=1
 action.PD_MODE_LOCK.hex=05000100
-action.VIA_MACRO.operand=63
-action.VIA_MACRO.hex=06003f00
+action.MACRO.operand=63
+action.MACRO.hex=06003f00
 action.CUSTOM_KEY.operand=63
 action.CUSTOM_KEY.hex=07003f00

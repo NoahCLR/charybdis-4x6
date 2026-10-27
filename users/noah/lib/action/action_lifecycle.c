@@ -6,11 +6,11 @@
 
 #include "action_kind_dispatch_internal.h"
 #include "action_kind_internal.h"
-#include "../compat/qmk_via_playback_contract.h"
+#include "../macro/profile_macro_provider.h"
 #include "noah_keymap_ids.h"
 
 static bool noah_action_handle_macro_preflight(noah_action_desc_t desc) {
-    return noah_qmk_contract_try_play_via_macro(desc.action);
+    return noah_profile_macro_try_play(desc.action);
 }
 
 void noah_action_tap(uint16_t action) {
@@ -34,7 +34,7 @@ void noah_action_press(keypos_t key_pos, uint16_t action) {
         return;
     }
 
-    if (noah_action_desc_intercepts_pd_mode_press(desc) && pd_mode_handle_keycode_press_at(action, key_pos)) {
+    if (noah_action_desc_intercepts_pointing_mode_press(desc) && pointing_mode_handle_keycode_press_at(action, key_pos)) {
         return;
     }
 
@@ -44,7 +44,7 @@ void noah_action_press(keypos_t key_pos, uint16_t action) {
 void noah_action_release(keypos_t key_pos, uint16_t action) {
     noah_action_desc_t desc = noah_action_describe(action);
 
-    if (noah_action_desc_intercepts_pd_mode_release(desc) && pd_mode_handle_keycode_release_at(action, key_pos)) {
+    if (noah_action_desc_intercepts_pointing_mode_release(desc) && pointing_mode_handle_keycode_release_at(action, key_pos)) {
         return;
     }
 

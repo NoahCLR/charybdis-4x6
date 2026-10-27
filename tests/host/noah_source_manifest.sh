@@ -103,6 +103,8 @@ lib/key/runtime/debug.c
 lib/key/runtime/preflight.c
 lib/key/runtime/press.c
 lib/key/runtime/process.c
+lib/macro/macro_input_guard.c
+lib/key/behavior/participation.c
 lib/key/runtime/slot/origin_registry.c
 lib/key/runtime/release.c
 lib/key/runtime/deferred_release.c
@@ -143,14 +145,14 @@ lib/state/ownership/layer_ownership.c
 lib/state/diagnostics/runtime_trace.c'
     pointing_additions='
 lib/pointing/policy/pointer_layer_policy.c
-lib/pointing/runtime/pd_mode_snapshot.c
-lib/pointing/runtime/pd_mode_key_runtime_bridge.c
-lib/pointing/runtime/pd_mode_state.c'
+lib/pointing/runtime/pointing_mode_snapshot.c
+lib/pointing/runtime/pointing_mode_key_runtime_bridge.c
+lib/pointing/runtime/pointing_mode_state.c'
     base_paths="$(noah_source_manifest_absolute_userspace_paths_selected "$root" NOAH_COMMON_SOURCES "$base_sources")"
     common_paths="$(noah_source_manifest_absolute_userspace_paths_selected "$root" NOAH_COMMON_SOURCES "$common_additions")"
     pointing_paths="$(noah_source_manifest_absolute_userspace_paths_selected "$root" NOAH_POINTING_SOURCES "$pointing_additions")"
 
-    printf '%s %s %s\n' "$base_paths" "$common_paths" "$pointing_paths"
+    printf '%s %s %s %s\n' "$base_paths" "$common_paths" "$pointing_paths" "$root/tests/host/macro_payload_engine_unit_stub.c"
 }
 
 noah_host_key_runtime_modifier_hold_support_paths() {
@@ -180,5 +182,5 @@ lib/state/diagnostics/runtime_trace.c'
     base_paths="$(noah_source_manifest_absolute_userspace_paths_selected "$root" NOAH_COMMON_SOURCES "$base_sources")"
     common_paths="$(noah_source_manifest_absolute_userspace_paths_selected "$root" NOAH_COMMON_SOURCES "$common_additions")"
 
-    printf '%s %s\n' "$base_paths" "$common_paths"
+    printf '%s %s %s\n' "$base_paths" "$common_paths" "$root/tests/host/macro_payload_engine_unit_stub.c"
 }

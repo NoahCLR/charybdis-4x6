@@ -4,6 +4,13 @@
 # full ruleset for the current Charybdis keymap, including feature toggles and
 # reusable runtime sources.
 
+# VIA is not supported (D-F31). QMK reads this file after the keymap's rules,
+# so a VIA_ENABLE from either, or the command line, stops the build here,
+# before profile validation runs.
+ifeq ($(strip $(VIA_ENABLE)),yes)
+    $(error VIA is not supported (D-F31): remove VIA_ENABLE = yes; clients edit the profile over Profile Wire)
+endif
+
 NOAH_USERSPACE_ROOT := $(if $(QMK_USERSPACE),$(QMK_USERSPACE),$(abspath $(USER_PATH)/../..))
 NOAH_PROFILE_VALIDATION_RESULT := $(shell log="$$(mktemp "$${TMPDIR:-/tmp}/noah-profile-validation.XXXXXX")"; cd "$(NOAH_USERSPACE_ROOT)" && sh tests/host/run_real_profile_validation_tests.sh "$(KEYMAP_PATH)" >"$$log" 2>&1; status=$$?; if [ $$status -ne 0 ]; then cat "$$log" >&2; echo failed; fi; rm -f "$$log")
 
@@ -14,14 +21,24 @@ endif
 include $(USER_PATH)/source_manifest.mk
 include $(USER_PATH)/lib/compat/qmk_split_transport.mk
 
-# VIA support: enables runtime key remapping via the VIA desktop app.
-VIA_ENABLE = yes
+# The firmware answers Raw HID itself (D-F31): clients speak Profile Wire on
+# QMK's Raw HID interface (usage page 0xFF60).
+RAW_ENABLE = yes
+# VIA used to switch these on; the firmware still uses them. Bootmagic comes
+# from the keyboard's own definition.
+SEND_STRING_ENABLE = yes
+TRI_LAYER_ENABLE = yes
+OS_DETECTION_ENABLE = yes
 
 # Key combos: press multiple keys simultaneously to trigger an action.
 COMBO_ENABLE = yes
 
 # Link-time optimization: reduces binary size.
 LTO_ENABLE = yes
+
+# The profile slots have a flash region of their own (D-F29); the link fails
+# if the image grows into it.
+EXTRALDFLAGS += $(USER_PATH)/lib/compat/qmk_profile_flash.ld
 
 # The reviewed target paths need more than the ChibiOS platform default while
 # retaining a 25% (and at least 512-byte) process-stack reserve.
@@ -86,9 +103,6 @@ ifneq ($(strip $(NOAH_LIVE_PROFILE_OWNER)),no)
         $(error NOAH_LIVE_PROFILE_OWNER must be `yes` or `no`)
     endif
     ifneq ($(strip $(NOAH_PHYSICAL_HALF)),)
-        ifneq ($(strip $(VIA_ENABLE)),yes)
-            $(error NOAH_LIVE_PROFILE_OWNER=yes requires VIA_ENABLE=yes)
-        endif
         OPT_DEFS += -DNOAH_LIVE_PROFILE_OWNER_ENABLE
         SRC += $(NOAH_LIVE_PROFILE_OWNER_SOURCES)
     else
@@ -114,33 +128,21 @@ ifneq ($(strip $(NOAH_LIVE_PROFILE_MUTATION)),no)
     endif
     ifneq ($(strip $(NOAH_PHYSICAL_HALF)),)
         OPT_DEFS += -DNOAH_LIVE_PROFILE_MUTATION_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE
+        # The keyboard name in the profile is the USB product string (D-F25),
+        # through the BK fork's runtime product string hook.
+        OPT_DEFS += -DUSB_PRODUCT_STRING_USER
     endif
 endif
 
 # Temporary, read-only on-device cadence recorder used to compare ordinary and
 # live-profile firmware from the same source revision. The recorder is absent
-# from normal artifacts and requires VIA for bounded post-capture readback.
+# from normal artifacts and is read back over Profile Wire.
 ifneq ($(strip $(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS)),)
     ifneq ($(strip $(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS)),yes)
         $(error NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS must be `yes` when specified)
     endif
-    ifneq ($(strip $(VIA_ENABLE)),yes)
-        $(error NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes requires VIA_ENABLE=yes)
-    endif
     OPT_DEFS += -DNOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
 endif
-
-# All firmware uses the 32-slot profile engine. The old storage-geometry
-# readback bridges and their per-mode handlers are retired.
-ifneq ($(strip $(NOAH_PD_PROFILE)),)
-    ifneq ($(strip $(NOAH_PD_PROFILE)),yes)
-        $(error NOAH_PD_PROFILE=no is retired; build the 32-slot firmware)
-    endif
-endif
-ifneq ($(strip $(NOAH_LEGACY_SNAPSHOT_BRIDGE)),)
-    $(error NOAH_LEGACY_SNAPSHOT_BRIDGE is retired)
-endif
-OPT_DEFS += -DNOAH_PD_PROFILE_ENABLE
 
 ifeq ($(strip $(POINTING_DEVICE_ENABLE)),yes)
     SRC += $(NOAH_POINTING_SOURCES)

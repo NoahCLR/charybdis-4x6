@@ -14,7 +14,7 @@ typedef enum {
     KEY_RUNTIME_TRACE_RELEASE_OUTCOME_NONE = 0,
     KEY_RUNTIME_TRACE_RELEASE_OUTCOME_TAP,
     KEY_RUNTIME_TRACE_RELEASE_OUTCOME_ACTION,
-    KEY_RUNTIME_TRACE_RELEASE_OUTCOME_PD_MODE_LOCK_TAP,
+    KEY_RUNTIME_TRACE_RELEASE_OUTCOME_POINTING_MODE_LOCK_TAP,
 } key_runtime_trace_release_outcome_t;
 
 typedef enum {
@@ -75,7 +75,7 @@ static inline uint16_t key_runtime_trace_pack_multi_tap_decision(key_runtime_tra
 void key_runtime_trace_record(const char *stage, uint16_t keycode, const keyrecord_t *record);
 void key_runtime_trace_bool_result(const char *stage, uint16_t keycode, const keyrecord_t *record, bool value);
 void key_runtime_trace_message(const char *stage, const char *message);
-void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan_t *plan);
+void key_runtime_trace_plan(const char *stage, const key_runtime_core_effect_plan_t *plan);
 void key_runtime_trace_effect_execute(uint8_t index, const key_runtime_effect_t *effect);
 void key_runtime_trace_release_resolution(key_runtime_slot_phase_t phase, key_runtime_trace_release_outcome_t outcome, uint16_t flags, uint16_t detail);
 void key_runtime_trace_hold_policy_decision(key_runtime_trace_hold_policy_decision_t decision, key_runtime_trace_hold_dispatch_t dispatch, uint16_t flags, uint16_t detail);

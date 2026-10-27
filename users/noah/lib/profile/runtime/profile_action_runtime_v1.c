@@ -7,10 +7,10 @@
 #include "profile_action_runtime_v1.h"
 
 #include "noah_keymap_ids.h"
-#include "../../pointing/defs/pd_modes.h"
+#include "../../pointing/defs/pointing_modes.h"
 
 _Static_assert(CUSTOM_KEY_SLOT_COUNT == NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS, "custom key identities drifted from the action ABI");
-_Static_assert(PD_SLOT_31 == PD_SLOT_0 + PD_MODE_COUNT - 1 && PD_SLOT_31_LOCK == PD_SLOT_0_LOCK + PD_MODE_COUNT - 1, "pointing slot keycodes are their block's first plus the slot ID");
+_Static_assert(PD_MODE_31 == PD_MODE_0 + POINTING_MODE_COUNT - 1 && PD_MODE_31_LOCK == PD_MODE_0_LOCK + POINTING_MODE_COUNT - 1, "pointing slot keycodes are their block's first plus the slot ID");
 
 noah_profile_action_runtime_v1_result_t noah_profile_action_runtime_v1_from_native(uint16_t native_action, noah_profile_action_v1_t *action) {
     if (!action) {
@@ -26,9 +26,9 @@ noah_profile_action_runtime_v1_result_t noah_profile_action_runtime_v1_from_nati
         return NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
     }
     if (IS_QK_MACRO(native_action)) {
-        action->kind    = NOAH_PROFILE_ACTION_V1_VIA_MACRO;
+        action->kind    = NOAH_PROFILE_ACTION_V1_MACRO;
         action->operand = (uint16_t)(native_action - QK_MACRO_0);
-        return action->operand < VIA_MACRO_SLOT_COUNT ? NOAH_PROFILE_ACTION_RUNTIME_V1_OK : NOAH_PROFILE_ACTION_RUNTIME_V1_UNSUPPORTED;
+        return action->operand < MACRO_SLOT_COUNT ? NOAH_PROFILE_ACTION_RUNTIME_V1_OK : NOAH_PROFILE_ACTION_RUNTIME_V1_UNSUPPORTED;
     }
     if (native_action >= LAYER_LOCK_BASE && native_action < LAYER_LOCK_BASE + LAYER_COUNT) {
         action->kind    = NOAH_PROFILE_ACTION_V1_LAYER_LOCK;
@@ -44,14 +44,14 @@ noah_profile_action_runtime_v1_result_t noah_profile_action_runtime_v1_from_nati
     // is its block's first plus its ID. Behaviour canonicalization converts
     // every action many times over; scanning 32 slots for each one starved
     // the restart watchdog while a host read the compiled profile.
-    if (native_action >= PD_SLOT_0 && native_action < PD_SLOT_0 + PD_MODE_COUNT) {
-        action->kind    = NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY;
-        action->operand = (uint16_t)(native_action - PD_SLOT_0);
+    if (native_action >= PD_MODE_0 && native_action < PD_MODE_0 + POINTING_MODE_COUNT) {
+        action->kind    = NOAH_PROFILE_ACTION_V1_POINTING_MODE_MOMENTARY;
+        action->operand = (uint16_t)(native_action - PD_MODE_0);
         return NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
     }
-    if (native_action >= PD_SLOT_0_LOCK && native_action < PD_SLOT_0_LOCK + PD_MODE_COUNT) {
-        action->kind    = NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK;
-        action->operand = (uint16_t)(native_action - PD_SLOT_0_LOCK);
+    if (native_action >= PD_MODE_0_LOCK && native_action < PD_MODE_0_LOCK + POINTING_MODE_COUNT) {
+        action->kind    = NOAH_PROFILE_ACTION_V1_POINTING_MODE_LOCK;
+        action->operand = (uint16_t)(native_action - PD_MODE_0_LOCK);
         return NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
     }
     action->kind    = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE;
@@ -79,16 +79,16 @@ noah_profile_action_runtime_v1_result_t noah_profile_action_runtime_v1_to_native
             if (action->operand >= LAYER_COUNT) break;
             *native_action = (uint16_t)(LAYER_LOCK_BASE + action->operand);
             return NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
-        case NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY:
-            if (action->operand >= PD_MODE_COUNT) break;
-            *native_action = pd_modes[action->operand].keycode;
+        case NOAH_PROFILE_ACTION_V1_POINTING_MODE_MOMENTARY:
+            if (action->operand >= POINTING_MODE_COUNT) break;
+            *native_action = pointing_modes[action->operand].keycode;
             return NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
-        case NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK:
-            if (action->operand >= PD_MODE_COUNT) break;
-            *native_action = pd_modes[action->operand].lock_action;
+        case NOAH_PROFILE_ACTION_V1_POINTING_MODE_LOCK:
+            if (action->operand >= POINTING_MODE_COUNT) break;
+            *native_action = pointing_modes[action->operand].lock_action;
             return NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
-        case NOAH_PROFILE_ACTION_V1_VIA_MACRO:
-            if (action->operand >= VIA_MACRO_SLOT_COUNT) break;
+        case NOAH_PROFILE_ACTION_V1_MACRO:
+            if (action->operand >= MACRO_SLOT_COUNT) break;
             *native_action = (uint16_t)(QK_MACRO_0 + action->operand);
             return NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
         case NOAH_PROFILE_ACTION_V1_CUSTOM_KEY:

@@ -3,17 +3,22 @@
 
 #ifdef QMK_CONTRACT_USE_STUB
 #    include "qmk_stub.h"
+#    define QMK_KEYBOARD_H "qmk_stub.h"
 #    include "send_string.h"
 #else
 #    include "quantum_keycodes.h"
 #    include "send_string.h"
 #    include "action.h"
+#    define QMK_KEYBOARD_H "action.h"
 #    include "report.h"
 #    include "keycode.h"
 #    include "process_keycode/process_combo.h"
+#    include "keycode_config.h"
 #endif
 
-#include "via.h"
+#include "../../users/noah/lib/compat/qmk_factory_settings.h"
+#include "../../users/noah/lib/compat/qmk_mod_contract.h"
+#include "../../users/noah/lib/compat/qmk_native_report_contract.h"
 
 _Static_assert(offsetof(keyrecord_t, event) == 0, "keyrecord_t.event must remain the first field");
 
@@ -44,6 +49,31 @@ static void qmk_contract_field_smoke(void) {
 
 int main(void) {
     qmk_contract_field_smoke();
+#ifdef QMK_CONTRACT_USE_STUB
+    printf("FACTORY_KEYMAP_OPTIONS=0x%04X\n", (unsigned)NOAH_QMK_FACTORY_KEYMAP_OPTIONS);
+#else
+    // Match the pinned quantum/eeconfig.c initializer using QMK's real layout.
+    keymap_config_t factory = {.oneshot_enable = true, .autocorrect_enable = true, .nkro = NKRO_DEFAULT_ON};
+    printf("FACTORY_KEYMAP_OPTIONS=0x%04X\n", (unsigned)factory.raw);
+#endif
+
+    // Pin both the MT field and its interpretation to QMK's action encoding.
+    // Includes the empty field and right selector alone, which hold nothing.
+    for (uint8_t encoded = 0u; encoded < 32u; encoded++) {
+        uint16_t code = MT(encoded, KC_Q);
+        uint8_t report = noah_qmk_mods_to_report_mask(QK_MOD_TAP_GET_MODS(code));
+#ifndef QMK_CONTRACT_USE_STUB
+        action_t action = {.code = ACTION_MODS_TAP_KEY(QK_MOD_TAP_GET_MODS(code), QK_MOD_TAP_GET_TAP_KEYCODE(code))};
+        // This is the ACT_LMODS_TAP/ACT_RMODS_TAP choice in pinned action.c.
+        uint8_t qmk_report = action.kind.id == ACT_LMODS_TAP ? action.key.mods : action.key.mods << 4u;
+        if (report != qmk_report) {
+            fprintf(stderr, "MT modifier contract drift: encoded=0x%02x userspace=0x%02x QMK=0x%02x\n", encoded, report, qmk_report);
+            return 1;
+        }
+#endif
+        printf("MT_%02X_KC_Q=0x%04X field=0x%02X report=0x%02X\n", encoded, code, (unsigned)QK_MOD_TAP_GET_MODS(code), report);
+    }
+    printf("MOD_RCTL=0x%02X MOD_RSFT=0x%02X MOD_RALT=0x%02X MOD_RGUI=0x%02X\n", MOD_RCTL, MOD_RSFT, MOD_RALT, MOD_RGUI);
 
     printf("SAFE_RANGE=0x%04X\n", (unsigned)SAFE_RANGE);
     printf("COMBO_EVENT=%u\n", (unsigned)COMBO_EVENT);
@@ -78,8 +108,6 @@ int main(void) {
     printf("SS_DOWN_CODE=%u\n", (unsigned)SS_DOWN_CODE);
     printf("SS_UP_CODE=%u\n", (unsigned)SS_UP_CODE);
     printf("SS_DELAY_CODE=%u\n", (unsigned)SS_DELAY_CODE);
-    printf("VIA_ID_CUSTOM_GET_VALUE=0x%02X\n", (unsigned)id_custom_get_value);
-    printf("VIA_ID_CUSTOM_CHANNEL=0x%02X\n", (unsigned)id_custom_channel);
 
     return 0;
 }

@@ -53,7 +53,7 @@ static void put32(uint8_t *p, uint32_t v) {
         p[i] = (uint8_t)(v >> (8 * i));
 }
 bool noah_split_diagnostics_command(uint8_t *data, uint8_t length) {
-    // VIA custom channel 0, reserved diagnostic value 0x0A. SET starts capture;
+    // Profile Wire channel 0, reserved diagnostic value 0x0A. SET starts capture;
     // GET page 0 reads metadata, pages 1..N read transaction counters.
     if (!data || length != 32 || data[1] != 0 || data[2] != 0x0a || (data[0] != 7 && data[0] != 8)) return false;
     uint8_t command = data[0], page = data[4];

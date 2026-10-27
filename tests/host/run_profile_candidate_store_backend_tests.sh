@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 BUILD_DIR="$(mktemp -d)"
@@ -20,8 +21,7 @@ build_and_run() {
     cc -std=c11 -Wall -Wextra -Werror -pedantic "$@" \
         -DQMK_KEYBOARD_H='"qmk_stub.h"' \
         -DQMK_STUB_SUPPRESS_LAYER_COUNT \
-        -DVIA_ENABLE \
-        -DTOTAL_EEPROM_BYTE_COUNT=0x4000u \
+        -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
         -I"$ROOT/tests/host/include" \
@@ -30,13 +30,17 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/protocol/profile_candidate_v1.c" \
         "$ROOT/users/noah/lib/profile/protocol/profile_wire_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_macros_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
-        "$ROOT/users/noah/lib/profile/runtime/effective_profile_provider.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_provider.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_store.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_candidate_transaction.c" \

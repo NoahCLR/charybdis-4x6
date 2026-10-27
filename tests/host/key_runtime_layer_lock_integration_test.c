@@ -6,10 +6,11 @@
 #include "key_runtime_integration_harness.h"
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
+#include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
-#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
 #include "users/noah/lib/state/diagnostics/runtime_debug.h"
 #include "users/noah/lib/state/shared/runtime_reset.h"
@@ -27,9 +28,10 @@ enum {
 };
 
 layer_state_t layer_state;
-extern bool key_runtime_integration_output_ready;
 
 static uint16_t fake_time;
+static uint16_t last_tap;
+static uint16_t tap_count;
 
 // The one layer action a press-and-hold branch holds (see held_action_register).
 static struct {
@@ -73,6 +75,8 @@ static void test_reset_state(void) {
     fake_time   = 1000;
     layer_state = 0;
     test_held_layer.active = false;
+    last_tap              = KC_NO;
+    tap_count             = 0;
     noah_runtime_reset_for_test();
 }
 
@@ -164,7 +168,8 @@ void del_mods(uint8_t mods) {
 void send_keyboard_report(void) {}
 
 void tap_code16(uint16_t keycode) {
-    (void)keycode;
+    last_tap = keycode;
+    tap_count++;
 }
 
 void register_code16(uint16_t keycode) {
@@ -173,6 +178,10 @@ void register_code16(uint16_t keycode) {
 
 void unregister_code16(uint16_t keycode) {
     (void)keycode;
+}
+
+void wait_ms(uint16_t ms) {
+    (void)ms;
 }
 
 bool layer_state_cmp(layer_state_t state, uint8_t layer) {
@@ -190,6 +199,15 @@ void layer_off(uint8_t layer) {
 }
 
 key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
+    if (keycode == MT(MOD_LCTL, KC_A)) {
+        return (key_behavior_view_t){
+            .keycode            = keycode,
+            .handled            = true,
+            .authored_tap_depth = 1u,
+            .tap_hold_term      = 150,
+            .single             = {.tap = TAP_SENDS(KC_B)},
+        };
+    }
     if (keycode == TEST_MULTI_TAP_KEY) {
         return (key_behavior_view_t){
             .keycode            = keycode,
@@ -197,7 +215,7 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
             .has_multi_tap      = true,
             .authored_tap_depth = 2u,
             .tap_hold_term      = 150,
-            .longer_hold_term   = 350,
+            .long_hold_term     = 350,
             .multi_tap_term     = 120,
             .single =
                 {
@@ -253,7 +271,7 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
     return keycode == TEST_MULTI_TAP_KEY && count < 2;
 }
 
-bool key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t count, pd_mode_mask_t base_mode) {
+bool key_behavior_future_tap_path_has_foreign_pointing_mode(uint16_t keycode, uint8_t count, pointing_mode_mask_t base_mode) {
     (void)keycode;
     (void)count;
     (void)base_mode;
@@ -281,6 +299,13 @@ bool owned_keycode_unregister(uint16_t keycode) {
 // The ledger is faked here, so a literal tap is recorded as QMK's tap.
 void owned_keycode_tap_literal(uint16_t keycode) {
     tap_code16(keycode);
+}
+
+// No custom key here has a shortcut (D-F26); this only satisfies the link.
+bool owned_keycode_tap_chord(uint8_t mods, const uint8_t keys[OWNED_KEYCODE_CHORD_KEYS]) {
+    (void)mods;
+    (void)keys;
+    return false;
 }
 
 void owned_keycode_track_physical_event(uint16_t keycode, keyrecord_t *record) {
@@ -314,7 +339,7 @@ void noah_dispatch_synthetic_qmk_record(uint16_t keycode, bool pressed, uint8_t 
     (void)tap_count;
 }
 
-bool noah_qmk_contract_try_play_via_macro(uint16_t keycode) {
+bool noah_profile_macro_try_play(uint16_t keycode) {
     (void)keycode;
     return false;
 }
@@ -333,69 +358,63 @@ void pointer_layer_policy_take_back_qmk_toggle(uint16_t keycode, const keyrecord
     (void)record;
 }
 
-bool is_pd_mode_lock_action(uint16_t action) {
+bool is_pointing_mode_lock_action(uint16_t action) {
     (void)action;
     return false;
 }
 
-const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
+const pointing_mode_def_t *pointing_mode_lock_action_lookup(uint16_t action) {
     (void)action;
     return NULL;
 }
 
-bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
+bool pointing_mode_toggle_lock_state(pointing_mode_mask_t mode) {
     (void)mode;
     return false;
 }
 
-bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
+bool pointing_mode_toggle_lock_state_at(pointing_mode_mask_t mode, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_toggle_lock_state(mode);
+    return pointing_mode_toggle_lock_state(mode);
 }
 
-bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {
+bool pointing_mode_set_lock_state(pointing_mode_mask_t mode, bool locked) {
     (void)mode;
     (void)locked;
     return false;
 }
 
-bool pd_mode_set_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_pos) {
+bool pointing_mode_set_lock_state_at(pointing_mode_mask_t mode, bool locked, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_set_lock_state(mode, locked);
+    return pointing_mode_set_lock_state(mode, locked);
 }
 
-bool pd_mode_handle_keycode_press(uint16_t keycode) {
+bool pointing_mode_handle_keycode_press(uint16_t keycode) {
     (void)keycode;
     return false;
 }
 
-bool pd_mode_handle_keycode_press_at(uint16_t keycode, keypos_t key_pos) {
+bool pointing_mode_handle_keycode_press_at(uint16_t keycode, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_handle_keycode_press(keycode);
+    return pointing_mode_handle_keycode_press(keycode);
 }
 
-bool pd_mode_handle_keycode_release(uint16_t keycode) {
+bool pointing_mode_handle_keycode_release(uint16_t keycode) {
     (void)keycode;
     return false;
 }
 
-bool pd_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos) {
+bool pointing_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_handle_keycode_release(keycode);
+    return pointing_mode_handle_keycode_release(keycode);
 }
 
-bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
-    return false;
-}
-
-pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
     (void)keycode;
     return 0;
 }
 
-bool pd_mode_local_locked(pd_mode_mask_t mode) {
+bool pointing_mode_local_locked(pointing_mode_mask_t mode) {
     (void)mode;
     return false;
 }
@@ -405,11 +424,6 @@ void split_runtime_sync(void) {}
 void split_runtime_sync_request(void) {}
 
 void keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
-}
-
-void keyboard_mod_ownership_track_mod_tap_hold_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
 }
@@ -650,38 +664,38 @@ static void test_behavior_tap_arms_osl_and_hold_holds_tt(void) {
     CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
 }
 
-static void test_profile_output_fence_drops_whole_key_presses(void) {
-    keyrecord_t press   = {.event = {.key = {.row = 0u, .col = 0u}, .pressed = true, .type = KEY_EVENT}};
-    keyrecord_t release = press;
-    keyrecord_t other   = {.event = {.key = {.row = 1u, .col = 2u}, .pressed = true, .type = KEY_EVENT}};
-
-    release.event.pressed = false;
+// A runtime-owned MT has no native tap.count. Its owning release decision
+// must consume the real one-shot, while still sending the authored tap.
+static void test_owned_mod_tap_consumes_oneshot(void) {
     test_reset_state();
+    CHECK(layer_ownership_oneshot_tap(TEST_OTHER_LAYER, fake_time, 150));
+    const key_runtime_integration_step_t steps[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(MT(MOD_LCTL, KC_A), 0, 0),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(20),
+        KEY_RUNTIME_INTEGRATION_RELEASE(MT(MOD_LCTL, KC_A), 0, 0),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(200),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+    key_runtime_integration_run(&fake_time, steps, ARRAY_SIZE(steps));
+    CHECK(tap_count == 1 && last_tap == KC_B);
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+    CHECK(!test_layer_active(TEST_OTHER_LAYER));
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
 
-    // A press made during the fence loses its release too, even when the
-    // fence lifts while the key is still held.
-    key_runtime_integration_output_ready = false;
-    CHECK(!noah_pre_process_record_user(KC_A, &press));
-    key_runtime_integration_output_ready = true;
-    CHECK(!noah_pre_process_record_user(KC_A, &release));
-
-    // A press made before the fence keeps its release after the fence lifts.
-    CHECK(noah_pre_process_record_user(KC_B, &other));
-    key_runtime_integration_output_ready = false;
-    other.event.pressed = true;
-    CHECK(!noah_pre_process_record_user(KC_A, &press));
-    CHECK(!noah_pre_process_record_user(KC_A, &release));
-    key_runtime_integration_output_ready = true;
-    other.event.pressed = false;
-    CHECK(noah_pre_process_record_user(KC_B, &other));
-
-    // Once paired, the key is ordinary again.
-    CHECK(noah_pre_process_record_user(KC_A, &press));
-    CHECK(noah_pre_process_record_user(KC_A, &release));
+    // Consuming a one-shot retires only that owner, not the layer's lock.
+    test_reset_state();
+    CHECK(layer_ownership_set_lock_state(TEST_OTHER_LAYER, true));
+    CHECK(layer_ownership_oneshot_tap(TEST_OTHER_LAYER, fake_time, 150));
+    key_runtime_integration_run(&fake_time, steps, ARRAY_SIZE(steps));
+    CHECK(tap_count == 1 && last_tap == KC_B);
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+    CHECK(test_layer_locked(TEST_OTHER_LAYER) && test_layer_active(TEST_OTHER_LAYER));
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
 }
 
 int main(void) {
-    test_profile_output_fence_drops_whole_key_presses();
+    test_owned_mod_tap_consumes_oneshot();
     test_double_tap_hold_toggles_num_layer_lock_off_on_second_cycle();
     test_thumb_cycle_release_still_clears_slot_when_layer_change_resolves_to_other_keycode();
     test_double_tap_hold_with_prethreshold_scan_toggles_num_layer_only_once();
@@ -693,4 +707,10 @@ int main(void) {
 
     puts("key_runtime layer-lock integration tests passed");
     return 0;
+}
+
+// Participation allows every press in this harness (no stored policy), so a
+// row-less view is never asked for beyond linking.
+key_behavior_view_t key_behavior_lookup_without_row(uint16_t keycode) {
+    return key_behavior_lookup(keycode);
 }

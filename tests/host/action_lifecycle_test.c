@@ -1,14 +1,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_kind_dispatch_internal.h"
 #include "users/noah/lib/action/action_kind_internal.h"
 #include "users/noah/lib/action/action_lifecycle.h"
+#include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/action/synthetic_record.h"
-#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/noah_keymap_ids.h"
 
 enum {
@@ -52,11 +54,21 @@ static bool pd_press_result;
 static bool pd_release_result;
 static bool owned_register_result;
 static bool owned_unregister_result;
+static uint8_t                    shortcut_tap_calls;
+static noah_custom_key_shortcut_t shortcut_tapped;
+static noah_custom_key_shortcut_t test_custom_shortcut; // TEST_CUSTOM_ACTION's
+// The order a tapped shortcut's parts arrive in: 'L' its layers on, 'T' its
+// key and modifiers tapped, 'l' its layers off.
+static char          shortcut_tap_order[8];
+static uint8_t       shortcut_tap_order_count;
+static layer_state_t shortcut_tap_layers_on;
+static layer_state_t shortcut_tap_layers_off;
+static layer_state_t shortcut_kind_layers; // the set Lock, Move to or One-shot acted on
 
-static const pd_mode_def_t test_pd_mode_def = {
-    .mode_flag   = PD_MODE_ARROW,
-    .keycode     = PD_SLOT_4,
-    .lock_action = PD_SLOT_4_LOCK,
+static const pointing_mode_def_t test_pointing_mode_def = {
+    .mode_flag   = POINTING_MODE_ARROW,
+    .keycode     = PD_MODE_4,
+    .lock_action = PD_MODE_4_LOCK,
 };
 
 void split_runtime_sync(void);
@@ -87,6 +99,14 @@ static void test_reset_stubs(void) {
     layer_oneshot_call        = (test_call_t){0};
     layer_press_call          = (test_call_t){0};
     layer_release_call        = (test_call_t){0};
+    shortcut_tap_calls        = 0;
+    shortcut_tapped        = (noah_custom_key_shortcut_t){0};
+    memset(shortcut_tap_order, 0, sizeof(shortcut_tap_order));
+    shortcut_tap_order_count = 0;
+    shortcut_tap_layers_on   = 0;
+    shortcut_tap_layers_off  = 0;
+    shortcut_kind_layers     = 0;
+    test_custom_shortcut      = (noah_custom_key_shortcut_t){0};
     synthetic_tap_call        = (test_call_t){0};
     synthetic_qmk_tap_call    = (test_call_t){0};
     synthetic_record_call     = (test_call_t){0};
@@ -110,20 +130,20 @@ static void test_reset_stubs(void) {
     owned_unregister_result   = false;
 }
 
-bool is_pd_mode_lock_action(uint16_t action) {
-    return action == PD_SLOT_4_LOCK;
+bool is_pointing_mode_lock_action(uint16_t action) {
+    return action == PD_MODE_4_LOCK;
 }
 
-pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
-    return keycode == PD_SLOT_4 ? PD_MODE_ARROW : 0;
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
+    return keycode == PD_MODE_4 ? POINTING_MODE_ARROW : 0;
 }
 
-const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
-    return action == PD_SLOT_4_LOCK ? &test_pd_mode_def : NULL;
+const pointing_mode_def_t *pointing_mode_lock_action_lookup(uint16_t action) {
+    return action == PD_MODE_4_LOCK ? &test_pointing_mode_def : NULL;
 }
 
-bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
-    CHECK(mode == PD_MODE_ARROW);
+bool pointing_mode_toggle_lock_state(pointing_mode_mask_t mode) {
+    CHECK(mode == POINTING_MODE_ARROW);
     pd_toggle_calls++;
     if (pd_toggle_result) {
         split_runtime_sync();
@@ -131,35 +151,35 @@ bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
     return pd_toggle_result;
 }
 
-bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
+bool pointing_mode_toggle_lock_state_at(pointing_mode_mask_t mode, keypos_t key_pos) {
     pd_toggle_key_pos = key_pos;
-    return pd_mode_toggle_lock_state(mode);
+    return pointing_mode_toggle_lock_state(mode);
 }
 
-bool pd_mode_handle_keycode_press(uint16_t keycode) {
-    if (keycode == PD_SLOT_4) {
+bool pointing_mode_handle_keycode_press(uint16_t keycode) {
+    if (keycode == PD_MODE_4) {
         pd_press_calls++;
         return pd_press_result;
     }
     return false;
 }
 
-bool pd_mode_handle_keycode_press_at(uint16_t keycode, keypos_t key_pos) {
+bool pointing_mode_handle_keycode_press_at(uint16_t keycode, keypos_t key_pos) {
     pd_press_key_pos = key_pos;
-    return pd_mode_handle_keycode_press(keycode);
+    return pointing_mode_handle_keycode_press(keycode);
 }
 
-bool pd_mode_handle_keycode_release(uint16_t keycode) {
-    if (keycode == PD_SLOT_4) {
+bool pointing_mode_handle_keycode_release(uint16_t keycode) {
+    if (keycode == PD_MODE_4) {
         pd_release_calls++;
         return pd_release_result;
     }
     return false;
 }
 
-bool pd_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos) {
+bool pointing_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos) {
     pd_release_key_pos = key_pos;
-    return pd_mode_handle_keycode_release(keycode);
+    return pointing_mode_handle_keycode_release(keycode);
 }
 
 bool layer_ownership_toggle_lock_state(uint8_t layer) {
@@ -239,6 +259,55 @@ bool owned_keycode_unregister(uint16_t keycode) {
     return owned_unregister_result;
 }
 
+static void shortcut_tap_note(char part) {
+    CHECK(shortcut_tap_order_count < sizeof(shortcut_tap_order) - 1u);
+    shortcut_tap_order[shortcut_tap_order_count++] = part;
+}
+
+void layer_ownership_shortcut_tap_begin(layer_state_t layers) {
+    shortcut_tap_note('L');
+    shortcut_tap_layers_on = layers;
+}
+
+void layer_ownership_shortcut_tap_end(layer_state_t layers) {
+    shortcut_tap_note('l');
+    shortcut_tap_layers_off = layers;
+}
+
+// A shortcut's other layer kinds (D-F26): 'K' locks the set, 'M' moves to it,
+// 'O' arms it one-shot, each recording the set it acted on.
+bool layer_ownership_toggle_lock_set(layer_state_t layers) {
+    shortcut_tap_note('K');
+    shortcut_kind_layers = layers;
+    return true;
+}
+
+bool layer_ownership_goto_set(layer_state_t layers) {
+    shortcut_tap_note('M');
+    shortcut_kind_layers = layers;
+    return true;
+}
+
+bool layer_ownership_oneshot_tap_set(layer_state_t layers, uint16_t now, uint16_t double_tap_ms) {
+    (void)now;
+    (void)double_tap_ms;
+    shortcut_tap_note('O');
+    shortcut_kind_layers = layers;
+    return true;
+}
+
+bool owned_keycode_tap_chord(uint8_t mods, const uint8_t keys[OWNED_KEYCODE_CHORD_KEYS]) {
+    shortcut_tap_note('T');
+    shortcut_tap_calls++;
+    shortcut_tapped = (noah_custom_key_shortcut_t){.mods = mods};
+    memcpy(shortcut_tapped.keys, keys, OWNED_KEYCODE_CHORD_KEYS);
+    return true;
+}
+
+noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
+    return slot == TEST_CUSTOM_ACTION - CUSTOM_KEY_0 ? test_custom_shortcut : (noah_custom_key_shortcut_t){0};
+}
+
 // A literal tap goes through the ownership ledger, never straight to QMK's
 // tap_code16(); owned_keycode_test.c covers what the ledger then sends.
 void owned_keycode_tap_literal(uint16_t keycode) {
@@ -266,9 +335,9 @@ static void test_descriptor_classifies_dispatch_shapes(void) {
     test_reset_stubs();
 
     CHECK(noah_action_desc_is_press_only(noah_action_describe(LOCK_LAYER(3))));
-    CHECK(noah_action_desc_is_press_only(noah_action_describe(PD_SLOT_4_LOCK)));
+    CHECK(noah_action_desc_is_press_only(noah_action_describe(PD_MODE_4_LOCK)));
     CHECK(!noah_action_desc_is_press_only(noah_action_describe(CUSTOM_KEY_0)));
-    CHECK(noah_action_desc_consumes_direct_press(noah_action_describe(VIA_MACRO_6)));
+    CHECK(noah_action_desc_consumes_direct_press(noah_action_describe(MACRO_6)));
     CHECK(noah_action_desc_requires_per_key_hold(noah_action_describe(MO(2))));
     CHECK(noah_action_desc_uses_shared_hold(noah_action_describe(KC_C)));
 }
@@ -289,8 +358,8 @@ static void test_invalid_action_kind_is_rejected_consistently(void) {
     CHECK(!noah_action_kind_metadata_defined(invalid.kind));
     CHECK(!noah_action_desc_has_capability(invalid, NOAH_ACTION_CAP_BEHAVIOR_KEYCODE_SUPPORTED));
     CHECK(!noah_action_desc_dispatches_macro_preflight(invalid));
-    CHECK(!noah_action_desc_intercepts_pd_mode_press(invalid));
-    CHECK(!noah_action_desc_intercepts_pd_mode_release(invalid));
+    CHECK(!noah_action_desc_intercepts_pointing_mode_press(invalid));
+    CHECK(!noah_action_desc_intercepts_pointing_mode_release(invalid));
     CHECK(!noah_action_desc_keeps_registered_feedback(invalid));
     CHECK(noah_action_desc_preview_layer(invalid) == UINT8_MAX);
     CHECK(!noah_action_desc_is_runtime_handled_keycode(invalid));
@@ -381,7 +450,7 @@ static void test_tap_handles_layer_lock_and_pd_lock(void) {
     test_reset_stubs();
     pd_toggle_result = true;
 
-    noah_action_tap(PD_SLOT_4_LOCK);
+    noah_action_tap(PD_MODE_4_LOCK);
     CHECK(pd_toggle_calls == 1);
     CHECK(pd_toggle_key_pos.row == MATRIX_ROWS);
     CHECK(pd_toggle_key_pos.col == MATRIX_COLS);
@@ -391,7 +460,7 @@ static void test_tap_handles_layer_lock_and_pd_lock(void) {
     test_reset_stubs();
     pd_toggle_result = false;
 
-    noah_action_tap(PD_SLOT_4_LOCK);
+    noah_action_tap(PD_MODE_4_LOCK);
     CHECK(pd_toggle_calls == 1);
     CHECK(split_sync_calls == 0);
 }
@@ -402,7 +471,7 @@ static void test_tap_at_preserves_pd_lock_origin_key_pos(void) {
     test_reset_stubs();
     pd_toggle_result = true;
 
-    noah_action_tap_at(key_pos, PD_SLOT_4_LOCK);
+    noah_action_tap_at(key_pos, PD_MODE_4_LOCK);
     CHECK(pd_toggle_calls == 1);
     CHECK(pd_toggle_key_pos.row == key_pos.row);
     CHECK(pd_toggle_key_pos.col == key_pos.col);
@@ -412,9 +481,93 @@ static void test_tap_at_preserves_pd_lock_origin_key_pos(void) {
 static void test_tap_routes_macro_custom_qmk_and_plain_actions(void) {
     test_reset_stubs();
 
+    // A custom key sent as an action sends its shortcut alone, never a replay
+    // of its own record (D-F26); one without a shortcut sends nothing.
     noah_action_tap(TEST_CUSTOM_ACTION);
-    CHECK(synthetic_tap_call.keycode == TEST_CUSTOM_ACTION);
+    CHECK(shortcut_tap_calls == 0);
+    CHECK(synthetic_tap_call.keycode == KC_NO && synthetic_record_call.keycode == KC_NO);
     CHECK(literal_tap_call.keycode == KC_NO);
+
+    test_reset_stubs();
+    test_custom_shortcut = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT), .keys = {KC_K}};
+
+    noah_action_tap(TEST_CUSTOM_ACTION);
+    CHECK(shortcut_tap_calls == 1);
+    CHECK(shortcut_tapped.mods == (MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT)) && shortcut_tapped.keys[0] == KC_K && shortcut_tapped.keys[1] == KC_NO);
+    CHECK(synthetic_tap_call.keycode == KC_NO && synthetic_record_call.keycode == KC_NO);
+    CHECK(literal_tap_call.keycode == KC_NO);
+    CHECK(!strcmp(shortcut_tap_order, "T"));
+
+    // A shortcut's keys tap as one: every key, in order, through one tap.
+    test_reset_stubs();
+    test_custom_shortcut = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_SHIFT), .keys = {KC_A, KC_S, KC_D, KC_MEDIA_PLAY_PAUSE, MS_BTN1, KC_SYSTEM_SLEEP}};
+    noah_action_tap(TEST_CUSTOM_ACTION);
+    CHECK(shortcut_tap_calls == 1 && !strcmp(shortcut_tap_order, "T"));
+    CHECK(!memcmp(shortcut_tapped.keys, test_custom_shortcut.keys, NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT) && shortcut_tapped.mods == MOD_BIT(KC_LEFT_SHIFT));
+
+    // Its layers are on only for the tap: on before its key and modifiers,
+    // off after them. Layers alone tap only the layers.
+    test_reset_stubs();
+    test_custom_shortcut = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_GUI), .keys = {KC_J}, .layers = 0x0024};
+    noah_action_tap(TEST_CUSTOM_ACTION);
+    CHECK(!strcmp(shortcut_tap_order, "LTl"));
+    CHECK(shortcut_tap_layers_on == 0x0024 && shortcut_tap_layers_off == 0x0024);
+    CHECK(shortcut_tapped.mods == MOD_BIT(KC_LEFT_GUI) && shortcut_tapped.keys[0] == KC_J);
+
+    test_reset_stubs();
+    test_custom_shortcut = (noah_custom_key_shortcut_t){.layers = 0x8000};
+    noah_action_tap(TEST_CUSTOM_ACTION);
+    CHECK(!strcmp(shortcut_tap_order, "Ll") && shortcut_tap_calls == 0);
+    CHECK(shortcut_tap_layers_on == 0x8000 && shortcut_tap_layers_off == 0x8000);
+
+    // A tap of the other layer kinds does what a tap of their layer key does:
+    // Tap-toggle's layers are on for the tap, as Hold's; Lock and Move to act
+    // on the set before the keys; One-shot arms it after them, so the keys
+    // cannot use it up.
+    static const struct {
+        uint8_t     kind;
+        const char *order;
+    } kinds[] = {
+        {NOAH_SHORTCUT_LAYERS_TAP_TOGGLE, "LTl"},
+        {NOAH_SHORTCUT_LAYERS_LOCK, "KT"},
+        {NOAH_SHORTCUT_LAYERS_MOVE, "MT"},
+        {NOAH_SHORTCUT_LAYERS_ONESHOT, "TO"},
+    };
+    for (uint8_t i = 0; i < ARRAY_SIZE(kinds); i++) {
+        test_reset_stubs();
+        test_custom_shortcut = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_SHIFT), .layers = 0x0050, .layer_kind = kinds[i].kind};
+        noah_action_tap(TEST_CUSTOM_ACTION);
+        CHECK(!strcmp(shortcut_tap_order, kinds[i].order));
+        CHECK(shortcut_tapped.mods == MOD_BIT(KC_LEFT_SHIFT));
+        CHECK(kinds[i].kind == NOAH_SHORTCUT_LAYERS_TAP_TOGGLE ? shortcut_tap_layers_on == 0x0050 : shortcut_kind_layers == 0x0050);
+    }
+
+    // With one-shots off, a One-shot tap sends only its keys, as OSL() does nothing.
+    test_reset_stubs();
+    test_oneshot_enabled = false;
+    test_custom_shortcut = (noah_custom_key_shortcut_t){.layers = 0x0002, .layer_kind = NOAH_SHORTCUT_LAYERS_ONESHOT};
+    noah_action_tap(TEST_CUSTOM_ACTION);
+    CHECK(!strcmp(shortcut_tap_order, ""));
+    test_oneshot_enabled = true;
+
+    // CUSTOM_KEY_LAYER_TAP(n) is what a dual-role custom key's own tap does
+    // to its layers, its keys having been held from the press: Tap-toggle's
+    // last tap locks them, One-shot arms them, and nothing else is sent. It is
+    // the runtime's own and supported nowhere a profile stores an action.
+    test_reset_stubs();
+    test_custom_shortcut = (noah_custom_key_shortcut_t){.keys = {KC_ESC}, .layers = 0x0006, .layer_kind = NOAH_SHORTCUT_LAYERS_TAP_TOGGLE};
+    noah_action_tap(CUSTOM_KEY_LAYER_TAP(TEST_CUSTOM_ACTION - CUSTOM_KEY_0));
+    CHECK(!strcmp(shortcut_tap_order, "K") && shortcut_kind_layers == 0x0006 && shortcut_tap_calls == 0);
+    test_reset_stubs();
+    test_custom_shortcut = (noah_custom_key_shortcut_t){.keys = {KC_ESC}, .layers = 0x0006, .layer_kind = NOAH_SHORTCUT_LAYERS_ONESHOT};
+    noah_action_tap(CUSTOM_KEY_LAYER_TAP(TEST_CUSTOM_ACTION - CUSTOM_KEY_0));
+    CHECK(!strcmp(shortcut_tap_order, "O") && shortcut_kind_layers == 0x0006 && shortcut_tap_calls == 0);
+    for (uint8_t kind = NOAH_SHORTCUT_LAYERS_HOLD; kind <= NOAH_SHORTCUT_LAYERS_MOVE; kind++) {
+        test_reset_stubs();
+        test_custom_shortcut = (noah_custom_key_shortcut_t){.layers = 0x0006, .layer_kind = kind};
+        noah_action_tap(CUSTOM_KEY_LAYER_TAP(TEST_CUSTOM_ACTION - CUSTOM_KEY_0));
+        CHECK(!strcmp(shortcut_tap_order, ""));
+    }
 
     test_reset_stubs();
 
@@ -442,13 +595,13 @@ static void test_tap_ignores_raw_layer_actions(void) {
     CHECK(synthetic_qmk_tap_call.keycode == KC_NO);
 }
 
-static void test_press_routes_pd_mode_momentary_qmk_custom_and_plain(void) {
+static void test_press_routes_pointing_mode_momentary_qmk_custom_and_plain(void) {
     keypos_t key_pos = test_keypos(1, 2);
 
     test_reset_stubs();
     pd_press_result = true;
 
-    noah_action_press(key_pos, PD_SLOT_4);
+    noah_action_press(key_pos, PD_MODE_4);
     CHECK(pd_press_calls == 1);
     CHECK(pd_press_key_pos.row == key_pos.row);
     CHECK(pd_press_key_pos.col == key_pos.col);
@@ -473,9 +626,13 @@ static void test_press_routes_pd_mode_momentary_qmk_custom_and_plain(void) {
 
     test_reset_stubs();
 
+    // A held custom key is owned by its held-action lease; generic press
+    // dispatch has no owner for it and sends nothing.
+    test_custom_shortcut = (noah_custom_key_shortcut_t){.keys = {KC_K}};
     noah_action_press(key_pos, TEST_CUSTOM_ACTION);
-    CHECK(synthetic_record_call.keycode == TEST_CUSTOM_ACTION);
-    CHECK(synthetic_record_call.pressed);
+    noah_action_release(key_pos, TEST_CUSTOM_ACTION);
+    CHECK(synthetic_record_call.keycode == KC_NO);
+    CHECK(shortcut_tap_calls == 0);
     CHECK(register_code16_call.keycode == KC_NO);
 
     test_reset_stubs();
@@ -510,7 +667,7 @@ static void test_press_ignores_raw_layer_actions_and_one_shot_actions(void) {
     CHECK(register_code16_call.keycode == KC_NO);
 }
 
-static void test_release_routes_press_only_pd_mode_momentary_qmk_custom_and_plain(void) {
+static void test_release_routes_press_only_pointing_mode_momentary_qmk_custom_and_plain(void) {
     keypos_t key_pos = test_keypos(4, 5);
 
     test_reset_stubs();
@@ -523,7 +680,7 @@ static void test_release_routes_press_only_pd_mode_momentary_qmk_custom_and_plai
     test_reset_stubs();
     pd_release_result = true;
 
-    noah_action_release(key_pos, PD_SLOT_4);
+    noah_action_release(key_pos, PD_MODE_4);
     CHECK(pd_release_calls == 1);
     CHECK(pd_release_key_pos.row == key_pos.row);
     CHECK(pd_release_key_pos.col == key_pos.col);
@@ -547,9 +704,11 @@ static void test_release_routes_press_only_pd_mode_momentary_qmk_custom_and_plai
 
     test_reset_stubs();
 
+    // A held custom key's shortcut is released by its held-action lease
+    // (D-F26); generic release dispatch sends nothing.
     noah_action_release(key_pos, TEST_CUSTOM_ACTION);
-    CHECK(synthetic_record_call.keycode == TEST_CUSTOM_ACTION);
-    CHECK(!synthetic_record_call.pressed);
+    CHECK(synthetic_record_call.keycode == KC_NO);
+    CHECK(shortcut_tap_calls == 0);
     CHECK(unregister_code16_call.keycode == KC_NO);
 
     test_reset_stubs();
@@ -629,7 +788,7 @@ static void test_qmk_functions_dispatch_as_synthetic_qmk_records(void) {
 
 // An unassigned userspace code sends nothing, whichever way it is dispatched.
 static void test_unassigned_userspace_codes_send_nothing(void) {
-    const uint16_t unassigned[] = {NOAH_KEYCODE_PD_HOLD_BASE + PD_MODE_COUNT, LAYER_LOCK_BASE + LAYER_COUNT, NOAH_KEYCODE_USERSPACE_END, QK_USER_MAX};
+    const uint16_t unassigned[] = {NOAH_KEYCODE_PD_HOLD_BASE + POINTING_MODE_COUNT, LAYER_LOCK_BASE + LAYER_COUNT, NOAH_KEYCODE_USERSPACE_END, QK_USER_MAX};
     keypos_t       key_pos      = {.row = 1, .col = 2};
     for (size_t index = 0; index < ARRAY_SIZE(unassigned); index++) {
         test_reset_stubs();
@@ -655,9 +814,9 @@ int main(void) {
     test_tap_at_preserves_pd_lock_origin_key_pos();
     test_tap_routes_macro_custom_qmk_and_plain_actions();
     test_tap_ignores_raw_layer_actions();
-    test_press_routes_pd_mode_momentary_qmk_custom_and_plain();
+    test_press_routes_pointing_mode_momentary_qmk_custom_and_plain();
     test_press_ignores_raw_layer_actions_and_one_shot_actions();
-    test_release_routes_press_only_pd_mode_momentary_qmk_custom_and_plain();
+    test_release_routes_press_only_pointing_mode_momentary_qmk_custom_and_plain();
     test_release_ignores_raw_layer_actions();
     test_qmk_functions_dispatch_as_synthetic_qmk_records();
 

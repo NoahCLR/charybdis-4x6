@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 
@@ -17,7 +18,10 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
+# TAP_CODE_DELAY is QMK's default, which the firmware keeps, so timing checks
+# match the keyboard rather than the stub's slower fallback.
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+    -DNKRO_ENABLE -DTAP_CODE_DELAY=0u \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -I"$QMK_ROOT/platforms" \
     -I"$QMK_ROOT/quantum/send_string" \
@@ -26,6 +30,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/macro_payload_engine_test.c" \
     "$ROOT/users/noah/lib/macro/macro_payload_run.c" \
+    "$ROOT/users/noah/lib/macro/host_layout.c" \
+    "$ROOT/users/noah/lib/macro/host_layout_tables.c" \
     -o "$BIN"
 
 "$BIN"
@@ -33,6 +39,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -fsanitize=address,undefined \
     -fno-omit-frame-pointer \
+    -DNKRO_ENABLE -DTAP_CODE_DELAY=0u \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -I"$QMK_ROOT/platforms" \
     -I"$QMK_ROOT/quantum/send_string" \
@@ -41,6 +48,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/macro_payload_engine_test.c" \
     "$ROOT/users/noah/lib/macro/macro_payload_run.c" \
+    "$ROOT/users/noah/lib/macro/host_layout.c" \
+    "$ROOT/users/noah/lib/macro/host_layout_tables.c" \
     -o "$SANITIZED_BIN"
 
 "$SANITIZED_BIN"

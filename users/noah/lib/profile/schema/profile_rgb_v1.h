@@ -17,15 +17,18 @@ enum {
     NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT    = 58u,
     NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE       = 8u,
     NOAH_PROFILE_RGB_V1_MAX_GROUPS            = 16u,
-    NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS    = 8u,
-    NOAH_PROFILE_RGB_V1_MAX_PD_MODES          = NOAH_PROFILE_PD_COUNT,
+    NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS    = 16u,
+    NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES    = NOAH_PROFILE_PD_COUNT,
     NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS  = 32u,
-    NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS = 4u,
-    NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE      = NOAH_PROFILE_BLOB_V1_MAX_SIZE - NOAH_PROFILE_BLOB_V1_HEADER_SIZE - NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE,
+    // Taps past the first: the shared tap depth minus one (D-F14).
+    NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS = NOAH_PROFILE_TAP_DEPTH - 1u,
+    // The domain's own offsets are 16 bits (its format is unchanged by schema
+    // 4, D-F28), so its payload stays within 65,535 bytes whatever the blob's.
+    NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE      = NOAH_PROFILE_BLOB_V1_MAX_SIZE - NOAH_PROFILE_BLOB_V1_HEADER_SIZE - NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE < 0xFFFFu ? NOAH_PROFILE_BLOB_V1_MAX_SIZE - NOAH_PROFILE_BLOB_V1_HEADER_SIZE - NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE : 0xFFFFu,
     NOAH_PROFILE_RGB_V1_SELECTOR_ALL          = 0xffu,
     NOAH_PROFILE_RGB_V1_STAGE_LAYER           = 1u << 0,
     NOAH_PROFILE_RGB_V1_STAGE_AUTOMOUSE       = 1u << 1,
-    NOAH_PROFILE_RGB_V1_STAGE_PD_MODE         = 1u << 2,
+    NOAH_PROFILE_RGB_V1_STAGE_POINTING_MODE   = 1u << 2,
     NOAH_PROFILE_RGB_V1_STAGE_COMBO           = 1u << 3,
     NOAH_PROFILE_RGB_V1_STAGE_KEY_BEHAVIOR    = 1u << 4,
     NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL        = 0x1fu,
@@ -38,8 +41,23 @@ enum {
     NOAH_PROFILE_RGB_V1_EMBEDDED_VALIDATION_BUDGET = 72u,
 };
 
-// One bit per PD slot; 32 slots fill the word, so it is not an enum constant.
-#define NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL (UINT32_MAX >> (32u - NOAH_PROFILE_PD_COUNT))
+// One bit per pointing slot; 32 slots fill the word, so it is not an enum
+// constant.
+#define NOAH_PROFILE_RGB_V1_POINTING_MODE_MASK_ALL (UINT32_MAX >> (32u - NOAH_PROFILE_PD_COUNT))
+
+// Record geometry shared by decoding and the authored writer.
+enum {
+    NOAH_PROFILE_RGB_V1_GROUP_RECORD_SIZE       = 9u,
+    NOAH_PROFILE_RGB_V1_LAYER_COLOR_RECORD_SIZE = 5u,
+    NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE   = 5u,
+    NOAH_PROFILE_RGB_V1_AUTOMOUSE_RECORD_SIZE   = 4u,
+    NOAH_PROFILE_RGB_V1_PD_COLOR_RECORD_SIZE    = 5u,
+    NOAH_PROFILE_RGB_V1_COMBO_RECORD_SIZE       = 4u,
+    NOAH_PROFILE_RGB_V1_COMBO_GROUP_RECORD_SIZE = 4u,
+    NOAH_PROFILE_RGB_V1_COLOR_RECORD_SIZE       = 3u,
+    NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE       = 11u,
+    NOAH_PROFILE_RGB_V1_FIXED_PAYLOAD_SIZE      = NOAH_PROFILE_RGB_V1_HEADER_SIZE + NOAH_PROFILE_RGB_V1_AUTOMOUSE_RECORD_SIZE + NOAH_PROFILE_RGB_V1_COMBO_RECORD_SIZE + NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE,
+};
 
 typedef enum {
     NOAH_PROFILE_RGB_V1_OK = 0u,
@@ -110,7 +128,7 @@ typedef struct {
     uint8_t  max_logical_layers;
     uint8_t  maximum_brightness;
     uint8_t  tap_branch_color_count;
-    uint32_t supported_pd_mode_mask;
+    uint32_t supported_pointing_mode_mask;
 } noah_profile_rgb_v1_limits_t;
 
 typedef struct {
@@ -142,7 +160,7 @@ typedef struct {
 } noah_profile_rgb_v1_automouse_t;
 
 typedef struct {
-    uint8_t                   pd_mode_id;
+    uint8_t                   pointing_mode_id;
     noah_profile_rgb_v1_hsv_t color;
     uint8_t                   locality;
 } noah_profile_rgb_v1_pd_color_t;

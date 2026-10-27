@@ -22,7 +22,10 @@ jobs:
     name: Host suite (GCC)
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0-gcc15.2.0-r1@sha256:b62c41e6f75f74158bfc35727864847c4f5f80797724832e97017de8dadbf02e
+      image: ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0-gcc15.2.0-r2@sha256:c1b25ac9a7ccaa8d31ba443a3ea308b959edef67e165fc91517d746ccc869957
+    env:
+      # Already in the build image: host runners and the pair build run in place.
+      NOAH_IN_BUILD_IMAGE: 1
     steps:
       - name: Checkout userspace
         uses: actions/checkout@v6
@@ -51,18 +54,6 @@ jobs:
           qmk config user.qmk_home="$GITHUB_WORKSPACE/qmk_firmware"
           qmk config user.overlay_dir="$GITHUB_WORKSPACE"
 
-      - name: Install ripgrep for host-suite guard checks
-        # The official image lists GitHub CLI's apt source, whose signing key has
-        # since rotated, so apt-get update fails with it. CI does not use gh.
-        run: |
-          rm -f /etc/apt/sources.list.d/github-cli.list
-          apt-get update -qq && apt-get install -y -qq ripgrep
-
-      - name: Install Node for diagnostics host tests
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-
       - name: Run firmware host suite
         run: QMK_ROOT="$GITHUB_WORKSPACE/qmk_firmware" sh tests/host/run_all_host_tests.sh
 
@@ -73,7 +64,10 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0-gcc15.2.0-r1@sha256:b62c41e6f75f74158bfc35727864847c4f5f80797724832e97017de8dadbf02e
+      image: ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0-gcc15.2.0-r2@sha256:c1b25ac9a7ccaa8d31ba443a3ea308b959edef67e165fc91517d746ccc869957
+    env:
+      # Already in the build image: host runners and the pair build run in place.
+      NOAH_IN_BUILD_IMAGE: 1
     steps:
       - name: Checkout userspace
         uses: actions/checkout@v6
@@ -140,6 +134,14 @@ jobs:
     name: Agreement with Ark main
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    # In the build image like the other jobs, so the contract probe compiles in
+    # place: on the bare runner its Docker re-run copied this checkout, with
+    # Ark and BK nested inside it, and could not.
+    container:
+      image: ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0-gcc15.2.0-r2@sha256:c1b25ac9a7ccaa8d31ba443a3ea308b959edef67e165fc91517d746ccc869957
+    env:
+      # Already in the build image: host runners and the pair build run in place.
+      NOAH_IN_BUILD_IMAGE: 1
     steps:
       - name: Checkout firmware
         uses: actions/checkout@v6
@@ -182,6 +184,12 @@ jobs:
         with:
           node-version-file: .ci/ark/.nvmrc
 
+      - name: Configure Git safe directories
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/.ci/ark"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/.ci/qmk"
+
       - name: Judge this firmware's contract with Ark ${{ steps.ark.outputs.ref }}
         run: node .ci/ark/scripts/check-agreement.js --firmware "$GITHUB_WORKSPACE" --qmk .ci/qmk --markdown "$RUNNER_TEMP/agreement.md"
 
@@ -196,7 +204,10 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0-gcc15.2.0-r1@sha256:b62c41e6f75f74158bfc35727864847c4f5f80797724832e97017de8dadbf02e
+      image: ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0-gcc15.2.0-r2@sha256:c1b25ac9a7ccaa8d31ba443a3ea308b959edef67e165fc91517d746ccc869957
+    env:
+      # Already in the build image: host runners and the pair build run in place.
+      NOAH_IN_BUILD_IMAGE: 1
     steps:
       - name: Checkout userspace
         uses: actions/checkout@v6
@@ -227,18 +238,6 @@ jobs:
           pin="$(python3 -c 'import json; print(json.load(open("qmk-pin.json"))["commit"])')"
           ahead="$(git -C qmk_firmware rev-list --count "$pin..HEAD")"
           echo "BK dev head is $ahead commit(s) ahead of the pin $pin." >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Install ripgrep for host-suite guard checks
-        # The official image lists GitHub CLI's apt source, whose signing key has
-        # since rotated, so apt-get update fails with it. CI does not use gh.
-        run: |
-          rm -f /etc/apt/sources.list.d/github-cli.list
-          apt-get update -qq && apt-get install -y -qq ripgrep
-
-      - name: Install Node for diagnostics host tests
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24'
 
       - name: Run firmware host suite against the BK dev head
         run: QMK_ROOT="$GITHUB_WORKSPACE/qmk_firmware" sh tests/host/run_all_host_tests.sh

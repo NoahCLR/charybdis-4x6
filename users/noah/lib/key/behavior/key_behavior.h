@@ -13,13 +13,14 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-// ─── Hold Tiers ─────────────────────────────────────────────────────────────
+// ─── Hold Styles ────────────────────────────────────────────────────────────
 //
-// A hold tier is an action plus its timing mode.
+// A hold or long hold is an action plus its hold style: how the action is
+// sent.
 //
 // PRESS_IMMEDIATELY_UNTIL_RELEASE:
-//   internal runtime mode used for implicit pd-mode momentary holds.
-//   Not exposed as a normal keymap authoring helper.
+//   internal runtime style used for implicit pointing-mode momentary holds.
+//   Not exposed as a keymap authoring macro.
 //
 // PRESS_AND_HOLD_UNTIL_RELEASE:
 //   fire at threshold and keep registered while held.
@@ -41,13 +42,13 @@ typedef enum {
     HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD,
     HOLD_BEHAVIOR_REPEAT_WHILE_HELD,
     HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD,
-} hold_behavior_mode_t;
+} hold_style_t;
 
 typedef struct {
-    bool                 present;
-    uint16_t             action;
-    uint16_t             repeat_hz;
-    hold_behavior_mode_t mode;
+    bool         present;
+    uint16_t     action;
+    uint16_t     repeat_hz;
+    hold_style_t style;
 } hold_behavior_t;
 
 // ─── Tap Behavior ───────────────────────────────────────────────────────────
@@ -78,15 +79,15 @@ typedef struct {
 //   If omitted, the key keeps its normal tap behavior for that step.
 //   If present but hold/long_hold are both omitted, keys that already have a
 //   default held path keep using it (for example normal keys, LT()/MO(), and
-//   pd-mode keys). Stacked pd-mode rows defer that default hold until the hold
-//   threshold when a later tap-count branch can enter a different pd mode.
+//   pointing-mode keys). Stacked pointing-mode rows defer that default hold until the hold
+//   threshold when a later tap-count branch can enter a different pointing mode.
 //   Other keycodes keep the tap override and send it on release.
 //
 // hold:
 //   What happens after the first hold threshold.
 //
 // long_hold:
-//   What happens after the longer hold threshold.
+//   What happens after the long hold threshold.
 
 typedef struct {
     tap_behavior_t  tap;
@@ -126,13 +127,13 @@ typedef struct {
 
 #define TAP_SENDS(action_) {.present = true, .action = (action_)}
 
-#define PRESS_AND_HOLD_UNTIL_RELEASE(action_) {.present = true, .action = (action_), .mode = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE}
+#define PRESS_AND_HOLD_UNTIL_RELEASE(action_) {.present = true, .action = (action_), .style = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE}
 
-#define TAP_AT_HOLD_THRESHOLD(action_) {.present = true, .action = (action_), .mode = HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD}
+#define TAP_AT_HOLD_THRESHOLD(action_) {.present = true, .action = (action_), .style = HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD}
 
-#define REPEAT_WHILE_HELD(action_, hz_) {.present = true, .action = (action_), .repeat_hz = (hz_), .mode = HOLD_BEHAVIOR_REPEAT_WHILE_HELD}
+#define REPEAT_WHILE_HELD(action_, hz_) {.present = true, .action = (action_), .repeat_hz = (hz_), .style = HOLD_BEHAVIOR_REPEAT_WHILE_HELD}
 
-#define TAP_ON_RELEASE_AFTER_HOLD(action_) {.present = true, .action = (action_), .mode = HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD}
+#define TAP_ON_RELEASE_AFTER_HOLD(action_) {.present = true, .action = (action_), .style = HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD}
 
 // Defined once in keymap.c.
 extern const key_behavior_t key_behaviors[];
@@ -143,7 +144,7 @@ static inline hold_behavior_t hold_behavior_none(void) {
 }
 
 static inline bool hold_registers_on_press(hold_behavior_t hold) {
-    return hold.present && hold.mode == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE;
+    return hold.present && hold.style == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE;
 }
 
 static inline bool hold_repeat_rate_valid(uint16_t repeat_hz) {

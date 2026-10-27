@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../runtime/effective_profile_provider.h"
+#include "../runtime/active_profile_provider.h"
 #include "../schema/profile_validator_v1.h"
 #include "profile_candidate_transaction.h"
 #include "profile_store.h"
@@ -17,30 +17,48 @@ typedef enum {
     NOAH_PROFILE_STORAGE_ADMISSION_PEER,
 } noah_profile_storage_admission_owner_t;
 
+enum {
+    // Separate REUSE ranges a host candidate remembers for the other-half copy.
+    // The host planner sends a handful; contiguous steps merge into one range,
+    // and ranges past the table are simply sent to the other half as bytes.
+    NOAH_PROFILE_CANDIDATE_STORE_REUSE_RANGES = 16u,
+};
+
+typedef struct {
+    uint32_t offset;
+    uint32_t source_offset;
+    uint32_t length;
+} noah_profile_candidate_store_reuse_range_t;
+
 typedef struct {
     noah_profile_store_t                     *store;
-    noah_effective_profile_provider_t        *provider;
+    noah_active_profile_provider_t           *provider;
     noah_profile_validator_v1_compatibility_t compatibility;
     const noah_profile_validator_v1_runtime_t *candidate_runtime;
     noah_profile_validator_v1_t               validator;
     noah_profile_validator_v1_profile_t       validated_profile;
     noah_profile_candidate_v1_metadata_t      metadata;
     noah_profile_reader_t                     staged_reader;
-    noah_effective_profile_snapshot_t         activation_snapshot;
-    noah_profile_store_record_t               committed_record;
+    noah_active_profile_snapshot_t            activation_snapshot;
+    noah_profile_store_record_t               saved_record;
     uint32_t                                  compiled_default_digest;
     uint8_t                                   origin_half;
     bool                                      validation_complete;
-    bool                                      committed_available;
+    bool                                      saved_available;
     bool                                      activation_requested;
     bool                                      reuse_guard_installed;
-    bool                                      validating_committed_record;
+    bool                                      validating_saved_record;
     noah_profile_storage_admission_owner_t    admission_owner;
+    // The host candidate's REUSE ranges, in candidate order, all from
+    // reuse_source. Cleared when a candidate begins.
+    noah_profile_candidate_v1_source_t         reuse_source;
+    noah_profile_candidate_store_reuse_range_t reuse_ranges[NOAH_PROFILE_CANDIDATE_STORE_REUSE_RANGES];
+    uint8_t                                    reuse_range_count;
 } noah_profile_candidate_store_backend_t;
 
 // backend and store must remain at stable addresses for their shared lifetime:
 // the store's destructive-write guard borrows backend as its callback context.
-void noah_profile_candidate_store_backend_init(noah_profile_candidate_store_backend_t *backend, noah_profile_store_t *store, noah_effective_profile_provider_t *provider, const noah_profile_validator_v1_compatibility_t *compatibility, uint32_t compiled_default_digest, uint8_t origin_half);
+void noah_profile_candidate_store_backend_init(noah_profile_candidate_store_backend_t *backend, noah_profile_store_t *store, noah_active_profile_provider_t *provider, const noah_profile_validator_v1_compatibility_t *compatibility, uint32_t compiled_default_digest, uint8_t origin_half);
 
 // Returns callbacks for the scan-owned candidate transaction. The returned
 // interface borrows backend for its entire lifetime.
@@ -48,9 +66,9 @@ noah_profile_candidate_backend_t noah_profile_candidate_store_backend_interface(
 
 // A candidate the host uploads is validated with runtime in place of the
 // compatibility's own, so it is held to checks (such as where its actions are
-// placed) that a committed record being adopted, or the other half's
-// committed record arriving as a peer candidate, is not. runtime must outlive
-// backend; NULL restores the compatibility's own.
+// placed) that a saved record being adopted, or the other half's
+// saved record arriving as the other-half candidate, is not. runtime must
+// outlive backend; NULL restores the compatibility's own.
 void noah_profile_candidate_store_backend_hold_candidates_to(noah_profile_candidate_store_backend_t *backend, const noah_profile_validator_v1_runtime_t *runtime);
 
 // Split reconciliation uses the same storage/validator/provider owner as host
@@ -62,11 +80,11 @@ noah_profile_store_result_t noah_profile_candidate_store_backend_begin_exact(noa
 // Reboot path for a record already selected by profile_store_boot_select().
 // It performs no write and does not manufacture a new durable identity. Begin
 // and every step are scan-owned and obey the same bounded whole-profile
-// validator contract as an uploaded or peer-supplied candidate.
-noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_adopt_committed_begin(noah_profile_candidate_store_backend_t *backend, const noah_profile_store_record_t *record, noah_profile_candidate_v1_error_t *error);
-noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_adopt_committed_step(noah_profile_candidate_store_backend_t *backend, uint8_t byte_budget, noah_profile_candidate_v1_error_t *error);
+// validator contract as an uploaded or other-half-supplied candidate.
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_adopt_saved_begin(noah_profile_candidate_store_backend_t *backend, const noah_profile_store_record_t *record, noah_profile_candidate_v1_error_t *error);
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_adopt_saved_step(noah_profile_candidate_store_backend_t *backend, uint8_t byte_budget, noah_profile_candidate_v1_error_t *error);
 
-// Host and peer staging share one backend. Admission remains held across
+// Host and other-half staging share one backend. Admission remains held across
 // validation, durability, convergence, and activation so neither path can
 // overwrite the other's retained validated view. Abort or a successful
 // activation releases it; durability-unknown deliberately retains it.
@@ -74,11 +92,20 @@ noah_profile_storage_admission_owner_t noah_profile_candidate_store_backend_admi
 bool                                   noah_profile_candidate_store_backend_release_admission(noah_profile_candidate_store_backend_t *backend, noah_profile_storage_admission_owner_t owner);
 
 // While a validated HOST candidate is still precommit, the split owner may
-// stream its exact bytes to the sibling's inactive slot. These observations
+// stream its exact bytes to the slave half's inactive slot. These observations
 // never imply durability: the returned identity is the provisional store
 // candidate, and both calls fail once local marker-last commit begins.
 bool noah_profile_candidate_store_backend_staged_candidate(const noah_profile_candidate_store_backend_t *backend, noah_profile_store_candidate_t *candidate);
-bool noah_profile_candidate_store_backend_staged_read(void *context, const noah_profile_store_candidate_t *candidate, uint16_t offset, uint8_t *bytes, uint8_t length);
+bool noah_profile_candidate_store_backend_staged_read(void *context, const noah_profile_store_candidate_t *candidate, uint32_t offset, uint8_t *bytes, uint8_t length);
+// The first REUSE range of that staged candidate ending after `offset`, so
+// the copy to the slave half can ask it to fill the range from its own active
+// profile.
+bool noah_profile_candidate_store_backend_staged_reuse(const noah_profile_candidate_store_backend_t *backend, const noah_profile_store_candidate_t *candidate, uint32_t offset, noah_profile_candidate_v1_source_t *source, noah_profile_candidate_store_reuse_range_t *range);
+
+// Reads this half's active profile for the staging owner `owner`, only while
+// its whole identity still matches `source`, with at most 20 bytes. The host
+// uses it for candidate REUSE, the other-half receiver for a split reuse range.
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_read_active(noah_profile_candidate_store_backend_t *backend, noah_profile_storage_admission_owner_t owner, const noah_profile_candidate_v1_source_t *source, uint32_t offset, uint8_t *bytes, uint8_t length);
 
 // Split logical transactions persist intent and the decision in separate
 // phases. These calls retain the validated profile and admission lease across
@@ -91,23 +118,23 @@ noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_pre
 // Cold/test convenience wrapper around the interface's bounded commit steps.
 // Staging and validation never call it; production durability still requires
 // an explicit commit operation owned by scan context.
-noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_commit(noah_profile_candidate_store_backend_t *backend, noah_profile_store_record_t *committed);
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_commit(noah_profile_candidate_store_backend_t *backend, noah_profile_store_record_t *saved);
 
-// After durable commit, request publication through the effective provider.
-// This never publishes directly; the scan owner must poll the provider and the
-// provider's safe-boundary predicate remains authoritative.
+// After durable commit, request publication through the active-profile
+// provider. This never publishes directly; the scan owner must poll the
+// provider and the provider's safe-boundary predicate remains authoritative.
 noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_request_activation(noah_profile_candidate_store_backend_t *backend);
 
-// Owner-facing activation lifecycle for boot adoption and exact peer commits.
-// expected_owner prevents a top-level scheduler from polling a lease that
-// changed underneath it. NONE is valid only for boot adoption, which does not
-// acquire a host/peer staging lease.
+// Owner-facing activation lifecycle for boot adoption and exact other-half
+// commits. expected_owner prevents a top-level scheduler from polling a lease
+// that changed underneath it. NONE is valid only for boot adoption, which does
+// not acquire a host/other-half staging lease.
 noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_activation_begin(noah_profile_candidate_store_backend_t *backend, noah_profile_storage_admission_owner_t expected_owner);
 noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_activation_step(noah_profile_candidate_store_backend_t *backend, noah_profile_storage_admission_owner_t expected_owner);
 
 // Returns only the exact semantically validated durable record retained by
 // this backend. Callers must copy it before a later staging admission reuses
 // the backend's validated view.
-bool noah_profile_candidate_store_backend_committed(const noah_profile_candidate_store_backend_t *backend, noah_profile_store_record_t *record);
+bool noah_profile_candidate_store_backend_saved(const noah_profile_candidate_store_backend_t *backend, noah_profile_store_record_t *record);
 
 const noah_profile_validator_v1_profile_t *noah_profile_candidate_store_backend_validated_profile(const noah_profile_candidate_store_backend_t *backend);

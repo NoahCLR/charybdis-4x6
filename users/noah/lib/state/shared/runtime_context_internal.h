@@ -18,19 +18,43 @@
 #include "../diagnostics/runtime_trace.h"
 #include "runtime_shared_state_internal.h"
 
+// The layers a key's shortcuts own (D-F26), by owner: a custom key it holds
+// through its held action, and a Tap-toggle or One-shot custom key's own
+// momentary hold. One key can have both at once (the key's own layers from the
+// press, and the custom key its behaviour holds), so each keeps its own. Both
+// none is a free entry.
+typedef struct {
+    keypos_t      key_pos;
+    layer_state_t held;
+    layer_state_t momentary;
+} layer_ownership_shortcut_binding_t;
+
 typedef struct {
     layer_ownership_binding_snapshot_t bindings[LAYER_OWNERSHIP_BINDING_CAPACITY];
+    layer_ownership_shortcut_binding_t shortcut_bindings[LAYER_OWNERSHIP_BINDING_CAPACITY];
+    // Each layer's key owners: its momentary bindings, the held shortcuts
+    // naming it and the shortcut taps in flight.
     uint8_t                            momentary_refcounts[LAYER_COUNT];
     layer_state_t                      locked_mask;
     layer_state_t                      oneshot_mask;
+    // The layers the running pointing mode's key turns on (D-F62).
+    layer_state_t                      pointing_mode_layer_mask;
     uint16_t                           oneshot_armed_at;
 } noah_layer_ownership_state_t;
+
+// What a held action's binding took from the owned output: a literal
+// keycode's lease, or the chord lease holding a custom key's shortcut's
+// modifiers and keys (D-F26). The binding's action says which.
+typedef union {
+    owned_keycode_lease_t       keycode;
+    owned_keycode_chord_lease_t shortcut;
+} held_action_lease_t;
 
 typedef struct {
     held_action_binding_snapshot_t modifiers[HELD_ACTION_BINDING_CAPACITY];
     uint8_t                        modifier_refcounts[8];
     held_action_binding_snapshot_t actions[HELD_ACTION_BINDING_CAPACITY];
-    owned_keycode_lease_t          action_leases[HELD_ACTION_BINDING_CAPACITY];
+    held_action_lease_t            action_leases[HELD_ACTION_BINDING_CAPACITY];
     uint8_t                        action_lease_managed[(HELD_ACTION_BINDING_CAPACITY + 7u) / 8u];
 } noah_held_action_state_t;
 

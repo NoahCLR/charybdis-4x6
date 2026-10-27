@@ -1,4 +1,4 @@
-#include "lib/profile/runtime/effective_settings_runtime.h"
+#include "lib/profile/runtime/active_profile_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // Key Runtime Feedback
 // ────────────────────────────────────────────────────────────────────────────
@@ -11,11 +11,12 @@
 #include "../behavior/key_behavior_lookup.h"
 #include "../../compat/qmk_combo_origin.h"
 #include "../../split/runtime_sync.h"
+#include "../../state/ownership/layer_ownership.h"
 #include "reducer/ownership_state.h"
 #include "reducer/state_query.h"
 
 #ifdef POINTING_DEVICE_ENABLE
-#    include "../../pointing/defs/pd_modes.h"
+#    include "../../pointing/defs/pointing_modes.h"
 #endif
 
 #ifdef KEY_FEEDBACK_TEST_INSTRUMENTATION
@@ -23,8 +24,13 @@ static uint16_t key_feedback_slot_visits;
 void key_feedback_test_slot_visits_reset(void) { key_feedback_slot_visits = 0u; }
 uint16_t key_feedback_test_slot_visits(void) { return key_feedback_slot_visits; }
 #    define KEY_FEEDBACK_RECORD_SLOT_VISIT() (key_feedback_slot_visits++)
+static uint16_t key_feedback_combo_owner_walks;
+void key_feedback_test_combo_owner_walks_reset(void) { key_feedback_combo_owner_walks = 0u; }
+uint16_t key_feedback_test_combo_owner_walks(void) { return key_feedback_combo_owner_walks; }
+#    define KEY_FEEDBACK_RECORD_COMBO_OWNER_WALK() (key_feedback_combo_owner_walks++)
 #else
 #    define KEY_FEEDBACK_RECORD_SLOT_VISIT() ((void)0)
+#    define KEY_FEEDBACK_RECORD_COMBO_OWNER_WALK() ((void)0)
 #endif
 
 static key_feedback_semantic_t key_feedback_semantic_for_token(const press_token_t *token, keypos_t key_pos);
@@ -248,7 +254,8 @@ static bool key_feedback_tap_branch_is_non_base(uint8_t tap_count) {
 // resolves, which is the instant the action path takes the key over. Both edges
 // are events the runtime observes directly, so there is no derived settle moment
 // to get wrong and no way for the color to claim an outcome the engine has not
-// reached. A further tap simply renames the branch. See docs/rgbflow.md.
+// reached. A further tap simply renames the branch. See
+// docs/architecture/rgb-render.md.
 //
 // The base tap stays quiet because branch 0 needs no color of its own; one tap
 // does not show the user meant to enter a tap branch at all.
@@ -413,7 +420,7 @@ static key_feedback_semantic_t key_feedback_semantic_for_token(const press_token
     }
 
     held_action            = key_runtime_core_held_action_keycode_at(key_pos);
-    bool long_hold_reached = token->interaction.binding.long_hold.present && timer_elapsed(token->pressed_at) >= token->interaction.binding.longer_hold_term;
+    bool long_hold_reached = token->interaction.binding.long_hold.present && timer_elapsed(token->pressed_at) >= token->interaction.binding.long_hold_term;
 
     if (held_action != KC_NO) {
         handled_key_hold_semantics_t active_contract = key_feedback_registered_hold_contract(token->interaction, held_action, long_hold_reached);
@@ -613,9 +620,14 @@ void key_feedback_tap_branch_map(uint8_t *out_map) {
     }
 }
 
+// A combo whose output holds a momentary layer shows no combo light: the layer
+// lighting already says what the hold does, as it does for a key whose hold
+// enters a layer (no pulse, no registered feedback). Until a behavior output's
+// hold resolves, the combo still lights.
 void combo_feedback_bitmaps(uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap) {
     keypos_t preview_owner_key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
     keypos_t pd_owner_key_pos      = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
+    uint8_t  layer_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 
     if (out_underlay_bitmap) {
         key_origin_bitmap_clear(out_underlay_bitmap);
@@ -625,15 +637,19 @@ void combo_feedback_bitmaps(uint8_t *out_underlay_bitmap, uint8_t *out_overlay_b
         key_origin_bitmap_clear(out_overlay_bitmap);
     }
 
-    if (!(out_underlay_bitmap && out_overlay_bitmap)) {
+    // Built every pass for the split sync and the lighting; with no combo
+    // output held the partition is empty, so skip the owner lookups.
+    if (!(out_underlay_bitmap && out_overlay_bitmap) || !noah_qmk_combo_origin_any_active()) {
         return;
     }
 
     (void)key_runtime_core_preview_owner_key_pos(&preview_owner_key_pos);
 #ifdef POINTING_DEVICE_ENABLE
-    (void)pd_mode_local_owner_key_pos_snapshot(&pd_owner_key_pos);
+    (void)pointing_mode_local_owner_key_pos_snapshot(&pd_owner_key_pos);
 #endif
-    noah_qmk_combo_origin_active_bitmaps_partitioned(preview_owner_key_pos, pd_owner_key_pos, out_underlay_bitmap, out_overlay_bitmap);
+    KEY_FEEDBACK_RECORD_COMBO_OWNER_WALK();
+    layer_ownership_momentary_owner_bitmap(layer_owner_bitmap);
+    noah_qmk_combo_origin_active_bitmaps_partitioned(preview_owner_key_pos, pd_owner_key_pos, layer_owner_bitmap, out_underlay_bitmap, out_overlay_bitmap);
 }
 
 void combo_feedback_underlay_bitmap(uint8_t *out_bitmap) {

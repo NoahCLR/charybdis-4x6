@@ -1,4 +1,4 @@
-#include "lib/profile/runtime/effective_settings_runtime.h"
+#include "lib/profile/runtime/active_profile_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // RGB Key Feedback Stage
 // ────────────────────────────────────────────────────────────────────────────
@@ -18,7 +18,7 @@ typedef struct {
 #        error "RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS must be greater than zero"
 #    endif
 
-static uint8_t rgb_runtime_key_feedback_stage_tap_branch_color_index(const rgb_effective_key_feedback_t *config, uint8_t tap_branch) {
+static uint8_t rgb_runtime_key_feedback_stage_tap_branch_color_index(const rgb_active_profile_key_feedback_t *config, uint8_t tap_branch) {
     uint8_t index;
 
     if (!config || config->tap_branch_color_count == 0u) {
@@ -35,7 +35,7 @@ static uint8_t rgb_runtime_key_feedback_stage_tap_branch_color_index(const rgb_e
     return index;
 }
 
-static bool rgb_runtime_key_feedback_stage_semantic_color(const rgb_effective_key_feedback_t *config, key_feedback_semantic_t semantic, uint8_t tap_branch, rgb_t *out_color) {
+static bool rgb_runtime_key_feedback_stage_semantic_color(const rgb_active_profile_key_feedback_t *config, key_feedback_semantic_t semantic, uint8_t tap_branch, rgb_t *out_color) {
     if (!(config && out_color)) {
         return false;
     }
@@ -155,7 +155,7 @@ static bool rgb_runtime_key_feedback_stage_paint_key(rgb_runtime_frame_t *frame,
     return painted;
 }
 
-static bool rgb_runtime_key_feedback_stage_render_key_mode(const rgb_effective_key_feedback_t *config, rgb_runtime_frame_t *frame, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_key_feedback_stage_render_key_mode(const rgb_active_profile_key_feedback_t *config, rgb_runtime_frame_t *frame, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, uint8_t led_min, uint8_t led_max) {
     bool painted = false;
 
     if (!(config && frame && semantic_map && tap_branch_map && flash_visibility_bitmap)) {
@@ -198,7 +198,7 @@ static key_feedback_render_state_t rgb_runtime_key_feedback_stage_state_for_owne
     return state;
 }
 
-static bool rgb_runtime_key_feedback_stage_paint_half(const rgb_effective_key_feedback_t *config, rgb_runtime_frame_t *frame, bool right_half, key_feedback_render_state_t state, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_key_feedback_stage_paint_half(const rgb_active_profile_key_feedback_t *config, rgb_runtime_frame_t *frame, bool right_half, key_feedback_render_state_t state, uint8_t led_min, uint8_t led_max) {
     rgb_t color;
 
     if (!rgb_runtime_key_feedback_stage_semantic_color(config, state.semantic, state.tap_branch, &color)) {
@@ -210,7 +210,7 @@ static bool rgb_runtime_key_feedback_stage_paint_half(const rgb_effective_key_fe
     return rgb_runtime_key_feedback_stage_paint_range(frame, color, 0u, RGB_LEFT_LED_COUNT, led_min, led_max);
 }
 
-static bool rgb_runtime_key_feedback_stage_render_locality(const rgb_effective_key_feedback_t *config, rgb_runtime_frame_t *frame, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_key_feedback_stage_render_locality(const rgb_active_profile_key_feedback_t *config, rgb_runtime_frame_t *frame, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max) {
     key_feedback_render_state_t left_state;
     key_feedback_render_state_t right_state;
     key_feedback_render_state_t global_state;
@@ -242,7 +242,7 @@ static bool rgb_runtime_key_feedback_stage_render_locality(const rgb_effective_k
     return rgb_runtime_key_feedback_stage_paint_range(frame, color, 0u, RGB_MATRIX_LED_COUNT, led_min, led_max);
 }
 
-static bool rgb_runtime_key_feedback_stage_paint_group(rgb_runtime_frame_t *frame, const rgb_effective_key_group_t *group, rgb_t color, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_key_feedback_stage_paint_group(rgb_runtime_frame_t *frame, const rgb_active_profile_key_group_t *group, rgb_t color, uint8_t led_min, uint8_t led_max) {
     bool painted = false;
 
     if (!(frame && group)) {
@@ -259,7 +259,7 @@ static bool rgb_runtime_key_feedback_stage_paint_group(rgb_runtime_frame_t *fram
     return painted;
 }
 
-static bool rgb_runtime_key_feedback_stage_render_group(const rgb_effective_key_feedback_t *config, rgb_runtime_frame_t *frame, const rgb_effective_key_group_t *group, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_key_feedback_stage_render_group(const rgb_active_profile_key_feedback_t *config, rgb_runtime_frame_t *frame, const rgb_active_profile_key_group_t *group, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max) {
     static const key_behavior_feedback_group_semantic_t all_semantics[] = {
         KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING,
         KEY_FEEDBACK_GROUP_TAP_COMMITTED,
@@ -301,17 +301,17 @@ static bool rgb_runtime_key_feedback_stage_render_group(const rgb_effective_key_
     return painted;
 }
 
-static bool rgb_runtime_key_feedback_stage_render_groups(const rgb_effective_key_feedback_t *config, rgb_runtime_frame_t *frame, const noah_effective_rgb_frame_t *profile_frame, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_key_feedback_stage_render_groups(const rgb_active_profile_key_feedback_t *config, rgb_runtime_frame_t *frame, const noah_active_profile_rgb_frame_t *profile_frame, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max) {
     bool    painted     = false;
-    uint8_t group_count = rgb_effective_config_key_group_count(profile_frame);
+    uint8_t group_count = rgb_active_profile_config_key_group_count(profile_frame);
 
     for (uint8_t pass = 0u; pass < 2u; pass++) {
         bool all_base_pass = pass == 0u;
 
         for (uint8_t group_index = 0u; group_index < group_count; group_index++) {
-            rgb_effective_key_group_t group;
+            rgb_active_profile_key_group_t group;
 
-            if (!rgb_effective_config_key_group_at(profile_frame, group_index, &group)) {
+            if (!rgb_active_profile_config_key_group_at(profile_frame, group_index, &group)) {
                 rgb_runtime_frame_clear(frame, led_min, led_max);
                 return false;
             }
@@ -324,21 +324,21 @@ static bool rgb_runtime_key_feedback_stage_render_groups(const rgb_effective_key
     return painted;
 }
 
-bool rgb_runtime_key_feedback_stage_render_effective_frame(rgb_runtime_frame_t *frame, const noah_effective_rgb_frame_t *profile_frame, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max) {
-    rgb_effective_key_feedback_t config;
-    bool                         painted = false;
+bool rgb_runtime_key_feedback_stage_render_active_profile_frame(rgb_runtime_frame_t *frame, const noah_active_profile_rgb_frame_t *profile_frame, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max) {
+    rgb_active_profile_key_feedback_t config;
+    bool                              painted = false;
 
     if (!frame) {
         return false;
     }
     rgb_runtime_frame_clear(frame, led_min, led_max);
-    if (!(semantic_map && tap_branch_map && flash_visibility_bitmap && broad_owner_map) || !rgb_effective_config_key_stage_enabled(profile_frame) || !rgb_effective_config_key_feedback(profile_frame, &config)) {
+    if (!(semantic_map && tap_branch_map && flash_visibility_bitmap && broad_owner_map) || !rgb_active_profile_config_key_stage_enabled(profile_frame) || !rgb_active_profile_config_key_feedback(profile_frame, &config)) {
         return false;
     }
 
     painted |= rgb_runtime_key_feedback_stage_render_locality(&config, frame, semantic_map, tap_branch_map, flash_visibility_bitmap, broad_owner_map, led_min, led_max);
     painted |= rgb_runtime_key_feedback_stage_render_groups(&config, frame, profile_frame, semantic_map, tap_branch_map, flash_visibility_bitmap, broad_owner_map, led_min, led_max);
-    if (!rgb_effective_config_frame_current(profile_frame)) {
+    if (!rgb_active_profile_config_frame_current(profile_frame)) {
         rgb_runtime_frame_clear(frame, led_min, led_max);
         return false;
     }

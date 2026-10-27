@@ -20,7 +20,7 @@ static inline uint8_t handled_key_hold_preview_layer(key_runtime_slot_hold_strat
         return UINT8_MAX;
     }
 
-    if (hold.mode != HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE) {
+    if (hold.style != HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE) {
         return UINT8_MAX;
     }
 
@@ -40,8 +40,9 @@ static inline handled_key_hold_semantics_t handled_key_hold_semantics_for_behavi
 
     semantics.release_layer_before_action = (flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0 && noah_action_desc_releases_momentary_layer_before_action(desc);
     semantics.preview_layer               = handled_key_hold_preview_layer(hold_strategy, hold, desc);
+    semantics.hold_is_layer               = semantics.preview_layer != UINT8_MAX;
 
-    switch (hold.mode) {
+    switch (hold.style) {
         case HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE:
             semantics.threshold_action          = hold.action;
             semantics.keeps_registered_feedback = handled_key_hold_action_keeps_registered_feedback(desc);
@@ -71,11 +72,29 @@ static inline handled_key_hold_semantics_t handled_key_hold_semantics_for_behavi
     }
 }
 
-static inline handled_key_behavior_contract_t handled_key_behavior_contract(key_runtime_slot_hold_strategy_t hold_strategy, uint16_t flags, uint16_t tap_action, pd_mode_mask_t pd_mode, hold_behavior_t hold, hold_behavior_t long_hold) {
+static inline bool handled_key_action_leads_to_layer(uint16_t action, uint8_t layer) {
+    noah_action_desc_t desc = noah_action_describe(action);
+    return (noah_action_desc_is_layer_lock(desc) || noah_action_desc_is_layer_goto(desc)) && desc.layer == layer;
+}
+
+// The preview lights a held layer only where it cannot be wrong: when the
+// press's tap lands on that layer too (a lock of it, or going to it), and so
+// does any long hold. An LT() row's tap types its key, so it shows none; its
+// layer lights when it turns on.
+static inline handled_key_hold_semantics_t handled_key_hold_semantics_previewed(handled_key_hold_semantics_t held, uint16_t tap_action, hold_behavior_t long_hold, handled_key_hold_semantics_t long_held) {
+    if (held.preview_layer != UINT8_MAX && !(handled_key_action_leads_to_layer(tap_action, held.preview_layer) && (!long_hold.present || long_held.preview_layer == held.preview_layer || handled_key_action_leads_to_layer(long_hold.action, held.preview_layer)))) {
+        held.preview_layer = UINT8_MAX;
+    }
+    return held;
+}
+
+static inline handled_key_behavior_contract_t handled_key_behavior_contract(key_runtime_slot_hold_strategy_t hold_strategy, uint16_t flags, uint16_t tap_action, pointing_mode_mask_t pointing_mode, hold_behavior_t hold, hold_behavior_t long_hold) {
+    handled_key_hold_semantics_t long_held = handled_key_hold_semantics_for_behavior(hold_strategy, flags, long_hold);
+
     return (handled_key_behavior_contract_t){
-        .hold                                           = handled_key_hold_semantics_for_behavior(hold_strategy, flags, hold),
-        .long_hold                                      = handled_key_hold_semantics_for_behavior(hold_strategy, flags, long_hold),
-        .quick_tap_pd_mode_lock                         = pd_mode,
+        .hold                                           = handled_key_hold_semantics_previewed(handled_key_hold_semantics_for_behavior(hold_strategy, flags, hold), tap_action, long_hold, long_held),
+        .long_hold                                      = long_held,
+        .quick_tap_pointing_mode_lock                   = pointing_mode,
         .suppress_tap_on_layer_interrupt                = (flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0,
         .buffered_base_tap_dispatches_tap               = (flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0 && tap_action == KC_NO,
         .quick_release_of_immediate_hold_dispatches_tap = hold_registers_on_press(hold),

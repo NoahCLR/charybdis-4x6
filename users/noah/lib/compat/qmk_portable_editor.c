@@ -78,16 +78,17 @@ uint8_t noah_qmk_portable_editor_page(uint8_t page, uint8_t *payload) {
 
 void noah_qmk_portable_apply_lighting(uint32_t mode, uint32_t color) {
     // QMK ignores mode and HSV setters while disabled. This synchronous safe-
-    // boundary update never runs the LED renderer between enabling and restoring
-    // the requested state, and persists the final on/off choice.
+    // boundary update never runs the LED renderer between enabling and
+    // restoring the requested state. Nothing goes to QMK's EEPROM: the
+    // profile owns these values (D-F32).
     rgb_matrix_enable_noeeprom();
-    rgb_matrix_mode((mode >> 8) & 255);
-    rgb_matrix_set_speed((mode >> 16) & 255);
-    rgb_matrix_set_flags(mode >> 24);
-    rgb_matrix_sethsv(color & 255, (color >> 8) & 255, (color >> 16) & 255);
+    rgb_matrix_mode_noeeprom((mode >> 8) & 255);
+    rgb_matrix_set_speed_noeeprom((mode >> 16) & 255);
+    rgb_matrix_set_flags_noeeprom(mode >> 24);
+    rgb_matrix_sethsv_noeeprom(color & 255, (color >> 8) & 255, (color >> 16) & 255);
     if (mode & 255)
-        rgb_matrix_enable();
+        rgb_matrix_enable_noeeprom();
     else
-        rgb_matrix_disable();
+        rgb_matrix_disable_noeeprom();
 }
 #endif

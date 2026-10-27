@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "key_runtime_integration_harness.h"
+#include "users/noah/noah_runtime.h"
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/action/owned_keycode.h"
@@ -11,6 +12,7 @@
 #include "users/noah/lib/state/modifiers/keyboard_mod_policy.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
+#include "users/noah/lib/key/runtime/projection/projection.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "users/noah/lib/state/diagnostics/runtime_debug.h"
 #include "users/noah/lib/state/shared/runtime_reset.h"
@@ -42,6 +44,11 @@ static const test_behavior_row_t test_behavior_rows[] = {
     {.keycode = TEST_SHIFTED_SYMBOL_KEY, .single = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_1))}}, {.keycode = TEST_SHIFT_ENTER_KEY, .single = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))}}, {.keycode = TEST_HANDLED_SHIFT_KEY, .single = {.tap = TAP_SENDS(KC_CAPS)}}, {.keycode = TEST_MANAGED_SHIFT_KEY, .single = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_SHIFT)}}, {.keycode = TEST_SHIFTED_PLAIN_KEY, .single = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_A))}},
 };
 
+// A row with an authored tap and the MT source's intrinsic modifier hold. This
+// harness's lookup handles only keys with a row, so the row also stands in for
+// the default every MT() gets without one (D-F27): QMK's tapping decides none.
+static test_behavior_row_t test_authored_mod_tap;
+
 static uint16_t fake_time;
 static uint8_t  fake_mods;
 static uint8_t  fake_weak_mods;
@@ -49,6 +56,8 @@ static uint8_t  fake_oneshot_mods;
 static uint8_t  fake_oneshot_locked_mods;
 
 static uint8_t send_keyboard_report_count;
+static uint8_t report_mods;
+static uint8_t report_required_mods;
 static uint8_t emitted_action_count;
 static int8_t  report_key_depth[UINT8_MAX + 1];
 
@@ -72,6 +81,9 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
 }
 
 static const test_behavior_row_t *test_behavior_row(uint16_t keycode) {
+    if (test_authored_mod_tap.keycode != KC_NO && keycode == test_authored_mod_tap.keycode) {
+        return &test_authored_mod_tap;
+    }
     for (uint8_t index = 0; index < ARRAY_SIZE(test_behavior_rows); index++) {
         if (test_behavior_rows[index].keycode == keycode) {
             return &test_behavior_rows[index];
@@ -107,6 +119,8 @@ static void test_reset_state(void) {
     fake_oneshot_mods          = 0;
     fake_oneshot_locked_mods   = 0;
     send_keyboard_report_count = 0;
+    report_mods                = 0;
+    report_required_mods        = 0;
     emitted_action_count       = 0;
     for (uint16_t index = 0; index <= UINT8_MAX; index++) {
         report_key_depth[index] = 0;
@@ -189,6 +203,18 @@ void del_mods(uint8_t mods) {
 }
 
 void send_keyboard_report(void) {
+    CHECK((get_mods() & report_required_mods) == report_required_mods);
+    report_mods = get_mods() | get_weak_mods() | get_oneshot_mods();
+    // QMK consumes unlocked one-shot modifiers when a keyboard report contains
+    // a basic key, even when that report does not add another usage edge.
+    if (get_oneshot_mods()) {
+        for (uint16_t code = KC_A; code <= KC_EXSEL; code++) {
+            if (report_key_depth[code] > 0) {
+                clear_oneshot_mods();
+                break;
+            }
+        }
+    }
     send_keyboard_report_count++;
 }
 
@@ -241,12 +267,12 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     }
 
     return (key_behavior_view_t){
-        .keycode          = keycode,
-        .handled          = true,
-        .tap_hold_term    = TEST_HOLD_TERM,
-        .longer_hold_term = 350,
-        .multi_tap_term   = 120,
-        .single           = row->single,
+        .keycode        = keycode,
+        .handled        = true,
+        .tap_hold_term  = TEST_HOLD_TERM,
+        .long_hold_term = 350,
+        .multi_tap_term = 120,
+        .single         = row->single,
     };
 }
 
@@ -280,14 +306,14 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
     return false;
 }
 
-bool key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t count, pd_mode_mask_t base_mode) {
+bool key_behavior_future_tap_path_has_foreign_pointing_mode(uint16_t keycode, uint8_t count, pointing_mode_mask_t base_mode) {
     (void)keycode;
     (void)count;
     (void)base_mode;
     return false;
 }
 
-bool is_pd_mode_lock_action(uint16_t action) {
+bool is_pointing_mode_lock_action(uint16_t action) {
     (void)action;
     return false;
 }
@@ -313,35 +339,35 @@ void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_actio
     dispatch_delayed_action(action, mods);
 }
 
-pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
     (void)keycode;
     return 0;
 }
 
-bool pd_mode_local_locked(pd_mode_mask_t mode) {
+bool pointing_mode_local_locked(pointing_mode_mask_t mode) {
     (void)mode;
     return false;
 }
 
-bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
+bool pointing_mode_toggle_lock_state(pointing_mode_mask_t mode) {
     (void)mode;
     return false;
 }
 
-bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
+bool pointing_mode_toggle_lock_state_at(pointing_mode_mask_t mode, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_toggle_lock_state(mode);
+    return pointing_mode_toggle_lock_state(mode);
 }
 
-bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {
+bool pointing_mode_set_lock_state(pointing_mode_mask_t mode, bool locked) {
     (void)mode;
     (void)locked;
     return false;
 }
 
-bool pd_mode_set_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_pos) {
+bool pointing_mode_set_lock_state_at(pointing_mode_mask_t mode, bool locked, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_set_lock_state(mode, locked);
+    return pointing_mode_set_lock_state(mode, locked);
 }
 
 void split_runtime_sync(void) {}
@@ -358,6 +384,37 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
     return false;
 }
 
+// No custom key here turns a layer on (D-F26).
+void layer_ownership_shortcut_press(keypos_t key_pos, layer_state_t layers) {
+    (void)key_pos;
+    (void)layers;
+}
+
+bool layer_ownership_shortcut_release(keypos_t key_pos) {
+    (void)key_pos;
+    return false;
+}
+
+void layer_ownership_shortcut_momentary_press(keypos_t key_pos, layer_state_t layers) {
+    (void)key_pos;
+    (void)layers;
+}
+
+bool layer_ownership_shortcut_momentary_release(keypos_t key_pos) {
+    (void)key_pos;
+    return false;
+}
+
+bool layer_ownership_toggle_lock_set(layer_state_t layers) {
+    (void)layers;
+    return false;
+}
+
+bool layer_ownership_goto_set(layer_state_t layers) {
+    (void)layers;
+    return false;
+}
+
 void noah_action_press(keypos_t key_pos, uint16_t action) {
     (void)key_pos;
     (void)action;
@@ -369,12 +426,6 @@ void noah_action_release(keypos_t key_pos, uint16_t action) {
 }
 
 bool noah_synthetic_record_active(void) {
-    return false;
-}
-
-bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
     return false;
 }
 
@@ -466,26 +517,6 @@ static void test_consumed_handled_modifier_does_not_block_managed_teardown(void)
     CHECK(test_report_mod_refcount_total() == 0);
 }
 
-// QMK resolves a mod-tap before userspace sees it: tap_count 0 is a hold, whose
-// default action then registers the modifier through the linked register_mods()
-// override, exactly as the fork's action.c does. A mode that owns the same
-// modifier (Pinch's Cmd) masks only its own, so the user's held mod-tap must
-// still reach a concurrent key.
-static void test_mod_tap_hold(uint16_t keycode, keypos_t key_pos, bool pressed) {
-    CHECK(key_runtime_integration_process_tap_record(keycode, key_pos, pressed, 0u));
-}
-
-static void test_qmk_mod_tap_default(uint16_t keycode, bool pressed) {
-    uint8_t mods = (uint8_t)QK_MOD_TAP_GET_MODS(keycode);
-
-    mods = (mods & 0x10u) ? (uint8_t)((mods & 0x0Fu) << 4u) : (uint8_t)(mods & 0x0Fu);
-    if (pressed) {
-        register_mods(mods);
-    } else {
-        unregister_mods(mods);
-    }
-}
-
 // The modifier bits a concurrent key would carry while the mode masks `mods`.
 static uint8_t test_mods_for_concurrent_key(uint8_t mods) {
     uint8_t mask = keyboard_mod_policy_managed_only_mask(mods);
@@ -509,101 +540,383 @@ static void test_assert_mods_balanced(void) {
     CHECK(get_mods() == 0);
 }
 
-static void test_held_mod_tap_is_not_masked_as_mode_owned(void) {
-    const uint16_t gui_tap = MT(MOD_LGUI, KC_A);
-    keypos_t       mt_pos  = test_keypos(4, 0);
-    uint8_t        gui     = MOD_BIT(KC_LEFT_GUI);
+static uint8_t test_managed_mod_refcount_total(void) {
+    keyboard_mod_ownership_debug_snapshot_t snapshot = {0};
+    uint8_t                                 total    = 0;
 
-    // A direct Cmd hold was already excluded; the mod-tap hold now matches it.
-    test_reset_state();
-    CHECK(key_runtime_integration_process_record(KC_LEFT_GUI, mt_pos, true));
-    add_mods(gui);
-    keyboard_mod_ownership_register(KC_LEFT_GUI);
-    CHECK(test_mods_for_concurrent_key(gui) == gui);
-
-    // Mod-tap held first, then the mode takes its Cmd; then the other order.
-    for (uint8_t order = 0; order < 2u; order++) {
-        test_reset_state();
-        if (order == 1u) keyboard_mod_ownership_register(KC_LEFT_GUI);
-        test_mod_tap_hold(gui_tap, mt_pos, true);
-        test_qmk_mod_tap_default(gui_tap, true);
-        if (order == 0u) keyboard_mod_ownership_register(KC_LEFT_GUI);
-        CHECK(keyboard_mod_policy_managed_only_mask(gui) == 0);
-        CHECK(test_mods_for_concurrent_key(gui) == gui);
-
-        // Releasing the mod-tap while the mode still holds Cmd: Cmd stays in
-        // the report for the mode, and is masked again as the mode's alone.
-        test_mod_tap_hold(gui_tap, mt_pos, false);
-        test_qmk_mod_tap_default(gui_tap, false);
-        CHECK((get_mods() & gui) != 0);
-        CHECK(test_mods_for_concurrent_key(gui) == 0);
-        keyboard_mod_ownership_unregister(KC_LEFT_GUI);
-        test_assert_mods_balanced();
+    keyboard_mod_ownership_debug_snapshot(&snapshot);
+    for (uint8_t index = 0; index < KEYBOARD_MOD_OWNERSHIP_MOD_COUNT; index++) {
+        total = (uint8_t)(total + snapshot.managed_refcounts[index]);
     }
-
-    // The mode replaced by another that owns Cmd too: the hold stays unmasked.
-    test_reset_state();
-    test_mod_tap_hold(gui_tap, mt_pos, true);
-    test_qmk_mod_tap_default(gui_tap, true);
-    keyboard_mod_ownership_register(KC_LEFT_GUI);
-    keyboard_mod_ownership_unregister(KC_LEFT_GUI);
-    keyboard_mod_ownership_register(KC_LEFT_GUI);
-    CHECK(test_mods_for_concurrent_key(gui) == gui);
-    keyboard_mod_ownership_unregister(KC_LEFT_GUI);
-    test_mod_tap_hold(gui_tap, mt_pos, false);
-    test_qmk_mod_tap_default(gui_tap, false);
-    test_assert_mods_balanced();
+    return total;
 }
 
-// A tapped mod-tap never held its modifier: the mode's Cmd is still masked.
+// A tapped mod-tap never holds its modifier: the mode's Cmd is its only
+// owner, before the tap and after it, and stays masked. Held past its hold
+// time, the same key does take Cmd, so the count tells a tap from a hold.
+// (A held mod-tap is masked under such a mode too, an open issue, so masking
+// alone cannot tell them apart.)
 static void test_tapped_mod_tap_is_not_a_held_modifier(void) {
     const uint16_t gui_tap = MT(MOD_LGUI, KC_A);
     keypos_t       mt_pos  = test_keypos(4, 0);
     uint8_t        gui     = MOD_BIT(KC_LEFT_GUI);
 
+    test_authored_mod_tap = (test_behavior_row_t){
+        .keycode = gui_tap,
+        .single  = {.tap = TAP_SENDS(KC_A), .hold = PRESS_AND_HOLD_UNTIL_RELEASE((uint16_t)(MOD_LGUI << 8u))},
+    };
+    for (uint8_t held = 0; held < 2u; held++) {
+        test_reset_state();
+        keyboard_mod_ownership_register(KC_LEFT_GUI);
+        CHECK(test_managed_mod_refcount_total() == 1u);
+        CHECK(!key_runtime_integration_process_record(gui_tap, mt_pos, true));
+        CHECK(test_managed_mod_refcount_total() == 1u);
+        CHECK(test_mods_for_concurrent_key(gui) == 0);
+        if (held) {
+            key_runtime_integration_advance(&fake_time, 400u);
+            key_runtime_integration_scan();
+            CHECK(test_managed_mod_refcount_total() == 2u);
+        }
+        CHECK(!key_runtime_integration_process_record(gui_tap, mt_pos, false));
+        CHECK(test_managed_mod_refcount_total() == 1u);
+        CHECK(test_mods_for_concurrent_key(gui) == 0);
+        keyboard_mod_ownership_unregister(KC_LEFT_GUI);
+        key_runtime_integration_advance(&fake_time, 400u);
+        key_runtime_integration_scan();
+        test_assert_mods_balanced();
+    }
+    test_authored_mod_tap = (test_behavior_row_t){0};
+}
+
+// Compare report masks from the reducer with the real applied ownership ledger,
+// not with a second expected-value decoder. All 15 subsets on each side are
+// supported by QMK; its five-bit encoding cannot express mixed-side holds.
+static void test_assert_mod_tap_projection(uint8_t expected) {
+    projection_snapshot_t applied = key_runtime_core_projection_snapshot_capture();
+    const key_runtime_core_shadow_projection_t *shadow = &key_runtime_core_state()->shadow_projection;
+
+    CHECK(applied.keyboard_mod_state.real == expected);
+    CHECK(applied.keyboard_managed_mod_mask == expected);
+    CHECK(applied.keyboard_physical_mod_mask == 0u);
+    if (shadow->keyboard_mod_state.real != applied.keyboard_mod_state.real) {
+        fprintf(stderr, "MT shadow/applied disagreement: shadow=0x%02x applied=0x%02x expected=0x%02x\n",
+                shadow->keyboard_mod_state.real, applied.keyboard_mod_state.real, expected);
+    }
+    CHECK(shadow->keyboard_mod_state.real == applied.keyboard_mod_state.real);
+    CHECK(shadow->keyboard_managed_mod_mask == applied.keyboard_managed_mod_mask);
+}
+
+static void test_assert_mod_tap_quiescent(void) {
+    test_assert_mod_tap_projection(0u);
+    test_assert_mods_balanced();
+    CHECK(key_runtime_core_state()->press_token_count == 0u);
+    CHECK(key_runtime_core_state()->lease_count == 0u);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0u);
+    CHECK(noah_runtime_debug_deferred_release_count() == 0u);
+    CHECK(key_runtime_core_state()->shadow_projection.keyboard_physical_mod_mask == 0u);
+}
+
+static void test_mod_tap_shadow_matches_applied_ownership(void) {
+    const keypos_t pos = {4, 3};
+
+    for (uint8_t side = 0; side < 2u; side++) {
+        for (uint8_t subset = 1u; subset < 16u; subset++) {
+            const uint8_t encoded = (uint8_t)(subset | (side ? 0x10u : 0u));
+            const uint8_t expected = (uint8_t)(side ? subset << 4u : subset);
+            const uint16_t code = MT(encoded, KC_Q);
+
+            // Authored hold is applied through the real literal action ledger.
+            test_authored_mod_tap = (test_behavior_row_t){
+                .keycode = code,
+                .single = {.tap = TAP_SENDS(KC_Q), .hold = PRESS_AND_HOLD_UNTIL_RELEASE((uint16_t)(encoded << 8u))},
+            };
+            test_reset_state();
+            CHECK(!key_runtime_integration_process_record(code, pos, true));
+            test_assert_mod_tap_projection(0u);
+            key_runtime_integration_advance(&fake_time, TEST_HOLD_TERM + 1u);
+            key_runtime_integration_scan();
+            test_assert_mod_tap_projection(expected);
+            CHECK(!key_runtime_integration_process_record(code, pos, false));
+            key_runtime_integration_advance(&fake_time, 400u);
+            key_runtime_integration_scan();
+            test_assert_mod_tap_quiescent();
+
+            test_reset_state();
+            CHECK(!key_runtime_integration_process_record(code, pos, true));
+            test_assert_mod_tap_projection(0u);
+            CHECK(!key_runtime_integration_process_record(code, pos, false));
+            key_runtime_integration_advance(&fake_time, 400u);
+            key_runtime_integration_scan();
+            test_assert_mod_tap_quiescent();
+            test_authored_mod_tap = (test_behavior_row_t){0};
+        }
+    }
+
+    // A row whose hold is not the MT's own modifiers holds none of them: the
+    // shadow follows what the hold holds, not the keycode family (D-F27).
+    const uint16_t code = MT(MOD_LCTL, KC_Q);
+    test_authored_mod_tap = (test_behavior_row_t){
+        .keycode = code,
+        .single = {.tap = TAP_SENDS(KC_Q), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_B)},
+    };
     test_reset_state();
-    keyboard_mod_ownership_register(KC_LEFT_GUI);
-    CHECK(key_runtime_integration_process_tap_record(gui_tap, mt_pos, true, 1u));
-    CHECK(test_mods_for_concurrent_key(gui) == 0);
-    CHECK(key_runtime_integration_process_tap_record(gui_tap, mt_pos, false, 1u));
-    CHECK(test_mods_for_concurrent_key(gui) == 0);
-    keyboard_mod_ownership_unregister(KC_LEFT_GUI);
+    CHECK(!key_runtime_integration_process_record(code, pos, true));
+    key_runtime_integration_advance(&fake_time, TEST_HOLD_TERM + 1u);
+    key_runtime_integration_scan();
+    CHECK(noah_runtime_debug_slot_held_action_keycode(pos) == KC_B);
+    test_assert_mod_tap_projection(0u);
+    CHECK(!key_runtime_integration_process_record(code, pos, false));
+    key_runtime_integration_advance(&fake_time, 400u);
+    key_runtime_integration_scan();
+    test_assert_mod_tap_quiescent();
+    test_authored_mod_tap = (test_behavior_row_t){0};
+}
+
+// Native ACT_LMODS/ACT_RMODS with KC_NO or a modifier uses add_mods/del_mods,
+// not register_mods. Run that default action between the real process and
+// finalize hooks; a consumed release must never send a transient missing mod.
+static void test_native_modifier_event(uint16_t code, keypos_t pos, bool pressed, uint8_t mods) {
+    keyrecord_t record = {.event = {.type = KEY_EVENT, .key = pos, .pressed = pressed, .time = fake_time}};
+    CHECK(noah_pre_process_record_user(code, &record));
+    if (noah_process_record_user(code, &record)) {
+        if (pressed) add_mods(mods);
+        else del_mods(mods);
+        send_keyboard_report();
+        noah_post_process_record_user(code, &record);
+    } else {
+        noah_process_record_user_finalize(code, &record, false);
+    }
+}
+
+static void test_native_modifier_combination(uint16_t code, uint8_t mods) {
+    const keypos_t pos = {4, 4};
+    uint8_t shared = (uint8_t)(mods & (uint8_t)(0u - mods));
+    for (uint8_t order = 0; order < 4u; order++) {
+        test_reset_state();
+        if (order & 1u) keyboard_mod_ownership_register_mods(shared);
+        test_native_modifier_event(code, pos, true, mods);
+        if (!(order & 1u)) keyboard_mod_ownership_register_mods(shared);
+        CHECK(get_mods() == mods);
+        CHECK(keyboard_mod_policy_managed_only_mask(shared) == 0);
+        CHECK(key_runtime_core_projection_snapshot_capture().keyboard_physical_mod_mask == mods);
+        CHECK(key_runtime_core_state()->shadow_projection.keyboard_physical_mod_mask == mods);
+        report_required_mods = shared;
+        if (order & 2u) {
+            test_native_modifier_event(code, pos, false, mods);
+            CHECK(get_mods() == shared); // unshared parts must leave immediately
+            CHECK(keyboard_mod_policy_managed_only_mask(shared) == shared);
+            report_required_mods = 0;
+            keyboard_mod_ownership_unregister_mods(shared);
+        } else {
+            keyboard_mod_ownership_unregister_mods(shared);
+            CHECK(get_mods() == mods); // the native key still holds every part
+            report_required_mods = 0;
+            test_native_modifier_event(code, pos, false, mods);
+        }
+        test_assert_mods_balanced();
+        CHECK(key_runtime_core_state()->press_token_count == 0u);
+        CHECK(key_runtime_core_state()->lease_count == 0u);
+        CHECK(key_runtime_core_state()->shadow_projection.keyboard_physical_mod_mask == 0);
+    }
+}
+
+static void test_native_modifier_combinations_preserve_every_owner(void) {
+    for (uint8_t side = 0; side < 2u; side++) {
+        for (uint8_t subset = 1; subset < 16u; subset++) {
+            uint8_t encoded = (uint8_t)(subset | (side ? 0x10u : 0u));
+            test_native_modifier_combination((uint16_t)encoded << 8u, side ? (uint8_t)(subset << 4u) : subset);
+        }
+    }
+    test_native_modifier_combination(S(KC_LEFT_CTRL), MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_CTRL));
+    test_native_modifier_combination(RSFT(KC_LEFT_CTRL), MOD_BIT(KC_RIGHT_SHIFT) | MOD_BIT(KC_LEFT_CTRL));
+    test_native_modifier_combination(C(KC_LEFT_CTRL), MOD_BIT(KC_LEFT_CTRL));
+
+    // A plain physical modifier overlaps a combination too, without a managed
+    // owner. Neither release may clear the other physical owner's component.
+    for (uint8_t order = 0; order < 2u; order++) {
+        const keypos_t plain = {4, 3}, combo = {4, 4};
+        uint8_t ctrl = MOD_BIT(KC_LEFT_CTRL), meh = ctrl | MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_ALT);
+        test_reset_state();
+        test_native_modifier_event(KC_MEH, combo, true, meh);
+        test_native_modifier_event(KC_LEFT_CTRL, plain, true, ctrl);
+        report_required_mods = ctrl;
+        if (order) {
+            test_native_modifier_event(KC_LEFT_CTRL, plain, false, ctrl);
+            CHECK(get_mods() == meh);
+            report_required_mods = 0;
+            test_native_modifier_event(KC_MEH, combo, false, meh);
+        } else {
+            test_native_modifier_event(KC_MEH, combo, false, meh);
+            CHECK(get_mods() == ctrl);
+            report_required_mods = 0;
+            test_native_modifier_event(KC_LEFT_CTRL, plain, false, ctrl);
+        }
+        test_assert_mods_balanced();
+    }
+}
+
+static void test_modified_ordinary_key_keeps_native_weak_mod_path(void) {
+    const keypos_t pos = {4, 4};
+    const uint16_t code = S(KC_A);
+    test_reset_state();
+    keyboard_mod_ownership_register(KC_LEFT_SHIFT);
+    CHECK(key_runtime_integration_process_record(code, pos, true));
+    CHECK(keyboard_mod_policy_managed_only_mask(MOD_BIT(KC_LEFT_SHIFT)) == MOD_BIT(KC_LEFT_SHIFT));
+    CHECK(key_runtime_core_state()->shadow_projection.keyboard_physical_mod_mask == 0);
+    CHECK(key_runtime_integration_process_record(code, pos, false));
+    keyboard_mod_ownership_unregister(KC_LEFT_SHIFT);
     test_assert_mods_balanced();
 }
 
-// Right-hand and multi-modifier mod-taps count each modifier they hold.
-static void test_mod_tap_hold_counts_each_modifier_it_holds(void) {
-    const uint16_t right_shift = MT(MOD_RSFT, KC_B);
-    const uint16_t ctrl_shift  = MT(MOD_LCTL | MOD_LSFT, KC_C);
-    keypos_t       right_pos   = test_keypos(4, 1);
-    keypos_t       left_pos    = test_keypos(4, 2);
-    uint8_t        managed     = MOD_BIT(KC_RIGHT_SHIFT) | MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI);
-
+static void test_consumed_modifier_combination_does_not_own_report_parts(void) {
+    const keypos_t pos = {4, 4};
+    const uint16_t code = KC_HYPR;
+    const uint8_t mods = MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_ALT) | MOD_BIT(KC_LEFT_GUI);
+    test_authored_mod_tap = (test_behavior_row_t){.keycode = code, .single = {.tap = TAP_SENDS(KC_Q)}};
     test_reset_state();
-    keyboard_mod_ownership_register_mods(managed);
-    test_mod_tap_hold(right_shift, right_pos, true);
-    test_qmk_mod_tap_default(right_shift, true);
-    test_mod_tap_hold(ctrl_shift, left_pos, true);
-    test_qmk_mod_tap_default(ctrl_shift, true);
-    CHECK(keyboard_mod_policy_managed_only_mask(managed) == MOD_BIT(KC_LEFT_GUI));
-    test_mod_tap_hold(ctrl_shift, left_pos, false);
-    test_qmk_mod_tap_default(ctrl_shift, false);
-    CHECK(keyboard_mod_policy_managed_only_mask(managed) == (uint8_t)(managed & ~MOD_BIT(KC_RIGHT_SHIFT)));
-    test_mod_tap_hold(right_shift, right_pos, false);
-    test_qmk_mod_tap_default(right_shift, false);
-    keyboard_mod_ownership_unregister_mods(managed);
+    CHECK(!key_runtime_integration_process_record(code, pos, true));
+    CHECK(test_report_mod_refcount_total() == 0);
+    keyboard_mod_ownership_register_mods(mods);
+    keyboard_mod_ownership_unregister_mods(mods);
+    CHECK(get_mods() == 0); // a consumed physical press cannot veto teardown
+    CHECK(!key_runtime_integration_process_record(code, pos, false));
+    key_runtime_integration_advance(&fake_time, 400u);
+    key_runtime_integration_scan();
     test_assert_mods_balanced();
+    test_authored_mod_tap = (test_behavior_row_t){0};
+}
+
+// A duplicate basic edge must not suppress a modified native key's own weak
+// modifier transitions or forget the physical owner that remains held.
+static void test_overlapping_native_shortcut_keeps_weak_mods_and_basic_owner(void) {
+    const uint16_t shortcuts[] = {S(KC_A), RSFT(KC_A)};
+    const uint8_t masks[] = {MOD_BIT(KC_LEFT_SHIFT), MOD_BIT(KC_RIGHT_SHIFT)};
+    for (uint8_t i = 0; i < ARRAY_SIZE(shortcuts); i++) {
+        for (uint8_t physical_releases_first = 0; physical_releases_first < 2; physical_releases_first++) {
+            test_reset_state();
+            owned_keycode_lease_t hold = {0};
+            CHECK(owned_keycode_acquire(KC_A, &hold));
+            CHECK(!key_runtime_integration_process_record(shortcuts[i], test_keypos(5, 1), true));
+            CHECK(get_weak_mods() == masks[i]);
+            CHECK(test_owned_snapshot(KC_A).physical_count == 1u);
+            CHECK(report_key_depth[KC_A] == 1);
+            if (physical_releases_first) {
+                CHECK(!key_runtime_integration_process_record(shortcuts[i], test_keypos(5, 1), false));
+                CHECK(get_weak_mods() == 0u && report_key_depth[KC_A] == 1);
+                CHECK(owned_keycode_release(&hold));
+            } else {
+                CHECK(owned_keycode_release(&hold));
+                CHECK(get_weak_mods() == masks[i] && report_key_depth[KC_A] == 1);
+                CHECK(key_runtime_integration_process_record(shortcuts[i], test_keypos(5, 1), false));
+                // QMK performs the last owner's normal default action.
+                unregister_code(KC_A);
+                set_weak_mods(0u);
+            }
+            CHECK(report_key_depth[KC_A] == 0);
+            test_assert_ledgers_balanced(KC_A);
+        }
+    }
+}
+
+// Model the pinned QMK action_exec/ACT_LMODS boundary, including the weak-mod
+// clear before every press. The default basic edge runs only if userspace
+// admits it, and finalize follows that edge as it does in QMK.
+static bool test_native_keyboard_report_event(uint16_t code, keypos_t pos, bool pressed) {
+    keyrecord_t record = {.event = {.type = KEY_EVENT, .key = pos, .pressed = pressed, .time = fake_time}};
+    uint8_t basic = IS_QK_MODS(code) ? QK_MODS_GET_BASIC_KEYCODE(code) : (uint8_t)code;
+    uint8_t mods = IS_QK_MODS(code) ? noah_qmk_mods_to_report_mask(QK_MODS_GET_MODS(code)) : 0u;
+    if (pressed) clear_weak_mods();
+    CHECK(noah_pre_process_record_user(code, &record));
+    bool keep_processing = noah_process_record_user(code, &record);
+    if (keep_processing) {
+        if (pressed) {
+            if (mods) {
+                set_weak_mods(get_weak_mods() | mods);
+                send_keyboard_report();
+            }
+            register_code(basic);
+            send_keyboard_report();
+        } else {
+            unregister_code(basic);
+            send_keyboard_report();
+            if (mods) {
+                set_weak_mods(get_weak_mods() & (uint8_t)~mods);
+                send_keyboard_report();
+            }
+        }
+        noah_post_process_record_user(code, &record);
+    } else {
+        noah_process_record_user_finalize(code, &record, false);
+    }
+    return keep_processing;
+}
+
+static void test_plain_native_overlap_reports_cleared_weak_mods(void) {
+    const uint16_t shortcuts[] = {S(KC_A), RSFT(KC_A)};
+    const uint8_t masks[] = {MOD_BIT(KC_LEFT_SHIFT), MOD_BIT(KC_RIGHT_SHIFT)};
+    const keypos_t shifted = {5, 1}, plain = {5, 2};
+    for (uint8_t i = 0; i < ARRAY_SIZE(shortcuts); i++) {
+        for (uint8_t plain_releases_first = 0; plain_releases_first < 2; plain_releases_first++) {
+            test_reset_state();
+            CHECK(test_native_keyboard_report_event(shortcuts[i], shifted, true));
+            CHECK(report_mods == masks[i] && report_key_depth[KC_A] == 1);
+            uint8_t reports_before_overlap = send_keyboard_report_count;
+            CHECK(!test_native_keyboard_report_event(KC_A, plain, true));
+            CHECK(send_keyboard_report_count > reports_before_overlap);
+            CHECK(report_mods == 0 && get_weak_mods() == 0);
+            CHECK(report_key_depth[KC_A] == 1);
+            CHECK(test_owned_snapshot(KC_A).physical_count == 2);
+            if (plain_releases_first) {
+                CHECK(!test_native_keyboard_report_event(KC_A, plain, false));
+                CHECK(report_key_depth[KC_A] == 1);
+                CHECK(test_native_keyboard_report_event(shortcuts[i], shifted, false));
+            } else {
+                CHECK(!test_native_keyboard_report_event(shortcuts[i], shifted, false));
+                CHECK(report_key_depth[KC_A] == 1);
+                CHECK(test_native_keyboard_report_event(KC_A, plain, false));
+            }
+            CHECK(report_mods == 0 && report_key_depth[KC_A] == 0);
+            test_assert_ledgers_balanced(KC_A);
+        }
+    }
+}
+
+static void test_plain_native_overlap_consumes_oneshot_mods(void) {
+    const keypos_t first = {5, 1}, second = {5, 2};
+    test_reset_state();
+    CHECK(test_native_keyboard_report_event(KC_A, first, true));
+    set_oneshot_mods(MOD_BIT(KC_LEFT_SHIFT));
+    CHECK(!test_native_keyboard_report_event(KC_A, second, true));
+    CHECK(report_mods == MOD_BIT(KC_LEFT_SHIFT));
+    CHECK(get_oneshot_mods() == 0);
+    CHECK(report_key_depth[KC_A] == 1);
+    CHECK(!test_native_keyboard_report_event(KC_A, second, false));
+    CHECK(report_mods == 0 && report_key_depth[KC_A] == 1);
+    CHECK(test_native_keyboard_report_event(KC_A, first, false));
+    CHECK(report_key_depth[KC_A] == 0);
+    test_assert_ledgers_balanced(KC_A);
 }
 
 int main(void) {
+    test_plain_native_overlap_reports_cleared_weak_mods();
+    test_plain_native_overlap_consumes_oneshot_mods();
+    test_overlapping_native_shortcut_keeps_weak_mods_and_basic_owner();
+    test_native_modifier_combinations_preserve_every_owner();
+    test_modified_ordinary_key_keeps_native_weak_mod_path();
+    test_consumed_modifier_combination_does_not_own_report_parts();
+    test_mod_tap_shadow_matches_applied_ownership();
     test_handled_same_basic_hold_registers_base_key(TEST_SHIFTED_SYMBOL_KEY, KC_1);
     test_handled_same_basic_hold_registers_base_key(TEST_SHIFT_ENTER_KEY, KC_ENT);
     test_default_processed_key_still_blocks_managed_double_register();
     test_consumed_handled_modifier_does_not_block_managed_teardown();
-    test_held_mod_tap_is_not_masked_as_mode_owned();
     test_tapped_mod_tap_is_not_a_held_modifier();
-    test_mod_tap_hold_counts_each_modifier_it_holds();
 
     puts("key_runtime physical-ownership integration tests passed");
     return 0;
+}
+
+// Participation allows every press in this harness (no stored policy), so a
+// row-less view is never asked for beyond linking.
+key_behavior_view_t key_behavior_lookup_without_row(uint16_t keycode) {
+    return key_behavior_lookup(keycode);
 }

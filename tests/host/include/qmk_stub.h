@@ -1,4 +1,5 @@
 #pragma once
+#define NOAH_HOST_QMK_STUB 1
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -10,6 +11,7 @@
 #include "quantum_keycodes.h"
 
 #define NOAH_HOST_TEST_ENV 1
+#define KEYRECORD_USER_DATA
 
 #define PROGMEM
 static inline uint8_t pgm_read_byte(const void *addr_) {
@@ -29,7 +31,7 @@ static inline uint16_t pgm_read_word(const void *addr_) {
 #endif
 
 #ifndef QMK_STUB_SUPPRESS_LAYER_COUNT
-#    define LAYER_COUNT 8
+#    define LAYER_COUNT 16
 #endif
 
 #ifndef CUSTOM_TAP_HOLD_TERM
@@ -52,12 +54,6 @@ static inline uint16_t pgm_read_word(const void *addr_) {
 #endif
 #ifndef TAP_HOLD_CAPS_DELAY
 #    define TAP_HOLD_CAPS_DELAY 80u
-#endif
-#ifndef DYNAMIC_KEYMAP_LAYER_COUNT
-#    define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
-#endif
-#ifndef DYNAMIC_KEYMAP_MACRO_COUNT
-#    define DYNAMIC_KEYMAP_MACRO_COUNT 64u
 #endif
 
 #ifndef MOD_BIT
@@ -109,6 +105,18 @@ static inline uint16_t pgm_read_word(const void *addr_) {
 #ifndef POINTER_SNIPING_DPI_REVERSE
 #    define POINTER_SNIPING_DPI_REVERSE QK_KB_3
 #endif
+#ifndef SNIPING_MODE
+#    define SNIPING_MODE QK_KB_4
+#endif
+#ifndef SNIPING_MODE_TOGGLE
+#    define SNIPING_MODE_TOGGLE QK_KB_5
+#endif
+#ifndef DRAGSCROLL_MODE
+#    define DRAGSCROLL_MODE QK_KB_6
+#endif
+#ifndef DRAGSCROLL_MODE_TOGGLE
+#    define DRAGSCROLL_MODE_TOGGLE QK_KB_7
+#endif
 
 #ifndef DPI_MOD
 #    define DPI_MOD POINTER_DEFAULT_DPI_FORWARD
@@ -157,6 +165,7 @@ typedef struct {
 
 typedef struct {
     keyevent_t event;
+    uint8_t    user_data;
     tap_t      tap;
     uint16_t   keycode;
 } keyrecord_t;
@@ -237,11 +246,14 @@ uint32_t                   timer_read32(void);
 uint32_t                   timer_elapsed32(uint32_t last);
 uint32_t                   last_input_activity_elapsed(void);
 uint32_t                   last_matrix_activity_elapsed(void);
+typedef uint8_t            matrix_row_t;
+matrix_row_t               matrix_get_row(uint8_t row);
 bool                       is_keyboard_master(void);
 bool                       is_keyboard_left(void);
 struct rgb_matrix_limits_t rgb_matrix_get_limits(uint8_t iter);
 uint32_t                   eeconfig_read_user(void);
 void                       eeconfig_update_user(uint32_t value);
+bool                       is_tap_record_user(keyrecord_t *record, bool native_tap, bool default_tap);
 bool                       process_record_user(uint16_t keycode, keyrecord_t *record);
 uint16_t                   get_tapping_term(uint16_t keycode, keyrecord_t *record);
 uint16_t                   get_quick_tap_term(uint16_t keycode, keyrecord_t *record);
@@ -257,9 +269,11 @@ void                 layer_on(uint8_t layer);
 void                 layer_off(uint8_t layer);
 uint8_t              get_highest_layer(layer_state_t state);
 uint8_t              combo_ref_from_layer(uint8_t layer);
+bool                 is_combo_enabled(void);
 uint16_t             keymap_key_to_keycode(uint8_t layer, keypos_t key);
 uint16_t             get_record_keycode(keyrecord_t *record, bool update_layer_cache);
 uint8_t              read_source_layers_cache(keypos_t key);
+uint8_t              layer_switch_get_layer(keypos_t key);
 
 uint8_t get_mods(void);
 uint8_t get_weak_mods(void);
@@ -284,6 +298,7 @@ void    unregister_code(uint8_t keycode);
 void    register_code16(uint16_t keycode);
 void    unregister_code16(uint16_t keycode);
 void    wait_ms(uint16_t ms);
+void    soft_reset_keyboard(void);
 
 bool     charybdis_get_pointer_dragscroll_enabled(void);
 bool     charybdis_get_pointer_sniping_enabled(void);
@@ -292,3 +307,15 @@ uint16_t charybdis_get_pointer_sniping_dpi(void);
 void     charybdis_set_pointer_dragscroll_enabled(bool enabled);
 void     charybdis_set_pointer_sniping_enabled(bool enabled);
 void     pointing_device_set_cpi(uint16_t cpi);
+report_mouse_t pointing_device_get_report(void);
+void           pointing_device_set_report(report_mouse_t mouse_report);
+
+#ifndef QMK_REPORT_KEYS_FILTER
+#define QMK_REPORT_KEYS_FILTER 1
+#define KEYBOARD_REPORT_KEYS 6
+#define NKRO_REPORT_BITS 30
+typedef struct { uint8_t mods; uint8_t reserved; uint8_t keys[KEYBOARD_REPORT_KEYS]; } report_keyboard_t;
+typedef struct { uint8_t report_id; uint8_t mods; uint8_t bits[NKRO_REPORT_BITS]; } report_nkro_t;
+void keyboard_report_keys_filter_user(report_keyboard_t *report);
+void nkro_report_keys_filter_user(report_nkro_t *report);
+#endif

@@ -9,13 +9,18 @@
 
 enum {
     TEST_ROW_COUNT                = NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS,
-    TEST_STEPS_PER_ROW            = 2u,
+    TEST_STEPS_PER_ROW            = NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_TAP_STEPS_PER_ROW,
     TEST_STEP_COUNT               = TEST_ROW_COUNT * TEST_STEPS_PER_ROW,
     TEST_ACTION_ABI               = 0x12345678u,
     STEP_READ_CALL_LIMIT          = 1u,
     STEP_BYTE_LIMIT               = NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX,
-    MAX_VALIDATION_STEPS          = 1200u,
-    MAX_BEHAVIOR_DOMAIN_STEPS     = 897u,
+    // Each row: one domain step for its length, one for its fixed fields, and
+    // six per fully populated step; one for the header.
+    MAX_BEHAVIOR_DOMAIN_STEPS = 1u + TEST_ROW_COUNT * (2u + 6u * TEST_STEPS_PER_ROW),
+    // A row's body: 16 fixed bytes, then 18 per fully populated step.
+    TEST_BEHAVIOR_LENGTH      = 4u + TEST_ROW_COUNT * (2u + 16u + 18u * TEST_STEPS_PER_ROW),
+    TEST_PROFILE_LENGTH       = TEST_BEHAVIOR_LENGTH + NOAH_PROFILE_BLOB_V1_HEADER_SIZE + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE,
+    MAX_VALIDATION_STEPS      = MAX_BEHAVIOR_DOMAIN_STEPS + TEST_PROFILE_LENGTH / 20u + 64u,
     MAX_RGB_DOMAIN_STEPS          = 58u,
     TEST_MAXIMUM_RGB_PAYLOAD_SIZE = 344u,
 };
@@ -75,30 +80,31 @@ static size_t build_maximum_behavior_profile(void) {
                 .tap           = qmk_action(action_base),
                 .hold =
                     {
-                        .mode      = NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD,
+                        .style     = NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD,
                         .repeat_hz = NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_REPEAT_HZ,
                         .action    = qmk_action((uint16_t)(action_base + 1u)),
                     },
                 .long_hold =
                     {
-                        .mode   = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD,
+                        .style  = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD,
                         .action = qmk_action((uint16_t)(action_base + 2u)),
                     },
             };
         }
         rows[row_index] = (noah_key_behavior_row_v1_t){
-            .target           = qmk_action((uint16_t)(0x100u + row_index)),
-            .tap_hold_term    = 0xffffu,
-            .longer_hold_term = 0xffffu,
-            .multi_tap_term   = 0xffffu,
-            .flags            = NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE,
-            .steps            = steps[row_index],
-            .step_count       = TEST_STEPS_PER_ROW,
+            .target         = qmk_action((uint16_t)(0x100u + row_index)),
+            .tap_hold_term  = 0xffffu,
+            .long_hold_term = 0xffffu,
+            .multi_tap_term = 0xffffu,
+            .flags          = NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE,
+            .allowed_layers = 0xffffu,
+            .steps          = steps[row_index],
+            .step_count     = TEST_STEPS_PER_ROW,
         };
     }
 
     assert(noah_key_behavior_domain_v1_encode(rows, TEST_ROW_COUNT, NULL, NULL, behavior_payload, sizeof(behavior_payload), &behavior_length, &error) == NOAH_PROFILE_CODEC_V1_OK);
-    assert(behavior_length == 3204u);
+    assert(behavior_length == TEST_BEHAVIOR_LENGTH);
     const noah_profile_domain_v1_t domain = {
         .id             = NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS,
         .version        = NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION,
@@ -106,7 +112,7 @@ static size_t build_maximum_behavior_profile(void) {
         .payload_length = behavior_length,
     };
     assert(noah_profile_blob_v1_encode(&domain, 1u, profile_blob, sizeof(profile_blob), &profile_length, &error) == NOAH_PROFILE_CODEC_V1_OK);
-    assert(profile_length == 3216u);
+    assert(profile_length == TEST_PROFILE_LENGTH);
     return profile_length;
 }
 
@@ -180,10 +186,10 @@ static void run_maximum_rgb_profile(void) {
     compatibility.required_domain_mask              = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
     compatibility.allowed_domain_mask               = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
     compatibility.logical_layer_count               = 1u;
-    compatibility.supported_pd_mode_mask            = 0u;
+    compatibility.supported_pointing_mode_mask      = 0u;
     compatibility.rgb_limits.compiled_stage_mask    = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
     compatibility.rgb_limits.logical_layer_count    = 1u;
-    compatibility.rgb_limits.supported_pd_mode_mask = 0u;
+    compatibility.rgb_limits.supported_pointing_mode_mask = 0u;
     assert(noah_profile_validator_v1_begin(&validator, &reader, 0u, &declaration, &compatibility, &error) == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS);
 
     noah_profile_validator_v1_result_t result = NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
@@ -255,7 +261,9 @@ int main(void) {
         assert(++total_steps < MAX_VALIDATION_STEPS);
     }
     assert(result == NOAH_PROFILE_VALIDATOR_V1_VALID);
-    assert(profile_length * 4u >= NOAH_PROFILE_BLOB_V1_MAX_SIZE * 3u);
+    // The maximum behavior workload: 128 rows of fully populated steps at the
+    // shared depth (13,840 bytes at depth five), well inside the 53,216-byte payload.
+    assert(profile_length == TEST_PROFILE_LENGTH && profile_length <= NOAH_PROFILE_BLOB_V1_MAX_SIZE);
     assert(validator.profile.key_behaviors.row_count == TEST_ROW_COUNT);
     assert(validator.profile.key_behaviors.populated_step_count == TEST_STEP_COUNT);
 

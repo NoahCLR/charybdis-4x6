@@ -14,7 +14,7 @@
 #include <stdint.h>
 
 #include "../core/rgb_helpers.h"
-#include "../core/rgb_effective_config.h"
+#include "../core/rgb_active_profile_config.h"
 
 #ifdef RGB_MATRIX_ENABLE
 typedef struct {
@@ -28,8 +28,11 @@ void rgb_runtime_frame_clear(rgb_runtime_frame_t *frame, uint8_t led_min, uint8_
 bool rgb_runtime_frame_fill(rgb_runtime_frame_t *frame, rgb_t color, uint8_t led_min, uint8_t led_max);
 bool rgb_runtime_layer_stage_render_frame(rgb_runtime_frame_t *frame, layer_state_t state, uint8_t led_min, uint8_t led_max);
 bool rgb_runtime_layer_stage_render_selected_frame(rgb_runtime_frame_t *frame, uint8_t layer, uint8_t led_min, uint8_t led_max);
-bool rgb_runtime_layer_stage_render_effective_frame(rgb_runtime_frame_t *frame, layer_state_t state, const noah_effective_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max);
-bool rgb_runtime_layer_stage_render_effective_selected_frame(rgb_runtime_frame_t *frame, uint8_t layer, const noah_effective_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max);
+bool rgb_runtime_layer_stage_render_active_profile_frame(rgb_runtime_frame_t *frame, layer_state_t state, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max);
+// Only layers first..end-1 and their rows, so a linked pointing mode can paint
+// between two parts of the stack (D-F62).
+bool rgb_runtime_layer_stage_render_active_profile_layers_frame(rgb_runtime_frame_t *frame, layer_state_t state, uint8_t first, uint8_t end, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max);
+bool rgb_runtime_layer_stage_render_active_profile_selected_frame(rgb_runtime_frame_t *frame, uint8_t layer, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max);
 bool rgb_runtime_layer_stage_apply_frame(const rgb_runtime_frame_t *frame, uint8_t led_min, uint8_t led_max);
 #    ifdef RGB_LAYER_STAGE_TEST_BACKEND
 void     rgb_runtime_layer_stage_test_reset_group_scan_count(void);

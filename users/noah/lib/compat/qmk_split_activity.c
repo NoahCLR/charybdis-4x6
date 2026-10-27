@@ -4,7 +4,7 @@
 #    include "transactions.h"
 #    include "sync_timer.h"
 #    include "qmk_split_activity_policy.h"
-#    include "../profile/runtime/effective_settings_runtime.h"
+#    include "../profile/runtime/active_profile_settings_runtime.h"
 
 #    ifndef QMK_SPLIT_ACTIVITY_POLICY_VERSION
 #        error "Activity coalescing needs the fork's split activity hook (noah-userspace-contracts at 6889960271 or later); NOAH_SPLIT_ACTIVITY_COALESCE=no builds without it"

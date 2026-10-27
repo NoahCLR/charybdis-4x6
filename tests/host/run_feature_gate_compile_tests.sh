@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 
@@ -16,9 +17,9 @@ RGB_SOURCES="$(noah_source_manifest_raw_paths "$ROOT" NOAH_RGB_KEYMAP_SOURCES)"
 COMMON_SOURCES="$COMMON_SOURCES $(noah_source_manifest_raw_paths "$ROOT" NOAH_PROFILE_KEYMAP_SOURCES)"
 AUTOMOUSE_SOURCES="$(noah_source_manifest_userspace_paths "$ROOT" NOAH_AUTOMOUSE_SOURCES)"
 PROFILE_KEYMAP_PATHS="$(charybdis_profile_keymap_paths "$ROOT")"
-PROFILE_WIRE_COMPILE_SOURCES="users/noah/lib/profile/runtime/profile_owner.c users/noah/lib/profile/runtime/profile_action_placement_v1.c users/noah/lib/profile/storage/profile_store_runtime.c users/noah/lib/profile/storage/profile_candidate_transaction.c users/noah/lib/profile/storage/profile_candidate_store_backend.c users/noah/lib/profile/storage/profile_peer_store_backend.c users/noah/lib/profile/split/profile_split_authority.c users/noah/lib/profile/split/profile_split_protocol_v1.c users/noah/lib/profile/split/profile_split_reconciler.c users/noah/lib/profile/protocol/profile_wire_v1.c users/noah/lib/profile/protocol/profile_candidate_v1.c users/noah/lib/compat/qmk_profile_eeprom.c users/noah/lib/compat/qmk_profile_split_transport.c users/noah/lib/compat/qmk_via_profile_channel.c users/noah/lib/compat/qmk_combo_readback.c"
+PROFILE_WIRE_COMPILE_SOURCES="users/noah/lib/profile/runtime/profile_owner.c users/noah/lib/profile/runtime/profile_action_placement_v1.c users/noah/lib/profile/storage/profile_store_runtime.c users/noah/lib/profile/storage/profile_candidate_transaction.c users/noah/lib/profile/storage/profile_candidate_store_backend.c users/noah/lib/profile/storage/profile_other_half_store_backend.c users/noah/lib/profile/split/profile_split_authority.c users/noah/lib/profile/split/profile_split_protocol_v1.c users/noah/lib/profile/split/profile_split_reconciler.c users/noah/lib/profile/protocol/profile_wire_v1.c users/noah/lib/profile/protocol/profile_candidate_v1.c users/noah/lib/profile/storage/profile_flash_store.c users/noah/lib/compat/qmk_profile_flash.c users/noah/lib/compat/qmk_durable_io.c users/noah/lib/compat/qmk_profile_split_transport.c users/noah/lib/compat/qmk_profile_working.c users/noah/lib/compat/qmk_profile_channel.c users/noah/lib/compat/qmk_combo_readback.c users/noah/lib/compat/qmk_profile_adjustments.c"
 
-POINTING_TEST_FLAGS="-DPOINTING_DEVICE_ENABLE -DNOAH_PD_PROFILE_ENABLE"
+POINTING_TEST_FLAGS="-DPOINTING_DEVICE_ENABLE"
 RGB_TEST_FLAGS="-DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812"
 REPO_OWNED_PRODUCTION_PATHS="users/noah $PROFILE_KEYMAP_PATHS"
 HOST_TEST_PATHS="tests/host"
@@ -143,21 +144,21 @@ check_runtime_sealing_boundaries() {
         exit 1
     fi
 
-    if repo_owned_code_includes '#include ".*pd_mode_runtime_shared_state\.h"' >/dev/null; then
+    if repo_owned_code_includes '#include ".*pointing_mode_runtime_shared_state\.h"' >/dev/null; then
         echo "repo-owned code must not include removed public pd runtime shared-state header" >&2
-        repo_owned_code_includes '#include ".*pd_mode_runtime_shared_state\.h"' >&2
+        repo_owned_code_includes '#include ".*pointing_mode_runtime_shared_state\.h"' >&2
         exit 1
     fi
 
-    if host_test_includes '#include ".*pd_mode_runtime_shared_state_internal\.h"' >/dev/null; then
+    if host_test_includes '#include ".*pointing_mode_runtime_shared_state_internal\.h"' >/dev/null; then
         echo "host tests must not include internal pd runtime storage headers" >&2
-        host_test_includes '#include ".*pd_mode_runtime_shared_state_internal\.h"' >&2
+        host_test_includes '#include ".*pointing_mode_runtime_shared_state_internal\.h"' >&2
         exit 1
     fi
 
     pd_runtime_internal_prod_violations="$(
         repo_owned_production_include_violations \
-            '#include ".*pd_mode_runtime_shared_state_internal\.h"' \
+            '#include ".*pointing_mode_runtime_shared_state_internal\.h"' \
             '^(users/noah/lib/state/shared/|users/noah/lib/pointing/runtime/)'
     )"
     if [ -n "$pd_runtime_internal_prod_violations" ]; then
@@ -166,7 +167,7 @@ check_runtime_sealing_boundaries() {
         exit 1
     fi
 
-    pd_runtime_key_core_bridge_allowlist='^users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge\.c:'
+    pd_runtime_key_core_bridge_allowlist='^users/noah/lib/pointing/runtime/pointing_mode_key_runtime_bridge\.c:'
     pd_runtime_key_core_include_violations="$(
         (
             cd "$ROOT"
@@ -178,7 +179,7 @@ check_runtime_sealing_boundaries() {
         )
     )"
     if [ -n "$pd_runtime_key_core_include_violations" ]; then
-        echo "pd runtime modules must reach key-runtime core through pd_mode_key_runtime_bridge.c" >&2
+        echo "pd runtime modules must reach key-runtime core through pointing_mode_key_runtime_bridge.c" >&2
         printf '%s\n' "$pd_runtime_key_core_include_violations" >&2
         exit 1
     fi
@@ -186,11 +187,11 @@ check_runtime_sealing_boundaries() {
     pd_runtime_key_core_call_violations="$(
         (
             cd "$ROOT"
-            rg -n 'key_runtime_core_observe_pd_mode_lock_state' users/noah/lib/pointing/runtime | grep -Ev "$pd_runtime_key_core_bridge_allowlist" || true
+            rg -n 'key_runtime_core_observe_pointing_mode_lock_state' users/noah/lib/pointing/runtime | grep -Ev "$pd_runtime_key_core_bridge_allowlist" || true
         )
     )"
     if [ -n "$pd_runtime_key_core_call_violations" ]; then
-        echo "pd runtime modules must observe pd lock state through pd_mode_key_runtime_bridge.c" >&2
+        echo "pd runtime modules must observe pd lock state through pointing_mode_key_runtime_bridge.c" >&2
         printf '%s\n' "$pd_runtime_key_core_call_violations" >&2
         exit 1
     fi
@@ -240,69 +241,75 @@ check_runtime_sealing_boundaries() {
         exit 1
     fi
 
-    pd_mode_buffered_tap_internal_test_allowlist='^(tests/host/pd_mode_test\.c:)'
-    pd_mode_buffered_tap_internal_test_violations="$(
-        host_test_includes '#include ".*pd_mode_buffered_tap_internal\.h"' | grep -Ev "$pd_mode_buffered_tap_internal_test_allowlist" || true
+    pointing_mode_buffered_tap_internal_test_allowlist='^(tests/host/pointing_mode_test\.c:)'
+    pointing_mode_buffered_tap_internal_test_violations="$(
+        host_test_includes '#include ".*pointing_mode_buffered_tap_internal\.h"' | grep -Ev "$pointing_mode_buffered_tap_internal_test_allowlist" || true
     )"
-    if [ -n "$pd_mode_buffered_tap_internal_test_violations" ]; then
-        echo "only the pd-mode white-box host suite may include pd_mode_buffered_tap_internal.h" >&2
-        printf '%s\n' "$pd_mode_buffered_tap_internal_test_violations" >&2
+    if [ -n "$pointing_mode_buffered_tap_internal_test_violations" ]; then
+        echo "only the pointing-mode white-box host suite may include pointing_mode_buffered_tap_internal.h" >&2
+        printf '%s\n' "$pointing_mode_buffered_tap_internal_test_violations" >&2
         exit 1
     fi
 
-    pd_mode_buffered_tap_internal_prod_allowlist='^users/noah/lib/pointing/runtime/'
-    pd_mode_buffered_tap_internal_prod_violations="$(
+    pointing_mode_buffered_tap_internal_prod_allowlist='^users/noah/lib/pointing/runtime/'
+    pointing_mode_buffered_tap_internal_prod_violations="$(
         repo_owned_production_include_violations \
-            '#include ".*pd_mode_buffered_tap_internal\.h"' \
-            "$pd_mode_buffered_tap_internal_prod_allowlist"
+            '#include ".*pointing_mode_buffered_tap_internal\.h"' \
+            "$pointing_mode_buffered_tap_internal_prod_allowlist"
     )"
-    if [ -n "$pd_mode_buffered_tap_internal_prod_violations" ]; then
-        echo "only pd runtime owner modules may include pd_mode_buffered_tap_internal.h in repo-owned production code" >&2
-        printf '%s\n' "$pd_mode_buffered_tap_internal_prod_violations" >&2
+    if [ -n "$pointing_mode_buffered_tap_internal_prod_violations" ]; then
+        echo "only pd runtime owner modules may include pointing_mode_buffered_tap_internal.h in repo-owned production code" >&2
+        printf '%s\n' "$pointing_mode_buffered_tap_internal_prod_violations" >&2
         exit 1
     fi
 
-    pd_mode_keyboard_event_internal_test_allowlist='^(tests/host/pd_mode_test\.c:)'
-    pd_mode_keyboard_event_internal_test_violations="$(
-        host_test_includes '#include ".*pd_mode_keyboard_event_internal\.h"' | grep -Ev "$pd_mode_keyboard_event_internal_test_allowlist" || true
+    pointing_mode_keyboard_event_internal_test_allowlist='^(tests/host/pointing_mode_test\.c:)'
+    pointing_mode_keyboard_event_internal_test_violations="$(
+        host_test_includes '#include ".*pointing_mode_keyboard_event_internal\.h"' | grep -Ev "$pointing_mode_keyboard_event_internal_test_allowlist" || true
     )"
-    if [ -n "$pd_mode_keyboard_event_internal_test_violations" ]; then
-        echo "only the pd-mode white-box host suite may include pd_mode_keyboard_event_internal.h" >&2
-        printf '%s\n' "$pd_mode_keyboard_event_internal_test_violations" >&2
+    if [ -n "$pointing_mode_keyboard_event_internal_test_violations" ]; then
+        echo "only the pointing-mode white-box host suite may include pointing_mode_keyboard_event_internal.h" >&2
+        printf '%s\n' "$pointing_mode_keyboard_event_internal_test_violations" >&2
         exit 1
     fi
 
-    pd_mode_keyboard_event_internal_prod_allowlist='^(users/noah/lib/pointing/runtime/|users/noah/lib/key/runtime/process\.c:)'
-    pd_mode_keyboard_event_internal_prod_violations="$(
+    pointing_mode_keyboard_event_internal_prod_allowlist='^(users/noah/lib/pointing/runtime/|users/noah/lib/key/runtime/process\.c:)'
+    pointing_mode_keyboard_event_internal_prod_violations="$(
         repo_owned_production_include_violations \
-            '#include ".*pd_mode_keyboard_event_internal\.h"' \
-            "$pd_mode_keyboard_event_internal_prod_allowlist"
+            '#include ".*pointing_mode_keyboard_event_internal\.h"' \
+            "$pointing_mode_keyboard_event_internal_prod_allowlist"
     )"
-    if [ -n "$pd_mode_keyboard_event_internal_prod_violations" ]; then
-        echo "only pd runtime owner modules and process.c may include pd_mode_keyboard_event_internal.h in repo-owned production code" >&2
-        printf '%s\n' "$pd_mode_keyboard_event_internal_prod_violations" >&2
+    if [ -n "$pointing_mode_keyboard_event_internal_prod_violations" ]; then
+        echo "only pd runtime owner modules and process.c may include pointing_mode_keyboard_event_internal.h in repo-owned production code" >&2
+        printf '%s\n' "$pointing_mode_keyboard_event_internal_prod_violations" >&2
         exit 1
     fi
 }
+
+# Each variant's sources compile side by side, one per CPU; any failure fails
+# the variant, with the compiler's message.
+COMPILE_JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
 
 compile_variant() {
     config_header="$1"
     extra_flags="$2"
     sources="$3"
+    export ROOT config_header extra_flags
 
-    # Intentional word splitting for flag and source lists.
+    # Intentional word splitting for the source list (in the printf) and the
+    # flag list (inside the compile).
     # shellcheck disable=SC2086
-    for src in $sources; do
+    printf '%s\n' $sources | xargs -P "$COMPILE_JOBS" -I{} sh -c '
         cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic -fsyntax-only \
-            -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+            "-DQMK_KEYBOARD_H=\"qmk_stub.h\"" \
             -DQMK_STUB_SUPPRESS_LAYER_COUNT \
             $extra_flags \
             -I"$ROOT" \
             -I"$ROOT/users/noah" \
             -I"$ROOT/tests/host/include" \
             -include "$ROOT/$config_header" \
-            "$ROOT/$src"
-    done
+            "$ROOT/$1"
+    ' compile {}
 }
 
 compile_variant_must_fail() {
@@ -327,7 +334,7 @@ compile_variant_must_fail() {
 }
 
 compile_variant "tests/host/include/noah_compile_config.h" "" "$COMMON_SOURCES"
-compile_variant "tests/host/include/noah_compile_config.h" "-DCONSOLE_ENABLE -DNOAH_KEY_RUNTIME_TRACE_ENABLE -DNOAH_RUNTIME_TRACE_ENABLE" "$COMMON_SOURCES users/noah/lib/key/runtime/process.c users/noah/lib/key/runtime/preflight.c users/noah/lib/key/runtime/press.c users/noah/lib/key/runtime/release.c users/noah/lib/key/runtime/scan.c users/noah/lib/key/runtime/transition.c"
+compile_variant "tests/host/include/noah_compile_config.h" "-DCONSOLE_ENABLE -DNOAH_KEY_RUNTIME_TRACE_ENABLE -DNOAH_RUNTIME_TRACE_ENABLE" "$COMMON_SOURCES users/noah/lib/key/runtime/process.c users/noah/lib/key/behavior/participation.c users/noah/lib/key/runtime/preflight.c users/noah/lib/key/runtime/press.c users/noah/lib/key/runtime/release.c users/noah/lib/key/runtime/scan.c users/noah/lib/key/runtime/transition.c"
 compile_variant "tests/host/include/noah_compile_config_no_rgb_feedback.h" "$RGB_TEST_FLAGS" "$COMMON_SOURCES $RGB_SOURCES"
 compile_variant "tests/host/include/noah_compile_config_no_rgb_feedback.h" "$POINTING_TEST_FLAGS -DCOMBO_ENABLE $RGB_TEST_FLAGS" "$COMMON_SOURCES $POINTING_SOURCES $RGB_SOURCES"
 compile_variant "tests/host/include/noah_compile_config.h" "$RGB_TEST_FLAGS" "$COMMON_SOURCES $RGB_SOURCES"
@@ -338,17 +345,20 @@ compile_variant "tests/host/include/noah_compile_config_no_automouse.h" "$POINTI
 compile_variant "tests/host/include/noah_compile_config_no_automouse.h" "-DSPLIT_KEYBOARD $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$COMMON_SOURCES $POINTING_SOURCES $RGB_SOURCES"
 compile_variant "tests/host/include/noah_compile_config.h" "-DSPLIT_KEYBOARD $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$COMMON_SOURCES $POINTING_SOURCES $RGB_SOURCES $AUTOMOUSE_SOURCES"
 
-# The normal matrix above proves the VIA-off source-manifest path. These named
-# variants make the live-profile VIA hook's real preprocessor body part of the
-# compile gate across RGB and split feature combinations.
-compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE" "$PROFILE_WIRE_COMPILE_SOURCES"
-compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
-compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD" "$PROFILE_WIRE_COMPILE_SOURCES"
-compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
-compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
-compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DNOAH_LIVE_PROFILE_MUTATION_ENABLE $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
-compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DNOAH_RUNTIME_DIAG_TEST_BACKEND -DNOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE" "$PROFILE_WIRE_COMPILE_SOURCES users/noah/lib/state/diagnostics/runtime_diag.c"
-compile_variant_must_fail "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DNOAH_LIVE_PROFILE_MUTATION_ENABLE" "users/noah/lib/compat/qmk_via_profile_channel.c"
+# The normal matrix above proves the source manifest without Raw HID. These
+# named variants make the Raw HID Profile Wire channel's real preprocessor body
+# part of the compile gate across RGB and split feature combinations.
+compile_variant "tests/host/include/noah_compile_config.h" "-DRAW_ENABLE" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DRAW_ENABLE $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DRAW_ENABLE -DSPLIT_KEYBOARD" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DRAW_ENABLE -DSPLIT_KEYBOARD $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DRAW_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DRAW_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DNOAH_LIVE_PROFILE_MUTATION_ENABLE $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DRAW_ENABLE -DNOAH_RUNTIME_DIAG_TEST_BACKEND -DNOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE" "$PROFILE_WIRE_COMPILE_SOURCES users/noah/lib/state/diagnostics/runtime_diag.c"
+compile_variant_must_fail "tests/host/include/noah_compile_config.h" "-DRAW_ENABLE -DNOAH_LIVE_PROFILE_MUTATION_ENABLE" "users/noah/lib/compat/qmk_profile_channel.c"
+# The Raw HID endpoint size must be checked even when QMK's descriptor header
+# was not already included by another header.
+compile_variant_must_fail "tests/host/include/noah_compile_config.h" "-DRAW_ENABLE -DRAW_EPSIZE=64" "users/noah/lib/compat/qmk_profile_channel.c"
 compile_variant "tests/host/include/noah_compile_config.h" "-DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT" "users/noah/lib/compat/qmk_physical_half.c"
 compile_variant "tests/host/include/noah_compile_config.h" "-DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_RIGHT" "users/noah/lib/compat/qmk_physical_half.c"
 
@@ -358,4 +368,4 @@ check_dragscroll_config_surface
 check_runtime_sealing_boundaries
 
 compile_variant "tests/host/include/noah_compile_config.h" "-DCOMBO_ENABLE $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$COMMON_SOURCES $POINTING_SOURCES $RGB_SOURCES $AUTOMOUSE_SOURCES"
-compile_variant "tests/host/include/noah_compile_config.h" "-DNOAH_PD_PROFILE_ENABLE -DVIA_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DRAW_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"

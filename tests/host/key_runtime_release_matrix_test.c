@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 #include "key_runtime_scenario_harness.h"
-#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/lib/state/diagnostics/runtime_debug.h"
 #include "users/noah/noah_keymap_ids.h"
 
@@ -19,13 +19,13 @@ enum {
     TEST_CHAIN_CONTINUE_TAP    = CUSTOM_KEY_0 + 0x27,
     TEST_SIBLING_KEY           = CUSTOM_KEY_0 + 0x28,
     TEST_SIBLING_TAP_ACTION    = CUSTOM_KEY_0 + 0x29,
-    TEST_PD_MODE_KEY           = CUSTOM_KEY_0 + 0x2A,
+    TEST_POINTING_MODE_KEY     = CUSTOM_KEY_0 + 0x2A,
     TEST_OTHER_LAYER           = 3,
     TEST_TAP_HOLD_TERM_MS      = 120,
-    TEST_LONGER_HOLD_TERM_MS   = 240,
+    TEST_LONG_HOLD_TERM_MS     = 240,
     TEST_MULTI_TAP_TERM_MS     = 150,
     TEST_TAP_SETUP_ELAPSED_MS  = TEST_TAP_HOLD_TERM_MS + 1,
-    TEST_LONG_SETUP_ELAPSED_MS = TEST_LONGER_HOLD_TERM_MS + 1,
+    TEST_LONG_SETUP_ELAPSED_MS = TEST_LONG_HOLD_TERM_MS + 1,
 };
 
 typedef enum {
@@ -122,9 +122,9 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
 static key_behavior_view_t test_pressable_handled_key(uint16_t keycode) {
     key_behavior_view_t behavior = key_runtime_scenario_pressable_handled_key(keycode);
 
-    behavior.tap_hold_term    = TEST_TAP_HOLD_TERM_MS;
-    behavior.longer_hold_term = TEST_LONGER_HOLD_TERM_MS;
-    behavior.multi_tap_term   = TEST_MULTI_TAP_TERM_MS;
+    behavior.tap_hold_term  = TEST_TAP_HOLD_TERM_MS;
+    behavior.long_hold_term = TEST_LONG_HOLD_TERM_MS;
+    behavior.multi_tap_term = TEST_MULTI_TAP_TERM_MS;
     return behavior;
 }
 
@@ -141,6 +141,18 @@ static void test_configure_tap_release_key(uint16_t keycode, uint16_t tap_action
     key_behavior_view_t behavior = test_pressable_handled_key(keycode);
 
     behavior.single.tap = (tap_behavior_t)TAP_SENDS(tap_action);
+    key_runtime_scenario_add_behavior_view(behavior);
+}
+
+// A later press settles an earlier key whose hold is an output of its own
+// (D-F27), so only a key whose hold changes other keys, here a modifier, is
+// still undecided with a later sibling down. Admission holds that sibling back
+// unless it overflows; this harness delivers it at once.
+static void test_configure_modifier_hold_tap_key(uint16_t keycode, uint16_t tap_action) {
+    key_behavior_view_t behavior = test_pressable_handled_key(keycode);
+
+    behavior.single.tap  = (tap_behavior_t)TAP_SENDS(tap_action);
+    behavior.single.hold = (hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_SHIFT);
     key_runtime_scenario_add_behavior_view(behavior);
 }
 
@@ -431,7 +443,7 @@ static void test_active_and_pending_release_semantics_stay_equivalent(void) {
             .expected        = TEST_EXPECT_ACTION(TEST_RELEASE_LONG, false),
         },
         {
-            .name            = "release long wins over primary after longer term",
+            .name            = "release long wins over primary after long hold term",
             .hold            = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
             .long_hold       = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
             .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
@@ -440,7 +452,7 @@ static void test_active_and_pending_release_semantics_stay_equivalent(void) {
             .expected        = TEST_EXPECT_ACTION(TEST_RELEASE_LONG, false),
         },
         {
-            .name            = "release primary still wins before longer term",
+            .name            = "release primary still wins before long hold term",
             .hold            = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
             .long_hold       = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
             .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
@@ -458,7 +470,7 @@ static void test_active_and_pending_release_semantics_stay_equivalent(void) {
             .expected        = TEST_EXPECT_NONE(),
         },
         {
-            .name            = "threshold hold releases long action after longer term",
+            .name            = "threshold hold releases long action after long hold term",
             .hold            = HOLD_INIT(TAP_AT_HOLD_THRESHOLD(TEST_THRESHOLD_ACTION)),
             .long_hold       = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
             .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
@@ -476,7 +488,7 @@ static void test_active_and_pending_release_semantics_stay_equivalent(void) {
             .expected        = TEST_EXPECT_HELD(TEST_HELD_ACTION, true),
         },
         {
-            .name            = "held lifecycle releases owned state and long action after longer term",
+            .name            = "held lifecycle releases owned state and long action after long hold term",
             .hold            = HOLD_INIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HELD_ACTION)),
             .long_hold       = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
             .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
@@ -574,10 +586,14 @@ static void test_release_with_live_tap_release_sibling_defers_dispatch(void) {
 }
 
 static void test_release_with_live_held_sibling_dispatches_immediately(void) {
-    static const char                       *case_name     = "release with live held sibling dispatches immediately";
+    static const char *case_name = "release with live held sibling dispatches immediately";
+    // The sibling holds before the key goes down: a sibling pressed later
+    // would settle the key as a tap at its press (D-F27).
     static const key_runtime_scenario_step_t setup_steps[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1),
         KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 1, 2),
+        KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1),
         KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS),
         KEY_RUNTIME_SCENARIO_SCAN(),
     };
@@ -588,11 +604,11 @@ static void test_release_with_live_held_sibling_dispatches_immediately(void) {
     key_runtime_scenario_reset();
     test_configure_tap_release_key(TEST_ACTIVE_KEY, TEST_RELEASE_PRIMARY);
     key_runtime_scenario_add_behavior_view((key_behavior_view_t){
-        .keycode          = TEST_SIBLING_KEY,
-        .handled          = true,
-        .tap_hold_term    = TEST_TAP_HOLD_TERM_MS,
-        .longer_hold_term = TEST_LONGER_HOLD_TERM_MS,
-        .multi_tap_term   = TEST_MULTI_TAP_TERM_MS,
+        .keycode        = TEST_SIBLING_KEY,
+        .handled        = true,
+        .tap_hold_term  = TEST_TAP_HOLD_TERM_MS,
+        .long_hold_term = TEST_LONG_HOLD_TERM_MS,
+        .multi_tap_term = TEST_MULTI_TAP_TERM_MS,
         .single =
             {
                 .hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_SIBLING_TAP_ACTION),
@@ -625,7 +641,7 @@ static void test_release_dispatch_is_deferred_until_tap_release_sibling_clears(v
     };
 
     key_runtime_scenario_reset();
-    test_configure_tap_release_key(TEST_ACTIVE_KEY, TEST_RELEASE_PRIMARY);
+    test_configure_modifier_hold_tap_key(TEST_ACTIVE_KEY, TEST_RELEASE_PRIMARY);
     test_configure_tap_release_key(TEST_SIBLING_KEY, TEST_SIBLING_TAP_ACTION);
 
     key_runtime_scenario_run(setup_steps, ARRAY_SIZE(setup_steps));
@@ -666,7 +682,7 @@ static void test_release_dispatch_drains_when_last_blocker_clears_on_release(voi
     };
 
     key_runtime_scenario_reset();
-    test_configure_tap_release_key(TEST_ACTIVE_KEY, TEST_RELEASE_PRIMARY);
+    test_configure_modifier_hold_tap_key(TEST_ACTIVE_KEY, TEST_RELEASE_PRIMARY);
     test_configure_tap_release_key(TEST_SIBLING_KEY, TEST_SIBLING_TAP_ACTION);
 
     key_runtime_scenario_run(setup_steps, ARRAY_SIZE(setup_steps));
@@ -704,7 +720,7 @@ static void test_release_dispatch_drains_after_sibling_delayed_action_in_same_sc
     };
 
     key_runtime_scenario_reset();
-    test_configure_tap_release_key(TEST_ACTIVE_KEY, TEST_RELEASE_PRIMARY);
+    test_configure_modifier_hold_tap_key(TEST_ACTIVE_KEY, TEST_RELEASE_PRIMARY);
     test_configure_multi_tap_tap_key(TEST_SIBLING_KEY, TEST_SIBLING_TAP_ACTION);
 
     key_runtime_scenario_run(setup_steps, ARRAY_SIZE(setup_steps));
@@ -869,13 +885,13 @@ static void test_release_with_interrupted_layer_tap_sibling_dispatches_immediate
 static void test_release_with_interrupted_consumed_pd_lock_does_not_relock(void) {
     static const char                       *case_name     = "release with interrupted consumed pd lock does not relock";
     static const key_runtime_scenario_step_t setup_steps[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_PD_MODE_KEY, 1, 1),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_POINTING_MODE_KEY, 1, 1),
         KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS),
         KEY_RUNTIME_SCENARIO_SCAN(),
         KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 1, 2),
     };
     static const key_runtime_scenario_step_t release_steps[] = {
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_PD_MODE_KEY, 1, 1),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_POINTING_MODE_KEY, 1, 1),
     };
     static const key_runtime_scenario_step_t clear_sibling_steps[] = {
         KEY_RUNTIME_SCENARIO_RELEASE(TEST_SIBLING_KEY, 1, 2),
@@ -883,11 +899,11 @@ static void test_release_with_interrupted_consumed_pd_lock_does_not_relock(void)
     };
 
     key_runtime_scenario_reset();
-    key_runtime_scenario_define_pd_mode_key(TEST_PD_MODE_KEY, PD_MODE_VOLUME, true);
+    key_runtime_scenario_define_pointing_mode_key(TEST_POINTING_MODE_KEY, POINTING_MODE_VOLUME, true);
     test_configure_tap_release_key(TEST_SIBLING_KEY, TEST_SIBLING_TAP_ACTION);
 
     key_runtime_scenario_run(setup_steps, ARRAY_SIZE(setup_steps));
-    CHECK_CASE(case_name, !pd_mode_local_locked(PD_MODE_VOLUME));
+    CHECK_CASE(case_name, !pointing_mode_local_locked(POINTING_MODE_VOLUME));
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
 
@@ -909,7 +925,9 @@ static void test_release_with_interrupted_consumed_pd_lock_does_not_relock(void)
 static void test_pending_multi_tap_release_with_live_tap_release_sibling_keeps_held_lifecycle_immediate(void) {
     static const char                       *case_name     = "pending multi-tap release with live tap-release sibling keeps held lifecycle immediate";
     static const key_runtime_scenario_step_t setup_steps[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 2, 3), KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS),
+        // Held past its hold time before the sibling goes down, which would
+        // otherwise settle the chain as a tap (D-F27).
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS), KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 2, 3),
     };
     static const key_runtime_scenario_step_t release_chain[] = {
         KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 2),
@@ -945,12 +963,12 @@ static void test_pending_multi_tap_release_with_live_tap_release_sibling_keeps_h
 
 static void test_release_timing_intervals(void) {
     // Ark may prune a release-only hold only when no release can choose it.
-    for (uint16_t longer = 99; longer <= 101; longer++) {
+    for (uint16_t long_hold_term = 99; long_hold_term <= 101; long_hold_term++) {
         for (uint16_t elapsed = 99; elapsed <= 102; elapsed++) {
             key_runtime_scenario_reset();
             key_behavior_view_t behavior = test_pressable_handled_key(TEST_ACTIVE_KEY);
             behavior.tap_hold_term = 100;
-            behavior.longer_hold_term = longer;
+            behavior.long_hold_term = long_hold_term;
             behavior.single.tap = (tap_behavior_t)TAP_SENDS(KC_A);
             behavior.single.hold = (hold_behavior_t)TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY);
             behavior.single.long_hold = (hold_behavior_t)TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG);
@@ -965,7 +983,7 @@ static void test_release_timing_intervals(void) {
             key_runtime_scenario_step_t release[] = {KEY_RUNTIME_SCENARIO_RELEASE(TEST_ACTIVE_KEY, 1, 1)};
             test_run_steps(release, ARRAY_SIZE(release));
             test_release_summary_t result = test_release_summary_from_effects("release interval", test_keypos(1, 1), KC_NO);
-            uint16_t expected = elapsed < 100 ? KC_A : elapsed >= longer ? TEST_RELEASE_LONG : TEST_RELEASE_PRIMARY;
+            uint16_t expected = elapsed < 100 ? KC_A : elapsed >= long_hold_term ? TEST_RELEASE_LONG : TEST_RELEASE_PRIMARY;
             CHECK_CASE("release interval", result.action == expected);
         }
     }

@@ -8,23 +8,24 @@
 #include "print.h"
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/macro/macro_payload.h"
+#include "users/noah/lib/profile/schema/profile_macros_v1.h"
 #include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/noah_keymap.h"
 #include "users/noah/noah_runtime.h"
 #include "users/noah/lib/key/behavior/keymap_validation.h"
-#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/lib/rgb/core/rgb_validation.h"
 
 static char log_buffer[16384];
 
-#if defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-extern const pd_mode_color_t pd_mode_colors[];
-extern const uint8_t         pd_mode_color_count;
+#if defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+extern const pointing_mode_color_t pointing_mode_colors[];
+extern const uint8_t         pointing_mode_color_count;
 #endif
 
-#define NOAH_PD_MODE_TEST_ROW(name, mode_keycode) [PD_MODE_INDEX_##name] = {.mode_flag = PD_MODE_##name, .keycode = (mode_keycode), .lock_action = mode_keycode##_LOCK},
-const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(NOAH_PD_MODE_TEST_ROW)};
-#undef NOAH_PD_MODE_TEST_ROW
+#define NOAH_POINTING_MODE_TEST_ROW(name, mode_keycode) [POINTING_MODE_INDEX_##name] = {.mode_flag = POINTING_MODE_##name, .keycode = (mode_keycode), .lock_action = mode_keycode##_LOCK},
+const pointing_mode_def_t pointing_modes[POINTING_MODE_COUNT] = {NOAH_POINTING_MODE_LIST(NOAH_POINTING_MODE_TEST_ROW)};
+#undef NOAH_POINTING_MODE_TEST_ROW
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -48,10 +49,10 @@ int uprintf(const char *fmt, ...) {
     return written;
 }
 
-pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_modes[i].keycode == keycode) {
-            return pd_modes[i].mode_flag;
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
+    for (uint8_t i = 0; i < POINTING_MODE_COUNT; i++) {
+        if (pointing_modes[i].keycode == keycode) {
+            return pointing_modes[i].mode_flag;
         }
     }
 
@@ -81,28 +82,28 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
 
 // Lock keycodes resolve as the firmware's registry does, so a lock placed as a
 // step is validated as a pointing lock rather than as a plain keycode.
-const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_modes[i].lock_action == action) {
-            return &pd_modes[i];
+const pointing_mode_def_t *pointing_mode_lock_action_lookup(uint16_t action) {
+    for (uint8_t i = 0; i < POINTING_MODE_COUNT; i++) {
+        if (pointing_modes[i].lock_action == action) {
+            return &pointing_modes[i];
         }
     }
 
     return NULL;
 }
 
-bool is_pd_mode_lock_action(uint16_t action) {
-    return pd_mode_lock_action_lookup(action) != NULL;
+bool is_pointing_mode_lock_action(uint16_t action) {
+    return pointing_mode_lock_action_lookup(action) != NULL;
 }
 
-bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
+bool pointing_mode_toggle_lock_state(pointing_mode_mask_t mode) {
     (void)mode;
     return false;
 }
 
-bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
+bool pointing_mode_toggle_lock_state_at(pointing_mode_mask_t mode, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_toggle_lock_state(mode);
+    return pointing_mode_toggle_lock_state(mode);
 }
 
 void noah_dispatch_synthetic_tap(uint16_t keycode) {
@@ -190,11 +191,6 @@ void send_char_with_delay(char ascii_code, uint8_t interval) {
     (void)interval;
 }
 
-const uint8_t ascii_to_shift_lut[16];
-const uint8_t ascii_to_altgr_lut[16];
-const uint8_t ascii_to_dead_lut[16];
-const uint8_t ascii_to_keycode_lut[128];
-
 uint32_t timer_read32(void) {
     return 0u;
 }
@@ -219,21 +215,91 @@ static void export_authored_via(void) {
             CHECK(fputc(value & 255, file) != EOF);
         }
     }
-    for (uint8_t slot = 0; slot < VIA_MACRO_SLOT_COUNT; slot++) {
+    for (uint8_t slot = 0; slot < MACRO_SLOT_COUNT; slot++) {
         uint8_t bytes[2048];
         uint16_t length;
-        CHECK(macro_payload_encode(via_macro_payloads[slot], bytes, sizeof(bytes), &length));
+        CHECK(macro_payload_encode(macro_payloads[slot], bytes, sizeof(bytes), &length));
         CHECK(fwrite(bytes, 1, length, file) == length);
         CHECK(fputc(0, file) != EOF);
     }
     CHECK(fclose(file) == 0);
 }
 
+// The compiled defaults copy authored_macro_bank instead of compiling macros
+// while a profile is written. Rebuild it with the firmware's own compiler and
+// encoder, exactly as VIA's bank is seeded: a stale copy fails here, and
+// NOAH_AUTHORED_MACRO_BANK_HEADER (set when the runner gets
+// NOAH_WRITE_AUTHORED_MACRO_BANK=1) rewrites the header from what was rebuilt.
+typedef struct {
+    uint8_t  bytes[NOAH_PROFILE_MACROS_V1_MAX_SIZE];
+    uint32_t length;
+} rebuilt_bank_t;
+
+static bool append_bank_byte(uint8_t byte, void *context) {
+    rebuilt_bank_t *bank = context;
+    if (bank->length >= sizeof(bank->bytes)) return false;
+    bank->bytes[bank->length++] = byte;
+    return true;
+}
+
+static void check_authored_macro_bank(void) {
+    static rebuilt_bank_t bank;
+    static macro_payload_ir_t ir;
+
+    for (uint8_t slot = 0; slot < MACRO_SLOT_COUNT; slot++) {
+        const char *payload = macro_payloads[slot];
+        if (payload && *payload) {
+            memset(&ir, 0, sizeof(ir));
+            CHECK(macro_payload_compile(payload, &ir));
+            if (ir.length != 0u) CHECK(macro_payload_encode_ir_write(&ir, append_bank_byte, &bank, NULL));
+        }
+        CHECK(append_bank_byte(0u, &bank));
+    }
+
+    const char *path = getenv("NOAH_AUTHORED_MACRO_BANK_HEADER");
+    if (!path) {
+        if (authored_macro_bank_size != bank.length || memcmp(authored_macro_bank, bank.bytes, bank.length) != 0) {
+            fprintf(stderr, "stale authored_macro_bank.h: run NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh\n");
+        }
+        CHECK(authored_macro_bank_size == bank.length);
+        CHECK(memcmp(authored_macro_bank, bank.bytes, bank.length) == 0);
+        return;
+    }
+    FILE *file = fopen(path, "w");
+    CHECK(file != NULL);
+    fputs("// Generated by NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh; do not edit.\n"
+          "// The MACROS() payloads in the macro bank encoding, each followed by\n"
+          "// its zero terminator: the compiled defaults' macro domain. Real-profile\n"
+          "// validation rebuilds it with the firmware encoder and refuses a stale copy.\n"
+          "#pragma once\n\n"
+          "#define NOAH_AUTHORED_MACRO_BANK",
+          file);
+    for (uint32_t index = 0; index < bank.length; index++) {
+        fprintf(file, "%s0x%02x%s", index % 16u == 0u ? " \\\n    " : " ", bank.bytes[index], index + 1u < bank.length ? "," : "");
+    }
+    fputs("\n", file);
+    CHECK(fclose(file) == 0);
+}
+
+// A layer or keyboard name: UTF-8 without control characters, ending before
+// its field of `size` bytes does.
+static void check_utf8_name(const unsigned char *name, size_t size) {
+    CHECK(memchr(name, '\0', size) != NULL);
+    for (size_t i = 0; name[i];) {
+        unsigned char lead = name[i];
+        size_t        extra = lead < 0x80 ? 0 : lead >= 0xc2 && lead <= 0xdf ? 1 : lead >= 0xe0 && lead <= 0xef ? 2 : lead >= 0xf0 && lead <= 0xf4 ? 3 : SIZE_MAX;
+        CHECK(extra != SIZE_MAX && lead >= 0x20 && lead != 0x7f);
+        for (size_t k = 1; k <= extra; k++)
+            CHECK((name[i + k] & 0xc0) == 0x80);
+        i += extra + 1;
+    }
+}
+
 // The names settings v4 can hold: a macro name is printable ASCII, a layer
 // name UTF-8 without control characters, each ending before its field does.
 static void check_authored_names(void) {
-    for (uint8_t slot = 0; slot < VIA_MACRO_SLOT_COUNT; slot++) {
-        const char *name = via_macro_names[slot];
+    for (uint8_t slot = 0; slot < MACRO_SLOT_COUNT; slot++) {
+        const char *name = macro_names[slot];
         CHECK(memchr(name, '\0', NOAH_MACRO_NAME_SIZE) != NULL);
         for (const char *c = name; *c; c++)
             CHECK(*c >= 0x20 && *c <= 0x7e);
@@ -245,25 +311,21 @@ static void check_authored_names(void) {
         for (const char *c = name; *c; c++)
             CHECK(*c >= 0x20 && *c <= 0x7e);
     }
-    for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
-        const unsigned char *name = (const unsigned char *)layer_names[layer];
-        CHECK(memchr(name, '\0', NOAH_LAYER_NAME_SIZE) != NULL);
-        for (size_t i = 0; name[i];) {
-            unsigned char lead = name[i];
-            size_t        extra = lead < 0x80 ? 0 : lead >= 0xc2 && lead <= 0xdf ? 1 : lead >= 0xe0 && lead <= 0xef ? 2 : lead >= 0xf0 && lead <= 0xf4 ? 3 : SIZE_MAX;
-            CHECK(extra != SIZE_MAX && lead >= 0x20 && lead != 0x7f);
-            for (size_t k = 1; k <= extra; k++)
-                CHECK((name[i + k] & 0xc0) == 0x80);
-            i += extra + 1;
-        }
-    }
+    for (uint8_t layer = 0; layer < LAYER_COUNT; layer++)
+        check_utf8_name((const unsigned char *)layer_names[layer], NOAH_LAYER_NAME_SIZE);
+#ifdef NOAH_KEYBOARD_NAME
+    // The keyboard name follows the layer-name rule, in at most 32 bytes.
+    CHECK(sizeof(NOAH_KEYBOARD_NAME) <= NOAH_LAYER_NAME_SIZE);
+    check_utf8_name((const unsigned char *)NOAH_KEYBOARD_NAME, sizeof(NOAH_KEYBOARD_NAME));
+#endif
 }
 
 int main(void) {
     export_authored_via();
+    check_authored_macro_bank();
     check_authored_names();
-#if defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-    CHECK(pd_mode_color_count == PD_MODE_COUNT);
+#if defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+    CHECK(pointing_mode_color_count == POINTING_MODE_COUNT);
 #endif
 
     uint8_t keymap_validation_errors = noah_keymap_validate();
@@ -280,4 +342,10 @@ int main(void) {
 
     puts("real profile validation host tests passed");
     return 0;
+}
+
+void send_keyboard_report(void) {}
+
+uint16_t keymap_key_to_keycode(uint8_t layer, keypos_t key) {
+    return keycode_at_keymap_location(layer, key.row, key.col);
 }

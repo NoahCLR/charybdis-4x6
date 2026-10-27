@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 BUILD_DIR="$(mktemp -d)"
@@ -15,16 +16,13 @@ build_and_run() {
     name="$1"
     shift
     cc -std=c11 -Wall -Wextra -Werror -pedantic \
-        -DVIA_ENABLE \
-        -DDYNAMIC_KEYMAP_EEPROM_MAX_ADDR=0x1FFFu \
-        -DNOAH_PROFILE_STORAGE_SLOT_A_START_ADDR=0x2000u \
-        -DNOAH_PROFILE_STORAGE_SLOT_A_END_ADDR=0x2FFFu \
-        -DNOAH_PROFILE_STORAGE_SLOT_B_START_ADDR=0x3000u \
-        -DNOAH_PROFILE_STORAGE_SLOT_B_END_ADDR=0x3FFFu \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
         "$ROOT/tests/host/profile_store_test.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_store.c" \
         "$@" \
         -o "$BUILD_DIR/profile_store_test_$name"

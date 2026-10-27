@@ -47,7 +47,7 @@ static void begin_response(uint8_t *frame, noah_profile_wire_v1_status_code_t st
 }
 
 static void encode_capabilities_page_zero(uint8_t *payload, const noah_profile_wire_v1_capabilities_t *capabilities) {
-    payload[0] = 1u; // response layout version
+    payload[0] = NOAH_PROFILE_WIRE_V1_CAPABILITY_LAYOUT;
     payload[1] = NOAH_PROFILE_WIRE_V1_CAPABILITY_PAGES;
     payload[2] = capabilities->protocol_major;
     payload[3] = capabilities->protocol_minor;
@@ -62,26 +62,35 @@ static void encode_capabilities_page_zero(uint8_t *payload, const noah_profile_w
     write_u32(&payload[21], capabilities->compiled_default_digest);
 }
 
+// Layout 3 (D-F28): page 1 holds every byte-wide ceiling, page 2 the wider
+// ones.
 static void encode_capabilities_page_one(uint8_t *payload, const noah_profile_wire_v1_capabilities_t *capabilities) {
     payload[0]  = capabilities->compiled_layer_count;
     payload[1]  = capabilities->max_logical_layers;
     payload[2]  = capabilities->max_behavior_rows;
     payload[3]  = capabilities->max_tap_steps_per_behavior;
-    payload[4]  = capabilities->max_populated_behavior_steps;
-    payload[5]  = capabilities->max_combos;
-    payload[6]  = capabilities->max_keys_per_combo;
-    payload[7]  = capabilities->max_reusable_rgb_groups;
-    payload[8]  = capabilities->max_rgb_stage_group_rows;
-    payload[9]  = capabilities->physical_led_count;
-    payload[10] = capabilities->led_bitmap_size;
-    payload[11] = capabilities->custom_key_slots;
-    payload[12] = capabilities->via_macro_slots;
-    write_u16(&payload[13], capabilities->max_profile_payload);
-    write_u16(&payload[15], capabilities->profile_slot_payload);
-    write_u16(&payload[17], capabilities->profile_slot_size);
-    write_u16(&payload[19], capabilities->via_macro_bytes);
-    payload[21] = capabilities->supported_domain_mask;
-    // Bytes 22..24 remain canonical zero padding.
+    payload[4]  = capabilities->max_combos;
+    payload[5]  = capabilities->max_keys_per_combo;
+    payload[6]  = capabilities->max_reusable_rgb_groups;
+    payload[7]  = capabilities->max_rgb_stage_group_rows;
+    payload[8]  = capabilities->physical_led_count;
+    payload[9]  = capabilities->led_bitmap_size;
+    payload[10] = capabilities->custom_key_slots;
+    payload[11] = capabilities->macro_slots;
+    payload[12] = capabilities->supported_domain_mask;
+    payload[13] = capabilities->max_name_bytes;
+    payload[14] = capabilities->layer_mask_bits;
+    payload[15] = capabilities->placement_positions;
+    // Bytes 16..24 remain canonical zero padding.
+}
+
+static void encode_capabilities_page_two(uint8_t *payload, const noah_profile_wire_v1_capabilities_t *capabilities) {
+    write_u16(&payload[0], capabilities->max_populated_behavior_steps);
+    write_u32(&payload[2], capabilities->profile_slot_size);
+    write_u32(&payload[6], capabilities->max_profile_payload);
+    write_u32(&payload[10], capabilities->profile_slot_payload);
+    write_u32(&payload[14], capabilities->macro_bytes);
+    // Bytes 18..24 remain canonical zero padding.
 }
 
 static void encode_status_page_zero(uint8_t *payload, const noah_profile_wire_v1_device_status_t *status) {
@@ -92,17 +101,17 @@ static void encode_status_page_zero(uint8_t *payload, const noah_profile_wire_v1
     write_u32(&payload[8], status->compiled_default_digest);
     write_u32(&payload[12], status->active_digest);
     write_u32(&payload[16], status->pending_digest);
-    write_u32(&payload[20], status->committed_digest);
+    write_u32(&payload[20], status->saved_digest);
     payload[24] = status->active_kind;
 }
 
 static void encode_status_page_one(uint8_t *payload, const noah_profile_wire_v1_device_status_t *status) {
     write_u32(&payload[0], status->active_generation);
     payload[4] = status->active_origin_half;
-    write_u32(&payload[5], status->committed_generation);
-    payload[9] = status->committed_origin_half;
-    write_u32(&payload[10], status->peer_generation);
-    payload[14] = status->peer_origin_half;
+    write_u32(&payload[5], status->saved_generation);
+    payload[9] = status->saved_origin_half;
+    write_u32(&payload[10], status->slave_generation);
+    payload[14] = status->slave_origin_half;
     write_u16(&payload[15], status->candidate_transaction_id);
     write_u16(&payload[17], status->last_committed_transaction_id);
     write_u16(&payload[19], status->conflict_count);
@@ -141,8 +150,10 @@ bool noah_profile_wire_v1_handle_get(const noah_profile_wire_v1_read_service_t *
     if (value == NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY) {
         if (page == 0u) {
             encode_capabilities_page_zero(&frame[WIRE_PAYLOAD], &service->capabilities);
-        } else {
+        } else if (page == 1u) {
             encode_capabilities_page_one(&frame[WIRE_PAYLOAD], &service->capabilities);
+        } else {
+            encode_capabilities_page_two(&frame[WIRE_PAYLOAD], &service->capabilities);
         }
     } else if (page == 0u) {
         encode_status_page_zero(&frame[WIRE_PAYLOAD], &service->status);

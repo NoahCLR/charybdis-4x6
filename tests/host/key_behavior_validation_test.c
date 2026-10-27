@@ -7,8 +7,8 @@
 
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
-#include "users/noah/lib/pointing/defs/pd_mode_flags.h"
-#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/defs/pointing_mode_flags.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
 
 static char log_buffer[1024];
 
@@ -41,12 +41,12 @@ int uprintf(const char *fmt, ...) {
     return written;
 }
 
-pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
     (void)keycode;
     return 0;
 }
 
-bool is_pd_mode_lock_action(uint16_t action) {
+bool is_pointing_mode_lock_action(uint16_t action) {
     (void)action;
     return false;
 }
@@ -71,19 +71,19 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
     return true;
 }
 
-const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
+const pointing_mode_def_t *pointing_mode_lock_action_lookup(uint16_t action) {
     (void)action;
     return NULL;
 }
 
-bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
+bool pointing_mode_toggle_lock_state(pointing_mode_mask_t mode) {
     (void)mode;
     return false;
 }
 
-bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
+bool pointing_mode_toggle_lock_state_at(pointing_mode_mask_t mode, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_toggle_lock_state(mode);
+    return pointing_mode_toggle_lock_state(mode);
 }
 
 void noah_dispatch_synthetic_tap(uint16_t keycode) {

@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 
@@ -27,13 +28,13 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DAUTOMOUSE_RGB_DEAD_TIME=20u \
     -DAUTOMOUSE_RGB_SYNC_STEP=10u \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
-    -DRGB_PD_MODE_ACTIVE_HALF_ENABLE \
+    -DRGB_POINTING_MODE_ACTIVE_HALF_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/split_runtime_sync_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/split/runtime_sync_dirty.c" \
     "$ROOT/users/noah/lib/split/runtime_sync.c" \
     -o "$BIN"
@@ -55,7 +56,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/split_runtime_sync_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/split/runtime_sync_dirty.c" \
     "$ROOT/users/noah/lib/split/runtime_sync.c" \
     -o "$BIN_NO_TRIGGER_HALF"

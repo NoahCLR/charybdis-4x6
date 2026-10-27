@@ -11,7 +11,7 @@ the loop's time goes, and what the split link costs. Captured with
   exclusive time per loop stage, in one-second windows.
 
 Both are specified in
-[`docs/architecture/split-activity-sync.md`](../../docs/architecture/split-activity-sync.md),
+[`docs/spec/split-activity-sync.md`](../../docs/spec/split-activity-sync.md),
 including what each loop stage covers. Pointing polls are pointing-task runs,
 an upper bound on the USB mouse reports; the host's own report rate is the
 final word.

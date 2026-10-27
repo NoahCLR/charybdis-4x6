@@ -27,7 +27,7 @@ typedef struct {
     bool                                  quick_tap;
     bool                                  quick_immediate_hold;
     bool                                  buffered_base_tap;
-    pd_mode_mask_t                        lock_tap_mode;
+    pointing_mode_mask_t                  lock_tap_mode;
     key_runtime_release_decision_t        decision;
 } key_runtime_core_active_release_resolution_t;
 
@@ -48,39 +48,32 @@ typedef struct {
     key_feedback_pulse_kind_t                            action_feedback_kind;
     uint8_t                                              tap_count;
     bool                                                 keeps_own_layer; // the action keeps the key's own layer on
+    bool                                                 consumes_oneshot;
+    // This press holds an action or a repeat, as an implicit hold does from
+    // the press (a dual-role custom key's shortcut, D-F26): the release lets go
+    // of it, as an active release does.
+    bool                                                 release_owned_state;
 } key_runtime_core_pending_multi_tap_release_resolution_t;
 
+// What a release does to its key's tap series. The reducer applies it, and a
+// series it starts is filled from the released press token.
 typedef enum {
     KEY_RUNTIME_CORE_RELEASE_SLOT_SETTLEMENT_NONE = 0,
     KEY_RUNTIME_CORE_RELEASE_SLOT_SETTLEMENT_RESET,
     KEY_RUNTIME_CORE_RELEASE_SLOT_SETTLEMENT_CLEAR_ACTIVE_PRESERVE_PENDING_MULTI_TAP,
+    // The released first tap waits for more taps: its series starts.
+    KEY_RUNTIME_CORE_RELEASE_SLOT_SETTLEMENT_START_TAP_SERIES,
 } key_runtime_core_release_slot_settlement_t;
 
 typedef struct {
-    bool     active;
-    uint16_t keycode;
-    keypos_t key_pos;
-    uint8_t  tap_count;
-    uint16_t tap_action;
-    uint8_t  tap_repeat_count;
-    bool     tap_branch_has_authored_step;
-    bool     tap_branch_has_authored_tap;
-    uint16_t tap_hold_term;
-    uint16_t multi_tap_term;
-    bool     has_more_taps;
-    uint8_t  authored_tap_depth;
-} key_runtime_core_pending_multi_tap_seed_t;
-
-typedef struct {
     key_runtime_core_release_slot_settlement_t settlement;
-    key_runtime_core_pending_multi_tap_seed_t  pending_multi_tap_seed;
     KEY_RUNTIME_EFFECT_QUEUE_FIELDS(KEY_RUNTIME_CORE_RELEASE_EFFECT_PLAN_CAPACITY);
 } key_runtime_core_release_effect_plan_t;
 
 _Static_assert(sizeof(key_runtime_core_release_effect_plan_t) <= 196u, "key_runtime_core_release_effect_plan_t must stay within the approved stack budget");
 
 bool key_runtime_core_resolve_active_release(keypos_t key_pos, key_runtime_core_active_release_resolution_t *out);
-bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t keycode, const key_runtime_core_active_release_resolution_t *resolution, key_runtime_core_release_effect_plan_t *out);
+bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, const key_runtime_core_active_release_resolution_t *resolution, key_runtime_core_release_effect_plan_t *out);
 bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16_t tap_action, uint8_t tap_repeat_count, bool preserve_chain_available, key_runtime_core_pending_multi_tap_release_resolution_t *out);
 bool key_runtime_core_plan_pending_multi_tap_release_effects(keypos_t key_pos, bool is_momentary_layer, const key_runtime_core_pending_multi_tap_release_resolution_t *resolution, delayed_action_mods_t mods, key_runtime_core_release_effect_plan_t *out);
 

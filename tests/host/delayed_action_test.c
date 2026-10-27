@@ -160,27 +160,27 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
     return true;
 }
 
-const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
+const pointing_mode_def_t *pointing_mode_lock_action_lookup(uint16_t action) {
     (void)action;
     return NULL;
 }
 
-bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
+bool pointing_mode_toggle_lock_state(pointing_mode_mask_t mode) {
     (void)mode;
     return false;
 }
 
-bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
+bool pointing_mode_toggle_lock_state_at(pointing_mode_mask_t mode, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_toggle_lock_state(mode);
+    return pointing_mode_toggle_lock_state(mode);
 }
 
-pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
     (void)keycode;
     return 0;
 }
 
-bool is_pd_mode_lock_action(uint16_t action) {
+bool is_pointing_mode_lock_action(uint16_t action) {
     (void)action;
     return false;
 }
@@ -256,6 +256,10 @@ void unregister_code16(uint16_t keycode) {
 
 void tap_code16(uint16_t keycode) {
     (void)keycode;
+}
+
+void wait_ms(uint16_t ms) {
+    (void)ms;
 }
 
 bool noah_synthetic_record_active(void) {

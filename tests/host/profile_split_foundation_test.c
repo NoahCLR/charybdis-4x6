@@ -13,13 +13,13 @@ static noah_profile_split_descriptor_t compiled_descriptor(void) {
     return (noah_profile_split_descriptor_t){
         .compiled_default_digest = UINT32_C(0x11223344),
         .action_abi_digest       = UINT32_C(0x55667788),
-        .schema_major            = 1u,
-        .schema_minor            = 0u,
+        .schema_major            = NOAH_PROFILE_SCHEMA_MAJOR,
+        .schema_minor            = NOAH_PROFILE_SCHEMA_MINOR,
         .readable                = true,
     };
 }
 
-static noah_profile_split_descriptor_t committed_descriptor(uint32_t generation, uint8_t origin, uint32_t digest) {
+static noah_profile_split_descriptor_t saved_descriptor(uint32_t generation, uint8_t origin, uint32_t digest) {
     noah_profile_split_descriptor_t descriptor = compiled_descriptor();
 
     descriptor.generation     = generation;
@@ -45,8 +45,12 @@ static uint8_t test_crc8(const uint8_t *bytes, size_t length) {
     return crc;
 }
 
+static void refresh_crc_length(uint8_t *wire, uint8_t length) {
+    wire[length - 1u] = test_crc8(wire, length - 1u);
+}
+
 static void refresh_crc(uint8_t wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]) {
-    wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE - 1u] = test_crc8(wire, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE - 1u);
+    refresh_crc_length(wire, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
 }
 
 static void assert_descriptors_equal(const noah_profile_split_descriptor_t *actual, const noah_profile_split_descriptor_t *expected) {
@@ -63,92 +67,91 @@ static void assert_descriptors_equal(const noah_profile_split_descriptor_t *actu
     assert(actual->origin_half == expected->origin_half);
     assert(actual->readable == expected->readable);
     assert(actual->has_profile == expected->has_profile);
-    assert(actual->logical == expected->logical);
 }
 
 static void test_authority_decision_table(void) {
     noah_profile_split_descriptor_t absent     = compiled_descriptor();
-    noah_profile_split_descriptor_t local      = committed_descriptor(7u, 0u, UINT32_C(0x10203040));
-    noah_profile_split_descriptor_t peer       = local;
+    noah_profile_split_descriptor_t local      = saved_descriptor(7u, 0u, UINT32_C(0x10203040));
+    noah_profile_split_descriptor_t other_half = local;
     noah_profile_split_descriptor_t unreadable = {0};
 
-    assert(noah_profile_split_authority_compare(&unreadable, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_LOCAL_UNREADABLE);
-    assert(noah_profile_split_authority_compare(&absent, &unreadable) == NOAH_PROFILE_SPLIT_AUTHORITY_PEER_UNREADABLE);
+    assert(noah_profile_split_authority_compare(&unreadable, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_LOCAL_UNREADABLE);
+    assert(noah_profile_split_authority_compare(&absent, &unreadable) == NOAH_PROFILE_SPLIT_AUTHORITY_OTHER_HALF_UNREADABLE);
     assert(noah_profile_split_authority_compare(&absent, &absent) == NOAH_PROFILE_SPLIT_AUTHORITY_COMPILED_CONVERGED);
     assert(noah_profile_split_authority_compare(&local, &absent) == NOAH_PROFILE_SPLIT_AUTHORITY_LOCAL_NEWER);
-    assert(noah_profile_split_authority_compare(&absent, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_PEER_NEWER);
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED);
+    assert(noah_profile_split_authority_compare(&absent, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_OTHER_HALF_NEWER);
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_SAVED_CONVERGED);
 
-    peer.generation = 8u;
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_PEER_NEWER);
-    peer.generation = 6u;
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_LOCAL_NEWER);
+    other_half.generation = 8u;
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_OTHER_HALF_NEWER);
+    other_half.generation = 6u;
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_LOCAL_NEWER);
 
-    peer             = local;
-    peer.origin_half = 1u;
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_CONCURRENT_COMMIT);
-    peer = local;
-    peer.payload_digest ^= 1u;
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_CORRUPT_SAME_TUPLE);
-    peer = local;
-    peer.payload_crc32 ^= 1u;
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_CORRUPT_SAME_TUPLE);
-    peer = local;
-    peer.domain_mask ^= NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_CORRUPT_SAME_TUPLE);
-    peer = local;
-    peer.compiled_default_digest ^= 1u;
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_INCOMPATIBLE);
-    peer = local;
-    peer.action_abi_digest ^= 1u;
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_INCOMPATIBLE);
+    other_half       = local;
+    other_half.origin_half = 1u;
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_CONCURRENT_COMMIT);
+    other_half = local;
+    other_half.payload_digest ^= 1u;
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_CORRUPT_SAME_TUPLE);
+    other_half = local;
+    other_half.payload_crc32 ^= 1u;
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_CORRUPT_SAME_TUPLE);
+    other_half = local;
+    other_half.domain_mask ^= NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_CORRUPT_SAME_TUPLE);
+    other_half = local;
+    other_half.compiled_default_digest ^= 1u;
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_INCOMPATIBLE);
+    other_half = local;
+    other_half.action_abi_digest ^= 1u;
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_INCOMPATIBLE);
 
-    peer             = local;
-    peer.domain_mask = 0x80u;
-    assert(!noah_profile_split_descriptor_valid(&peer));
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_INVALID_METADATA);
+    other_half       = local;
+    other_half.domain_mask = 0x80u;
+    assert(!noah_profile_split_descriptor_valid(&other_half));
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_INVALID_METADATA);
 
-    peer               = local;
-    local.schema_major = 2u;
-    peer.schema_major  = 2u;
+    other_half         = local;
+    local.schema_major = 1u;
+    other_half.schema_major = 1u;
     assert(!noah_profile_split_descriptor_valid(&local));
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_INVALID_METADATA);
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_INVALID_METADATA);
 
-    local            = committed_descriptor(7u, 0u, UINT32_C(0x10203040));
-    peer             = local;
-    peer.has_profile = false;
-    assert(!noah_profile_split_descriptor_valid(&peer));
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_INVALID_METADATA);
+    local            = saved_descriptor(7u, 0u, UINT32_C(0x10203040));
+    other_half       = local;
+    other_half.has_profile = false;
+    assert(!noah_profile_split_descriptor_valid(&other_half));
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_INVALID_METADATA);
 }
 
 static void test_authority_publication_and_activation_observer(void) {
     noah_profile_split_authority_t        authority;
     noah_profile_split_authority_status_t status;
     noah_profile_split_descriptor_t       absent     = compiled_descriptor();
-    noah_profile_split_descriptor_t       local      = committed_descriptor(9u, 1u, UINT32_C(0x99887766));
-    noah_profile_split_descriptor_t       peer       = local;
+    noah_profile_split_descriptor_t       local      = saved_descriptor(9u, 1u, UINT32_C(0x99887766));
+    noah_profile_split_descriptor_t       other_half = local;
     uint8_t                               unresolved = 99u;
 
     noah_profile_split_authority_init(&authority);
-    assert(noah_profile_split_authority_peer_observer(&authority, &unresolved));
+    assert(noah_profile_split_authority_other_half_observer(&authority, &unresolved));
     assert(unresolved == 1u);
 
     assert(noah_profile_split_authority_publish(&authority, absent, absent, false));
-    assert(noah_profile_split_authority_peer_observer(&authority, &unresolved));
+    assert(noah_profile_split_authority_other_half_observer(&authority, &unresolved));
     assert(unresolved == 0u);
-    assert(noah_profile_split_authority_publish(&authority, local, peer, true));
-    assert(noah_profile_split_authority_peer_observer(&authority, &unresolved));
+    assert(noah_profile_split_authority_publish(&authority, local, other_half, true));
+    assert(noah_profile_split_authority_other_half_observer(&authority, &unresolved));
     assert(unresolved == 1u);
-    assert(noah_profile_split_authority_publish(&authority, local, peer, false));
-    assert(noah_profile_split_authority_peer_observer(&authority, &unresolved));
+    assert(noah_profile_split_authority_publish(&authority, local, other_half, false));
+    assert(noah_profile_split_authority_other_half_observer(&authority, &unresolved));
     assert(unresolved == 0u);
 
-    peer.schema_major = 0u;
-    assert(!noah_profile_split_authority_publish(&authority, local, peer, false));
+    other_half.schema_major = 0u;
+    assert(!noah_profile_split_authority_publish(&authority, local, other_half, false));
     assert(noah_profile_split_authority_status(&authority, &status));
     assert(status.state == NOAH_PROFILE_SPLIT_AUTHORITY_INVALID_METADATA);
     assert(status.publication_count == 4u);
-    assert(noah_profile_split_authority_peer_observer(&authority, &unresolved));
+    assert(noah_profile_split_authority_other_half_observer(&authority, &unresolved));
     assert(unresolved == 1u);
 
     authority.status.publication_count = UINT32_MAX;
@@ -156,20 +159,22 @@ static void test_authority_publication_and_activation_observer(void) {
     assert(authority.status.publication_count == UINT32_MAX);
 
     authority.publication_sequence = 1u;
-    status.state                   = NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED;
+    status.state                   = NOAH_PROFILE_SPLIT_AUTHORITY_SAVED_CONVERGED;
     assert(!noah_profile_split_authority_status(&authority, &status));
-    assert(status.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED);
-    assert(!noah_profile_split_authority_peer_observer(&authority, &unresolved));
+    assert(status.state == NOAH_PROFILE_SPLIT_AUTHORITY_SAVED_CONVERGED);
+    assert(!noah_profile_split_authority_other_half_observer(&authority, &unresolved));
 }
 
 static void assert_round_trip(const noah_profile_split_v1_frame_t *expected) {
-    uint8_t                       wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    uint8_t                       wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
     noah_profile_split_v1_frame_t decoded;
+    uint8_t                       length = noah_profile_split_v1_frame_encode(expected, wire, sizeof(wire));
 
-    assert(noah_profile_split_v1_frame_encode(expected, wire));
-    assert(noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
+    assert(length != 0u && length == noah_profile_split_v1_frame_length(expected));
+    assert(noah_profile_split_v1_frame_decode(wire, length, &decoded));
     assert(decoded.kind == expected->kind);
     assert(decoded.status == expected->status);
+    assert(decoded.no_prepared_push == expected->no_prepared_push);
     assert_descriptors_equal(&decoded.descriptor, &expected->descriptor);
     assert(decoded.generation == expected->generation);
     assert(decoded.payload_digest == expected->payload_digest);
@@ -177,26 +182,35 @@ static void assert_round_trip(const noah_profile_split_v1_frame_t *expected) {
     assert(decoded.payload_length == expected->payload_length);
     assert(decoded.chunk_length == expected->chunk_length);
     assert(memcmp(decoded.chunk, expected->chunk, sizeof(decoded.chunk)) == 0);
-    assert(decoded.store_format_version == expected->store_format_version);
-    assert(decoded.via_generation == expected->via_generation);
-    assert(decoded.via_digest == expected->via_digest);
+    assert(decoded.reuse_length == expected->reuse_length);
+    assert(decoded.reuse_source_offset == expected->reuse_source_offset);
+    assert(decoded.reuse_source.generation == expected->reuse_source.generation);
+    assert(decoded.reuse_source.digest == expected->reuse_source.digest);
+    assert(decoded.reuse_source.crc32 == expected->reuse_source.crc32);
+    assert(decoded.reuse_source.kind == expected->reuse_source.kind);
+    assert(decoded.reuse_source.origin == expected->reuse_source.origin);
+    assert(decoded.busy_reason == expected->busy_reason);
 }
 
 static void test_protocol_golden_frames(void) {
     static const uint8_t metadata_golden[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE] = {
-        0x01, 0x01, 0x00, 0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x44, 0x33, 0x22, 0x11, 0x88, 0x77, 0x66, 0x55, 0x00, 0xFC,
+        0x04, 0x01, 0x00, 0x02, 0x04, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x44, 0x33, 0x22, 0x11, 0x88, 0x77, 0x66, 0x55, 0xE8,
     };
     static const uint8_t begin_golden[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE] = {
-        0x01, 0x02, 0x00, 0x03, 0x01, 0x00, 0x01, 0x01, 0x41, 0x04, 0x07, 0x00, 0x00, 0x00, 0xD4, 0xC3, 0xB2, 0xA1, 0x40, 0x30, 0x20, 0x10, 0x44, 0x33, 0x22, 0x11, 0x88, 0x77, 0x66, 0x55, 0x03, 0xFD,
+        0x04, 0x02, 0x00, 0x1B, 0x04, 0x03, 0x03, 0x41, 0x04, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0xD4, 0xC3, 0xB2, 0xA1, 0x40, 0x30, 0x20, 0x10, 0x44, 0x33, 0x22, 0x11, 0x88, 0x77, 0x66, 0x55, 0x97,
     };
     static const uint8_t chunk_golden[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE] = {
-        0x01, 0x03, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x40, 0x30, 0x20, 0x10, 0x0E, 0x00, 0x41, 0x04, 0x0E, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x45,
+        0x04, 0x03, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x40, 0x30, 0x20, 0x10, 0x0E, 0x00, 0x00, 0x00, 0x41, 0x04, 0x00, 0x00, 0x0A, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x28,
+    };
+    // Version 4 retains D-F28's 32-bit offsets and 44-byte PAYLOAD_REUSE.
+    static const uint8_t reuse_golden[NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE] = {
+        0x04, 0x0C, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x40, 0x30, 0x20, 0x10, 0x00, 0x01, 0x00, 0x00, 0x41, 0x04, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0xBE, 0xBA, 0xFE, 0xCA, 0x0D, 0xF0, 0xAD, 0x0B, 0x01, 0x00, 0x00, 0x6D,
     };
     static const uint8_t request_golden[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE] = {
-        0x01, 0x08, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x40, 0x30, 0x20, 0x10, 0x0E, 0x00, 0x41, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xBB,
+        0x04, 0x08, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x40, 0x30, 0x20, 0x10, 0x0E, 0x00, 0x00, 0x00, 0x41, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x41,
     };
     noah_profile_split_v1_frame_t metadata = {.kind = NOAH_PROFILE_SPLIT_V1_METADATA, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = compiled_descriptor()};
-    noah_profile_split_v1_frame_t begin    = {.kind = NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = committed_descriptor(7u, 1u, UINT32_C(0x10203040))};
+    noah_profile_split_v1_frame_t begin    = {.kind = NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = saved_descriptor(7u, 1u, UINT32_C(0x10203040))};
     noah_profile_split_v1_frame_t chunk    = {
         .kind           = NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK,
         .status         = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
@@ -204,8 +218,8 @@ static void test_protocol_golden_frames(void) {
         .payload_digest = UINT32_C(0x10203040),
         .offset         = 14u,
         .payload_length = 1089u,
-        .chunk_length   = 14u,
-        .chunk          = {0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u, 9u, 10u, 11u, 12u, 13u},
+        .chunk_length   = 10u,
+        .chunk          = {0u, 1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u, 9u},
     };
     noah_profile_split_v1_frame_t request = {
         .kind           = NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST,
@@ -215,29 +229,173 @@ static void test_protocol_golden_frames(void) {
         .offset         = 14u,
         .payload_length = 1089u,
     };
-    uint8_t wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    noah_profile_split_v1_frame_t reuse = {
+        .kind                = NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE,
+        .status              = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
+        .generation          = 7u,
+        .payload_digest      = UINT32_C(0x10203040),
+        .offset              = 0x0100u,
+        .payload_length      = 1089u,
+        .reuse_length        = 0x0200u,
+        .reuse_source_offset = 0x0080u,
+        .reuse_source        = {.generation = 5u, .digest = UINT32_C(0xCAFEBABE), .crc32 = UINT32_C(0x0BADF00D), .kind = 1u, .origin = 0u},
+    };
+    noah_profile_split_v1_frame_t full_chunk = chunk;
+    uint8_t                       wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
 
     // The fixed begin CRC uses the exact descriptor CRC, not the helper's
     // digest-derived fixture value.
     begin.descriptor.payload_crc32 = UINT32_C(0xA1B2C3D4);
-    assert(noah_profile_split_v1_frame_encode(&metadata, wire));
-    assert(memcmp(wire, metadata_golden, sizeof(wire)) == 0);
-    assert(noah_profile_split_v1_frame_encode(&begin, wire));
-    assert(memcmp(wire, begin_golden, sizeof(wire)) == 0);
-    assert(noah_profile_split_v1_frame_encode(&chunk, wire));
-    assert(memcmp(wire, chunk_golden, sizeof(wire)) == 0);
-    assert(noah_profile_split_v1_frame_encode(&request, wire));
-    assert(memcmp(wire, request_golden, sizeof(wire)) == 0);
+    assert(noah_profile_split_v1_frame_encode(&metadata, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    assert(memcmp(wire, metadata_golden, sizeof(metadata_golden)) == 0);
+    assert(noah_profile_split_v1_frame_encode(&begin, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    assert(memcmp(wire, begin_golden, sizeof(begin_golden)) == 0);
+    assert(noah_profile_split_v1_frame_encode(&chunk, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    assert(memcmp(wire, chunk_golden, sizeof(chunk_golden)) == 0);
+    assert(noah_profile_split_v1_frame_encode(&request, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    assert(memcmp(wire, request_golden, sizeof(request_golden)) == 0);
+    assert(noah_profile_split_v1_frame_encode(&reuse, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE);
+    assert(memcmp(wire, reuse_golden, sizeof(reuse_golden)) == 0);
+    // A request's capacity bounds the encoding.
+    assert(noah_profile_split_v1_frame_encode(&reuse, wire, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE) == 0u);
+
+    // A full chunk fills the largest request: its header, 106 bytes and the
+    // CRC, which follows the chunk directly.
+    full_chunk.chunk_length = NOAH_PROFILE_SPLIT_V1_CHUNK_MAX;
+    for (uint8_t index = 0u; index < NOAH_PROFILE_SPLIT_V1_CHUNK_MAX; index++) {
+        full_chunk.chunk[index] = (uint8_t)(index * 3u + 1u);
+    }
+    assert(noah_profile_split_v1_frame_encode(&full_chunk, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_MAX);
+    assert(wire[20] == NOAH_PROFILE_SPLIT_V1_CHUNK_MAX && memcmp(&wire[21], full_chunk.chunk, NOAH_PROFILE_SPLIT_V1_CHUNK_MAX) == 0);
+    assert(wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX - 1u] == test_crc8(wire, NOAH_PROFILE_SPLIT_V1_FRAME_MAX - 1u));
+    assert_round_trip(&full_chunk);
+    full_chunk.chunk_length = 11u;
+    memset(&full_chunk.chunk[11], 0, sizeof(full_chunk.chunk) - 11u);
+    assert(noah_profile_split_v1_frame_length(&full_chunk) == 33u);
+    assert_round_trip(&full_chunk);
 
     assert_round_trip(&metadata);
     assert_round_trip(&begin);
     assert_round_trip(&chunk);
     assert_round_trip(&request);
-    assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .store_format_version = NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL, .via_generation = 9u, .via_digest = UINT32_C(0x55667788)});
-    assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND_REQUEST, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 7u, .payload_digest = UINT32_C(0x10203040)});
+    assert_round_trip(&reuse);
+    reuse.reuse_source = (noah_profile_split_v1_source_t){.digest = UINT32_C(0xCAFEBABE), .crc32 = UINT32_C(0x0BADF00D), .kind = 0u, .origin = 255u};
+    assert_round_trip(&reuse);
+    assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_ERROR, .status = NOAH_PROFILE_SPLIT_V1_STATUS_SOURCE_UNAVAILABLE, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .offset = 0x0180u, .payload_length = 1089u});
+    assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_ACK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_BUSY, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .offset = 0x0180u, .payload_length = 1089u, .busy_reason = NOAH_PROFILE_SPLIT_V1_BUSY_COPYING});
+    // Kinds 9 and 11 bound a copy to the VIA store; retired with it (D-F31).
+    for (uint8_t retired = 9u; retired <= 11u; retired += 2u) {
+        uint8_t                       wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+        noah_profile_split_v1_frame_t decoded;
+        noah_profile_split_v1_frame_t ack = {.kind = NOAH_PROFILE_SPLIT_V1_ACK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 7u, .payload_digest = UINT32_C(0x10203040)};
+
+        assert(noah_profile_split_v1_frame_encode(&ack, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+        wire[1] = retired;
+        refresh_crc(wire);
+        assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
+        ack.kind = (noah_profile_split_v1_kind_t)retired;
+        assert(noah_profile_split_v1_frame_encode(&ack, wire, sizeof(wire)) == 0u);
+    }
     assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = begin.descriptor});
     assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_ACK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_BUSY, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .offset = 28u, .payload_length = 1089u});
     assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_ERROR, .status = NOAH_PROFILE_SPLIT_V1_STATUS_CONFLICT, .generation = 7u, .payload_digest = UINT32_C(0x10203040)});
+}
+
+// Version 2's sized chunks and reuse frames: each kind has exactly one length
+// and every field outside its layout stays zero.
+static void test_protocol_rejects_malformed_sized_frames(void) {
+    noah_profile_split_v1_frame_t chunk = {
+        .kind           = NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK,
+        .status         = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
+        .generation     = 3u,
+        .payload_digest = 4u,
+        .payload_length = 400u,
+        .chunk_length   = 60u,
+    };
+    noah_profile_split_v1_frame_t reuse = {
+        .kind                = NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE,
+        .status              = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
+        .generation          = 3u,
+        .payload_digest      = 4u,
+        .offset              = 100u,
+        .payload_length      = 400u,
+        .reuse_length        = 300u,
+        .reuse_source_offset = 20u,
+        .reuse_source        = {.generation = 2u, .digest = 5u, .crc32 = 6u, .kind = 1u, .origin = 1u},
+    };
+    noah_profile_split_v1_frame_t probe;
+    noah_profile_split_v1_frame_t decoded;
+    uint8_t                       wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
+    uint8_t                       length;
+
+    length = noah_profile_split_v1_frame_encode(&chunk, wire, sizeof(wire));
+    assert(length == 82u);
+    assert(noah_profile_split_v1_frame_decode(wire, length, &decoded));
+    assert(!noah_profile_split_v1_frame_decode(wire, length - 1u, &decoded));
+    assert(!noah_profile_split_v1_frame_decode(wire, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, &decoded));
+    // Beyond the largest request, whatever the frame claims.
+    wire[20] = NOAH_PROFILE_SPLIT_V1_CHUNK_MAX + 1u;
+    assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
+    probe              = chunk;
+    probe.chunk_length = NOAH_PROFILE_SPLIT_V1_CHUNK_MAX + 1u;
+    assert(noah_profile_split_v1_frame_length(&probe) == 0u);
+    probe              = chunk;
+    probe.reuse_length = 1u;
+    assert(noah_profile_split_v1_frame_encode(&probe, wire, sizeof(wire)) == 0u);
+    // A 32-byte frame of another kind has room for 10 chunk bytes at most.
+    probe = (noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_ACK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 3u, .payload_digest = 4u, .offset = 0u, .payload_length = 400u};
+    assert(noah_profile_split_v1_frame_encode(&probe, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    wire[20] = 11u;
+    refresh_crc(wire);
+    assert(!noah_profile_split_v1_frame_decode(wire, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, &decoded));
+
+    length = noah_profile_split_v1_frame_encode(&reuse, wire, sizeof(wire));
+    assert(length == NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE);
+    assert(noah_profile_split_v1_frame_decode(wire, length, &decoded));
+    assert(!noah_profile_split_v1_frame_decode(wire, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, &decoded));
+    wire[42] = 1u;
+    refresh_crc_length(wire, length);
+    assert(!noah_profile_split_v1_frame_decode(wire, length, &decoded));
+    // Kind 2 names the working copy over a saved base (D-F32); kind 3
+    // names nothing.
+    (void)noah_profile_split_v1_frame_encode(&reuse, wire, sizeof(wire));
+    wire[40] = 2u;
+    refresh_crc_length(wire, length);
+    assert(noah_profile_split_v1_frame_decode(wire, length, &decoded) && decoded.reuse_source.kind == 2u);
+    wire[40] = 3u;
+    refresh_crc_length(wire, length);
+    assert(!noah_profile_split_v1_frame_decode(wire, length, &decoded));
+
+    probe              = reuse;
+    probe.reuse_length = 0u;
+    assert(noah_profile_split_v1_frame_length(&probe) == 0u);
+    probe              = reuse;
+    probe.reuse_length = 301u;
+    assert(noah_profile_split_v1_frame_length(&probe) == 0u);
+    probe        = reuse;
+    probe.status = NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;
+    assert(noah_profile_split_v1_frame_length(&probe) == 0u);
+    probe                   = reuse;
+    probe.reuse_source.kind = 0u;
+    assert(noah_profile_split_v1_frame_length(&probe) == 0u);
+    probe                     = reuse;
+    probe.reuse_source.origin = 2u;
+    assert(noah_profile_split_v1_frame_length(&probe) == 0u);
+    probe              = reuse;
+    probe.chunk_length = 1u;
+    probe.chunk[0]     = 1u;
+    assert(noah_profile_split_v1_frame_length(&probe) == 0u);
+    probe              = reuse;
+    probe.reuse_source = (noah_profile_split_v1_source_t){.generation = 1u, .kind = 0u, .origin = 255u};
+    assert(noah_profile_split_v1_frame_length(&probe) == 0u);
+
+    // Earlier framing versions are refused.
+    for (uint8_t version = 1u; version < NOAH_PROFILE_SPLIT_PROTOCOL_VERSION; version++) {
+        (void)noah_profile_split_v1_frame_encode(&reuse, wire, sizeof(wire));
+        wire[0] = version;
+        refresh_crc_length(wire, NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE);
+        assert(!noah_profile_split_v1_frame_decode(wire, NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE, &decoded));
+    }
 }
 
 static void test_protocol_rejects_malformed_frames(void) {
@@ -253,63 +411,240 @@ static void test_protocol_rejects_malformed_frames(void) {
     noah_profile_split_v1_frame_t decoded;
     uint8_t                       wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
 
-    assert(noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     for (uint8_t length = 0u; length < NOAH_PROFILE_SPLIT_V1_FRAME_SIZE; length++) {
         assert(!noah_profile_split_v1_frame_decode(wire, length, &decoded));
     }
     wire[31] ^= 1u;
     assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
 
-    assert(noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     wire[3] = 1u;
     refresh_crc(wire);
     assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
-    assert(noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     wire[30] = 1u;
     refresh_crc(wire);
     assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
-    assert(noah_profile_split_v1_frame_encode(&frame, wire));
-    wire[16] = 15u;
+    assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
+    // A chunk length the frame's length does not hold.
+    wire[20] = 11u;
     refresh_crc(wire);
     assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
-    assert(noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     wire[1] = 0xFFu;
     refresh_crc(wire);
     assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
-    assert(noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     wire[2] = 0xFFu;
     refresh_crc(wire);
     assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
 
     frame.offset       = 20u;
     frame.chunk_length = 1u;
-    assert(!noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(!noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     frame.offset       = 0u;
     frame.chunk_length = 0u;
-    assert(!noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(!noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     frame.kind   = NOAH_PROFILE_SPLIT_V1_ACK;
     frame.status = NOAH_PROFILE_SPLIT_V1_STATUS_CONFLICT;
-    assert(!noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(!noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     frame.kind   = NOAH_PROFILE_SPLIT_V1_ERROR;
     frame.status = NOAH_PROFILE_SPLIT_V1_STATUS_OK;
-    assert(!noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(!noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     frame.kind           = NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST;
     frame.status         = NOAH_PROFILE_SPLIT_V1_STATUS_OK;
     frame.generation     = 3u;
     frame.payload_length = 20u;
     frame.offset         = 20u;
-    assert(!noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(!noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     frame.offset       = 0u;
     frame.chunk_length = 1u;
     frame.chunk[0]     = 0xA5u;
-    assert(!noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(!noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
+    test_protocol_rejects_malformed_sized_frames();
+}
+
+// Version 3 packs a descriptor's origin half and override flag into its flags
+// byte (bits 3 and 4) beside a 32-bit length; other flag bits are refused,
+// bit 2 included since it marked a VIA-bound record (D-F31).
+static void test_protocol_descriptor_flags(void) {
+    noah_profile_split_v1_frame_t frame = {.kind = NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK};
+    noah_profile_split_v1_frame_t decoded;
+    uint8_t                       wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+
+    for (uint8_t origin = 0u; origin < 2u; origin++) {
+        for (uint8_t flags = 0u; flags < 2u; flags++) {
+            frame.descriptor               = saved_descriptor(9u, origin, UINT32_C(0x01020304));
+            frame.descriptor.profile_flags = flags;
+            assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+            assert(wire[3] == (uint8_t)(0x03u | (origin << 3u) | (flags << 4u)));
+            assert(wire[7] == (uint8_t)1089u && wire[8] == (uint8_t)(1089u >> 8u) && wire[9] == 0u && wire[10] == 0u);
+            assert_round_trip(&frame);
+        }
+    }
+    for (uint8_t bit = 2u; bit < 8u; bit = bit == 2u ? 5u : (uint8_t)(bit + 1u)) {
+        assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+        wire[3] = (uint8_t)(wire[3] | (1u << bit));
+        refresh_crc(wire);
+        assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
+    }
+    // A length differing only in its high bytes is that length, refused here
+    // as past the schema's ceiling rather than read as its low 16 bits.
+    assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    wire[10] = 1u;
+    refresh_crc(wire);
+    assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
+}
+
+// Flag bit 5 is a METADATA frame's alone: its sender holds no prepared push
+// (D-F34). It rides beside any descriptor, saved, compiled or unreadable,
+// and stays reserved in every other kind, where it is refused as before.
+static void test_protocol_no_prepared_push_flag(void) {
+    const noah_profile_split_descriptor_t descriptors[] = {saved_descriptor(9u, 1u, UINT32_C(0x01020304)), compiled_descriptor(), {0}};
+    const noah_profile_split_v1_kind_t    others[]      = {NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN, NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE, NOAH_PROFILE_SPLIT_V1_PREPARE_COMMIT, NOAH_PROFILE_SPLIT_V1_ABORT};
+    noah_profile_split_v1_frame_t         frame         = {.kind = NOAH_PROFILE_SPLIT_V1_METADATA, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK};
+    noah_profile_split_v1_frame_t         decoded;
+    uint8_t                               wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    uint8_t                               clear[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+
+    for (unsigned index = 0u; index < sizeof(descriptors) / sizeof(descriptors[0]); index++) {
+        frame.descriptor       = descriptors[index];
+        frame.no_prepared_push = false;
+        assert(noah_profile_split_v1_frame_encode(&frame, clear, sizeof(clear)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+        assert_round_trip(&frame);
+        frame.no_prepared_push = true;
+        assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+        // The same frame with bit 5 of byte 3 set, and nothing else.
+        assert(wire[3] == (uint8_t)(clear[3] | 0x20u) && memcmp(&wire[4], &clear[4], NOAH_PROFILE_SPLIT_V1_FRAME_SIZE - 5u) == 0);
+        assert_round_trip(&frame);
+        // Bits 2, 6 and 7 stay refused beside it.
+        for (uint8_t bit = 2u; bit < 8u; bit = bit == 2u ? 6u : (uint8_t)(bit + 1u)) {
+            assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+            wire[3] = (uint8_t)(wire[3] | (1u << bit));
+            refresh_crc(wire);
+            assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
+        }
+    }
+    frame.descriptor = saved_descriptor(9u, 1u, UINT32_C(0x01020304));
+    for (unsigned index = 0u; index < sizeof(others) / sizeof(others[0]); index++) {
+        frame.kind             = others[index];
+        frame.no_prepared_push = false;
+        assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+        wire[3] = (uint8_t)(wire[3] | 0x20u);
+        refresh_crc(wire);
+        assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
+        frame.no_prepared_push = true;
+        assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)) == 0u);
+    }
+    // A transfer frame has no descriptor to carry it either.
+    assert(noah_profile_split_v1_frame_encode(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_ACK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 7u, .payload_digest = 8u, .no_prepared_push = true}, wire, sizeof(wire)) == 0u);
+}
+
+// A pulled chunk travels in a reply as large as a pushed one (D-F28): the
+// requester sizes the reply buffer from its PAYLOAD_REQUEST, and the other
+// half's reply starts it, the rest zero.
+static void test_protocol_reply_buffers(void) {
+    noah_profile_split_v1_frame_t request = {.kind = NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .offset = 0u, .payload_length = 1089u};
+    noah_profile_split_v1_frame_t chunk   = {.kind = NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .offset = 0u, .payload_length = 1089u};
+    noah_profile_split_v1_frame_t error   = {.kind = NOAH_PROFILE_SPLIT_V1_ERROR, .status = NOAH_PROFILE_SPLIT_V1_STATUS_STALE, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .offset = 0u, .payload_length = 1089u};
+    noah_profile_split_v1_frame_t ack     = {.kind = NOAH_PROFILE_SPLIT_V1_ACK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .payload_length = 1089u};
+    noah_profile_split_v1_frame_t decoded;
+    uint8_t                       wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
+
+    assert(noah_profile_split_v1_pulled_chunk_length(0u, 1089u) == NOAH_PROFILE_SPLIT_V1_CHUNK_MAX);
+    assert(noah_profile_split_v1_pulled_chunk_length(1089u - 106u, 1089u) == 106u);
+    assert(noah_profile_split_v1_pulled_chunk_length(1080u, 1089u) == 9u);
+    assert(noah_profile_split_v1_pulled_chunk_length(1089u, 1089u) == 0u);
+    assert(noah_profile_split_v1_reply_capacity(&request) == NOAH_PROFILE_SPLIT_V1_FRAME_MAX);
+    request.offset = 1080u;
+    assert(noah_profile_split_v1_reply_capacity(&request) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    request.offset = 1089u - 20u;
+    assert(noah_profile_split_v1_reply_capacity(&request) == NOAH_PROFILE_SPLIT_V1_CHUNK_OVERHEAD + 20u);
+    assert(noah_profile_split_v1_reply_capacity(&ack) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    request.offset = 1089u;
+    assert(noah_profile_split_v1_reply_capacity(&request) == 0u);
+    request.offset = 0u;
+
+    // A full chunk fills the largest buffer exactly.
+    chunk.chunk_length = NOAH_PROFILE_SPLIT_V1_CHUNK_MAX;
+    for (uint8_t index = 0u; index < NOAH_PROFILE_SPLIT_V1_CHUNK_MAX; index++) {
+        chunk.chunk[index] = (uint8_t)(index + 5u);
+    }
+    assert(noah_profile_split_v1_frame_encode(&chunk, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_MAX);
+    assert(noah_profile_split_v1_reply_decode(wire, NOAH_PROFILE_SPLIT_V1_FRAME_MAX, &decoded));
+    assert(decoded.kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK && decoded.chunk_length == NOAH_PROFILE_SPLIT_V1_CHUNK_MAX && memcmp(decoded.chunk, chunk.chunk, NOAH_PROFILE_SPLIT_V1_CHUNK_MAX) == 0);
+    // ...and never fits a smaller one.
+    assert(!noah_profile_split_v1_reply_decode(wire, NOAH_PROFILE_SPLIT_V1_FRAME_MAX - 1u, &decoded));
+    assert(!noah_profile_split_v1_reply_decode(wire, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, &decoded));
+
+    // An ERROR or BUSY answering a pull is a 32-byte frame in its buffer.
+    memset(wire, 0, sizeof(wire));
+    assert(noah_profile_split_v1_frame_encode(&error, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    assert(noah_profile_split_v1_reply_decode(wire, NOAH_PROFILE_SPLIT_V1_FRAME_MAX, &decoded));
+    assert(decoded.kind == NOAH_PROFILE_SPLIT_V1_ERROR && decoded.status == NOAH_PROFILE_SPLIT_V1_STATUS_STALE);
+    assert(noah_profile_split_v1_reply_decode(wire, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, &decoded));
+    // Anything left past the frame is a torn or stale reply.
+    wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX - 1u] = 1u;
+    assert(!noah_profile_split_v1_reply_decode(wire, NOAH_PROFILE_SPLIT_V1_FRAME_MAX, &decoded));
+    wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX - 1u] = 0u;
+    wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]     = 1u;
+    assert(!noah_profile_split_v1_reply_decode(wire, NOAH_PROFILE_SPLIT_V1_FRAME_MAX, &decoded));
+    wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE] = 0u;
+    // Buffers outside 32..128 bytes are refused, as is a frame whose CRC fails.
+    assert(!noah_profile_split_v1_reply_decode(wire, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE - 1u, &decoded));
+    assert(!noah_profile_split_v1_reply_decode(NULL, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, &decoded));
+    wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE - 1u] ^= 1u;
+    assert(!noah_profile_split_v1_reply_decode(wire, NOAH_PROFILE_SPLIT_V1_FRAME_MAX, &decoded));
+}
+
+// The split copy past 65,535 bytes (D-F28): a descriptor, chunk, pull request
+// and reuse range of a 100,000-byte copy round-trip with every field whole.
+static void test_protocol_over_64_kib(void) {
+    noah_profile_split_v1_frame_t begin = {.kind = NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = saved_descriptor(7u, 0u, UINT32_C(0x10203040))};
+    noah_profile_split_v1_frame_t chunk = {.kind = NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .offset = 70000u, .payload_length = 100000u, .chunk_length = 3u, .chunk = {1u, 2u, 3u}};
+    noah_profile_split_v1_frame_t request = {.kind = NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .offset = 99999u, .payload_length = 100000u};
+    noah_profile_split_v1_frame_t reuse = {
+        .kind                = NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE,
+        .status              = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
+        .generation          = 7u,
+        .payload_digest      = UINT32_C(0x10203040),
+        .offset              = 66000u,
+        .payload_length      = 100000u,
+        .reuse_length        = 20000u,
+        .reuse_source_offset = 67000u,
+        .reuse_source        = {.generation = 5u, .digest = 6u, .crc32 = 7u, .kind = 1u, .origin = 1u},
+    };
+    uint8_t wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
+
+    begin.descriptor.payload_length = 100000u;
+    assert_round_trip(&begin);
+    assert_round_trip(&chunk);
+    assert(noah_profile_split_v1_frame_encode(&chunk, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    assert(wire[12] == (uint8_t)70000u && wire[13] == (uint8_t)(70000u >> 8u) && wire[14] == 1u && wire[15] == 0u);
+    assert(wire[16] == (uint8_t)100000u && wire[17] == (uint8_t)(100000u >> 8u) && wire[18] == 1u && wire[19] == 0u);
+    assert_round_trip(&request);
+    assert_round_trip(&reuse);
+    assert(noah_profile_split_v1_frame_encode(&reuse, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE);
+    assert(wire[24] == (uint8_t)67000u && wire[25] == (uint8_t)(67000u >> 8u) && wire[26] == 1u);
+    // A range past the copy, or one reaching past the source's ceiling, is
+    // refused.
+    reuse.reuse_length = 34001u;
+    assert(noah_profile_split_v1_frame_length(&reuse) == 0u);
+    reuse.reuse_length        = 20000u;
+    reuse.reuse_source_offset = NOAH_PROFILE_BLOB_V1_MAX_SIZE - 19999u;
+    assert(noah_profile_split_v1_frame_length(&reuse) == 0u);
 }
 
 int main(void) {
+    test_protocol_over_64_kib();
+    test_protocol_descriptor_flags();
+    test_protocol_no_prepared_push_flag();
     test_authority_decision_table();
     test_authority_publication_and_activation_observer();
     test_protocol_golden_frames();
     test_protocol_rejects_malformed_frames();
+    test_protocol_reply_buffers();
     puts("profile split foundation host tests passed");
     return 0;
 }

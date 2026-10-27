@@ -13,8 +13,8 @@ static const char *fixture_path;
 
 typedef struct {
     uint8_t                                 staged[NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE];
-    uint16_t                                declared_length;
-    uint16_t                                validation_offset;
+    uint32_t                                declared_length;
+    uint32_t                                validation_offset;
     uint32_t                                validation_crc;
     uint32_t                                validation_digest;
     uint8_t                                 max_validation_budget;
@@ -28,6 +28,7 @@ typedef struct {
     unsigned                                activation_begin_calls;
     unsigned                                activation_step_calls;
     unsigned                                abort_calls;
+    unsigned                                source_read_calls;
     noah_profile_candidate_backend_result_t begin_result;
     noah_profile_candidate_backend_result_t write_result;
     noah_profile_candidate_backend_result_t read_result;
@@ -43,6 +44,19 @@ typedef struct {
     bool                                    validation_step_returns_ok;
     noah_profile_candidate_v1_metadata_t    metadata;
 } fake_backend_t;
+
+// Long enough for a range that takes several REUSE steps; main fills the
+// bytes after the text.
+static uint8_t reuse_source[640] = "A source profile that remains immutable until activation.";
+static unsigned largest_write;
+static noah_profile_candidate_backend_result_t fake_read_source(void *context, const noah_profile_candidate_v1_source_t *source, uint32_t offset, uint8_t *bytes, uint8_t length) {
+    fake_backend_t *fake = context;
+    fake->source_read_calls++;
+    assert(length <= 20u);
+    if (source->generation != 7u || source->digest != 123u || source->crc32 != 456u || source->kind != 1u || source->origin != 0u || offset > sizeof(reuse_source) || length > sizeof(reuse_source) - offset) return NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
+    memcpy(bytes, reuse_source + offset, length);
+    return NOAH_PROFILE_CANDIDATE_BACKEND_OK;
+}
 
 static uint8_t hex_nibble(char value) {
     if (value >= '0' && value <= '9') {
@@ -99,16 +113,17 @@ static void write_u32(uint8_t *target, uint32_t value) {
     target[3] = (uint8_t)(value >> 24u);
 }
 
-static noah_profile_candidate_v1_metadata_t metadata_for(const uint8_t *bytes, uint16_t length) {
+static noah_profile_candidate_v1_metadata_t metadata_for(const uint8_t *bytes, uint32_t length) {
     noah_profile_candidate_v1_metadata_t metadata = {
-        .schema_major      = 1u,
-        .schema_minor      = 0u,
-        .requested_domains = 0u,
-        .flags             = 0u,
-        .payload_length    = length,
-        .crc32             = noah_profile_crc32_finish(noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, bytes, length)),
-        .digest            = noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, bytes, length),
-        .action_abi_digest = UINT32_C(0xCCBBAA99),
+        .store_format_version = NOAH_PROFILE_LOGICAL_STORE_VERSION,
+        .schema_major         = NOAH_PROFILE_SCHEMA_MAJOR,
+        .schema_minor         = NOAH_PROFILE_SCHEMA_MINOR,
+        .requested_domains    = 0u,
+        .flags                = 0u,
+        .payload_length       = length,
+        .crc32                = noah_profile_crc32_finish(noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, bytes, length)),
+        .digest               = noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, bytes, length),
+        .action_abi_digest    = UINT32_C(0xCCBBAA99),
     };
     return metadata;
 }
@@ -119,26 +134,26 @@ static void begin_frame(uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE], uint16_
     frame[1] = NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL;
     frame[2] = NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN;
     write_u16(&frame[3], transaction_id);
+    // Profile Wire 2 (D-F28): no flags or store-format byte, a 32-bit length.
     frame[5] = metadata->schema_major;
     frame[6] = metadata->schema_minor;
     frame[7] = metadata->requested_domains;
-    frame[8] = metadata->flags;
-    write_u16(&frame[9], metadata->payload_length);
-    write_u32(&frame[11], metadata->crc32);
-    write_u32(&frame[15], metadata->digest);
-    write_u32(&frame[19], metadata->action_abi_digest);
+    write_u32(&frame[8], metadata->payload_length);
+    write_u32(&frame[12], metadata->crc32);
+    write_u32(&frame[16], metadata->digest);
+    write_u32(&frame[20], metadata->action_abi_digest);
 }
 
-static void chunk_frame(uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE], uint16_t transaction_id, uint16_t offset, const uint8_t *bytes, uint8_t length) {
+static void chunk_frame(uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE], uint16_t transaction_id, uint32_t offset, const uint8_t *bytes, uint8_t length) {
     memset(frame, 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE);
     frame[0] = NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET;
     frame[1] = NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL;
     frame[2] = NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK;
     write_u16(&frame[3], transaction_id);
-    write_u16(&frame[5], offset);
-    frame[7] = length;
+    write_u32(&frame[5], offset);
+    frame[9] = length;
     if (length <= NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX) {
-        memcpy(&frame[8], bytes, length);
+        memcpy(&frame[10], bytes, length);
     }
 }
 
@@ -159,9 +174,10 @@ static noah_profile_candidate_backend_result_t fake_begin(void *context, const n
     return fake->begin_result;
 }
 
-static noah_profile_candidate_backend_result_t fake_write(void *context, uint16_t offset, const uint8_t *bytes, uint8_t length) {
+static noah_profile_candidate_backend_result_t fake_write(void *context, uint32_t offset, const uint8_t *bytes, uint8_t length) {
     fake_backend_t *fake = context;
     fake->write_calls++;
+    if (length > largest_write) largest_write = length;
     if (fake->write_result == NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
         assert((uint32_t)offset + length <= fake->declared_length);
         memcpy(&fake->staged[offset], bytes, length);
@@ -169,7 +185,7 @@ static noah_profile_candidate_backend_result_t fake_write(void *context, uint16_
     return fake->write_result;
 }
 
-static noah_profile_candidate_backend_result_t fake_read(void *context, uint16_t offset, uint8_t *bytes, uint8_t length) {
+static noah_profile_candidate_backend_result_t fake_read(void *context, uint32_t offset, uint8_t *bytes, uint8_t length) {
     fake_backend_t *fake = context;
     fake->read_calls++;
     if (fake->read_result == NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
@@ -192,7 +208,7 @@ static noah_profile_candidate_backend_result_t fake_validation_begin(void *conte
 
 static noah_profile_candidate_backend_result_t fake_validation_step(void *context, uint8_t byte_budget, noah_profile_candidate_v1_error_t *error) {
     fake_backend_t *fake = context;
-    uint16_t        remaining;
+    uint32_t        remaining;
     uint8_t         consumed;
 
     fake->validation_step_calls++;
@@ -204,11 +220,11 @@ static noah_profile_candidate_backend_result_t fake_validation_step(void *contex
         return NOAH_PROFILE_CANDIDATE_BACKEND_OK;
     }
 
-    remaining               = (uint16_t)(fake->declared_length - fake->validation_offset);
+    remaining               = fake->declared_length - fake->validation_offset;
     consumed                = remaining < byte_budget ? (uint8_t)remaining : byte_budget;
     fake->validation_crc    = noah_profile_crc32_update(fake->validation_crc, &fake->staged[fake->validation_offset], consumed);
     fake->validation_digest = noah_profile_fnv1a_update(fake->validation_digest, &fake->staged[fake->validation_offset], consumed);
-    fake->validation_offset = (uint16_t)(fake->validation_offset + consumed);
+    fake->validation_offset = fake->validation_offset + consumed;
     if (fake->validation_offset < fake->declared_length) {
         return NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS;
     }
@@ -288,6 +304,7 @@ static noah_profile_candidate_backend_t backend_for(fake_backend_t *fake) {
         .begin            = fake_begin,
         .write            = fake_write,
         .read             = fake_read,
+        .read_source      = fake_read_source,
         .validation_begin = fake_validation_begin,
         .validation_step  = fake_validation_step,
         .commit_begin     = fake_commit_begin,
@@ -301,8 +318,8 @@ static noah_profile_candidate_backend_t backend_for(fake_backend_t *fake) {
 
 static noah_profile_candidate_compatibility_t compatibility(void) {
     noah_profile_candidate_compatibility_t compatibility = {
-        .schema_major          = 1u,
-        .schema_minor          = 0u,
+        .schema_major          = NOAH_PROFILE_SCHEMA_MAJOR,
+        .schema_minor          = NOAH_PROFILE_SCHEMA_MINOR,
         .supported_domain_mask = NOAH_PROFILE_CANDIDATE_V1_KNOWN_DOMAINS,
         .max_payload_length    = NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE,
         .action_abi_digest     = UINT32_C(0xCCBBAA99),
@@ -354,7 +371,7 @@ static void test_exact_frame_codecs(void) {
     assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK);
     assert(command.operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_CHUNK);
     assert(command.payload.chunk.offset == 0u && command.payload.chunk.length == 8u);
-    assert(memcmp(command.payload.chunk.bytes, "NLP1\x01\x00\x00\x01", 8u) == 0);
+    assert(memcmp(command.payload.chunk.bytes, "NLP1\x04\x03\x00\x01", 8u) == 0);
 
     load_fixture("validate-request", frame);
     assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK);
@@ -403,28 +420,41 @@ static void test_malformed_frame_matrix(void) {
     begin_frame(frame, 1u, &metadata);
     frame[7] = 0x80u;
     assert(noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED && error.frame_offset == 7u);
-    begin_frame(frame, 1u, &metadata);
-    frame[8] = 1u;
-    assert(noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED && error.frame_offset == 8u);
     metadata.payload_length = 7u;
     begin_frame(frame, 1u, &metadata);
-    assert(noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED && error.frame_offset == 9u);
+    assert(noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED && error.frame_offset == 8u);
+    // Every length byte counts: a length past the schema's ceiling is refused,
+    // not read as its low 16 bits.
+    metadata.payload_length = NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE + 1u;
+    begin_frame(frame, 1u, &metadata);
+    assert(noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED && error.frame_offset == 8u);
     metadata.payload_length = 8u;
-    for (uint8_t offset = 23u; offset < 32u; offset++) {
+    begin_frame(frame, 1u, &metadata);
+    frame[10] = 1u; // 65,544 bytes
+    assert(noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == (NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE >= 65544u ? NOAH_PROFILE_CANDIDATE_V1_DECODE_OK : NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED));
+    // The base's version implies store format 6 (D-F28): BEGIN carries none.
+    begin_frame(frame, 1u, &metadata);
+    assert(noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK);
+    assert(command.payload.begin.store_format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION && command.payload.begin.flags == 0u);
+    // Bytes 24..31 bound a candidate to the VIA store until D-F31; any
+    // nonzero byte there is refused before a candidate lease or a write.
+    for (uint8_t offset = 24u; offset < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; offset++) {
         begin_frame(frame, 1u, &metadata);
         frame[offset] = 1u;
         assert(noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED && error.frame_offset == offset);
     }
 
     chunk_frame(frame, 1u, 0u, bytes, 1u);
-    frame[7] = 0u;
-    assert(noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED && error.frame_offset == 7u);
+    frame[9] = 0u;
+    assert(noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED && error.frame_offset == 9u);
     chunk_frame(frame, 1u, 0u, bytes, 1u);
-    frame[7] = 21u;
-    assert(noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED && error.frame_offset == 7u);
-    chunk_frame(frame, 1u, 4063u, bytes, 2u);
+    frame[9] = 21u;
+    assert(noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED && error.frame_offset == 9u);
+    chunk_frame(frame, 1u, NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE - 1u, bytes, 2u);
     assert(noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED && error.frame_offset == 5u);
-    for (uint8_t offset = 9u; offset < 32u; offset++) {
+    chunk_frame(frame, 1u, UINT32_MAX, bytes, 2u);
+    assert(noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED && error.frame_offset == 5u);
+    for (uint8_t offset = 11u; offset < 32u; offset++) {
         chunk_frame(frame, 1u, 0u, bytes, 1u);
         frame[offset] = 1u;
         assert(noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED && error.frame_offset == offset);
@@ -464,15 +494,32 @@ static void test_operation_status_codec(void) {
                 .row_index   = 5u,
                 .tap_index   = 3u,
                 .field_id    = 4u,
-                .byte_offset = UINT16_C(0x1122),
+                .byte_offset = UINT32_C(0x00011122),
             },
         .operation_sequence = UINT16_C(0x3344),
+        .error_sequence     = UINT16_C(0x6677),
     };
     uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
 
     load_fixture("operation-status-request", frame);
     assert(noah_profile_candidate_v1_handle_status_get(&status, frame, sizeof(frame)));
     assert_golden("operation-status-response", frame);
+
+    // Page 3: where the rejection is, its byte offset 32 bits wide (D-F28).
+    load_fixture("operation-status-request", frame);
+    frame[4] = NOAH_PROFILE_CANDIDATE_V1_STATUS_ERROR_PAGE;
+    assert(noah_profile_candidate_v1_handle_status_get(&status, frame, sizeof(frame)));
+    assert_golden("operation-error-response", frame);
+
+    // Offsets and lengths past 65,535 are reported whole.
+    status.next_offset    = UINT32_C(0x00012345);
+    status.payload_length = UINT32_C(0x0001FFE0);
+    load_fixture("operation-status-request", frame);
+    assert(noah_profile_candidate_v1_handle_status_get(&status, frame, sizeof(frame)));
+    assert(frame[13] == 0x45u && frame[14] == 0x23u && frame[15] == 0x01u && frame[16] == 0x00u);
+    assert(frame[17] == 0xE0u && frame[18] == 0xFFu && frame[19] == 0x01u && frame[20] == 0x00u);
+    status.next_offset    = 8u;
+    status.payload_length = 8u;
 
     status.state              = NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING;
     status.last_operation     = NOAH_PROFILE_CANDIDATE_V1_OPERATION_COMMIT;
@@ -502,13 +549,13 @@ static void test_operation_status_codec(void) {
 // Page 1 carries the save's copy to the other half. Page 0 is unchanged and
 // still refuses page 1, so a build without the owner keeps answering it with
 // UNKNOWN_PAGE.
-static void test_peer_status_page(void) {
-    const noah_profile_candidate_v1_peer_status_t peer = {
-        .phase                   = NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_SENDING,
+static void test_copy_status_page(void) {
+    const noah_profile_candidate_v1_copy_status_t other_half = {
+        .phase                   = NOAH_PROFILE_CANDIDATE_V1_COPY_PHASE_SENDING,
         .last_status             = 6u,
-        .flags                   = NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_CLEANUP_PENDING | NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_MASTER | 0x80u,
-        .transfer_offset         = 0x0102u,
-        .transfer_length         = 0x0304u,
+        .flags                   = NOAH_PROFILE_CANDIDATE_V1_COPY_FLAG_PEER_CLEANUP_PENDING | NOAH_PROFILE_CANDIDATE_V1_COPY_FLAG_MASTER | 0x80u,
+        .transfer_offset         = 0x00010102u,
+        .transfer_length         = 0x00020304u,
         .retry_count             = 0x05060708u,
         .transport_failure_count = 0x090a0b0cu,
         .busy_streak             = 0x0d0eu,
@@ -516,38 +563,61 @@ static void test_peer_status_page(void) {
         .busy_store_state        = 3u,
         .busy_owner              = 1u,
         .busy_admission          = 2u,
+        .reused_bytes = 0x00011112u,
+        .reuse_exchanges = 0x1314u,
+        .source_unavailable_replies = 0x1516u,
+        .prepared_scans = 0x1718191au,
+        .prepared_exchanges = 0x1b1c1d1eu,
+        .reuse_unavailable = true,
     };
     uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
 
     load_fixture("operation-status-request", frame);
-    assert(!noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, sizeof(frame)));
+    assert(!noah_profile_candidate_v1_handle_copy_status_get(&other_half, frame, sizeof(frame)));
     frame[4] = 1u;
-    assert(noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, sizeof(frame)));
+    assert(noah_profile_candidate_v1_handle_copy_status_get(&other_half, frame, sizeof(frame)));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == 25u);
-    assert(frame[7] == 1u && frame[8] == NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_SENDING && frame[9] == 6u);
+    // Layout 2 (D-F28): 32-bit transfer offset and length.
+    assert(frame[7] == 2u && frame[8] == NOAH_PROFILE_CANDIDATE_V1_COPY_PHASE_SENDING && frame[9] == 6u);
     assert(frame[10] == 0x03u); // unknown flag bits never reach the wire
-    assert(frame[11] == 0x02u && frame[12] == 0x01u && frame[13] == 0x04u && frame[14] == 0x03u);
-    assert(frame[15] == 0x08u && frame[18] == 0x05u && frame[19] == 0x0cu && frame[22] == 0x09u);
-    // The peer's last BUSY: streak, reason, store state, transfer owner.
-    assert(frame[23] == 0x0eu && frame[24] == 0x0du && frame[25] == 2u && frame[26] == 3u && frame[27] == 1u && frame[28] == 2u);
-    for (uint8_t index = 29u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) {
-        assert(frame[index] == 0u);
-    }
+    assert(frame[11] == 0x02u && frame[12] == 0x01u && frame[13] == 0x01u && frame[14] == 0x00u);
+    assert(frame[15] == 0x04u && frame[16] == 0x03u && frame[17] == 0x02u && frame[18] == 0x00u);
+    assert(frame[19] == 0x08u && frame[22] == 0x05u && frame[23] == 0x0cu && frame[26] == 0x09u);
+    // The other half's last BUSY: streak, reason, store state, and transfer
+    // owner with storage admission in the high nibble.
+    assert(frame[27] == 0x0eu && frame[28] == 0x0du && frame[29] == 2u && frame[30] == 3u && frame[31] == 0x21u);
     load_fixture("operation-status-request", frame);
     frame[4]  = 1u;
     frame[31] = 1u;
-    assert(noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, sizeof(frame)));
+    assert(noah_profile_candidate_v1_handle_copy_status_get(&other_half, frame, sizeof(frame)));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED);
     load_fixture("operation-status-request", frame);
     frame[4] = 2u;
-    assert(!noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, sizeof(frame)));
+    assert(noah_profile_candidate_v1_handle_copy_status_get(&other_half, frame, sizeof(frame)));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == 25u);
+    assert(frame[7] == 2u && frame[8] == 1u);
+    assert(frame[9] == 0x12u && frame[10] == 0x11u && frame[11] == 0x01u && frame[12] == 0x00u);
+    assert(frame[13] == 0x14u && frame[14] == 0x13u);
+    assert(frame[15] == 0x16u && frame[16] == 0x15u);
+    assert(frame[17] == 0x1au && frame[20] == 0x17u && frame[21] == 0x1eu && frame[24] == 0x1bu);
+    // The transfer offset; its length is page 1's.
+    assert(frame[25] == 0x02u && frame[26] == 0x01u && frame[27] == 0x01u && frame[28] == 0x00u);
+    for (uint8_t index = 29u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) assert(frame[index] == 0u);
+    load_fixture("operation-status-request", frame);
+    frame[4] = 2u;
+    frame[31] = 1u;
+    assert(noah_profile_candidate_v1_handle_copy_status_get(&other_half, frame, sizeof(frame)));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED);
+    load_fixture("operation-status-request", frame);
+    frame[4] = 3u;
+    assert(!noah_profile_candidate_v1_handle_copy_status_get(&other_half, frame, sizeof(frame)));
     frame[4] = 1u;
-    assert(!noah_profile_candidate_v1_handle_peer_status_get(NULL, frame, sizeof(frame)));
-    assert(!noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, 31u));
+    assert(!noah_profile_candidate_v1_handle_copy_status_get(NULL, frame, sizeof(frame)));
+    assert(!noah_profile_candidate_v1_handle_copy_status_get(&other_half, frame, 31u));
 }
 
 static void test_mailbox_and_begin_retries(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -614,7 +684,45 @@ static void begin_transaction(noah_profile_candidate_transaction_t *transaction,
     assert(status_of(transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING);
 }
 
-static void write_chunk(noah_profile_candidate_transaction_t *transaction, fake_backend_t *fake, uint16_t transaction_id, uint16_t offset, const uint8_t *bytes, uint8_t length) {
+static void test_begin_retry_requires_identical_metadata(void) {
+    static const uint8_t profile[8] = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
+    for (uint8_t changed = 1u; changed <= 3u; changed++) {
+        fake_backend_t fake;
+        fake_init(&fake);
+        noah_profile_candidate_backend_t backend = backend_for(&fake);
+        noah_profile_candidate_compatibility_t compatible = compatibility();
+        noah_profile_candidate_transaction_t transaction;
+        noah_profile_candidate_v1_metadata_t original = metadata_for(profile, sizeof(profile));
+        noah_profile_candidate_transaction_init(&transaction, &backend, &compatible);
+        begin_transaction(&transaction, &fake, 123u, &original);
+
+        uint8_t frame[32];
+        begin_frame(frame, 123u, &original);
+        queue_and_scan(&transaction, &fake, frame);
+        assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
+        assert(fake.begin_calls == 1u);
+
+        noah_profile_candidate_v1_metadata_t retry = original;
+        if (changed & 1u) retry.crc32++;
+        if (changed & 2u) retry.action_abi_digest++;
+        begin_frame(frame, 123u, &retry);
+        queue_and_scan(&transaction, &fake, frame);
+        noah_profile_candidate_v1_status_t status = status_of(&transaction);
+        assert(status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_CONFLICTING_RETRY);
+        assert(status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED);
+        assert(status.flags == NOAH_PROFILE_CANDIDATE_V1_STATUS_POISONED);
+        assert(fake.begin_calls == 1u && fake.commit_begin_calls == 0u);
+        assert(transaction.metadata.crc32 == original.crc32);
+        assert(transaction.metadata.action_abi_digest == original.action_abi_digest);
+
+        // An original BEGIN cannot revive a poisoned candidate either.
+        begin_frame(frame, 123u, &original);
+        queue_and_scan(&transaction, &fake, frame);
+        assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_POISONED);
+    }
+}
+
+static void write_chunk(noah_profile_candidate_transaction_t *transaction, fake_backend_t *fake, uint16_t transaction_id, uint32_t offset, const uint8_t *bytes, uint8_t length) {
     uint8_t frame[32];
     chunk_frame(frame, transaction_id, offset, bytes, length);
     queue_and_scan(transaction, fake, frame);
@@ -668,15 +776,15 @@ static void test_sequential_chunks_and_duplicate_rules(void) {
     assert((status.flags & NOAH_PROFILE_CANDIDATE_V1_STATUS_POISONED) != 0u);
 }
 
-static void stage_complete(noah_profile_candidate_transaction_t *transaction, fake_backend_t *fake, uint16_t transaction_id, const uint8_t *profile, uint16_t length, const noah_profile_candidate_v1_metadata_t *metadata) {
-    uint16_t offset;
+static void stage_complete(noah_profile_candidate_transaction_t *transaction, fake_backend_t *fake, uint16_t transaction_id, const uint8_t *profile, uint32_t length, const noah_profile_candidate_v1_metadata_t *metadata) {
+    uint32_t offset;
 
     begin_transaction(transaction, fake, transaction_id, metadata);
     for (offset = 0u; offset < length;) {
-        uint16_t remaining    = (uint16_t)(length - offset);
+        uint32_t remaining    = length - offset;
         uint8_t  chunk_length = remaining > 20u ? 20u : (uint8_t)remaining;
         write_chunk(transaction, fake, transaction_id, offset, &profile[offset], chunk_length);
-        offset = (uint16_t)(offset + chunk_length);
+        offset += chunk_length;
     }
     assert(status_of(transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMPLETE);
 }
@@ -772,8 +880,66 @@ static void test_bounded_validation_and_error_locations(void) {
     assert(status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE);
 }
 
+// Validation replaces an error with no mailbox operation between: a CHUNK
+// refused while validating, then the validator's own rejection. Transaction
+// and operation sequence stay put, so only the error sequence tells a page 3
+// read after the rejection from the page 0 read before it.
+static void test_error_pages_follow_asynchronous_errors(void) {
+    uint8_t                                profile[48];
+    uint8_t                                page0[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
+    uint8_t                                page3[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
+    fake_backend_t                         fake;
+    noah_profile_candidate_backend_t       backend;
+    noah_profile_candidate_compatibility_t compatible = compatibility();
+    noah_profile_candidate_transaction_t   transaction;
+    noah_profile_candidate_v1_metadata_t   metadata;
+    noah_profile_candidate_v1_status_t     refused;
+    noah_profile_candidate_v1_status_t     rejected;
+
+    for (uint8_t index = 0u; index < sizeof(profile); index++) profile[index] = (uint8_t)(0x80u + index);
+    metadata = metadata_for(profile, sizeof(profile));
+    fake_init(&fake);
+    fake.semantic_reject = true;
+    backend              = backend_for(&fake);
+    noah_profile_candidate_transaction_init(&transaction, &backend, &compatible);
+    assert(status_of(&transaction).error_sequence == 0u);
+    stage_complete(&transaction, &fake, 9u, profile, sizeof(profile), &metadata);
+    request_validation(&transaction, &fake, 9u);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING);
+    chunk_frame(page0, 9u, 0u, profile, 20u);
+    queue_and_scan(&transaction, &fake, page0);
+    refused = status_of(&transaction);
+    assert(refused.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING && refused.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_INVALID_STATE);
+
+    // The host reads page 0 while validation still runs...
+    load_fixture("operation-status-request", page0);
+    assert(noah_profile_candidate_v1_handle_status_get(&refused, page0, sizeof(page0)));
+    finish_validation(&transaction);
+    rejected = status_of(&transaction);
+    assert(rejected.state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED && rejected.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_VALIDATION_REJECTED && rejected.error.byte_offset == 6u);
+    assert(rejected.transaction_id == refused.transaction_id && rejected.operation_sequence == refused.operation_sequence);
+    assert(rejected.error_sequence == (uint16_t)(refused.error_sequence + 1u));
+
+    // ...and page 3 after it ended. Transaction and operation sequence match
+    // page 0's; the error sequence does not, so the location is not page 0's.
+    load_fixture("operation-status-request", page3);
+    page3[4] = NOAH_PROFILE_CANDIDATE_V1_STATUS_ERROR_PAGE;
+    assert(noah_profile_candidate_v1_handle_status_get(&rejected, page3, sizeof(page3)));
+    assert(page0[7 + 18] == NOAH_PROFILE_CANDIDATE_V1_ERROR_INVALID_STATE && page3[7 + 1] == NOAH_PROFILE_CANDIDATE_V1_ERROR_VALIDATION_REJECTED);
+    assert(memcmp(&page0[7 + 4], &page3[7 + 12], 2u) == 0 && memcmp(&page0[7 + 19], &page3[7 + 14], 2u) == 0);
+    assert(memcmp(&page0[7 + 21], &page3[7 + 16], 2u) != 0);
+    // Page 0 read again pairs with that page 3.
+    load_fixture("operation-status-request", page0);
+    assert(noah_profile_candidate_v1_handle_status_get(&rejected, page0, sizeof(page0)));
+    assert(memcmp(&page0[7 + 21], &page3[7 + 16], 2u) == 0);
+
+    // Setting the same error again is no change and does not advance it.
+    finish_validation(&transaction);
+    assert(status_of(&transaction).error_sequence == rejected.error_sequence);
+}
+
 static void test_commit_activation_and_idempotent_retry(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -831,8 +997,65 @@ static void test_commit_activation_and_idempotent_retry(void) {
     assert(fake.commit_begin_calls == 1u && fake.commit_step_calls == 2u && fake.activation_begin_calls == 1u && fake.activation_step_calls == 2u);
 }
 
+static void test_conflicting_begin_preserves_durable_phases(void) {
+    static const uint8_t profile[8] = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
+    const noah_profile_candidate_v1_state_t phases[] = {
+        NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING,
+        NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER,
+        NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING,
+        NOAH_PROFILE_CANDIDATE_V1_STATE_AUTHORITY_FAILED,
+    };
+    for (uint8_t i = 0; i < sizeof(phases) / sizeof(phases[0]); i++) {
+        fake_backend_t fake;
+        fake_init(&fake);
+        fake.commit_steps_remaining = fake.activation_steps_remaining = 1u;
+        noah_profile_candidate_backend_t backend = backend_for(&fake);
+        noah_profile_candidate_compatibility_t compatible = compatibility();
+        noah_profile_candidate_transaction_t transaction;
+        noah_profile_candidate_transaction_init(&transaction, &backend, &compatible);
+        assert(noah_profile_candidate_transaction_require_split_authorization(&transaction, true));
+        noah_profile_candidate_v1_metadata_t metadata = metadata_for(profile, sizeof(profile));
+        stage_validated(&transaction, &fake, 73u, profile, sizeof(profile), &metadata);
+        uint8_t frame[32];
+        simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 73u);
+        queue_and_scan(&transaction, &fake, frame);
+        assert(noah_profile_candidate_transaction_authorize_commit(&transaction));
+        if (phases[i] != NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING) {
+            while (transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING)
+                assert(noah_profile_candidate_transaction_scan(&transaction));
+        }
+        if (phases[i] == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING)
+            assert(noah_profile_candidate_transaction_authorize_activation(&transaction));
+        if (phases[i] == NOAH_PROFILE_CANDIDATE_V1_STATE_AUTHORITY_FAILED)
+            assert(noah_profile_candidate_transaction_fail_postcommit(&transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_POSTCOMMIT_AUTHORITY_LOST));
+        assert(transaction.status.state == phases[i]);
+        metadata.digest ^= 1u;
+        begin_frame(frame, 73u, &metadata);
+        queue_and_scan(&transaction, &fake, frame);
+        assert(transaction.status.state == phases[i]);
+        assert(transaction.metadata.digest != metadata.digest);
+        if (phases[i] != NOAH_PROFILE_CANDIDATE_V1_STATE_AUTHORITY_FAILED) {
+            assert(transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_CONFLICTING_RETRY);
+            assert(!transaction.poisoned);
+        }
+        simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT, 73u);
+        queue_and_scan(&transaction, &fake, frame);
+        assert(transaction.status.state == phases[i] && fake.abort_calls == 0u);
+        assert(noah_profile_candidate_transaction_expire_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_DURABLE_PHASE);
+        if (phases[i] == NOAH_PROFILE_CANDIDATE_V1_STATE_AUTHORITY_FAILED) continue;
+        while (transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING)
+            assert(noah_profile_candidate_transaction_scan(&transaction));
+        if (transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER)
+            assert(noah_profile_candidate_transaction_authorize_activation(&transaction));
+        while (transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING)
+            assert(noah_profile_candidate_transaction_scan(&transaction));
+        assert(transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+        assert(transaction.last_committed_transaction_id == 73u);
+    }
+}
+
 static void test_split_authorization_barriers(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -890,7 +1113,7 @@ static void test_split_authorization_barriers(void) {
     assert(fake.abort_calls == 2u && fake.commit_begin_calls == 0u);
 
     // Simultaneous-host arbitration has a distinct frozen outcome rather than
-    // impersonating a durable-peer supersession.
+    // impersonating a durable supersession by the other half.
     stage_validated(&transaction, &fake, 710u, profile, sizeof(profile), &metadata);
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 710u);
     queue_and_scan(&transaction, &fake, frame);
@@ -962,7 +1185,7 @@ static void test_split_authorization_barriers(void) {
 }
 
 static void test_postcommit_authority_failure_is_terminal_and_retains_candidate(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -995,7 +1218,7 @@ static void test_postcommit_authority_failure_is_terminal_and_retains_candidate(
 }
 
 static void test_split_commit_failure_reports_and_cleans_known_precommit_failure(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -1040,7 +1263,7 @@ static void test_split_commit_failure_reports_and_cleans_known_precommit_failure
 }
 
 static void test_activation_failure_is_durable_and_requires_status_clear(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -1081,7 +1304,7 @@ static void test_activation_failure_is_durable_and_requires_status_clear(void) {
 }
 
 static void test_unknown_marker_durability_is_not_reported_as_safe_failure(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -1106,7 +1329,7 @@ static void test_unknown_marker_durability_is_not_reported_as_safe_failure(void)
 }
 
 static void test_abort_reset_and_no_timeout(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -1170,7 +1393,7 @@ static void test_abort_reset_and_no_timeout(void) {
 }
 
 static void test_begin_compatibility_rejections(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -1181,11 +1404,11 @@ static void test_begin_compatibility_rejections(void) {
     fake_init(&fake);
     backend = backend_for(&fake);
     noah_profile_candidate_transaction_init(&transaction, &backend, &compatible);
-    metadata.schema_minor = 1u;
+    metadata.schema_minor = NOAH_PROFILE_SCHEMA_MINOR + 1u;
     begin_frame(frame, 1u, &metadata);
     queue_and_scan(&transaction, &fake, frame);
     assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_INCOMPATIBLE_SCHEMA && fake.begin_calls == 0u);
-    metadata.schema_minor            = 0u;
+    metadata.schema_minor            = NOAH_PROFILE_SCHEMA_MINOR;
     metadata.requested_domains       = NOAH_PROFILE_CANDIDATE_V1_DOMAIN_RGB;
     compatible.supported_domain_mask = 0u;
     noah_profile_candidate_transaction_init(&transaction, &backend, &compatible);
@@ -1208,7 +1431,7 @@ static void test_begin_compatibility_rejections(void) {
 }
 
 static void test_busy_begin_remains_queued_without_poisoning(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -1244,7 +1467,7 @@ static void test_busy_begin_remains_queued_without_poisoning(void) {
 }
 
 static void test_explicit_precommit_expiry_never_crosses_durable_boundary(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -1302,18 +1525,229 @@ static void test_explicit_precommit_expiry_never_crosses_durable_boundary(void) 
     assert(fake.abort_calls == 3u);
 }
 
+// Profile Wire 2 (D-F28): destination, source and length are 32 bits.
+static void reuse_frame(uint8_t frame[32], uint16_t transaction_id, uint32_t offset, uint32_t source_offset, uint32_t length) {
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_REUSE, transaction_id);
+    write_u32(frame + 5, offset);
+    write_u32(frame + 9, source_offset);
+    write_u32(frame + 13, length);
+    write_u32(frame + 17, 7u);
+    write_u32(frame + 21, 123u);
+    write_u32(frame + 25, 456u);
+    frame[29] = 1;
+}
+
+static void test_reuse_is_bounded_and_validated(void) {
+    uint8_t frame[32], target[600];
+    fake_backend_t fake;
+    memset(&fake, 0, sizeof(fake));
+    memcpy(target, reuse_source + 3, sizeof(target));
+    noah_profile_candidate_backend_t backend = backend_for(&fake);
+    noah_profile_candidate_compatibility_t compat = compatibility();
+    noah_profile_candidate_transaction_t transaction;
+    noah_profile_candidate_v1_metadata_t metadata = metadata_for(target, sizeof(target));
+    noah_profile_candidate_transaction_init(&transaction, &backend, &compat);
+    begin_transaction(&transaction, &fake, 77, &metadata);
+    reuse_frame(frame, 77, 0, 3, sizeof(target));
+    queue(&transaction, &fake, frame);
+    assert(fake.source_read_calls == 0u);
+    // A step copies up to a flash page of the range, each piece read and then
+    // written in at most 20 bytes, so a step programs at most one page.
+    unsigned steps = 0;
+    largest_write = 0u;
+    while (transaction.mailbox.pending) {
+        uint32_t before = status_of(&transaction).next_offset;
+        unsigned reads  = fake.source_read_calls;
+        unsigned writes = fake.write_calls;
+        assert(noah_profile_candidate_transaction_scan(&transaction));
+        assert(status_of(&transaction).next_offset - before <= NOAH_PROFILE_CANDIDATE_STEP_BYTES);
+        assert(fake.source_read_calls - reads == fake.write_calls - writes);
+        assert(++steps <= 3u);
+    }
+    assert(steps == (sizeof(target) + NOAH_PROFILE_CANDIDATE_STEP_BYTES - 1u) / NOAH_PROFILE_CANDIDATE_STEP_BYTES);
+    assert(largest_write == 20u);
+    assert(memcmp(fake.staged, target, sizeof(target)) == 0);
+    assert(status_of(&transaction).next_offset == sizeof(target));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMPLETE);
+    assert(fake.validation_begin_calls == 0u);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE, 77);
+    queue_and_scan(&transaction, &fake, frame);
+    while (status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING) assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
+    assert(fake.validation_step_calls > 0u);
+    assert(fake.commit_begin_calls == 0u);
+}
+
+static void test_supersession_discards_a_partly_copied_reuse(void) {
+    uint8_t frame[32], target[600];
+    fake_backend_t fake;
+    fake_init(&fake);
+    memcpy(target, reuse_source, sizeof(target));
+    noah_profile_candidate_backend_t backend = backend_for(&fake);
+    noah_profile_candidate_compatibility_t compat = compatibility();
+    noah_profile_candidate_transaction_t transaction;
+    noah_profile_candidate_v1_metadata_t metadata = metadata_for(target, sizeof(target));
+    noah_profile_candidate_transaction_init(&transaction, &backend, &compat);
+    begin_transaction(&transaction, &fake, 79, &metadata);
+    reuse_frame(frame, 79, 0, 0, sizeof(target));
+    queue_and_scan(&transaction, &fake, frame);
+    assert(transaction.mailbox.pending && status_of(&transaction).next_offset == NOAH_PROFILE_CANDIDATE_STEP_BYTES);
+    unsigned reads = fake.source_read_calls, writes = fake.write_calls;
+    assert(noah_profile_candidate_transaction_supersede_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_DONE);
+    assert(!transaction.mailbox.pending);
+    assert(!noah_profile_candidate_transaction_scan(&transaction));
+    assert(fake.source_read_calls == reads && fake.write_calls == writes && fake.commit_begin_calls == 0u);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    // A later candidate copies from its own source and offset.
+    begin_transaction(&transaction, &fake, 80, &metadata);
+    reuse_frame(frame, 80, 0, 1, sizeof(target));
+    queue_and_scan(&transaction, &fake, frame);
+    assert(memcmp(fake.staged, reuse_source + 1, NOAH_PROFILE_CANDIDATE_STEP_BYTES) == 0);
+}
+
+static void test_streaming_admission_and_reuse_failure(void) {
+    uint8_t frame[32], target[48] = {0};
+    fake_backend_t fake;
+    memset(&fake, 0, sizeof(fake));
+    noah_profile_candidate_backend_t backend = backend_for(&fake);
+    noah_profile_candidate_compatibility_t compat = compatibility();
+    noah_profile_candidate_transaction_t transaction;
+    noah_profile_candidate_v1_metadata_t metadata = metadata_for(target, sizeof(target));
+    noah_profile_candidate_transaction_init(&transaction, &backend, &compat);
+    begin_transaction(&transaction, &fake, 78, &metadata);
+    chunk_frame(frame, 78, 1, target, 20); frame[2] = 0x1c;
+    assert(noah_profile_candidate_transaction_receive(&transaction, frame, sizeof(frame)));
+    assert(frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_REJECTED);
+    assert(!transaction.mailbox.pending && fake.write_calls == 0u);
+    chunk_frame(frame, 78, 0, target, 20); frame[2] = 0x1c;
+    queue(&transaction, &fake, frame);
+    chunk_frame(frame, 78, 20, target, 20); frame[2] = 0x1c;
+    assert(noah_profile_candidate_transaction_receive(&transaction, frame, sizeof(frame)));
+    assert(frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_BUSY);
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(status_of(&transaction).next_offset == 20);
+    reuse_frame(frame, 78, 20, 0, 28); frame[21]++;
+    queue_and_scan(&transaction, &fake, frame);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED);
+    chunk_frame(frame, 78, 20, target, 20); frame[2] = 0x1c;
+    assert(noah_profile_candidate_transaction_receive(&transaction, frame, sizeof(frame)));
+    assert(frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_REJECTED);
+    assert(fake.write_calls == 1u);
+    assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT, 78);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+}
+
+static void test_differential_transfer_frames(void) {
+    uint8_t frame[32] = {0x07, 0, 0x1b, 1, 0};
+    noah_profile_candidate_v1_command_t command;
+    noah_profile_candidate_v1_frame_error_t error;
+    write_u32(frame + 13, 1024u);
+    frame[30] = 0xffu; // Compiled source, generation zero.
+    assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK);
+    frame[31] = 1;
+    assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED && error.frame_offset == 31u);
+    frame[31] = 0;
+    write_u32(frame + 13, 0);
+    assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED && error.frame_offset == 13u);
+    // A length past the copy ceiling, or one whose only difference is in its
+    // high bytes, is refused rather than truncated.
+    write_u32(frame + 13, 1024u + 0x10000u);
+    assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED && error.frame_offset == 13u);
+    write_u32(frame + 13, 1024u);
+    write_u32(frame + 5, NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE - 1023u);
+    assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED && error.frame_offset == 5u);
+    write_u32(frame + 5, 0u);
+    write_u32(frame + 9, UINT32_MAX);
+    assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED && error.frame_offset == 9u);
+    write_u32(frame + 9, 0u);
+    chunk_frame(frame, 1, 0, (const uint8_t *)"abcdefgh", 8);
+    frame[2] = 0x1c;
+    assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK);
+}
+
+// Candidate upload past 65,535 bytes (D-F28): chunks and streaming chunks to
+// 66,000, a REUSE range landing there, then chunks to the end. Offsets,
+// lengths and status are whole at every step.
+static void test_upload_over_64_kib(void) {
+    enum { WIDE = 70000u, REUSED_AT = 66000u, REUSED = 48u };
+    static uint8_t                         target[WIDE];
+    static fake_backend_t                  fake;
+    uint8_t                                frame[32];
+    noah_profile_candidate_backend_t       backend;
+    noah_profile_candidate_compatibility_t compat = compatibility();
+    noah_profile_candidate_transaction_t   transaction;
+    noah_profile_candidate_v1_metadata_t   metadata;
+    uint32_t                               offset;
+
+    for (uint32_t index = 0u; index < WIDE; index++) target[index] = (uint8_t)(index * 7u + 3u);
+    memcpy(&target[REUSED_AT], reuse_source + 3, REUSED);
+    metadata = metadata_for(target, WIDE);
+    fake_init(&fake);
+    backend = backend_for(&fake);
+    noah_profile_candidate_transaction_init(&transaction, &backend, &compat);
+    begin_transaction(&transaction, &fake, 90u, &metadata);
+    assert(status_of(&transaction).payload_length == WIDE);
+    for (offset = 0u; offset < REUSED_AT; offset += 20u) {
+        chunk_frame(frame, 90u, offset, &target[offset], 20u);
+        if (offset >= 65000u) frame[2] = NOAH_PROFILE_CANDIDATE_V1_VALUE_STREAM_CHUNK;
+        queue_and_scan(&transaction, &fake, frame);
+    }
+    assert(status_of(&transaction).next_offset == REUSED_AT);
+    reuse_frame(frame, 90u, REUSED_AT, 3u, REUSED);
+    queue(&transaction, &fake, frame);
+    while (transaction.mailbox.pending) assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(status_of(&transaction).next_offset == REUSED_AT + REUSED);
+    // A gap past 64 KiB is out of order; a chunk past the declared length
+    // exceeds it.
+    chunk_frame(frame, 90u, REUSED_AT + REUSED + 512u, target, 20u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_OUT_OF_ORDER);
+    chunk_frame(frame, 90u, WIDE - 10u, target, 20u);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_CAPACITY_EXCEEDED);
+    assert(status_of(&transaction).next_offset == REUSED_AT + REUSED && status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING);
+    for (offset = REUSED_AT + REUSED; offset < WIDE;) {
+        uint8_t length = WIDE - offset < 20u ? (uint8_t)(WIDE - offset) : 20u;
+        write_chunk(&transaction, &fake, 90u, offset, &target[offset], length);
+        offset += length;
+    }
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMPLETE);
+    assert(memcmp(fake.staged, target, WIDE) == 0);
+    noah_profile_candidate_v1_status_t status = status_of(&transaction);
+    load_fixture("operation-status-request", frame);
+    assert(noah_profile_candidate_v1_handle_status_get(&status, frame, sizeof(frame)));
+    assert(frame[13] == (uint8_t)WIDE && frame[14] == (uint8_t)(WIDE >> 8u) && frame[15] == (uint8_t)(WIDE >> 16u) && frame[16] == 0u);
+    request_validation(&transaction, &fake, 90u);
+    // The fake checks CRC and digest a step at a time over all 70,000 bytes;
+    // profile_candidate_store_backend_test.c runs the real validator there.
+    while (status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING) assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
+}
+
 int main(int argc, char **argv) {
     assert(argc == 2);
     fixture_path = argv[1];
-    assert(sizeof(noah_profile_candidate_transaction_t) <= 256u);
+    for (size_t index = 64u; index < sizeof(reuse_source); index++) reuse_source[index] = (uint8_t)(index * 13u + 5u);
+    test_upload_over_64_kib();
+    // The firmware's 32-bit size: the backend's pointers count four bytes.
+    assert(sizeof(noah_profile_candidate_transaction_t) - sizeof(noah_profile_candidate_backend_t) + sizeof(noah_profile_candidate_backend_t) / sizeof(void *) * 4u <= 256u);
+    test_differential_transfer_frames();
+    test_reuse_is_bounded_and_validated();
+    test_supersession_discards_a_partly_copied_reuse();
+    test_streaming_admission_and_reuse_failure();
     test_exact_frame_codecs();
     test_malformed_frame_matrix();
     test_operation_status_codec();
-    test_peer_status_page();
+    test_copy_status_page();
     test_mailbox_and_begin_retries();
+    test_begin_retry_requires_identical_metadata();
     test_sequential_chunks_and_duplicate_rules();
     test_bounded_validation_and_error_locations();
+    test_error_pages_follow_asynchronous_errors();
     test_commit_activation_and_idempotent_retry();
+    test_conflicting_begin_preserves_durable_phases();
     test_split_authorization_barriers();
     test_postcommit_authority_failure_is_terminal_and_retains_candidate();
     test_split_commit_failure_reports_and_cleans_known_precommit_failure();

@@ -9,12 +9,6 @@ __attribute__((weak)) void eeconfig_init_user(void) {
     noah_eeconfig_init_user();
 }
 
-__attribute__((weak)) bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
-    return false;
-}
-
 // Fork hook at the top of process_record (after combos and native tapping).
 __attribute__((weak)) bool process_record_admit_user(keyrecord_t *record) {
     return noah_record_admission_admit(record);
@@ -24,7 +18,10 @@ __attribute__((weak)) bool pre_process_record_user(uint16_t keycode, keyrecord_t
     return noah_pre_process_record_user(keycode, record);
 }
 
-__attribute__((weak)) bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+// The reviewed stack paths run through process_record_user; keep it a frame
+// of its own, whatever LTO would inline, so the firmware anyone flashes has
+// the call shape those paths measure.
+__attribute__((weak, noinline)) bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     bool keep_processing = noah_process_record_user(keycode, record);
 
     if (!keep_processing) {
@@ -54,6 +51,10 @@ __attribute__((weak)) void housekeeping_task_user(void) {
 
 __attribute__((weak)) void suspend_power_down_user(void) {
     noah_suspend_power_down_user();
+}
+
+__attribute__((weak)) void keyboard_pre_init_user(void) {
+    noah_keyboard_pre_init_user();
 }
 
 __attribute__((weak)) void keyboard_post_init_user(void) {

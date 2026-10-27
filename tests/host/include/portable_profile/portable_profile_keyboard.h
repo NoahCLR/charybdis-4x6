@@ -4,10 +4,10 @@
 #include "qmk_stub.h"
 #define CHARYBDIS_AUTO_SNIPING_LAYER 3
 #define CHARYBDIS_DRAGSCROLL_DPI 100
-#define PD_MODE_VOLUME_DPI 100
-#define PD_MODE_BRIGHTNESS_DPI 100
-#define PD_MODE_ZOOM_DPI 400
-#define PD_MODE_ARROW_DPI 400
+#define POINTING_MODE_VOLUME_DPI 100
+#define POINTING_MODE_BRIGHTNESS_DPI 100
+#define POINTING_MODE_ZOOM_DPI 400
+#define POINTING_MODE_ARROW_DPI 400
 #define RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS 200
 #define AUTOMOUSE_RGB_DEAD_TIME 400
 bool     get_auto_mouse_enable(void);
@@ -32,6 +32,8 @@ uint16_t charybdis_get_pointer_default_dpi(void);
 uint16_t charybdis_get_pointer_sniping_dpi(void);
 void     charybdis_cycle_pointer_default_dpi(bool forward);
 void     charybdis_cycle_pointer_sniping_dpi(bool forward);
+void     charybdis_cycle_pointer_default_dpi_noeeprom(bool forward);
+void     charybdis_cycle_pointer_sniping_dpi_noeeprom(bool forward);
 void     default_layer_set(uint32_t state);
 extern uint32_t default_layer_state;
 typedef union {

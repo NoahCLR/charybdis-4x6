@@ -24,7 +24,7 @@ noah_runtime_context_t *noah_runtime_context(void) {
     return &noah_runtime_singleton;
 }
 
-pd_mode_runtime_shared_state_t *pd_mode_runtime_shared_state(void) {
+pointing_mode_runtime_shared_state_t *pointing_mode_runtime_shared_state(void) {
     return &noah_runtime_context()->shared.pd;
 }
 

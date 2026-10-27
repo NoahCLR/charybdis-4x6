@@ -24,6 +24,6 @@ uint16_t handled_key_resolution_tap_hold_term(handled_key_resolution_t resolutio
     return resolution.tap_hold_term;
 }
 
-uint16_t handled_key_resolution_longer_hold_term(handled_key_resolution_t resolution) {
-    return resolution.longer_hold_term;
+uint16_t handled_key_resolution_long_hold_term(handled_key_resolution_t resolution) {
+    return resolution.long_hold_term;
 }

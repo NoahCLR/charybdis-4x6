@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[2]
 # The fake QMK here is not a BK checkout at the pin: these tests cover build
 # flags and artifact names; pinning is covered by pair_build_script_test.py.
 class SplitTransportBuildTest(unittest.TestCase):
-    def test_split_speed_is_not_selectable(self):
-        # The link runs at QMK's default speed; 460,800 baud garbled it (D-L43).
+    def test_split_speed_is_fixed_at_460800(self):
+        # Both halves use the same fixed speed; the removed selector still fails.
         with tempfile.TemporaryDirectory() as directory:
             probe = Path(directory) / "probe.mk"
             probe.write_text("all:\n\t@echo $(OPT_DEFS)\n")
@@ -32,7 +32,8 @@ class SplitTransportBuildTest(unittest.TestCase):
                         self.assertIn("NOAH_SPLIT_BAUD was removed", result.stderr)
                     else:
                         self.assertEqual(result.returncode, 0, result.stderr)
-                        self.assertNotIn("SERIAL_USART_SPEED", result.stdout)
+                        self.assertIn("-DSERIAL_USART_SPEED=460800", result.stdout.split())
+                        self.assertIn("-DSPLIT_TRANSPORT_CRC", result.stdout.split())
 
     def test_feature_selection(self):
         # Coalescing and the frame CRC are on unless turned off; diagnostics
@@ -77,7 +78,7 @@ class SplitTransportBuildTest(unittest.TestCase):
                 )
                 mock.chmod(0o755)
                 log = workspace / "calls.jsonl"
-                env = dict(os.environ, NOAH_ALLOW_UNPINNED_QMK="1", NOAH_IN_BUILD_IMAGE="1", QMK_ROOT=str(qmk), BUILD_ROOT=str(workspace / "output"),
+                env = dict(os.environ, NOAH_RESOURCE_CHECKS="no", NOAH_ALLOW_UNPINNED_QMK="1", NOAH_IN_BUILD_IMAGE="1", QMK_ROOT=str(qmk), BUILD_ROOT=str(workspace / "output"),
                            NOAH_SPLIT_BAUD=baud, NOAH_SPLIT_ACTIVITY_COALESCE=activity, NOAH_SPLIT_CRC=crc, NOAH_SPLIT_DIAGNOSTICS=diagnostic,
                            NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=cadence, PAIR_TEST_LOG=str(log),
                            PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
@@ -130,7 +131,7 @@ class SplitTransportBuildTest(unittest.TestCase):
             )
             mock.chmod(0o755)
             output = workspace / "release"
-            env = dict(os.environ, NOAH_ALLOW_UNPINNED_QMK="1", NOAH_IN_BUILD_IMAGE="1", QMK_ROOT=str(qmk), OUTPUT_DIR=str(output),
+            env = dict(os.environ, NOAH_RESOURCE_CHECKS="no", NOAH_ALLOW_UNPINNED_QMK="1", NOAH_IN_BUILD_IMAGE="1", QMK_ROOT=str(qmk), OUTPUT_DIR=str(output),
                        NOAH_SPLIT_BAUD="", NOAH_SPLIT_ACTIVITY_COALESCE="",
                        NOAH_SPLIT_CRC="", NOAH_SPLIT_DIAGNOSTICS="",
                        NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS="",
@@ -165,7 +166,7 @@ class SplitTransportBuildTest(unittest.TestCase):
                 "    Path('bastardkb_charybdis_4x6_noah.uf2').write_text('right')\n"
             )
             mock.chmod(0o755)
-            env = dict(os.environ, NOAH_ALLOW_UNPINNED_QMK="1", NOAH_IN_BUILD_IMAGE="1", QMK_ROOT=str(qmk), BUILD_ROOT=str(workspace / "output"),
+            env = dict(os.environ, NOAH_RESOURCE_CHECKS="no", NOAH_ALLOW_UNPINNED_QMK="1", NOAH_IN_BUILD_IMAGE="1", QMK_ROOT=str(qmk), BUILD_ROOT=str(workspace / "output"),
                        NOAH_SPLIT_BAUD="", NOAH_SPLIT_ACTIVITY_COALESCE="",
                        NOAH_SPLIT_CRC="", NOAH_SPLIT_DIAGNOSTICS="",
                        NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS="",

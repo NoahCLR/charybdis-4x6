@@ -1,6 +1,9 @@
 #!/bin/sh
 
 set -eu
+# It writes into QMK (a qmk compile), so it works on the checkouts themselves.
+noah_writes_checkout=1
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 REPO_ROOT="$ROOT/../.."

@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 KEYMAP_PATH_ARG="${1:-keyboards/bastardkb/charybdis/4x6/keymaps/noah}"
@@ -45,8 +46,8 @@ write_config_variant() {
         if [ "$name" = "no_rgb_feedback" ]; then
             cat <<'EOF'
 
-#ifdef RGB_PD_MODE_FEEDBACK_ENABLE
-#    undef RGB_PD_MODE_FEEDBACK_ENABLE
+#ifdef RGB_POINTING_MODE_FEEDBACK_ENABLE
+#    undef RGB_POINTING_MODE_FEEDBACK_ENABLE
 #endif
 
 #ifdef RGB_COMBO_FEEDBACK_ENABLE
@@ -103,13 +104,26 @@ run_validation_variant() {
         "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_run.c" \
+        "$ROOT/users/noah/lib/macro/host_layout.c" \
+        "$ROOT/users/noah/lib/macro/host_layout_tables.c" \
         "$ROOT/users/noah/lib/macro/macro_slot_provider.c" \
         "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
         "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \
         -o "$bin"
 
-    "$bin"
+    if [ "${NOAH_WRITE_AUTHORED_MACRO_BANK:-}" = 1 ] && [ "$name" = default ]; then
+        NOAH_AUTHORED_MACRO_BANK_HEADER="$KEYMAP_PATH_ABS/authored_macro_bank.h" "$bin"
+    else
+        "$bin"
+    fi
 }
+
+# NOAH_WRITE_AUTHORED_MACRO_BANK=1 regenerates the authored macro bank: the
+# first variant writes it, the next compiles and checks the result. A placeholder
+# lets a profile without one compile the first time.
+if [ "${NOAH_WRITE_AUTHORED_MACRO_BANK:-}" = 1 ] && [ ! -f "$KEYMAP_PATH_ABS/authored_macro_bank.h" ]; then
+    printf '#pragma once\n\n#define NOAH_AUTHORED_MACRO_BANK 0\n' >"$KEYMAP_PATH_ABS/authored_macro_bank.h"
+fi
 
 run_validation_variant default
 run_validation_variant no_rgb_feedback

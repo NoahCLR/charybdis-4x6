@@ -3,7 +3,6 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "noah_keymap_ids.h"
-#include "keymap_introspection.h" // QMK
 
 #include <stdint.h>
 
@@ -60,7 +59,7 @@ static bool keycode_present_in_keymaps(uint16_t keycode) {
     for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
         for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
             for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-                if (keycode_at_keymap_location(layer, row, col) == keycode) {
+                if (keymap_key_to_keycode(layer, (keypos_t){.row = row, .col = col}) == keycode) {
                     return true;
                 }
             }
@@ -86,7 +85,7 @@ static uint8_t validate_authored_keymap_layer_actions(void) {
     for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
         for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
             for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-                uint16_t keycode = keycode_at_keymap_location(layer, row, col);
+                uint16_t keycode = keymap_key_to_keycode(layer, (keypos_t){.row = row, .col = col});
 
                 if (!keymap_layer_action_supported(keycode)) {
                     log_invalid_keymap_layer_action(layer, row, col, keycode);

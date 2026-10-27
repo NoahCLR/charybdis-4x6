@@ -4,9 +4,14 @@
 
 #include "effect_plan.h"
 #include "release_internal.h"
+#include "../transition.h"
 
 #include "../../../action/action_dispatch.h"
-#include "../../../pointing/defs/pd_modes.h"
+#include "../../../pointing/defs/pointing_modes.h"
+
+enum {
+    KEY_RUNTIME_CORE_EFFECT_PLAN_FLAG_STREAMING = 1u << 0,
+};
 
 void key_runtime_core_effect_plan_init(key_runtime_core_effect_plan_t *plan) {
     if (!plan) {
@@ -16,14 +21,21 @@ void key_runtime_core_effect_plan_init(key_runtime_core_effect_plan_t *plan) {
     *plan = (key_runtime_core_effect_plan_t){0};
 }
 
-void key_runtime_core_effect_plan_init_with_sink(key_runtime_core_effect_plan_t *plan, void (*sink)(void *ctx, key_runtime_effect_t effect), void *sink_ctx) {
+void key_runtime_core_effect_plan_init_streaming(key_runtime_core_effect_plan_t *plan) {
     key_runtime_core_effect_plan_init(plan);
-    if (!plan) {
-        return;
+    if (plan) {
+        plan->flags = KEY_RUNTIME_CORE_EFFECT_PLAN_FLAG_STREAMING;
     }
+}
 
-    plan->sink     = sink;
-    plan->sink_ctx = sink_ctx;
+static bool key_runtime_core_effect_plan_streaming(const key_runtime_core_effect_plan_t *plan) {
+    return (plan->flags & KEY_RUNTIME_CORE_EFFECT_PLAN_FLAG_STREAMING) != 0u;
+}
+
+void key_runtime_core_effect_plan_end_step(key_runtime_core_effect_plan_t *plan) {
+    if (plan && key_runtime_core_effect_plan_streaming(plan)) {
+        key_runtime_transition_execute_plan(NULL, plan);
+    }
 }
 
 static void key_runtime_core_effect_plan_push(key_runtime_core_effect_plan_t *plan, key_runtime_effect_t effect) {
@@ -31,9 +43,8 @@ static void key_runtime_core_effect_plan_push(key_runtime_core_effect_plan_t *pl
         return;
     }
 
-    if (plan->sink) {
-        plan->sink(plan->sink_ctx, effect);
-        return;
+    if (plan->count >= ARRAY_SIZE(plan->items) && key_runtime_core_effect_plan_streaming(plan)) {
+        key_runtime_transition_drain_plan(plan);
     }
 
     if (plan->count < ARRAY_SIZE(plan->items)) {
@@ -123,18 +134,18 @@ void key_runtime_core_effect_plan_push_layer_release(key_runtime_core_effect_pla
                                             });
 }
 
-void key_runtime_core_effect_plan_push_pd_mode_lock_state(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, pd_mode_mask_t mode, bool locked) {
+void key_runtime_core_effect_plan_push_pointing_mode_lock_state(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, pointing_mode_mask_t mode, bool locked) {
     if (!(plan && mode != 0)) {
         return;
     }
 
     key_runtime_core_effect_plan_push(plan, (key_runtime_effect_t){
-                                                .kind = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_STATE,
-                                                .data.pd_mode_lock_state =
+                                                .kind = KEY_RUNTIME_EFFECT_POINTING_MODE_LOCK_STATE,
+                                                .data.pointing_mode_lock_state =
                                                     {
-                                                        .pd_mode = mode,
-                                                        .key_pos = key_pos,
-                                                        .locked  = locked,
+                                                        .pointing_mode = mode,
+                                                        .key_pos       = key_pos,
+                                                        .locked        = locked,
                                                     },
                                             });
 }
@@ -153,12 +164,12 @@ static bool key_runtime_core_tap_commit_feedback_mode_allows(uint8_t tap_count) 
 bool key_runtime_core_tap_commit_feedback_allowed(uint16_t action, uint8_t tap_count) {
     noah_action_desc_t desc;
 
-    if (action == KC_NO || !key_runtime_core_tap_commit_feedback_mode_allows(tap_count) || pd_mode_lock_action_lookup(action)) {
+    if (action == KC_NO || !key_runtime_core_tap_commit_feedback_mode_allows(tap_count) || pointing_mode_lock_action_lookup(action)) {
         return false;
     }
 
     desc = noah_action_describe(action);
-    return !noah_action_desc_is_layer_action(desc) && !noah_action_desc_is_pd_mode_action(desc);
+    return !noah_action_desc_is_layer_action(desc) && !noah_action_desc_is_pointing_mode_action(desc);
 }
 
 static void key_runtime_core_effect_plan_push_feedback_pulse_ex(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, key_feedback_pulse_kind_t kind, uint8_t tap_branch) {

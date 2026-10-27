@@ -1,5 +1,6 @@
 #!/bin/sh
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
@@ -7,7 +8,7 @@ python3 - "$ROOT/tests/fixtures/client-regression/pd-corpus.bin.gz" "$BUILD_DIR/
 import gzip, pathlib, sys
 pathlib.Path(sys.argv[2]).write_bytes(gzip.decompress(pathlib.Path(sys.argv[1]).read_bytes()))
 PYCODE
-python3 - "$ROOT/tests/fixtures/pd_mode_domain_v2.json" "$BUILD_DIR/v2.txt" <<'PYCODE'
+python3 - "$ROOT/tests/fixtures/pd_mode_domain_v4.json" "$BUILD_DIR/v2.txt" <<'PYCODE'
 import json, pathlib, sys
 fixture = json.loads(pathlib.Path(sys.argv[1]).read_text())
 lines = [f"OK 0 {case['name']} {case['hex']}" for case in fixture['valid']]
@@ -21,6 +22,7 @@ build_and_run() {
     cc -std=c11 -Wall -Wextra -Werror -pedantic "$@" -I"$ROOT" \
         "$ROOT/tests/host/profile_pd_v1_test.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
         -o "$BUILD_DIR/$name"
     "$BUILD_DIR/$name" "$BUILD_DIR/corpus.bin" "$BUILD_DIR/v2.txt"
 }

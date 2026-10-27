@@ -6,16 +6,43 @@
 #include "key_runtime_integration_harness.h"
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
+#include "users/noah/lib/action/custom_key_shortcut.h"
 #include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
+#include "users/noah/lib/macro/macro_payload.h"
+#include "users/noah/lib/profile/runtime/profile_activation_policy.h"
+#include "users/noah/lib/profile/runtime/profile_working_copy.h"
+#include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "users/noah/lib/state/diagnostics/runtime_debug.h"
 #include "users/noah/lib/state/shared/runtime_reset.h"
+#include "noah_keymap_ids.h"
 
 enum {
     TEST_MULTI_TAP_KEY = SAFE_RANGE + 0x70,
+    // Custom keys with a shortcut and no row (D-F26): Left Ctrl + Right Alt +
+    // K, and Left Ctrl + J.
+    TEST_SHORTCUT_KEY          = CUSTOM_KEY_5,
+    TEST_OTHER_SHORTCUT_KEY    = CUSTOM_KEY_6,
+    TEST_SHORTCUT_MODS         = 0x41u,
+    TEST_OTHER_SHORTCUT_MODS   = 0x01u,
+    // A shortcut of keys (D-F26): Left Shift with A, S and Play held together; the
+    // profile may change it to Z alone while it is held.
+    TEST_KEYS_SHORTCUT_KEY     = CUSTOM_KEY_7,
+    TEST_KEYS_SHORTCUT_MODS    = 0x02u,
+    TEST_REPORT_EVENT_CAPACITY = 16,
 };
+
+typedef struct {
+    uint8_t keycode;
+    bool    down;
+    uint8_t mods; // the modifiers in the report when the usage changed
+} test_report_event_t;
+
+static test_report_event_t report_events[TEST_REPORT_EVENT_CAPACITY];
+static bool                test_keys_shortcut_changed;
+static uint8_t             report_event_count;
 
 static uint16_t fake_time;
 static uint8_t  fake_mods;
@@ -73,6 +100,8 @@ static void test_reset_state(void) {
     delayed_action_count       = 0;
     last_delayed_action        = KC_NO;
     last_delayed_mods          = (delayed_action_mods_t){0};
+    report_event_count         = 0;
+    test_keys_shortcut_changed         = false;
     noah_runtime_reset_for_test();
     send_keyboard_report_count = 0;
 }
@@ -145,12 +174,24 @@ void send_keyboard_report(void) {
     send_keyboard_report_count++;
 }
 
+static void test_record_report_event(uint8_t keycode, bool down) {
+    CHECK(report_event_count < TEST_REPORT_EVENT_CAPACITY);
+    report_events[report_event_count++] = (test_report_event_t){.keycode = keycode, .down = down, .mods = fake_mods};
+}
+
 void register_code(uint8_t keycode) {
-    (void)keycode;
+    test_record_report_event(keycode, true);
 }
 
 void unregister_code(uint8_t keycode) {
-    (void)keycode;
+    test_record_report_event(keycode, false);
+}
+
+noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
+    if (slot == (uint8_t)(TEST_SHORTCUT_KEY - CUSTOM_KEY_0)) return (noah_custom_key_shortcut_t){.mods = TEST_SHORTCUT_MODS, .keys = {KC_K}};
+    if (slot == (uint8_t)(TEST_OTHER_SHORTCUT_KEY - CUSTOM_KEY_0)) return (noah_custom_key_shortcut_t){.mods = TEST_OTHER_SHORTCUT_MODS, .keys = {KC_J}};
+    if (slot == (uint8_t)(TEST_KEYS_SHORTCUT_KEY - CUSTOM_KEY_0)) return test_keys_shortcut_changed ? (noah_custom_key_shortcut_t){.keys = {KC_Z}} : (noah_custom_key_shortcut_t){.mods = TEST_KEYS_SHORTCUT_MODS, .keys = {KC_A, KC_S, KC_MEDIA_PLAY_PAUSE}};
+    return (noah_custom_key_shortcut_t){0};
 }
 
 void register_code16(uint16_t keycode) {
@@ -188,9 +229,9 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
         .keycode            = keycode,
         .handled            = true,
         .has_multi_tap      = keycode == TEST_MULTI_TAP_KEY,
-        .authored_tap_depth = keycode == TEST_MULTI_TAP_KEY ? 3u : 1u,
+        .authored_tap_depth = keycode == TEST_MULTI_TAP_KEY ? 3u : (NOAH_KEYCODE_IS_CUSTOM_KEY(keycode) ? 0u : 1u),
         .tap_hold_term      = keycode == TEST_MULTI_TAP_KEY ? 120 : 0,
-        .longer_hold_term   = keycode == TEST_MULTI_TAP_KEY ? 240 : 0,
+        .long_hold_term     = keycode == TEST_MULTI_TAP_KEY ? 240 : 0,
         .multi_tap_term     = keycode == TEST_MULTI_TAP_KEY ? 150 : 0,
     };
 }
@@ -209,14 +250,14 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
     return keycode == TEST_MULTI_TAP_KEY && count < 3;
 }
 
-bool key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t count, pd_mode_mask_t base_mode) {
+bool key_behavior_future_tap_path_has_foreign_pointing_mode(uint16_t keycode, uint8_t count, pointing_mode_mask_t base_mode) {
     (void)keycode;
     (void)count;
     (void)base_mode;
     return false;
 }
 
-bool is_pd_mode_lock_action(uint16_t action) {
+bool is_pointing_mode_lock_action(uint16_t action) {
     (void)action;
     return false;
 }
@@ -245,35 +286,35 @@ void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_actio
     dispatch_delayed_action(action, mods);
 }
 
-pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
     (void)keycode;
     return 0;
 }
 
-bool pd_mode_local_locked(pd_mode_mask_t mode) {
+bool pointing_mode_local_locked(pointing_mode_mask_t mode) {
     (void)mode;
     return false;
 }
 
-bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
+bool pointing_mode_toggle_lock_state(pointing_mode_mask_t mode) {
     (void)mode;
     return false;
 }
 
-bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
+bool pointing_mode_toggle_lock_state_at(pointing_mode_mask_t mode, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_toggle_lock_state(mode);
+    return pointing_mode_toggle_lock_state(mode);
 }
 
-bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {
+bool pointing_mode_set_lock_state(pointing_mode_mask_t mode, bool locked) {
     (void)mode;
     (void)locked;
     return false;
 }
 
-bool pd_mode_set_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_pos) {
+bool pointing_mode_set_lock_state_at(pointing_mode_mask_t mode, bool locked, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_set_lock_state(mode, locked);
+    return pointing_mode_set_lock_state(mode, locked);
 }
 
 void split_runtime_sync(void) {}
@@ -290,6 +331,37 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
     return false;
 }
 
+// No custom key here turns a layer on (D-F26).
+void layer_ownership_shortcut_press(keypos_t key_pos, layer_state_t layers) {
+    (void)key_pos;
+    (void)layers;
+}
+
+bool layer_ownership_shortcut_release(keypos_t key_pos) {
+    (void)key_pos;
+    return false;
+}
+
+void layer_ownership_shortcut_momentary_press(keypos_t key_pos, layer_state_t layers) {
+    (void)key_pos;
+    (void)layers;
+}
+
+bool layer_ownership_shortcut_momentary_release(keypos_t key_pos) {
+    (void)key_pos;
+    return false;
+}
+
+bool layer_ownership_toggle_lock_set(layer_state_t layers) {
+    (void)layers;
+    return false;
+}
+
+bool layer_ownership_goto_set(layer_state_t layers) {
+    (void)layers;
+    return false;
+}
+
 void noah_action_press(keypos_t key_pos, uint16_t action) {
     (void)key_pos;
     (void)action;
@@ -301,12 +373,6 @@ void noah_action_release(keypos_t key_pos, uint16_t action) {
 }
 
 bool noah_synthetic_record_active(void) {
-    return false;
-}
-
-bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
     return false;
 }
 
@@ -409,7 +475,238 @@ static void test_third_tap_hold_modifier_keeps_processed_child_immediate(uint16_
     CHECK(delayed_action_count == 0);
 }
 
+static void test_check_report_event(uint8_t index, uint8_t keycode, bool down, uint8_t mods) {
+    CHECK(index < report_event_count);
+    CHECK(report_events[index].keycode == keycode);
+    CHECK(report_events[index].down == down);
+    CHECK(report_events[index].mods == mods);
+}
+
+static void test_assert_shortcut_ledger_empty(void) {
+    CHECK(owned_keycode_managed_usage_count() == 0u);
+    CHECK(get_mods() == 0u);
+    CHECK(test_snapshot_real_mods() == 0u);
+}
+
+// A custom key with a shortcut and no row holds it from the press: the
+// modifiers go down before the key, and on release the key leaves before the
+// modifiers, with nothing left in the ledger (D-F26).
+// The activation policy's view of the profile apply fence. This harness has
+// no macro engine, no QMK one-shot layer and no other half.
+void macro_payload_debug_snapshot(macro_payload_debug_snapshot_t *out) {
+    *out = (macro_payload_debug_snapshot_t){0};
+}
+bool is_oneshot_layer_active(void) {
+    return false;
+}
+static bool test_no_unresolved_other_half(void *context, uint8_t *unresolved_other_half_count) {
+    (void)context;
+    *unresolved_other_half_count = 0u;
+    return true;
+}
+
+// A held shortcut keeps a new profile from activating, so applying or
+// switching a profile waits for its release; nothing it held is left behind
+// to block the next one (D-F26).
+static void test_custom_key_holds_its_shortcut_until_release(void) {
+    keypos_t                         key_pos = test_keypos(2, 1);
+    noah_profile_activation_policy_t policy;
+    uint32_t                         held_reasons;
+
+    test_reset_state();
+    noah_profile_activation_policy_init(&policy, test_no_unresolved_other_half, NULL);
+    CHECK(noah_profile_activation_policy_safe_boundary(&policy) == 0u);
+    CHECK(!key_runtime_integration_process_record(TEST_SHORTCUT_KEY, key_pos, true));
+    CHECK(report_event_count == 1u);
+    test_check_report_event(0, KC_K, true, TEST_SHORTCUT_MODS);
+    CHECK(get_mods() == TEST_SHORTCUT_MODS);
+
+    key_runtime_integration_advance(&fake_time, 400);
+    key_runtime_integration_scan();
+    CHECK(report_event_count == 1u);
+    CHECK(get_mods() == TEST_SHORTCUT_MODS);
+    held_reasons = noah_profile_activation_policy_safe_boundary(&policy);
+    CHECK(held_reasons & NOAH_PROFILE_ACTIVATION_REASON_PHYSICAL_PRESS);
+    CHECK(held_reasons & NOAH_PROFILE_ACTIVATION_REASON_OWNED_OUTPUT);
+    CHECK(held_reasons & NOAH_PROFILE_ACTIVATION_REASON_MODIFIER_OR_ONESHOT);
+
+    CHECK(!key_runtime_integration_process_record(TEST_SHORTCUT_KEY, key_pos, false));
+    CHECK(report_event_count == 2u);
+    test_check_report_event(1, KC_K, false, TEST_SHORTCUT_MODS);
+    CHECK(emitted_action_count == 0u);
+    test_assert_shortcut_ledger_empty();
+    test_assert_runtime_quiescent(key_pos);
+    CHECK(noah_profile_activation_policy_safe_boundary(&policy) == 0u);
+}
+
+// A live edit (D-F32) committed while a key is held waits at the activation
+// boundary the real key runtime reports, and lands only once the key is
+// released: the shortcut types exactly as it would without the edit.
+static uint32_t live_edit_safe_boundary(void *context) {
+    return noah_profile_activation_policy_safe_boundary(context);
+}
+
+static void live_edit_invalidated(void *context, uint32_t publication, noah_active_profile_identity_t previous, noah_active_profile_identity_t active, const noah_active_profile_snapshot_t *view) {
+    (void)publication;
+    (void)previous;
+    (void)view;
+    *(uint8_t *)context = active.kind;
+}
+
+static void test_live_edit_waits_for_a_held_key(void) {
+    static const uint8_t                 empty_profile[NOAH_PROFILE_BLOB_V1_HEADER_SIZE] = {'N', 'L', 'P', '1', NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR, NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR, 0u, NOAH_PROFILE_BLOB_V1_CANONICAL_FLAG};
+    static uint8_t                       working[8192];
+    static uint8_t                       keymap[16u * 64u * 2u];
+    static noah_active_profile_provider_t provider;
+    static noah_profile_working_copy_t   copy;
+    noah_profile_validator_v1_compatibility_t rules = noah_profile_validator_v1_default_compatibility(0x1234u);
+    noah_profile_reader_t                reader      = noah_profile_reader_from_memory(empty_profile, sizeof(empty_profile));
+    noah_profile_validator_v1_profile_t  profile     = {
+        .byte_length       = sizeof(empty_profile),
+        .crc32             = noah_profile_crc32_finish(noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, empty_profile, sizeof(empty_profile))),
+        .digest            = noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, empty_profile, sizeof(empty_profile)),
+        .action_abi_digest = 0x1234u,
+    };
+    noah_active_profile_snapshot_t       compiled;
+    noah_profile_activation_policy_t     policy;
+    uint8_t                              published_kind = 0u;
+    noah_active_profile_invalidator_t invalidator      = {.callback = live_edit_invalidated, .context = &published_kind};
+    noah_profile_working_splice_t        create        = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = sizeof(keymap), .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
+    keypos_t                             key_pos       = test_keypos(2, 1);
+
+    test_reset_state();
+    rules.required_domain_mask = 0u;
+    noah_profile_activation_policy_init(&policy, test_no_unresolved_other_half, NULL);
+    CHECK(noah_active_profile_snapshot_make_compiled(&profile, &reader, 0u, &compiled) == NOAH_ACTIVE_PROFILE_OK);
+    CHECK(noah_active_profile_provider_init(&provider, &compiled, live_edit_safe_boundary, &policy, &invalidator, 1u) == NOAH_ACTIVE_PROFILE_OK);
+    noah_profile_working_copy_init(&copy, working, sizeof(working), &provider, &rules, &rules, 77u);
+
+    // Hold the shortcut, then send an edit that adds a keymap.
+    CHECK(!key_runtime_integration_process_record(TEST_SHORTCUT_KEY, key_pos, true));
+    CHECK(report_event_count == 1u);
+    CHECK(noah_profile_working_copy_begin(&copy, 1u, 77u, 0u, 1u, sizeof(keymap), 0u, false) == NOAH_PROFILE_WORKING_OK);
+    CHECK(noah_profile_working_copy_splice(&copy, 1u, 0u, &create) == NOAH_PROFILE_WORKING_OK);
+    for (uint32_t offset = 0u; offset < sizeof(keymap); offset += 22u) {
+        uint32_t count = sizeof(keymap) - offset < 22u ? sizeof(keymap) - offset : 22u;
+        CHECK(noah_profile_working_copy_data(&copy, 1u, offset, keymap + offset, count) == NOAH_PROFILE_WORKING_OK);
+    }
+    CHECK(noah_profile_working_copy_commit(&copy, 1u, noah_profile_crc32_finish(noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, keymap, sizeof(keymap)))) == NOAH_PROFILE_WORKING_QUEUED);
+    for (uint32_t scan = 0u; scan < 400u; scan++) {
+        key_runtime_integration_advance(&fake_time, 1);
+        key_runtime_integration_scan();
+        (void)noah_profile_working_copy_scan(&copy);
+    }
+    CHECK(copy.phase == NOAH_PROFILE_WORKING_PHASE_WAITING_SAFE && !copy.active && published_kind == 0u);
+    CHECK(report_event_count == 1u && get_mods() == TEST_SHORTCUT_MODS);
+
+    // Release: the shortcut ends as it would have, then the edit lands.
+    CHECK(!key_runtime_integration_process_record(TEST_SHORTCUT_KEY, key_pos, false));
+    CHECK(report_event_count == 2u);
+    test_check_report_event(1, KC_K, false, TEST_SHORTCUT_MODS);
+    for (uint32_t scan = 0u; scan < 16u && noah_profile_working_copy_busy(&copy); scan++) {
+        (void)noah_profile_working_copy_scan(&copy);
+    }
+    CHECK(copy.active && copy.revision == 1u && copy.last_result == NOAH_PROFILE_WORKING_OK && published_kind == NOAH_ACTIVE_PROFILE_KIND_WORKING_COPY);
+    test_assert_shortcut_ledger_empty();
+    test_assert_runtime_quiescent(key_pos);
+}
+
+// A quick tap is the same press and release, never a second tap after it.
+static void test_custom_key_quick_tap_sends_its_shortcut_once(void) {
+    keypos_t key_pos = test_keypos(2, 2);
+
+    test_reset_state();
+    CHECK(!key_runtime_integration_process_record(TEST_SHORTCUT_KEY, key_pos, true));
+    key_runtime_integration_advance(&fake_time, 20);
+    CHECK(!key_runtime_integration_process_record(TEST_SHORTCUT_KEY, key_pos, false));
+    key_runtime_integration_advance(&fake_time, 400);
+    key_runtime_integration_scan();
+
+    CHECK(report_event_count == 2u);
+    test_check_report_event(0, KC_K, true, TEST_SHORTCUT_MODS);
+    test_check_report_event(1, KC_K, false, TEST_SHORTCUT_MODS);
+    CHECK(emitted_action_count == 0u);
+    CHECK(delayed_action_count == 0u);
+    test_assert_shortcut_ledger_empty();
+    test_assert_runtime_quiescent(key_pos);
+}
+
+// Two held shortcuts sharing Left Ctrl: releasing one keeps the modifier the
+// other still owns, and drops only its own Right Alt.
+static void test_overlapping_shortcuts_keep_a_shared_modifier(void) {
+    keypos_t first  = test_keypos(2, 3);
+    keypos_t second = test_keypos(2, 4);
+
+    test_reset_state();
+    CHECK(!key_runtime_integration_process_record(TEST_SHORTCUT_KEY, first, true));
+    CHECK(!key_runtime_integration_process_record(TEST_OTHER_SHORTCUT_KEY, second, true));
+    CHECK(get_mods() == (TEST_SHORTCUT_MODS | TEST_OTHER_SHORTCUT_MODS));
+
+    CHECK(!key_runtime_integration_process_record(TEST_SHORTCUT_KEY, first, false));
+    CHECK(get_mods() == TEST_OTHER_SHORTCUT_MODS);
+    CHECK(owned_keycode_managed_usage_count() == 1u);
+
+    CHECK(!key_runtime_integration_process_record(TEST_OTHER_SHORTCUT_KEY, second, false));
+    CHECK(report_event_count == 4u);
+    test_check_report_event(0, KC_K, true, TEST_SHORTCUT_MODS);
+    test_check_report_event(1, KC_J, true, TEST_SHORTCUT_MODS | TEST_OTHER_SHORTCUT_MODS);
+    test_check_report_event(2, KC_K, false, TEST_SHORTCUT_MODS | TEST_OTHER_SHORTCUT_MODS);
+    test_check_report_event(3, KC_J, false, TEST_OTHER_SHORTCUT_MODS);
+    test_assert_shortcut_ledger_empty();
+    test_assert_runtime_quiescent(first);
+    test_assert_runtime_quiescent(second);
+}
+
+// A held shortcut of keys (D-F26): the modifiers, then each key in order, all
+// held together, a media key among them; released last first, then the modifiers.
+// Changed while held, it still lets go of exactly the keys it pressed.
+static void test_custom_key_holds_its_shortcut_keys_in_order(void) {
+    static const uint8_t keys[] = {KC_A, KC_S, KC_MEDIA_PLAY_PAUSE};
+    keypos_t             key_pos = test_keypos(2, 5);
+
+    test_reset_state();
+    CHECK(!key_runtime_integration_process_record(TEST_KEYS_SHORTCUT_KEY, key_pos, true));
+    CHECK(report_event_count == 3u && get_mods() == TEST_KEYS_SHORTCUT_MODS);
+    for (uint8_t i = 0; i < 3u; i++) {
+        test_check_report_event(i, keys[i], true, TEST_KEYS_SHORTCUT_MODS);
+    }
+    CHECK(owned_keycode_managed_usage_count() == 3u);
+    key_runtime_integration_advance(&fake_time, 400);
+    key_runtime_integration_scan();
+    CHECK(report_event_count == 3u);
+
+    test_keys_shortcut_changed = true;
+    CHECK(!key_runtime_integration_process_record(TEST_KEYS_SHORTCUT_KEY, key_pos, false));
+    CHECK(report_event_count == 6u);
+    for (uint8_t i = 0; i < 3u; i++) {
+        test_check_report_event((uint8_t)(3u + i), keys[2u - i], false, TEST_KEYS_SHORTCUT_MODS);
+    }
+    test_assert_shortcut_ledger_empty();
+    test_assert_runtime_quiescent(key_pos);
+
+    // Tapped, the same keys go down and up inside the tap, once.
+    test_reset_state();
+    CHECK(!key_runtime_integration_process_record(TEST_KEYS_SHORTCUT_KEY, key_pos, true));
+    key_runtime_integration_advance(&fake_time, 20);
+    CHECK(!key_runtime_integration_process_record(TEST_KEYS_SHORTCUT_KEY, key_pos, false));
+    key_runtime_integration_advance(&fake_time, 400);
+    key_runtime_integration_scan();
+    CHECK(report_event_count == 6u);
+    for (uint8_t i = 0; i < 3u; i++) {
+        test_check_report_event(i, keys[i], true, TEST_KEYS_SHORTCUT_MODS);
+        test_check_report_event((uint8_t)(3u + i), keys[2u - i], false, TEST_KEYS_SHORTCUT_MODS);
+    }
+    CHECK(emitted_action_count == 0u && delayed_action_count == 0u);
+    test_assert_shortcut_ledger_empty();
+    test_assert_runtime_quiescent(key_pos);
+}
+
 int main(void) {
+    test_custom_key_holds_its_shortcut_until_release();
+    test_custom_key_holds_its_shortcut_keys_in_order();
+    test_live_edit_waits_for_a_held_key();
+    test_custom_key_quick_tap_sends_its_shortcut_once();
+    test_overlapping_shortcuts_keep_a_shared_modifier();
     test_pending_third_tap_hold_modifier_keeps_processed_child_immediate(KC_LEFT_SHIFT, MOD_BIT(KC_LEFT_SHIFT));
     test_pending_third_tap_hold_modifier_keeps_processed_child_immediate(KC_LEFT_GUI, MOD_BIT(KC_LEFT_GUI));
     test_third_tap_hold_modifier_keeps_processed_child_immediate(KC_LEFT_SHIFT, MOD_BIT(KC_LEFT_SHIFT));
@@ -417,4 +714,10 @@ int main(void) {
 
     puts("key_runtime modifier-hold integration tests passed");
     return 0;
+}
+
+// Participation allows every press in this harness (no stored policy), so a
+// row-less view is never asked for beyond linking.
+key_behavior_view_t key_behavior_lookup_without_row(uint16_t keycode) {
+    return key_behavior_lookup(keycode);
 }

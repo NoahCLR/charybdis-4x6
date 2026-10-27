@@ -32,17 +32,17 @@ extern const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_
 extern const uint8_t                                  key_behavior_feedback_led_group_count;
 #    endif
 
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-#        include "../../pointing/defs/pd_modes.h"
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+#        include "../../pointing/defs/pointing_modes.h"
 
-extern const pd_mode_color_t            pd_mode_colors[];
-extern const uint8_t                    pd_mode_color_count;
-extern const pd_mode_led_group_t *const pd_mode_led_groups;
-extern const uint8_t                    pd_mode_led_group_count;
+extern const pointing_mode_color_t            pointing_mode_colors[];
+extern const uint8_t                          pointing_mode_color_count;
+extern const pointing_mode_led_group_t *const pointing_mode_led_groups;
+extern const uint8_t                          pointing_mode_led_group_count;
 
-static bool rgb_validation_pd_mode_known(pd_mode_mask_t mode) {
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_modes[i].mode_flag == mode) {
+static bool rgb_validation_pointing_mode_known(pointing_mode_mask_t mode) {
+    for (uint8_t i = 0; i < POINTING_MODE_COUNT; i++) {
+        if (pointing_modes[i].mode_flag == mode) {
             return true;
         }
     }
@@ -50,11 +50,11 @@ static bool rgb_validation_pd_mode_known(pd_mode_mask_t mode) {
     return false;
 }
 
-static uint8_t rgb_validation_pd_mode_color_match_count(pd_mode_mask_t mode) {
+static uint8_t rgb_validation_pointing_mode_color_match_count(pointing_mode_mask_t mode) {
     uint8_t matches = 0;
 
-    for (uint8_t i = 0; i < pd_mode_color_count; i++) {
-        if (pd_mode_colors[i].pointing_mode == mode) {
+    for (uint8_t i = 0; i < pointing_mode_color_count; i++) {
+        if (pointing_mode_colors[i].pointing_mode == mode) {
             matches++;
         }
     }
@@ -145,29 +145,29 @@ static void rgb_validation_log_invalid_key_behavior_feedback_group_semantic(uint
 }
 #    endif
 
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-static void rgb_validation_log_unknown_pd_mode_color(uint8_t color_index, pd_mode_mask_t mode) {
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+static void rgb_validation_log_unknown_pointing_mode_color(uint8_t color_index, pointing_mode_mask_t mode) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Unknown pd_mode_colors[%u].pointing_mode 0x%04X; entry does not match any registered pd mode\n", (unsigned int)color_index, (unsigned int)mode);
+    uprintf("Unknown pointing_mode_colors[%u].pointing_mode 0x%04X; entry does not match any registered pointing mode\n", (unsigned int)color_index, (unsigned int)mode);
 #        else
     (void)color_index;
     (void)mode;
 #        endif
 }
 
-static void rgb_validation_log_invalid_pd_mode_color_locality(uint8_t color_index, uint8_t locality) {
+static void rgb_validation_log_invalid_pointing_mode_color_locality(uint8_t color_index, uint8_t locality) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Invalid pd_mode_colors[%u].locality %u; expected RGB_BOTH_HALVES (0), RGB_LEFT_HALF (1), RGB_RIGHT_HALF (2), RGB_KEY_HALF (3), or RGB_KEYS_ONLY (4)\n", (unsigned int)color_index, (unsigned int)locality);
+    uprintf("Invalid pointing_mode_colors[%u].locality %u; expected RGB_BOTH_HALVES (0), RGB_LEFT_HALF (1), RGB_RIGHT_HALF (2), RGB_KEY_HALF (3), or RGB_KEYS_ONLY (4)\n", (unsigned int)color_index, (unsigned int)locality);
 #        else
     (void)color_index;
     (void)locality;
 #        endif
 }
 
-#        ifndef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-static void rgb_validation_log_pd_mode_key_locality_requires_feature(uint8_t color_index, pd_mode_mask_t mode) {
+#        ifndef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
+static void rgb_validation_log_pointing_mode_key_locality_requires_feature(uint8_t color_index, pointing_mode_mask_t mode) {
 #            ifdef CONSOLE_ENABLE
-    uprintf("pd_mode_colors[%u].locality uses key-local PD RGB placement for pd mode 0x%04X, but RGB_PD_MODE_ACTIVE_HALF_ENABLE is disabled\n", (unsigned int)color_index, (unsigned int)mode);
+    uprintf("pointing_mode_colors[%u].locality uses key-local PD RGB placement for pointing mode 0x%04X, but RGB_POINTING_MODE_ACTIVE_HALF_ENABLE is disabled\n", (unsigned int)color_index, (unsigned int)mode);
 #            else
     (void)color_index;
     (void)mode;
@@ -175,26 +175,26 @@ static void rgb_validation_log_pd_mode_key_locality_requires_feature(uint8_t col
 }
 #        endif
 
-static void rgb_validation_log_duplicate_pd_mode_color(pd_mode_mask_t mode) {
+static void rgb_validation_log_duplicate_pointing_mode_color(pointing_mode_mask_t mode) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Duplicate pd_mode_colors entries for pd mode 0x%04X; first-match lookup makes later rows unreachable\n", (unsigned int)mode);
+    uprintf("Duplicate pointing_mode_colors entries for pointing mode 0x%04X; first-match lookup makes later rows unreachable\n", (unsigned int)mode);
 #        else
     (void)mode;
 #        endif
 }
 
-static void rgb_validation_log_missing_pd_mode_color(pd_mode_mask_t mode, uint16_t keycode) {
+static void rgb_validation_log_missing_pointing_mode_color(pointing_mode_mask_t mode, uint16_t keycode) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Missing pd_mode_colors entry for pd mode 0x%04X (keycode 0x%04X); the active mode overlay will fall back to black\n", (unsigned int)mode, (unsigned int)keycode);
+    uprintf("Missing pointing_mode_colors entry for pointing mode 0x%04X (keycode 0x%04X); the active mode overlay will fall back to black\n", (unsigned int)mode, (unsigned int)keycode);
 #        else
     (void)mode;
     (void)keycode;
 #        endif
 }
 
-static void rgb_validation_log_unknown_pd_mode_led_group(uint8_t group_index, pd_mode_mask_t mode) {
+static void rgb_validation_log_unknown_pointing_mode_led_group(uint8_t group_index, pointing_mode_mask_t mode) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Unknown pd_mode_led_groups[%u].pointing_mode 0x%04X; entry does not match any registered pd mode or RGB_PD_MODE_GROUP_ALL\n", (unsigned int)group_index, (unsigned int)mode);
+    uprintf("Unknown pointing_mode_led_groups[%u].pointing_mode 0x%04X; entry does not match any registered pointing mode or RGB_POINTING_MODE_GROUP_ALL\n", (unsigned int)group_index, (unsigned int)mode);
 #        else
     (void)group_index;
     (void)mode;
@@ -288,51 +288,51 @@ static void rgb_validation_validate_key_behavior_feedback_led_groups(void) {
 }
 #    endif
 
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-static void rgb_validation_validate_pd_mode_colors(void) {
-    for (uint8_t color_index = 0; color_index < pd_mode_color_count; color_index++) {
-        pd_mode_mask_t mode     = pd_mode_colors[color_index].pointing_mode;
-        uint8_t        locality = (uint8_t)pd_mode_colors[color_index].locality;
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+static void rgb_validation_validate_pointing_mode_colors(void) {
+    for (uint8_t color_index = 0; color_index < pointing_mode_color_count; color_index++) {
+        pointing_mode_mask_t mode     = pointing_mode_colors[color_index].pointing_mode;
+        uint8_t              locality = (uint8_t)pointing_mode_colors[color_index].locality;
 
-        if (!rgb_validation_pd_mode_known(mode)) {
-            rgb_validation_log_unknown_pd_mode_color(color_index, mode);
+        if (!rgb_validation_pointing_mode_known(mode)) {
+            rgb_validation_log_unknown_pointing_mode_color(color_index, mode);
         }
 
         if (locality > RGB_KEYS_ONLY) {
-            rgb_validation_log_invalid_pd_mode_color_locality(color_index, locality);
+            rgb_validation_log_invalid_pointing_mode_color_locality(color_index, locality);
             continue;
         }
 
-#        ifndef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+#        ifndef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
         if (locality == RGB_KEY_HALF || locality == RGB_KEYS_ONLY) {
-            rgb_validation_log_pd_mode_key_locality_requires_feature(color_index, mode);
+            rgb_validation_log_pointing_mode_key_locality_requires_feature(color_index, mode);
         }
 #        endif
     }
 
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        uint8_t matches = rgb_validation_pd_mode_color_match_count(pd_modes[i].mode_flag);
+    for (uint8_t i = 0; i < POINTING_MODE_COUNT; i++) {
+        uint8_t matches = rgb_validation_pointing_mode_color_match_count(pointing_modes[i].mode_flag);
 
         if (matches == 0) {
-            rgb_validation_log_missing_pd_mode_color(pd_modes[i].mode_flag, pd_modes[i].keycode);
+            rgb_validation_log_missing_pointing_mode_color(pointing_modes[i].mode_flag, pointing_modes[i].keycode);
         } else if (matches > 1) {
-            rgb_validation_log_duplicate_pd_mode_color(pd_modes[i].mode_flag);
+            rgb_validation_log_duplicate_pointing_mode_color(pointing_modes[i].mode_flag);
         }
     }
 }
 
-static void rgb_validation_validate_pd_mode_led_groups(void) {
-    for (uint8_t group_index = 0; group_index < pd_mode_led_group_count; group_index++) {
-        const pd_mode_led_group_t *group = &pd_mode_led_groups[group_index];
+static void rgb_validation_validate_pointing_mode_led_groups(void) {
+    for (uint8_t group_index = 0; group_index < pointing_mode_led_group_count; group_index++) {
+        const pointing_mode_led_group_t *group = &pointing_mode_led_groups[group_index];
 
-        if (group->pointing_mode != RGB_PD_MODE_GROUP_ALL && !rgb_validation_pd_mode_known(group->pointing_mode)) {
-            rgb_validation_log_unknown_pd_mode_led_group(group_index, group->pointing_mode);
+        if (group->pointing_mode != RGB_POINTING_MODE_GROUP_ALL && !rgb_validation_pointing_mode_known(group->pointing_mode)) {
+            rgb_validation_log_unknown_pointing_mode_led_group(group_index, group->pointing_mode);
         }
 
         const rgb_led_group_t *led_group = &group->led_group;
         for (uint8_t led_index = 0; led_index < led_group->count; led_index++) {
             if (led_group->leds[led_index] >= RGB_MATRIX_LED_COUNT) {
-                rgb_validation_log_invalid_layer_led_index("pd_mode_led_groups", group_index, led_index, led_group->leds[led_index]);
+                rgb_validation_log_invalid_layer_led_index("pointing_mode_led_groups", group_index, led_index, led_group->leds[led_index]);
             }
         }
     }
@@ -357,9 +357,9 @@ void noah_rgb_validate_config(void) {
     rgb_validation_validate_key_behavior_feedback_led_groups();
 #    endif
 
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-    rgb_validation_validate_pd_mode_colors();
-    rgb_validation_validate_pd_mode_led_groups();
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+    rgb_validation_validate_pointing_mode_colors();
+    rgb_validation_validate_pointing_mode_led_groups();
 #    endif
 }
 

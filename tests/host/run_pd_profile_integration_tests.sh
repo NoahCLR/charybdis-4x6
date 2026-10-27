@@ -1,35 +1,42 @@
 #!/bin/sh
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
 python3 - "$ROOT" "$BUILD_DIR" <<'PY'
 import json, sys
 from pathlib import Path
-cases = {case['name']: case for case in json.loads(Path(sys.argv[1], 'tests/fixtures/pd_mode_domain_v2.json').read_text())['valid']}
+cases = {case['name']: case for case in json.loads(Path(sys.argv[1], 'tests/fixtures/pd_mode_domain_v4.json').read_text())['valid']}
 for name in ('presets', 'full'):
     Path(sys.argv[2], name + '.bin').write_bytes(bytes.fromhex(cases[name]['hex']))
 PY
 for sanitizer in normal sanitized; do
     flags=""
     if [ "$sanitizer" = sanitized ]; then flags="-fsanitize=address,undefined -fno-omit-frame-pointer"; fi
-    cc -std=c11 -Wall -Wextra -Werror -pedantic $flags -DNOAH_PD_PROFILE_ENABLE \
+    cc -std=c11 -Wall -Wextra -Werror -pedantic $flags \
         -I"$ROOT/users/noah" \
         "$ROOT/tests/host/pd_profile_integration_test.c" \
         "$ROOT/users/noah/lib/profile/protocol/profile_candidate_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_macros_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
-        "$ROOT/users/noah/lib/profile/runtime/effective_pd_runtime.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_pd_runtime.c" \
         -o "$BUILD_DIR/test"
     "$BUILD_DIR/test" "$BUILD_DIR/presets.bin" "$BUILD_DIR/full.bin"
 done
-arm-none-eabi-gcc -std=c11 -Wall -Wextra -Werror -pedantic -DNOAH_PD_PROFILE_ENABLE \
-    -mcpu=cortex-m0plus -mthumb -I"$ROOT/users/noah" \
-    -c "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" -o "$BUILD_DIR/validator.o"
+# The record layout, alignment and byte-order assertions hold on the target too.
+for source in schema/profile_validator_v1.c schema/profile_pd_v1.c runtime/active_profile_pd_runtime.c; do
+    arm-none-eabi-gcc -std=c11 -Wall -Wextra -Werror -pedantic \
+        -mcpu=cortex-m0plus -mthumb -I"$ROOT/users/noah" \
+        -c "$ROOT/users/noah/lib/profile/$source" -o "$BUILD_DIR/$(basename "$source" .c).o"
+done

@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 
@@ -28,9 +29,11 @@ build_and_run() {
     "$BUILD_DIR/profile_activation_policy_test_$name"
 }
 
-build_and_run configured -DNOAH_PD_PROFILE_ENABLE -DPOINTING_DEVICE_ENABLE
-build_and_run normal
-build_and_run sanitized -fsanitize=address,undefined -fno-omit-frame-pointer
+# The shipped keyboard has a pointing device; a held or locked pointing mode
+# then blocks activation. A build without one has no mode to wait for.
+build_and_run pointing -DPOINTING_DEVICE_ENABLE
+build_and_run no_pointing
+build_and_run sanitized -DPOINTING_DEVICE_ENABLE -fsanitize=address,undefined -fno-omit-frame-pointer
 
 # The policy must still compile when QMK's one-shot action surface is removed;
 # those fields then remain zero and cannot create a false blocker.
@@ -38,7 +41,7 @@ build_and_run no_oneshot -DNO_ACTION_ONESHOT
 
 ARM_CC="${ARM_CC:-arm-none-eabi-gcc}"
 "$ARM_CC" -std=c11 -Wall -Wextra -Werror -pedantic \
-    -mcpu=cortex-m0plus -mthumb \
+    -mcpu=cortex-m0plus -mthumb -DPOINTING_DEVICE_ENABLE \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \

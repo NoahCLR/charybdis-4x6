@@ -5,10 +5,17 @@
 #include "users/noah/lib/pointing/policy/pointer_layer_policy.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
-#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/lib/key/runtime/trace/core_trace.h"
 #include "users/noah/lib/key/runtime/api.h"
 #include "users/noah/noah_runtime.h"
+
+// Adjustment routing has its own QMK contract suite. Other key-runtime
+// harnesses can replace this seam when they exercise profile adjustments.
+__attribute__((weak)) bool noah_qmk_profile_adjustment_process(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode; (void)record;
+    return true;
+}
 
 __attribute__((weak)) layer_state_t layer_state;
 __attribute__((weak)) layer_state_t default_layer_state;
@@ -67,6 +74,7 @@ __attribute__((weak)) uint16_t get_record_keycode(keyrecord_t *record, bool upda
     if (!record) {
         return KC_NO;
     }
+    if (record->keycode) return record->keycode;
 
     layer = get_highest_layer(layer_state | default_layer_state);
     return keymap_key_to_keycode(layer, record->event.key);
@@ -84,12 +92,6 @@ __attribute__((weak)) bool noah_pre_process_record_user(uint16_t keycode, keyrec
     return true;
 }
 
-bool key_runtime_integration_output_ready = true;
-
-__attribute__((weak)) bool noah_profile_store_runtime_output_ready(void) {
-    return key_runtime_integration_output_ready;
-}
-
 __attribute__((weak)) void noah_process_record_user_finalize(uint16_t keycode, keyrecord_t *record, bool keep_processing) {
     (void)keycode;
     (void)record;
@@ -104,34 +106,48 @@ __attribute__((weak)) report_mouse_t noah_pointing_device_task_user(report_mouse
     return mouse_report;
 }
 
-__attribute__((weak)) void pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags) {
+__attribute__((weak)) void pointing_mode_apply_remote_snapshot(pointing_mode_mask_t active_flags, pointing_mode_mask_t locked_flags) {
     (void)active_flags;
     (void)locked_flags;
 }
 
-__attribute__((weak)) void pd_mode_service_active_dpi_sync(void) {}
+__attribute__((weak)) void pointing_mode_service_active_dpi_sync(void) {}
 
-__attribute__((weak)) uint8_t pd_mode_active_keyboard_event_masked_real_mods(void) {
+__attribute__((weak)) void pointing_mode_forget_applied_dpi(void) {}
+
+__attribute__((weak)) uint8_t pointing_mode_active_keyboard_event_masked_real_mods(void) {
     return 0u;
 }
 
-__attribute__((weak)) pd_mode_mask_t pd_mode_local_active_snapshot(void) {
+__attribute__((weak)) pointing_mode_mask_t pointing_mode_local_active_snapshot(void) {
     return 0u;
 }
 
-__attribute__((weak)) pd_mode_mask_t pd_mode_local_locked_snapshot(void) {
+__attribute__((weak)) pointing_mode_mask_t pointing_mode_local_locked_snapshot(void) {
     return 0u;
 }
 
-__attribute__((weak)) pd_mode_mask_t pd_mode_display_active_snapshot(void) {
+__attribute__((weak)) bool pointing_mode_local_key_source_active(void) {
+    return false;
+}
+
+__attribute__((weak)) void pointing_mode_apply_layer_state(layer_state_t state) {
+    (void)state;
+}
+
+__attribute__((weak)) void pointing_mode_end_layer_started_mode(void) {}
+
+__attribute__((weak)) void pointing_mode_reevaluate_layer_links(void) {}
+
+__attribute__((weak)) pointing_mode_mask_t pointing_mode_display_active_snapshot(void) {
     return 0u;
 }
 
-__attribute__((weak)) pd_mode_mask_t pd_mode_display_locked_snapshot(void) {
+__attribute__((weak)) pointing_mode_mask_t pointing_mode_display_locked_snapshot(void) {
     return 0u;
 }
 
-__attribute__((weak)) bool pd_mode_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
+__attribute__((weak)) bool pointing_mode_has_trait(pointing_mode_mask_t mode, pointing_mode_traits_t trait) {
     (void)mode;
     (void)trait;
     return false;
@@ -304,7 +320,7 @@ bool key_runtime_integration_apply_core_event(uint16_t *time, const runtime_even
         case RUNTIME_EVENT_KIND_REMOTE_SNAPSHOT:
             key_runtime_core_trace_record_input_event(event);
             key_runtime_integration_shadow_core_apply_event(event, time ? *time : timer_read());
-            pd_mode_apply_remote_snapshot(event->data.remote_snapshot.active_mode, event->data.remote_snapshot.locked_mode);
+            pointing_mode_apply_remote_snapshot(event->data.remote_snapshot.active_mode, event->data.remote_snapshot.locked_mode);
             key_runtime_core_trace_capture_projection();
             return true;
     }
@@ -336,3 +352,18 @@ void key_runtime_integration_run(uint16_t *time, const key_runtime_integration_s
         }
     }
 }
+
+// QMK's source-layer cache: these harnesses author every key on layer 0.
+__attribute__((weak)) uint8_t read_source_layers_cache(keypos_t key) {
+    (void)key;
+    return 0;
+}
+
+// The layer a press resolves from now: the cache's, as nothing here changes it.
+__attribute__((weak)) uint8_t layer_switch_get_layer(keypos_t key) {
+    return read_source_layers_cache(key);
+}
+
+// The integration harness controls macro playback without its output engine.
+bool key_runtime_test_macro_protected;
+bool macro_payload_engine_protected(void) {return key_runtime_test_macro_protected;}

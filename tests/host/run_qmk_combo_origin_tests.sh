@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 
@@ -21,6 +22,7 @@ run_variant() {
 
     cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
         -DCOMBO_ENABLE \
+        -DCOMBO_ORIGIN_TEST_INSTRUMENTATION \
         -DQMK_KEYBOARD_H='"qmk_stub.h"' \
         -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         "$@" \
@@ -31,6 +33,7 @@ run_variant() {
         "$ROOT/tests/host/qmk_combo_origin_test.c" \
         "$ROOT/users/noah/lib/key/runtime/slot/origin_registry.c" \
         "$ROOT/users/noah/lib/compat/qmk_combo_origin.c" \
+        "$ROOT/users/noah/lib/key/behavior/participation.c" \
         -o "$bin"
 
     "$bin"
@@ -38,6 +41,8 @@ run_variant() {
 
 run_variant normal
 run_variant extra_short -DEXTRA_SHORT_COMBOS
+run_variant output_permissions -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE
+run_variant output_permissions_sanitized -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE -fsanitize=address,undefined -fno-omit-frame-pointer
 
 # Timerless combos can remain legally pending until release. Compile that
 # branch to ensure its deliberately unbounded deadline path stays warning-free.

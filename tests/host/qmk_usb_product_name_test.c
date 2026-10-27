@@ -1,0 +1,259 @@
+// The keyboard name as the USB product string (D-F25): what USB serves before
+// it starts, and when the half on USB restarts it to serve a new name.
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "users/noah/lib/compat/qmk_usb_product_name.h"
+#include "users/noah/lib/profile/runtime/active_profile_settings_runtime.h"
+#include "users/noah/lib/profile/schema/profile_settings_defaults.h"
+#include "users/noah/lib/profile/storage/profile_store_runtime.h"
+
+// The world the module reads, set by each test.
+static bool                         master, usb_active, settled, boot_found;
+static noah_profile_keyboard_name_t boot_name, live_name, compiled_name;
+static uint32_t                     publication, now;
+static unsigned                     restarts, boot_reads, name_compares;
+
+// Linked with --wrap, so every comparison the module makes is counted.
+bool __real_noah_profile_keyboard_name_equal(const noah_profile_keyboard_name_t *a, const noah_profile_keyboard_name_t *b);
+bool __wrap_noah_profile_keyboard_name_equal(const noah_profile_keyboard_name_t *a, const noah_profile_keyboard_name_t *b) {
+    name_compares++;
+    return __real_noah_profile_keyboard_name_equal(a, b);
+}
+
+bool is_keyboard_master(void) {
+    return master;
+}
+uint32_t timer_read32(void) {
+    return now;
+}
+uint32_t timer_elapsed32(uint32_t last) {
+    return now - last;
+}
+bool noah_qmk_usb_product_name_test_usb_active(void) {
+    return usb_active;
+}
+void noah_qmk_usb_product_name_test_restart(void) {
+    restarts++;
+}
+bool noah_profile_store_runtime_boot_keyboard_name(noah_profile_keyboard_name_t *name) {
+    boot_reads++;
+    *name = boot_found ? boot_name : (noah_profile_keyboard_name_t){0};
+    return boot_found;
+}
+bool noah_profile_settings_defaults_keyboard_name(noah_profile_keyboard_name_t *name) {
+    *name = compiled_name;
+    return true;
+}
+bool noah_profile_store_runtime_usb_restart_safe(void) {
+    return settled;
+}
+void noah_active_profile_settings_keyboard_name(noah_profile_keyboard_name_t *name) {
+    *name = live_name;
+}
+uint32_t noah_active_profile_settings_publication(void) {
+    return publication;
+}
+
+static noah_profile_keyboard_name_t name_of(const char *text) {
+    noah_profile_keyboard_name_t name = {.length = (uint8_t)strlen(text)};
+    memcpy(name.bytes, text, name.length);
+    return name;
+}
+static void publish(const char *text) {
+    live_name = name_of(text);
+    publication++;
+}
+// Asserts USB serves `text` (NULL: QMK's built-in name).
+static void serves(const char *text) {
+    const uint8_t *descriptor = noah_qmk_usb_product_name_descriptor();
+    if (!text) {
+        assert(!descriptor);
+        return;
+    }
+    size_t length = strlen(text);
+    assert(descriptor && descriptor[0] == 2u + 2u * length && descriptor[1] == 3u);
+    for (size_t i = 0; i < length; i++)
+        assert(descriptor[2 + 2 * i] == (uint8_t)text[i] && descriptor[3 + 2 * i] == 0u);
+}
+// A booted, enumerated master half running `text`, or with nothing saved its
+// compiled defaults, with nothing in flight.
+static void boot(const char *saved, bool is_master) {
+    boot_found = saved != NULL;
+    boot_name  = boot_found ? name_of(saved) : (noah_profile_keyboard_name_t){0};
+    master = is_master, usb_active = true, settled = true;
+    restarts = 0;
+    noah_qmk_usb_product_name_pre_init();
+    live_name = saved ? name_of(saved) : compiled_name;
+    publication++;
+}
+
+static void test_encoding(void) {
+    uint8_t                      descriptor[NOAH_QMK_USB_PRODUCT_NAME_DESCRIPTOR_MAX];
+    noah_profile_keyboard_name_t name = name_of("A\xc3\xa9\xe2\x82\xac\xf0\x9f\x98\x80");
+    // A, é, €, then a surrogate pair for U+1F600.
+    assert(noah_qmk_usb_product_name_encode(&name, descriptor, sizeof(descriptor)) == 12u);
+    static const uint8_t expected[] = {12, 3, 'A', 0, 0xe9, 0, 0xac, 0x20, 0x3d, 0xd8, 0x00, 0xde};
+    assert(!memcmp(descriptor, expected, sizeof(expected)));
+    // Thirty-two ASCII bytes fill the largest descriptor exactly.
+    name = name_of("0123456789abcdef0123456789abcdef");
+    assert(noah_qmk_usb_product_name_encode(&name, descriptor, sizeof(descriptor)) == NOAH_QMK_USB_PRODUCT_NAME_DESCRIPTOR_MAX);
+    assert(noah_qmk_usb_product_name_encode(&name, descriptor, sizeof(descriptor) - 1u) == 0u);
+    // Empty and malformed names serve the built-in name.
+    name = name_of("");
+    assert(noah_qmk_usb_product_name_encode(&name, descriptor, sizeof(descriptor)) == 0u);
+    name = name_of("ab\xc3");
+    assert(noah_qmk_usb_product_name_encode(&name, descriptor, sizeof(descriptor)) == 0u);
+    name = name_of("\x80");
+    assert(noah_qmk_usb_product_name_encode(&name, descriptor, sizeof(descriptor)) == 0u);
+    assert(noah_qmk_usb_product_name_encode(NULL, descriptor, sizeof(descriptor)) == 0u);
+}
+
+static void test_boot_serves_the_saved_name(void) {
+    boot("Desk", true);
+    assert(boot_reads == 1u);
+    serves("Desk");
+    // The activated profile agrees: nothing to restart.
+    noah_qmk_usb_product_name_task();
+    assert(restarts == 0u);
+    serves("Desk");
+    // Nothing usable saved, and compiled defaults without a name: QMK's
+    // built-in name.
+    boot(NULL, true);
+    serves(NULL);
+    noah_qmk_usb_product_name_task();
+    assert(restarts == 0u);
+}
+
+static void test_boot_serves_the_compiled_name(void) {
+    // Nothing saved: the keyboard runs its compiled defaults, so it enumerates
+    // under their name at once rather than restarting USB to take it.
+    compiled_name = name_of("Charybdis - Home");
+    boot(NULL, true);
+    serves("Charybdis - Home");
+    noah_qmk_usb_product_name_task();
+    assert(restarts == 0u);
+    // A saved name still wins.
+    boot("Desk", true);
+    serves("Desk");
+    noah_qmk_usb_product_name_task();
+    assert(restarts == 0u);
+    compiled_name = (noah_profile_keyboard_name_t){0};
+}
+
+static void test_rename_restarts_once_when_safe(void) {
+    boot("Desk", true);
+    publish("Travel");
+    // Every condition holds it back until all are clear.
+    settled = false;
+    noah_qmk_usb_product_name_task();
+    assert(restarts == 0u);
+    settled    = true;
+    usb_active = false; // suspended or not enumerated
+    noah_qmk_usb_product_name_task();
+    assert(restarts == 0u);
+    usb_active = true;
+    // A client still talking keeps it waiting for a quiet second.
+    now = 5000u;
+    noah_qmk_usb_product_name_note_host_frame();
+    now += NOAH_QMK_USB_PRODUCT_NAME_QUIET_MS - 1u;
+    noah_qmk_usb_product_name_task();
+    assert(restarts == 0u);
+    serves("Desk");
+    now++;
+    noah_qmk_usb_product_name_task();
+    assert(restarts == 1u);
+    serves("Travel");
+    // Once enumerated under the name, it stays.
+    noah_qmk_usb_product_name_task();
+    noah_qmk_usb_product_name_task();
+    assert(restarts == 1u);
+    // Clearing the name restarts back to the built-in one.
+    publish("");
+    noah_qmk_usb_product_name_task();
+    assert(restarts == 2u);
+    serves(NULL);
+    // A republished profile with the same name changes nothing.
+    publish("");
+    noah_qmk_usb_product_name_task();
+    assert(restarts == 2u);
+}
+
+static void test_half_without_usb_never_restarts(void) {
+    boot("Desk", false);
+    // Before its role is known, the half keeps the name in memory only.
+    serves("Desk");
+    publish("Travel");
+    for (int i = 0; i < 5; i++)
+        noah_qmk_usb_product_name_task();
+    assert(restarts == 0u);
+    serves("Desk");
+}
+
+static void test_boot_activates_a_different_profile(void) {
+    // Boot read one name, the owner settled on another (the other half's newer
+    // profile, or a stored one it refused): restart to the running name.
+    boot("Desk", true);
+    publish("");
+    settled = false; // still activating
+    noah_qmk_usb_product_name_task();
+    assert(restarts == 0u);
+    settled = true;
+    noah_qmk_usb_product_name_task();
+    assert(restarts == 1u);
+    serves(NULL);
+}
+
+static void test_unencodable_name_settles(void) {
+    boot(NULL, true);
+    live_name = name_of("ab\xc3");
+    publication++;
+    noah_qmk_usb_product_name_task();
+    assert(restarts == 1u);
+    serves(NULL);
+    noah_qmk_usb_product_name_task();
+    assert(restarts == 1u);
+}
+
+// Housekeeping runs every main-loop pass: with nothing published and nothing
+// served since the last pass, it compares no names.
+static void test_an_idle_pass_compares_no_names(void) {
+    boot("Desk", true);
+    noah_qmk_usb_product_name_task();
+    name_compares = 0u;
+    for (int i = 0; i < 100; i++)
+        noah_qmk_usb_product_name_task();
+    assert(name_compares == 0u && restarts == 0u);
+    // A publication is compared once, whatever the passes after it.
+    publish("Desk");
+    for (int i = 0; i < 100; i++)
+        noah_qmk_usb_product_name_task();
+    assert(name_compares == 1u && restarts == 0u);
+    // A rename waiting for a safe moment is compared once too, and still served.
+    publish("Travel");
+    settled = false;
+    for (int i = 0; i < 100; i++)
+        noah_qmk_usb_product_name_task();
+    assert(name_compares == 2u && restarts == 0u);
+    settled = true;
+    noah_qmk_usb_product_name_task();
+    assert(restarts == 1u);
+    serves("Travel");
+    for (int i = 0; i < 100; i++)
+        noah_qmk_usb_product_name_task();
+    assert(restarts == 1u && name_compares == 3u);
+}
+
+int main(void) {
+    test_encoding();
+    test_boot_serves_the_saved_name();
+    test_boot_serves_the_compiled_name();
+    test_rename_restarts_once_when_safe();
+    test_half_without_usb_never_restarts();
+    test_boot_activates_a_different_profile();
+    test_unencodable_name_settles();
+    test_an_idle_pass_compares_no_names();
+    puts("qmk USB product name tests passed");
+    return 0;
+}

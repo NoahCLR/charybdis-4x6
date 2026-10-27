@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 
@@ -118,8 +119,11 @@ def body(source: str, signature: str) -> str:
     raise SystemExit(f"unterminated function: {signature}")
 
 action = (qmk / "quantum/action.c").read_text()
-if "is_tap_keycode_user(get_record_keycode(record, false), is_tap_action(action))" not in body(action, "bool is_tap_record(keyrecord_t *record)"):
-    raise SystemExit("QMK must offer authored dual-role keys to the userspace tapping classifier")
+if "is_tap_record_user(record, is_tap_action(action), is_tap_keycode_user(get_record_keycode(record, false), is_tap_action(action)))" not in body(action, "bool is_tap_record(keyrecord_t *record)"):
+    raise SystemExit("QMK must offer authored dual-role keys, with their record, to the userspace tapping classifier")
+# Its default keeps the keycode hook's answer for builds that define only that.
+if "return default_tap;" not in body(action, "__attribute__((weak)) bool is_tap_record_user(keyrecord_t *record, bool native_tap, bool default_tap)"):
+    raise SystemExit("QMK's record tapping hook must default to the keycode hook's answer")
 for source, signature in [("quantum/action_tapping.c", "bool tapping_key_event_pending("),
                           ("quantum/process_keycode/process_combo.c", "bool combo_key_event_pending(")]:
     if signature not in (qmk / source).read_text():
@@ -158,6 +162,87 @@ if "auto_mouse_get_time_elapsed_at(timer_read())" not in elapsed:
 
 if not re.search(r"^\s*#\s*define\s+RAW_EPSIZE\s+32\s*$", usb_descriptor_header, re.MULTILINE):
     raise SystemExit("QMK Raw HID endpoint size no longer matches Profile Wire's 32-byte report contract")
+
+# The keyboard name (D-F25): the fork serves a runtime product string, the
+# name is read from EEPROM in keyboard_pre_init before USB starts, and the half
+# on USB can restart the driver to be enumerated again.
+if not re.search(r"#ifdef USB_PRODUCT_STRING_USER\s*(//[^\n]*\n\s*)*const USB_Descriptor_String_t\s*\*\s*usb_product_string_user\(void\);", usb_descriptor_header):
+    raise SystemExit("QMK must declare usb_product_string_user() under USB_PRODUCT_STRING_USER (BK runtime product string hook)")
+descriptors = body((qmk / "tmk_core/protocol/usb_descriptor.c").read_text(encoding="utf-8"), "uint16_t get_usb_descriptor(")
+product = descriptors[descriptors.index("case 0x02:"):]
+if "usb_product_string_user()" not in product or product.index("usb_product_string_user()") > product.index("&ProductString"):
+    raise SystemExit("QMK must offer the product string descriptor to usb_product_string_user() before PRODUCT")
+setup = body(keyboard, "void keyboard_setup(void)")
+if setup.index("eeprom_driver_init();") > setup.index("keyboard_pre_init_quantum();"):
+    raise SystemExit("QMK no longer initializes EEPROM before keyboard_pre_init")
+main = body((qmk / "quantum/main.c").read_text(encoding="utf-8"), "int main(void) {")
+if "keyboard_setup();" not in main or "protocol_pre_init();" not in main or main.index("keyboard_setup();") > main.index("protocol_pre_init();"):
+    raise SystemExit("QMK no longer runs keyboard_setup before protocol_pre_init starts USB")
+if "init_usb_driver(" not in body((qmk / "tmk_core/protocol/chibios/chibios.c").read_text(encoding="utf-8"), "void protocol_pre_init(void)"):
+    raise SystemExit("QMK's ChibiOS protocol_pre_init no longer starts USB")
+if not re.search(r"void\s+restart_usb_driver\(USBDriver \*usbp\);", (qmk / "tmk_core/protocol/chibios/usb_main.h").read_text(encoding="utf-8")):
+    raise SystemExit("QMK's ChibiOS USB no longer offers restart_usb_driver")
+
+# The profile owns runtime lookup through BK's explicitly replaceable hook.
+keymap_common = (qmk / "quantum/keymap_common.c").read_text(encoding="utf-8")
+if not re.search(r"__attribute__\(\(weak\)\)\s+uint16_t\s+keymap_key_to_keycode\(", keymap_common):
+    raise SystemExit("QMK keymap_key_to_keycode must remain weak for profile lookup")
+
+# The DPI policy skips writing a CPI the sensor already holds
+# (pointing_mode_lifecycle.c) and is told of every other write
+# (pointing_mode_forget_applied_dpi): the sensor's init, then QMK's Charybdis
+# code, which writes only through maybe_update_pointing_device_cpi from the
+# callers below, each followed or preceded by a userspace hook that tells it.
+def definitions(source: str) -> dict:
+    found = {}
+    for match in re.finditer(r"^(?:static\s+)?(?:inline\s+)?(?:const\s+)?\w+\s*\*?\s*(\w+)\([^;{)]*\)\s*\{", source, re.MULTILINE):
+        found[match.group(1)] = body(source, match.group(0))
+    return found
+
+charybdis = (qmk / "keyboards/bastardkb/charybdis/charybdis.c").read_text(encoding="utf-8")
+charybdis_functions = definitions(charybdis)
+def callers(name: str) -> set:
+    return {function for function, text in charybdis_functions.items() if f"{name}(" in text}
+if charybdis.count("pointing_device_set_cpi(") != charybdis_functions["maybe_update_pointing_device_cpi"].count("pointing_device_set_cpi("):
+    raise SystemExit("QMK's Charybdis code writes the sensor's CPI outside maybe_update_pointing_device_cpi: tell the DPI policy (pointing_mode_forget_applied_dpi)")
+expected_writers = {
+    "maybe_update_pointing_device_cpi": {"step_pointer_default_dpi", "step_pointer_sniping_dpi", "charybdis_set_pointer_sniping_enabled", "charybdis_set_pointer_dragscroll_enabled", "eeconfig_init_kb", "keyboard_post_init_kb"},
+    "step_pointer_default_dpi": {"charybdis_cycle_pointer_default_dpi", "charybdis_cycle_pointer_default_dpi_noeeprom"},
+    "step_pointer_sniping_dpi": {"charybdis_cycle_pointer_sniping_dpi", "charybdis_cycle_pointer_sniping_dpi_noeeprom"},
+    "charybdis_cycle_pointer_default_dpi": {"process_record_kb"},
+    "charybdis_cycle_pointer_sniping_dpi": {"process_record_kb"},
+    "charybdis_set_pointer_sniping_enabled": {"process_record_kb"},
+    "charybdis_set_pointer_dragscroll_enabled": {"process_record_kb"},
+}
+for writer, expected in expected_writers.items():
+    if callers(writer) != expected:
+        raise SystemExit(f"QMK's Charybdis CPI writer {writer} is called from {sorted(callers(writer))}, not {sorted(expected)}: tell the DPI policy (pointing_mode_forget_applied_dpi)")
+for function, hook in [("eeconfig_init_kb", "eeconfig_init_user();"), ("keyboard_post_init_kb", "keyboard_post_init_user();")]:
+    text = charybdis_functions[function]
+    if hook not in text or text.index("maybe_update_pointing_device_cpi(") > text.index(hook):
+        raise SystemExit(f"QMK's {function} no longer writes the CPI before {hook}")
+record_kb = charybdis_functions["process_record_kb"]
+if record_kb.index("process_record_user(") > record_kb.index("switch (keycode)"):
+    raise SystemExit("QMK's Charybdis keys no longer reach process_record_user before they write the CPI")
+charybdis_keys = re.search(r"enum charybdis_keycodes \{([^}]*)\}", (qmk / "keyboards/bastardkb/charybdis/charybdis.h").read_text(encoding="utf-8"))
+key_names = [name.strip().split("=")[0].strip() for name in charybdis_keys.group(1).split(",") if name.strip()] if charybdis_keys else []
+if key_names != ["POINTER_DEFAULT_DPI_FORWARD", "POINTER_DEFAULT_DPI_REVERSE", "POINTER_SNIPING_DPI_FORWARD", "POINTER_SNIPING_DPI_REVERSE", "SNIPING_MODE", "SNIPING_MODE_TOGGLE", "DRAGSCROLL_MODE", "DRAGSCROLL_MODE_TOGGLE"] or "POINTER_DEFAULT_DPI_FORWARD = QK_KB_0" not in charybdis_keys.group(1):
+    raise SystemExit("QMK's Charybdis keycodes are no longer QK_KB_0 up to DRAGSCROLL_MODE_TOGGLE (noah_qmk_contract_pointer_keycode_sets_cpi, tests/host/include/qmk_stub.h)")
+stub = (Path(sys.argv[2]) / "tests/host/include/qmk_stub.h").read_text(encoding="utf-8")
+for index, name in enumerate(key_names):
+    if not re.search(rf"#\s*define\s+{name}\s+QK_KB_{index}\b", stub):
+        raise SystemExit(f"tests/host/include/qmk_stub.h no longer defines {name} as QMK's QK_KB_{index}")
+sensor = (qmk / "drivers/sensors/pmw33xx_common.c").read_text(encoding="utf-8")
+sensor_functions = definitions(sensor)
+sensor_writers = {function for function, text in sensor_functions.items() if "pmw33xx_set_cpi(" in text}
+if sensor_writers != {"pmw33xx_set_cpi_all_sensors", "pmw33xx_init", "pmw33xx_set_cpi_wrapper"}:
+    raise SystemExit(f"the PMW33xx driver writes the CPI from {sorted(sensor_writers)}: tell the DPI policy (pointing_mode_forget_applied_dpi)")
+pointing = (qmk / "quantum/pointing_device/pointing_device.c").read_text(encoding="utf-8")
+init = body(pointing, "__attribute__((weak)) void pointing_device_init(void)")
+if init.index("pointing_device_driver->init()") > init.index("pointing_device_init_user();"):
+    raise SystemExit("QMK's pointing_device_init no longer calls pointing_device_init_user after the sensor's init")
+if keyboard.count("pointing_device_init();") != 1:
+    raise SystemExit("QMK initializes the pointing device other than once, at keyboard_init")
 
 qmk_toggle = re.search(r"^\s*#\s*define\s+TAPPING_TOGGLE\s+(\d+)\s*$", action_tapping_header, re.MULTILINE)
 our_toggle = re.search(r"^\s*#\s*define\s+NOAH_QMK_TAPPING_TOGGLE\s+(\d+)\s*$", tapping_contract, re.MULTILINE)

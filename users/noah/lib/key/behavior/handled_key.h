@@ -9,7 +9,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "../../pointing/defs/pd_mode_flags.h"
+#include "../../pointing/defs/pointing_mode_flags.h"
 #include "../runtime/types.h"
 #include "key_behavior.h"
 
@@ -18,12 +18,14 @@ typedef struct {
     uint8_t             tap_count;
     key_behavior_step_t step;
     uint16_t            tap_hold_term;
-    uint16_t            longer_hold_term;
+    uint16_t            long_hold_term;
     uint16_t            multi_tap_term;
     uint8_t             layer;
-    pd_mode_mask_t      pd_mode;
+    pointing_mode_mask_t pointing_mode;
     bool                has_more_taps;
     uint8_t             authored_tap_depth;
+    // The first tap count's tap: what an empty tap at a later count repeats.
+    tap_behavior_t      first_tap;
     uint16_t            flags;
 } handled_key_resolution_t;
 
@@ -34,6 +36,9 @@ typedef enum {
     HANDLED_KEY_FLAG_FALLBACK_HOLD   = (1u << 3),
     HANDLED_KEY_FLAG_MOMENTARY_LAYER = (1u << 4),
     HANDLED_KEY_FLAG_LAYER_TAP       = (1u << 5),
+    // A lower layer's key that a transparent cell reads through: the pressed
+    // key's own row governs, so the lower key is never a native key.
+    HANDLED_KEY_FLAG_TRANSPARENT_SOURCE = (1u << 6),
 } handled_key_flag_t;
 
 typedef enum {
@@ -51,6 +56,10 @@ typedef struct {
     bool                         keeps_registered_feedback;
     bool                         keeps_pending_feedback;
     bool                         release_layer_before_action;
+    // A layer held until release: keys pressed while it decides wait for it.
+    bool                         hold_is_layer;
+    // The layer its preview lights while it decides, UINT8_MAX for none: only
+    // when every outcome of the press lands on that layer.
     uint8_t                      preview_layer;
 } handled_key_hold_semantics_t;
 
@@ -59,7 +68,7 @@ typedef handled_key_hold_semantics_t handled_key_hold_contract_t;
 typedef struct {
     handled_key_hold_semantics_t hold;
     handled_key_hold_semantics_t long_hold;
-    pd_mode_mask_t               quick_tap_pd_mode_lock;
+    pointing_mode_mask_t         quick_tap_pointing_mode_lock;
     bool                         suppress_tap_on_layer_interrupt;
     bool                         buffered_base_tap_dispatches_tap;
     bool                         quick_release_of_immediate_hold_dispatches_tap;
@@ -82,7 +91,7 @@ typedef struct {
     hold_behavior_t                  long_hold;
     key_runtime_slot_hold_strategy_t hold_strategy;
     uint8_t                          layer;
-    pd_mode_mask_t                   pd_mode;
+    pointing_mode_mask_t             pointing_mode;
     uint16_t                         flags;
     bool                             tap_resolves_on_press;
     handled_key_behavior_contract_t  contract;
@@ -108,7 +117,7 @@ static inline void handled_key_materialized_default_into(const handled_key_resol
 
     out->authored = *resolution;
     out->layer    = resolution->layer;
-    out->pd_mode  = resolution->pd_mode;
+    out->pointing_mode = resolution->pointing_mode;
     out->flags    = resolution->flags;
 }
 
@@ -130,6 +139,8 @@ static inline bool handled_key_hold_contract_fires_at_threshold(handled_key_hold
 
 void                           handled_key_lookup_into(uint16_t keycode, handled_key_resolution_t *out);
 void                           handled_key_lookup_tap_count_into(uint16_t keycode, uint8_t tap_count, handled_key_resolution_t *out);
+// use_row false: the key as if it had no authored row (a bypassed press).
+void                           handled_key_lookup_row_tap_count_into(uint16_t keycode, uint8_t tap_count, bool use_row, handled_key_resolution_t *out);
 handled_key_resolution_t       handled_key_lookup(uint16_t keycode);
 handled_key_resolution_t       handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count);
 handled_key_resolution_ctx_t   handled_key_resolution_ctx_live(keypos_t key_pos);
@@ -141,4 +152,4 @@ bool                           handled_key_resolution_has_multi_tap(handled_key_
 bool                           handled_key_resolution_is_momentary_layer(handled_key_resolution_t resolution);
 bool                           handled_key_resolution_is_layer_tap(handled_key_resolution_t resolution);
 uint16_t                       handled_key_resolution_tap_hold_term(handled_key_resolution_t resolution);
-uint16_t                       handled_key_resolution_longer_hold_term(handled_key_resolution_t resolution);
+uint16_t                       handled_key_resolution_long_hold_term(handled_key_resolution_t resolution);

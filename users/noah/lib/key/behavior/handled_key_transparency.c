@@ -4,7 +4,6 @@
 
 #include "handled_key_internal.h"
 
-#include "keymap_introspection.h" // QMK
 
 static bool handled_key_keypos_in_bounds(keypos_t key_pos) {
     return key_pos.row < MATRIX_ROWS && key_pos.col < MATRIX_COLS;
@@ -17,7 +16,15 @@ static uint16_t handled_key_resolution_transparent_field_action(const handled_ke
 
     switch (field) {
         case HANDLED_KEY_TRANSPARENT_FIELD_TAP:
-            return resolution->step.tap.present ? resolution->step.tap.action : noah_action_desc_default_tap_action(noah_action_describe(resolution->keycode));
+            if (resolution->step.tap.present) {
+                return resolution->step.tap.action;
+            }
+            // A later count's empty tap repeats the first tap (D-F33), so a
+            // transparent first tap reads through there too.
+            if (resolution->tap_count > 1u && resolution->first_tap.present) {
+                return resolution->first_tap.action;
+            }
+            return noah_action_desc_default_tap_action(noah_action_describe(resolution->keycode));
         case HANDLED_KEY_TRANSPARENT_FIELD_HOLD:
             return resolution->step.hold.present ? resolution->step.hold.action : KC_NO;
         case HANDLED_KEY_TRANSPARENT_FIELD_LONG_HOLD:
@@ -73,7 +80,7 @@ static int8_t handled_key_transparent_origin_layer(const handled_key_resolution_
             continue;
         }
 
-        if (keycode_at_keymap_location((uint8_t)layer, ctx->key_pos.row, ctx->key_pos.col) == resolution->keycode) {
+        if (keymap_key_to_keycode((uint8_t)layer, ctx->key_pos) == resolution->keycode) {
             return layer;
         }
     }
@@ -105,7 +112,7 @@ bool handled_key_transparent_source_at_position(const handled_key_resolution_t *
             continue;
         }
 
-        keycode = keycode_at_keymap_location((uint8_t)layer, ctx->key_pos.row, ctx->key_pos.col);
+        keycode = keymap_key_to_keycode((uint8_t)layer, ctx->key_pos);
         if (keycode == KC_TRNS) {
             continue;
         }
@@ -115,6 +122,7 @@ bool handled_key_transparent_source_at_position(const handled_key_resolution_t *
             continue;
         }
 
+        out->flags |= HANDLED_KEY_FLAG_TRANSPARENT_SOURCE;
         return true;
     }
 

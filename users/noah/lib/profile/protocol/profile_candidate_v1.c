@@ -56,7 +56,7 @@ static bool operation_is_supported(uint8_t command, uint8_t value) {
     if (command == NOAH_PROFILE_CANDIDATE_V1_COMMAND_SAVE) {
         return value == NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT;
     }
-    return command == NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET && (value == NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT);
+    return command == NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET && (value == NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_STREAM_CHUNK || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_REUSE || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT);
 }
 
 static noah_profile_candidate_v1_operation_t decode_operation(uint8_t value) {
@@ -64,7 +64,10 @@ static noah_profile_candidate_v1_operation_t decode_operation(uint8_t value) {
         case NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN:
             return NOAH_PROFILE_CANDIDATE_V1_OPERATION_BEGIN;
         case NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK:
+        case NOAH_PROFILE_CANDIDATE_V1_VALUE_STREAM_CHUNK:
             return NOAH_PROFILE_CANDIDATE_V1_OPERATION_CHUNK;
+        case NOAH_PROFILE_CANDIDATE_V1_VALUE_REUSE:
+            return NOAH_PROFILE_CANDIDATE_V1_OPERATION_REUSE;
         case NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE:
             return NOAH_PROFILE_CANDIDATE_V1_OPERATION_VALIDATE;
         case NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT:
@@ -120,58 +123,74 @@ noah_profile_candidate_v1_decode_result_t noah_profile_candidate_v1_decode(const
     if (command->operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_BEGIN) {
         noah_profile_candidate_v1_metadata_t *metadata = &command->payload.begin;
 
+        // The base's version implies the store format and leaves no flags.
         metadata->schema_major         = frame[5];
         metadata->schema_minor         = frame[6];
         metadata->requested_domains    = frame[7];
-        metadata->flags                = frame[8];
-        metadata->payload_length       = read_u16(&frame[9]);
-        metadata->crc32                = read_u32(&frame[11]);
-        metadata->digest               = read_u32(&frame[15]);
-        metadata->action_abi_digest    = read_u32(&frame[19]);
-        metadata->store_format_version = frame[23];
+        metadata->flags                = 0u;
+        metadata->payload_length       = read_u32(&frame[8]);
+        metadata->crc32                = read_u32(&frame[12]);
+        metadata->digest               = read_u32(&frame[16]);
+        metadata->action_abi_digest    = read_u32(&frame[20]);
+        metadata->store_format_version = NOAH_PROFILE_LOGICAL_STORE_VERSION;
         if ((metadata->requested_domains & (uint8_t)~NOAH_PROFILE_CANDIDATE_V1_KNOWN_DOMAINS) != 0u) {
             return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 7u);
         }
-        if (metadata->flags != 0u) {
+        if (metadata->payload_length < NOAH_PROFILE_CANDIDATE_V1_MIN_BLOB_SIZE || metadata->payload_length > NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE) {
             return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 8u);
         }
-        if (metadata->payload_length < NOAH_PROFILE_CANDIDATE_V1_MIN_BLOB_SIZE || metadata->payload_length > NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE) {
-            return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 9u);
-        }
-        if (metadata->store_format_version == 0u) {
-            return require_zero(frame, 24u, NOAH_PROFILE_WIRE_V1_REPORT_SIZE, error);
-        }
-        if (metadata->store_format_version != NOAH_PROFILE_LOGICAL_STORE_VERSION) {
-            return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 23u);
-        }
-        metadata->via_generation = read_u32(&frame[24]);
-        metadata->via_digest     = read_u32(&frame[28]);
-        if (metadata->via_generation == 0u || metadata->via_digest == 0u) {
-            return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, metadata->via_generation == 0u ? 24u : 28u);
+        // Bytes 24..31 bound the candidate to the VIA store until D-F31.
+        for (uint8_t index = 24u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) {
+            if (frame[index] != 0u) {
+                return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, index);
+            }
         }
         return NOAH_PROFILE_CANDIDATE_V1_DECODE_OK;
     }
 
-    if (command->operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_CHUNK) {
-        uint16_t                                  end;
-        uint8_t                                   chunk_length = frame[7];
-        noah_profile_candidate_v1_decode_result_t result;
+    if (command->operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_REUSE) {
+        uint32_t length = read_u32(&frame[13]);
 
-        command->payload.chunk.offset = read_u16(&frame[5]);
-        command->payload.chunk.length = chunk_length;
-        if (chunk_length == 0u || chunk_length > NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX) {
-            return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 7u);
+        command->payload.reuse.offset = read_u32(&frame[5]);
+        command->payload.reuse.source_offset = read_u32(&frame[9]);
+        command->payload.reuse.source.generation = read_u32(&frame[17]);
+        command->payload.reuse.source.digest = read_u32(&frame[21]);
+        command->payload.reuse.source.crc32 = read_u32(&frame[25]);
+        command->payload.reuse.source.kind = frame[29];
+        command->payload.reuse.source.origin = frame[30];
+        if (length == 0u || length > NOAH_PROFILE_CANDIDATE_V1_REUSE_MAX) {
+            return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 13u);
         }
-        end = (uint16_t)(command->payload.chunk.offset + chunk_length);
-        if (command->payload.chunk.offset >= NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE || end < command->payload.chunk.offset || end > NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE) {
+        command->payload.reuse.length = (uint16_t)length;
+        if (command->payload.reuse.offset > NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE - length) {
             return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 5u);
         }
-        memcpy(command->payload.chunk.bytes, &frame[8], chunk_length);
-        result = require_zero(frame, (uint8_t)(8u + chunk_length), 28u, error);
-        if (result != NOAH_PROFILE_CANDIDATE_V1_DECODE_OK) {
-            return result;
+        if (command->payload.reuse.source_offset > NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE - length) {
+            return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 9u);
         }
-        return require_zero(frame, 28u, NOAH_PROFILE_WIRE_V1_REPORT_SIZE, error);
+        bool saved_base = command->payload.reuse.source.generation != 0u && frame[30] <= 1u;
+        bool compiled_base  = command->payload.reuse.source.generation == 0u && frame[30] == UINT8_MAX;
+        // Kind 2 is the working copy (D-F32), over either base.
+        if (frame[29] > 2u || (frame[29] == 0u && !compiled_base) || (frame[29] == 1u && !saved_base) || (frame[29] == 2u && !saved_base && !compiled_base)) {
+            return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 29u);
+        }
+        return require_zero(frame, 31u, NOAH_PROFILE_WIRE_V1_REPORT_SIZE, error);
+    }
+
+    if (command->operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_CHUNK) {
+        uint8_t chunk_length = frame[9];
+
+        command->payload.chunk.offset = read_u32(&frame[5]);
+        command->payload.chunk.length = chunk_length;
+        if (chunk_length == 0u || chunk_length > NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX) {
+            return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 9u);
+        }
+        if (command->payload.chunk.offset > (uint32_t)NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE - chunk_length) {
+            return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 5u);
+        }
+        memcpy(command->payload.chunk.bytes, &frame[10], chunk_length);
+        // Unused chunk bytes, then the two reserved bytes, are zero.
+        return require_zero(frame, (uint8_t)(10u + chunk_length), NOAH_PROFILE_WIRE_V1_REPORT_SIZE, error);
     }
 
     return require_zero(frame, FRAME_BODY, NOAH_PROFILE_WIRE_V1_REPORT_SIZE, error);
@@ -195,7 +214,7 @@ noah_profile_candidate_v1_error_t noah_profile_candidate_v1_no_error(void) {
         .row_index   = NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16,
         .tap_index   = NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U8,
         .field_id    = NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U8,
-        .byte_offset = NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16,
+        .byte_offset = NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U32,
     };
     return error;
 }
@@ -230,39 +249,51 @@ bool noah_profile_candidate_v1_handle_status_get(const noah_profile_candidate_v1
         begin_status_response(frame, NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED, 0u);
         return true;
     }
-    if (frame[FRAME_READ_PAGE] != 0u) {
+    if (frame[FRAME_READ_PAGE] != 0u && frame[FRAME_READ_PAGE] != NOAH_PROFILE_CANDIDATE_V1_STATUS_ERROR_PAGE) {
         begin_status_response(frame, NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE, 0u);
         return true;
     }
 
+    uint8_t page = frame[FRAME_READ_PAGE];
     begin_status_response(frame, NOAH_PROFILE_WIRE_V1_STATUS_OK, OPERATION_PAYLOAD_SIZE);
-    payload    = &frame[FRAME_READ_PAYLOAD];
-    payload[0] = 1u;
+    payload = &frame[FRAME_READ_PAYLOAD];
+    if (page == NOAH_PROFILE_CANDIDATE_V1_STATUS_ERROR_PAGE) {
+        // The error page repeats the transaction, operation sequence and
+        // error sequence so a host can tie it to the page-0 read it follows.
+        payload[0] = 1u;
+        payload[1] = (uint8_t)status->error.code;
+        payload[2] = status->error.domain_id;
+        payload[3] = status->error.table_id;
+        write_u16(&payload[4], status->error.row_index);
+        payload[6] = status->error.tap_index;
+        payload[7] = status->error.field_id;
+        write_u32(&payload[8], status->error.byte_offset);
+        write_u16(&payload[12], status->transaction_id);
+        write_u16(&payload[14], status->operation_sequence);
+        write_u16(&payload[16], status->error_sequence);
+        return true; // Bytes 18..24 remain reserved zero.
+    }
+    payload[0] = 2u;
     payload[1] = (uint8_t)status->state;
     payload[2] = (uint8_t)status->last_operation;
     payload[3] = status->flags;
     write_u16(&payload[4], status->transaction_id);
-    write_u16(&payload[6], status->next_offset);
-    write_u16(&payload[8], status->payload_length);
-    write_u32(&payload[10], status->digest);
-    payload[14] = (uint8_t)status->error.code;
-    payload[15] = status->error.domain_id;
-    payload[16] = status->error.table_id;
-    write_u16(&payload[17], status->error.row_index);
-    payload[19] = status->error.tap_index;
-    payload[20] = status->error.field_id;
-    write_u16(&payload[21], status->error.byte_offset);
-    write_u16(&payload[23], status->operation_sequence);
-    return true;
+    write_u32(&payload[6], status->next_offset);
+    write_u32(&payload[10], status->payload_length);
+    write_u32(&payload[14], status->digest);
+    payload[18] = (uint8_t)status->error.code;
+    write_u16(&payload[19], status->operation_sequence);
+    write_u16(&payload[21], status->error_sequence);
+    return true; // Bytes 23..24 remain reserved zero.
 }
 
-bool noah_profile_candidate_v1_handle_peer_status_get(const noah_profile_candidate_v1_peer_status_t *peer, uint8_t *frame, size_t length) {
+bool noah_profile_candidate_v1_handle_copy_status_get(const noah_profile_candidate_v1_copy_status_t *other_half, uint8_t *frame, size_t length) {
     uint8_t *payload;
 
-    if (!peer || !frame || length != NOAH_PROFILE_WIRE_V1_REPORT_SIZE) {
+    if (!other_half || !frame || length != NOAH_PROFILE_WIRE_V1_REPORT_SIZE) {
         return false;
     }
-    if (frame[FRAME_COMMAND] != NOAH_PROFILE_WIRE_V1_COMMAND_GET || frame[FRAME_CHANNEL] != NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL || frame[FRAME_VALUE] != NOAH_PROFILE_CANDIDATE_V1_VALUE_STATUS || frame[FRAME_READ_PAGE] != 1u) {
+    if (frame[FRAME_COMMAND] != NOAH_PROFILE_WIRE_V1_COMMAND_GET || frame[FRAME_CHANNEL] != NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL || frame[FRAME_VALUE] != NOAH_PROFILE_CANDIDATE_V1_VALUE_STATUS || (frame[FRAME_READ_PAGE] != 1u && frame[FRAME_READ_PAGE] != 2u)) {
         return false;
     }
     if (frame[FRAME_READ_REQUEST] == 0u || !status_request_reserved_bytes_are_zero(frame)) {
@@ -270,22 +301,34 @@ bool noah_profile_candidate_v1_handle_peer_status_get(const noah_profile_candida
         return true;
     }
 
+    uint8_t page = frame[FRAME_READ_PAGE];
     begin_status_response(frame, NOAH_PROFILE_WIRE_V1_STATUS_OK, OPERATION_PAYLOAD_SIZE);
     payload    = &frame[FRAME_READ_PAYLOAD];
-    payload[0] = 1u;
-    payload[1] = (uint8_t)peer->phase;
-    payload[2] = peer->last_status;
-    payload[3] = (uint8_t)(peer->flags & NOAH_PROFILE_CANDIDATE_V1_PEER_FLAGS_KNOWN);
-    write_u16(&payload[4], peer->transfer_offset);
-    write_u16(&payload[6], peer->transfer_length);
-    write_u32(&payload[8], peer->retry_count);
-    write_u32(&payload[12], peer->transport_failure_count);
-    write_u16(&payload[16], peer->busy_streak);
-    payload[18] = peer->busy_reason;
-    payload[19] = peer->busy_store_state;
-    payload[20] = peer->busy_owner;
-    payload[21] = peer->busy_admission;
-    // Bytes 22..24 are reserved and stay zero.
+    payload[0] = 2u;
+    if (page == 2u) {
+        // The transfer length is page 1's; this page keeps the offset only.
+        payload[1] = other_half->reuse_unavailable ? 1u : 0u;
+        write_u32(&payload[2], other_half->reused_bytes);
+        write_u16(&payload[6], other_half->reuse_exchanges);
+        write_u16(&payload[8], other_half->source_unavailable_replies);
+        write_u32(&payload[10], other_half->prepared_scans);
+        write_u32(&payload[14], other_half->prepared_exchanges);
+        write_u32(&payload[18], other_half->transfer_offset);
+        return true; // Bytes 22..24 remain reserved zero.
+    }
+    payload[1] = (uint8_t)other_half->phase;
+    payload[2] = other_half->last_status;
+    payload[3] = (uint8_t)(other_half->flags & NOAH_PROFILE_CANDIDATE_V1_COPY_FLAGS_KNOWN);
+    write_u32(&payload[4], other_half->transfer_offset);
+    write_u32(&payload[8], other_half->transfer_length);
+    write_u32(&payload[12], other_half->retry_count);
+    write_u32(&payload[16], other_half->transport_failure_count);
+    write_u16(&payload[20], other_half->busy_streak);
+    payload[22] = other_half->busy_reason;
+    payload[23] = other_half->busy_store_state;
+    // Transfer owner (0..2) in the low nibble, storage admission (0..2) in
+    // the high one.
+    payload[24] = (uint8_t)((other_half->busy_owner & 0x0Fu) | (uint8_t)(other_half->busy_admission << 4u));
     return true;
 }
 

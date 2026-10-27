@@ -1,0 +1,1740 @@
+{
+ "generator": "tools/host_layouts/build.py --import-qmk",
+ "layouts": {
+  "us": {
+   "source": "US, as QMK send_string assumes",
+   "keys": {
+    "KC_A": [
+     "a",
+     "A",
+     null,
+     null
+    ],
+    "KC_B": [
+     "b",
+     "B",
+     null,
+     null
+    ],
+    "KC_C": [
+     "c",
+     "C",
+     null,
+     null
+    ],
+    "KC_D": [
+     "d",
+     "D",
+     null,
+     null
+    ],
+    "KC_E": [
+     "e",
+     "E",
+     null,
+     null
+    ],
+    "KC_F": [
+     "f",
+     "F",
+     null,
+     null
+    ],
+    "KC_G": [
+     "g",
+     "G",
+     null,
+     null
+    ],
+    "KC_H": [
+     "h",
+     "H",
+     null,
+     null
+    ],
+    "KC_I": [
+     "i",
+     "I",
+     null,
+     null
+    ],
+    "KC_J": [
+     "j",
+     "J",
+     null,
+     null
+    ],
+    "KC_K": [
+     "k",
+     "K",
+     null,
+     null
+    ],
+    "KC_L": [
+     "l",
+     "L",
+     null,
+     null
+    ],
+    "KC_M": [
+     "m",
+     "M",
+     null,
+     null
+    ],
+    "KC_N": [
+     "n",
+     "N",
+     null,
+     null
+    ],
+    "KC_O": [
+     "o",
+     "O",
+     null,
+     null
+    ],
+    "KC_P": [
+     "p",
+     "P",
+     null,
+     null
+    ],
+    "KC_Q": [
+     "q",
+     "Q",
+     null,
+     null
+    ],
+    "KC_R": [
+     "r",
+     "R",
+     null,
+     null
+    ],
+    "KC_S": [
+     "s",
+     "S",
+     null,
+     null
+    ],
+    "KC_T": [
+     "t",
+     "T",
+     null,
+     null
+    ],
+    "KC_U": [
+     "u",
+     "U",
+     null,
+     null
+    ],
+    "KC_V": [
+     "v",
+     "V",
+     null,
+     null
+    ],
+    "KC_W": [
+     "w",
+     "W",
+     null,
+     null
+    ],
+    "KC_X": [
+     "x",
+     "X",
+     null,
+     null
+    ],
+    "KC_Y": [
+     "y",
+     "Y",
+     null,
+     null
+    ],
+    "KC_Z": [
+     "z",
+     "Z",
+     null,
+     null
+    ],
+    "KC_1": [
+     "1",
+     "!",
+     null,
+     null
+    ],
+    "KC_2": [
+     "2",
+     "@",
+     null,
+     null
+    ],
+    "KC_3": [
+     "3",
+     "#",
+     null,
+     null
+    ],
+    "KC_4": [
+     "4",
+     "$",
+     null,
+     null
+    ],
+    "KC_5": [
+     "5",
+     "%",
+     null,
+     null
+    ],
+    "KC_6": [
+     "6",
+     "^",
+     null,
+     null
+    ],
+    "KC_7": [
+     "7",
+     "&",
+     null,
+     null
+    ],
+    "KC_8": [
+     "8",
+     "*",
+     null,
+     null
+    ],
+    "KC_9": [
+     "9",
+     "(",
+     null,
+     null
+    ],
+    "KC_0": [
+     "0",
+     ")",
+     null,
+     null
+    ],
+    "KC_SPC": [
+     " ",
+     " ",
+     null,
+     null
+    ],
+    "KC_MINS": [
+     "-",
+     "_",
+     null,
+     null
+    ],
+    "KC_EQL": [
+     "=",
+     "+",
+     null,
+     null
+    ],
+    "KC_LBRC": [
+     "[",
+     "{",
+     null,
+     null
+    ],
+    "KC_RBRC": [
+     "]",
+     "}",
+     null,
+     null
+    ],
+    "KC_BSLS": [
+     "\\",
+     "|",
+     null,
+     null
+    ],
+    "KC_NUHS": [
+     null,
+     null,
+     null,
+     null
+    ],
+    "KC_SCLN": [
+     ";",
+     ":",
+     null,
+     null
+    ],
+    "KC_QUOT": [
+     "'",
+     "\"",
+     null,
+     null
+    ],
+    "KC_GRV": [
+     "`",
+     "~",
+     null,
+     null
+    ],
+    "KC_COMM": [
+     ",",
+     "<",
+     null,
+     null
+    ],
+    "KC_DOT": [
+     ".",
+     ">",
+     null,
+     null
+    ],
+    "KC_SLSH": [
+     "/",
+     "?",
+     null,
+     null
+    ],
+    "KC_NUBS": [
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "dead": {}
+  },
+  "windows-us-international": {
+   "source": "QMK data/constants/keycodes/extras/keycodes_us_international_0.0.1.hjson",
+   "keys": {
+    "KC_A": [
+     "a",
+     "A",
+     "á",
+     "Á"
+    ],
+    "KC_B": [
+     "b",
+     "B",
+     null,
+     null
+    ],
+    "KC_C": [
+     "c",
+     "C",
+     "©",
+     "¢"
+    ],
+    "KC_D": [
+     "d",
+     "D",
+     "ð",
+     "Ð"
+    ],
+    "KC_E": [
+     "e",
+     "E",
+     "é",
+     "É"
+    ],
+    "KC_F": [
+     "f",
+     "F",
+     null,
+     null
+    ],
+    "KC_G": [
+     "g",
+     "G",
+     null,
+     null
+    ],
+    "KC_H": [
+     "h",
+     "H",
+     null,
+     null
+    ],
+    "KC_I": [
+     "i",
+     "I",
+     "í",
+     "Í"
+    ],
+    "KC_J": [
+     "j",
+     "J",
+     null,
+     null
+    ],
+    "KC_K": [
+     "k",
+     "K",
+     null,
+     null
+    ],
+    "KC_L": [
+     "l",
+     "L",
+     "ø",
+     "Ø"
+    ],
+    "KC_M": [
+     "m",
+     "M",
+     "µ",
+     null
+    ],
+    "KC_N": [
+     "n",
+     "N",
+     "ñ",
+     "Ñ"
+    ],
+    "KC_O": [
+     "o",
+     "O",
+     "ó",
+     "Ó"
+    ],
+    "KC_P": [
+     "p",
+     "P",
+     "ö",
+     "Ö"
+    ],
+    "KC_Q": [
+     "q",
+     "Q",
+     "ä",
+     "Ä"
+    ],
+    "KC_R": [
+     "r",
+     "R",
+     "®",
+     null
+    ],
+    "KC_S": [
+     "s",
+     "S",
+     "ß",
+     "§"
+    ],
+    "KC_T": [
+     "t",
+     "T",
+     "þ",
+     "Þ"
+    ],
+    "KC_U": [
+     "u",
+     "U",
+     "ú",
+     "Ú"
+    ],
+    "KC_V": [
+     "v",
+     "V",
+     null,
+     null
+    ],
+    "KC_W": [
+     "w",
+     "W",
+     "å",
+     "Å"
+    ],
+    "KC_X": [
+     "x",
+     "X",
+     null,
+     null
+    ],
+    "KC_Y": [
+     "y",
+     "Y",
+     "ü",
+     "Ü"
+    ],
+    "KC_Z": [
+     "z",
+     "Z",
+     "æ",
+     "Æ"
+    ],
+    "KC_1": [
+     "1",
+     "!",
+     "¡",
+     "¹"
+    ],
+    "KC_2": [
+     "2",
+     "@",
+     "²",
+     null
+    ],
+    "KC_3": [
+     "3",
+     "#",
+     "³",
+     null
+    ],
+    "KC_4": [
+     "4",
+     "$",
+     "¤",
+     "£"
+    ],
+    "KC_5": [
+     "5",
+     "%",
+     "€",
+     null
+    ],
+    "KC_6": [
+     "6",
+     {
+      "dead": "S(KC_6)"
+     },
+     "¼",
+     null
+    ],
+    "KC_7": [
+     "7",
+     "&",
+     "½",
+     null
+    ],
+    "KC_8": [
+     "8",
+     "*",
+     "¾",
+     null
+    ],
+    "KC_9": [
+     "9",
+     "(",
+     "‘",
+     null
+    ],
+    "KC_0": [
+     "0",
+     ")",
+     "’",
+     null
+    ],
+    "KC_SPC": [
+     " ",
+     " ",
+     null,
+     null
+    ],
+    "KC_MINS": [
+     "-",
+     "_",
+     "¥",
+     null
+    ],
+    "KC_EQL": [
+     "=",
+     "+",
+     "×",
+     "÷"
+    ],
+    "KC_LBRC": [
+     "[",
+     "{",
+     "«",
+     null
+    ],
+    "KC_RBRC": [
+     "]",
+     "}",
+     "»",
+     null
+    ],
+    "KC_BSLS": [
+     "\\",
+     "|",
+     "¬",
+     "¦"
+    ],
+    "KC_NUHS": [
+     "\\",
+     "|",
+     "¬",
+     "¦"
+    ],
+    "KC_SCLN": [
+     ";",
+     ":",
+     "¶",
+     "°"
+    ],
+    "KC_QUOT": [
+     {
+      "dead": "KC_QUOT"
+     },
+     {
+      "dead": "S(KC_QUOT)"
+     },
+     "´",
+     "¨"
+    ],
+    "KC_GRV": [
+     {
+      "dead": "KC_GRV"
+     },
+     {
+      "dead": "S(KC_GRV)"
+     },
+     null,
+     null
+    ],
+    "KC_COMM": [
+     ",",
+     "<",
+     "ç",
+     "Ç"
+    ],
+    "KC_DOT": [
+     ".",
+     ">",
+     null,
+     null
+    ],
+    "KC_SLSH": [
+     "/",
+     "?",
+     "¿",
+     null
+    ],
+    "KC_NUBS": [
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "dead": {
+    "S(KC_6)": {
+     "space": "^",
+     "compose": {
+      "KC_A": "â",
+      "S(KC_A)": "Â",
+      "KC_E": "ê",
+      "S(KC_E)": "Ê",
+      "KC_I": "î",
+      "S(KC_I)": "Î",
+      "KC_O": "ô",
+      "S(KC_O)": "Ô",
+      "KC_U": "û",
+      "S(KC_U)": "Û"
+     }
+    },
+    "KC_QUOT": {
+     "space": "'",
+     "compose": {
+      "KC_A": "á",
+      "S(KC_A)": "Á",
+      "KC_E": "é",
+      "S(KC_E)": "É",
+      "KC_I": "í",
+      "S(KC_I)": "Í",
+      "KC_O": "ó",
+      "S(KC_O)": "Ó",
+      "KC_U": "ú",
+      "S(KC_U)": "Ú",
+      "KC_Y": "ý",
+      "S(KC_Y)": "Ý"
+     }
+    },
+    "S(KC_QUOT)": {
+     "space": "\"",
+     "compose": {
+      "KC_A": "ä",
+      "S(KC_A)": "Ä",
+      "KC_E": "ë",
+      "S(KC_E)": "Ë",
+      "KC_I": "ï",
+      "S(KC_I)": "Ï",
+      "KC_O": "ö",
+      "S(KC_O)": "Ö",
+      "KC_U": "ü",
+      "S(KC_U)": "Ü",
+      "KC_Y": "ÿ"
+     }
+    },
+    "KC_GRV": {
+     "space": "`",
+     "compose": {
+      "KC_A": "à",
+      "S(KC_A)": "À",
+      "KC_E": "è",
+      "S(KC_E)": "È",
+      "KC_I": "ì",
+      "S(KC_I)": "Ì",
+      "KC_O": "ò",
+      "S(KC_O)": "Ò",
+      "KC_U": "ù",
+      "S(KC_U)": "Ù"
+     }
+    },
+    "S(KC_GRV)": {
+     "space": "~",
+     "compose": {
+      "KC_A": "ã",
+      "S(KC_A)": "Ã",
+      "KC_N": "ñ",
+      "S(KC_N)": "Ñ",
+      "KC_O": "õ",
+      "S(KC_O)": "Õ"
+     }
+    }
+   }
+  },
+  "windows-uk": {
+   "source": "QMK data/constants/keycodes/extras/keycodes_uk_0.0.1.hjson",
+   "keys": {
+    "KC_A": [
+     "a",
+     "A",
+     "á",
+     "Á"
+    ],
+    "KC_B": [
+     "b",
+     "B",
+     null,
+     null
+    ],
+    "KC_C": [
+     "c",
+     "C",
+     null,
+     null
+    ],
+    "KC_D": [
+     "d",
+     "D",
+     null,
+     null
+    ],
+    "KC_E": [
+     "e",
+     "E",
+     "é",
+     "É"
+    ],
+    "KC_F": [
+     "f",
+     "F",
+     null,
+     null
+    ],
+    "KC_G": [
+     "g",
+     "G",
+     null,
+     null
+    ],
+    "KC_H": [
+     "h",
+     "H",
+     null,
+     null
+    ],
+    "KC_I": [
+     "i",
+     "I",
+     "í",
+     "Í"
+    ],
+    "KC_J": [
+     "j",
+     "J",
+     null,
+     null
+    ],
+    "KC_K": [
+     "k",
+     "K",
+     null,
+     null
+    ],
+    "KC_L": [
+     "l",
+     "L",
+     null,
+     null
+    ],
+    "KC_M": [
+     "m",
+     "M",
+     null,
+     null
+    ],
+    "KC_N": [
+     "n",
+     "N",
+     null,
+     null
+    ],
+    "KC_O": [
+     "o",
+     "O",
+     "ó",
+     "Ó"
+    ],
+    "KC_P": [
+     "p",
+     "P",
+     null,
+     null
+    ],
+    "KC_Q": [
+     "q",
+     "Q",
+     null,
+     null
+    ],
+    "KC_R": [
+     "r",
+     "R",
+     null,
+     null
+    ],
+    "KC_S": [
+     "s",
+     "S",
+     null,
+     null
+    ],
+    "KC_T": [
+     "t",
+     "T",
+     null,
+     null
+    ],
+    "KC_U": [
+     "u",
+     "U",
+     "ú",
+     "Ú"
+    ],
+    "KC_V": [
+     "v",
+     "V",
+     null,
+     null
+    ],
+    "KC_W": [
+     "w",
+     "W",
+     null,
+     null
+    ],
+    "KC_X": [
+     "x",
+     "X",
+     null,
+     null
+    ],
+    "KC_Y": [
+     "y",
+     "Y",
+     null,
+     null
+    ],
+    "KC_Z": [
+     "z",
+     "Z",
+     null,
+     null
+    ],
+    "KC_1": [
+     "1",
+     "!",
+     null,
+     null
+    ],
+    "KC_2": [
+     "2",
+     "\"",
+     null,
+     null
+    ],
+    "KC_3": [
+     "3",
+     "£",
+     null,
+     null
+    ],
+    "KC_4": [
+     "4",
+     "$",
+     "€",
+     null
+    ],
+    "KC_5": [
+     "5",
+     "%",
+     null,
+     null
+    ],
+    "KC_6": [
+     "6",
+     "^",
+     null,
+     null
+    ],
+    "KC_7": [
+     "7",
+     "&",
+     null,
+     null
+    ],
+    "KC_8": [
+     "8",
+     "*",
+     null,
+     null
+    ],
+    "KC_9": [
+     "9",
+     "(",
+     null,
+     null
+    ],
+    "KC_0": [
+     "0",
+     ")",
+     null,
+     null
+    ],
+    "KC_SPC": [
+     " ",
+     " ",
+     null,
+     null
+    ],
+    "KC_MINS": [
+     "-",
+     "_",
+     null,
+     null
+    ],
+    "KC_EQL": [
+     "=",
+     "+",
+     null,
+     null
+    ],
+    "KC_LBRC": [
+     "[",
+     "{",
+     null,
+     null
+    ],
+    "KC_RBRC": [
+     "]",
+     "}",
+     null,
+     null
+    ],
+    "KC_BSLS": [
+     "#",
+     "~",
+     null,
+     null
+    ],
+    "KC_NUHS": [
+     "#",
+     "~",
+     null,
+     null
+    ],
+    "KC_SCLN": [
+     ";",
+     ":",
+     null,
+     null
+    ],
+    "KC_QUOT": [
+     "'",
+     "@",
+     null,
+     null
+    ],
+    "KC_GRV": [
+     "`",
+     "¬",
+     "¦",
+     null
+    ],
+    "KC_COMM": [
+     ",",
+     "<",
+     null,
+     null
+    ],
+    "KC_DOT": [
+     ".",
+     ">",
+     null,
+     null
+    ],
+    "KC_SLSH": [
+     "/",
+     "?",
+     null,
+     null
+    ],
+    "KC_NUBS": [
+     "\\",
+     "|",
+     null,
+     null
+    ]
+   },
+   "dead": {}
+  },
+  "windows-german": {
+   "source": "QMK data/constants/keycodes/extras/keycodes_german_0.0.1.hjson",
+   "keys": {
+    "KC_A": [
+     "a",
+     "A",
+     null,
+     null
+    ],
+    "KC_B": [
+     "b",
+     "B",
+     null,
+     null
+    ],
+    "KC_C": [
+     "c",
+     "C",
+     null,
+     null
+    ],
+    "KC_D": [
+     "d",
+     "D",
+     null,
+     null
+    ],
+    "KC_E": [
+     "e",
+     "E",
+     "€",
+     null
+    ],
+    "KC_F": [
+     "f",
+     "F",
+     null,
+     null
+    ],
+    "KC_G": [
+     "g",
+     "G",
+     null,
+     null
+    ],
+    "KC_H": [
+     "h",
+     "H",
+     null,
+     null
+    ],
+    "KC_I": [
+     "i",
+     "I",
+     null,
+     null
+    ],
+    "KC_J": [
+     "j",
+     "J",
+     null,
+     null
+    ],
+    "KC_K": [
+     "k",
+     "K",
+     null,
+     null
+    ],
+    "KC_L": [
+     "l",
+     "L",
+     null,
+     null
+    ],
+    "KC_M": [
+     "m",
+     "M",
+     "µ",
+     null
+    ],
+    "KC_N": [
+     "n",
+     "N",
+     null,
+     null
+    ],
+    "KC_O": [
+     "o",
+     "O",
+     null,
+     null
+    ],
+    "KC_P": [
+     "p",
+     "P",
+     null,
+     null
+    ],
+    "KC_Q": [
+     "q",
+     "Q",
+     "@",
+     null
+    ],
+    "KC_R": [
+     "r",
+     "R",
+     null,
+     null
+    ],
+    "KC_S": [
+     "s",
+     "S",
+     null,
+     null
+    ],
+    "KC_T": [
+     "t",
+     "T",
+     null,
+     null
+    ],
+    "KC_U": [
+     "u",
+     "U",
+     null,
+     null
+    ],
+    "KC_V": [
+     "v",
+     "V",
+     null,
+     null
+    ],
+    "KC_W": [
+     "w",
+     "W",
+     null,
+     null
+    ],
+    "KC_X": [
+     "x",
+     "X",
+     null,
+     null
+    ],
+    "KC_Y": [
+     "z",
+     "Z",
+     null,
+     null
+    ],
+    "KC_Z": [
+     "y",
+     "Y",
+     null,
+     null
+    ],
+    "KC_1": [
+     "1",
+     "!",
+     null,
+     null
+    ],
+    "KC_2": [
+     "2",
+     "\"",
+     "²",
+     null
+    ],
+    "KC_3": [
+     "3",
+     "§",
+     "³",
+     null
+    ],
+    "KC_4": [
+     "4",
+     "$",
+     null,
+     null
+    ],
+    "KC_5": [
+     "5",
+     "%",
+     null,
+     null
+    ],
+    "KC_6": [
+     "6",
+     "&",
+     null,
+     null
+    ],
+    "KC_7": [
+     "7",
+     "/",
+     "{",
+     null
+    ],
+    "KC_8": [
+     "8",
+     "(",
+     "[",
+     null
+    ],
+    "KC_9": [
+     "9",
+     ")",
+     "]",
+     null
+    ],
+    "KC_0": [
+     "0",
+     "=",
+     "}",
+     null
+    ],
+    "KC_SPC": [
+     " ",
+     " ",
+     null,
+     null
+    ],
+    "KC_MINS": [
+     "ß",
+     "?",
+     "\\",
+     null
+    ],
+    "KC_EQL": [
+     {
+      "dead": "KC_EQL"
+     },
+     {
+      "dead": "S(KC_EQL)"
+     },
+     null,
+     null
+    ],
+    "KC_LBRC": [
+     "ü",
+     "Ü",
+     null,
+     null
+    ],
+    "KC_RBRC": [
+     "+",
+     "*",
+     "~",
+     null
+    ],
+    "KC_BSLS": [
+     "#",
+     "'",
+     null,
+     null
+    ],
+    "KC_NUHS": [
+     "#",
+     "'",
+     null,
+     null
+    ],
+    "KC_SCLN": [
+     "ö",
+     "Ö",
+     null,
+     null
+    ],
+    "KC_QUOT": [
+     "ä",
+     "Ä",
+     null,
+     null
+    ],
+    "KC_GRV": [
+     {
+      "dead": "KC_GRV"
+     },
+     "°",
+     null,
+     null
+    ],
+    "KC_COMM": [
+     ",",
+     ";",
+     null,
+     null
+    ],
+    "KC_DOT": [
+     ".",
+     ":",
+     null,
+     null
+    ],
+    "KC_SLSH": [
+     "-",
+     "_",
+     null,
+     null
+    ],
+    "KC_NUBS": [
+     "<",
+     ">",
+     "|",
+     null
+    ]
+   },
+   "dead": {
+    "KC_EQL": {
+     "space": "´",
+     "compose": {
+      "KC_A": "á",
+      "S(KC_A)": "Á",
+      "KC_E": "é",
+      "S(KC_E)": "É",
+      "KC_I": "í",
+      "S(KC_I)": "Í",
+      "KC_O": "ó",
+      "S(KC_O)": "Ó",
+      "KC_U": "ú",
+      "S(KC_U)": "Ú",
+      "KC_Z": "ý",
+      "S(KC_Z)": "Ý"
+     }
+    },
+    "S(KC_EQL)": {
+     "space": "`",
+     "compose": {
+      "KC_A": "à",
+      "S(KC_A)": "À",
+      "KC_E": "è",
+      "S(KC_E)": "È",
+      "KC_I": "ì",
+      "S(KC_I)": "Ì",
+      "KC_O": "ò",
+      "S(KC_O)": "Ò",
+      "KC_U": "ù",
+      "S(KC_U)": "Ù"
+     }
+    },
+    "KC_GRV": {
+     "space": "^",
+     "compose": {
+      "KC_A": "â",
+      "S(KC_A)": "Â",
+      "KC_E": "ê",
+      "S(KC_E)": "Ê",
+      "KC_I": "î",
+      "S(KC_I)": "Î",
+      "KC_O": "ô",
+      "S(KC_O)": "Ô",
+      "KC_U": "û",
+      "S(KC_U)": "Û"
+     }
+    }
+   }
+  },
+  "windows-french": {
+   "source": "QMK data/constants/keycodes/extras/keycodes_french_0.0.1.hjson",
+   "keys": {
+    "KC_A": [
+     "q",
+     "Q",
+     null,
+     null
+    ],
+    "KC_B": [
+     "b",
+     "B",
+     null,
+     null
+    ],
+    "KC_C": [
+     "c",
+     "C",
+     null,
+     null
+    ],
+    "KC_D": [
+     "d",
+     "D",
+     null,
+     null
+    ],
+    "KC_E": [
+     "e",
+     "E",
+     "€",
+     null
+    ],
+    "KC_F": [
+     "f",
+     "F",
+     null,
+     null
+    ],
+    "KC_G": [
+     "g",
+     "G",
+     null,
+     null
+    ],
+    "KC_H": [
+     "h",
+     "H",
+     null,
+     null
+    ],
+    "KC_I": [
+     "i",
+     "I",
+     null,
+     null
+    ],
+    "KC_J": [
+     "j",
+     "J",
+     null,
+     null
+    ],
+    "KC_K": [
+     "k",
+     "K",
+     null,
+     null
+    ],
+    "KC_L": [
+     "l",
+     "L",
+     null,
+     null
+    ],
+    "KC_M": [
+     ",",
+     "?",
+     null,
+     null
+    ],
+    "KC_N": [
+     "n",
+     "N",
+     null,
+     null
+    ],
+    "KC_O": [
+     "o",
+     "O",
+     null,
+     null
+    ],
+    "KC_P": [
+     "p",
+     "P",
+     null,
+     null
+    ],
+    "KC_Q": [
+     "a",
+     "A",
+     null,
+     null
+    ],
+    "KC_R": [
+     "r",
+     "R",
+     null,
+     null
+    ],
+    "KC_S": [
+     "s",
+     "S",
+     null,
+     null
+    ],
+    "KC_T": [
+     "t",
+     "T",
+     null,
+     null
+    ],
+    "KC_U": [
+     "u",
+     "U",
+     null,
+     null
+    ],
+    "KC_V": [
+     "v",
+     "V",
+     null,
+     null
+    ],
+    "KC_W": [
+     "z",
+     "Z",
+     null,
+     null
+    ],
+    "KC_X": [
+     "x",
+     "X",
+     null,
+     null
+    ],
+    "KC_Y": [
+     "y",
+     "Y",
+     null,
+     null
+    ],
+    "KC_Z": [
+     "w",
+     "W",
+     null,
+     null
+    ],
+    "KC_1": [
+     "&",
+     "1",
+     null,
+     null
+    ],
+    "KC_2": [
+     "é",
+     "2",
+     {
+      "dead": "ALGR(KC_2)"
+     },
+     null
+    ],
+    "KC_3": [
+     "\"",
+     "3",
+     "#",
+     null
+    ],
+    "KC_4": [
+     "'",
+     "4",
+     "{",
+     null
+    ],
+    "KC_5": [
+     "(",
+     "5",
+     "[",
+     null
+    ],
+    "KC_6": [
+     "-",
+     "6",
+     "|",
+     null
+    ],
+    "KC_7": [
+     "è",
+     "7",
+     {
+      "dead": "ALGR(KC_7)"
+     },
+     null
+    ],
+    "KC_8": [
+     "_",
+     "8",
+     "\\",
+     null
+    ],
+    "KC_9": [
+     "ç",
+     "9",
+     null,
+     null
+    ],
+    "KC_0": [
+     "à",
+     "0",
+     "@",
+     null
+    ],
+    "KC_SPC": [
+     " ",
+     " ",
+     null,
+     null
+    ],
+    "KC_MINS": [
+     ")",
+     "°",
+     "]",
+     null
+    ],
+    "KC_EQL": [
+     "=",
+     "+",
+     "}",
+     null
+    ],
+    "KC_LBRC": [
+     {
+      "dead": "KC_LBRC"
+     },
+     {
+      "dead": "S(KC_LBRC)"
+     },
+     null,
+     null
+    ],
+    "KC_RBRC": [
+     "$",
+     "£",
+     "¤",
+     null
+    ],
+    "KC_BSLS": [
+     "*",
+     "µ",
+     null,
+     null
+    ],
+    "KC_NUHS": [
+     "*",
+     "µ",
+     null,
+     null
+    ],
+    "KC_SCLN": [
+     "m",
+     "M",
+     null,
+     null
+    ],
+    "KC_QUOT": [
+     "ù",
+     "%",
+     null,
+     null
+    ],
+    "KC_GRV": [
+     "²",
+     null,
+     null,
+     null
+    ],
+    "KC_COMM": [
+     ";",
+     ".",
+     null,
+     null
+    ],
+    "KC_DOT": [
+     ":",
+     "/",
+     null,
+     null
+    ],
+    "KC_SLSH": [
+     "!",
+     "§",
+     null,
+     null
+    ],
+    "KC_NUBS": [
+     "<",
+     ">",
+     null,
+     null
+    ]
+   },
+   "dead": {
+    "ALGR(KC_2)": {
+     "space": "~",
+     "compose": {
+      "KC_N": "ñ",
+      "S(KC_N)": "Ñ",
+      "KC_O": "õ",
+      "S(KC_O)": "Õ",
+      "KC_Q": "ã",
+      "S(KC_Q)": "Ã"
+     }
+    },
+    "ALGR(KC_7)": {
+     "space": "`",
+     "compose": {
+      "KC_E": "è",
+      "S(KC_E)": "È",
+      "KC_I": "ì",
+      "S(KC_I)": "Ì",
+      "KC_O": "ò",
+      "S(KC_O)": "Ò",
+      "KC_Q": "à",
+      "S(KC_Q)": "À",
+      "KC_U": "ù",
+      "S(KC_U)": "Ù"
+     }
+    },
+    "KC_LBRC": {
+     "space": "^",
+     "compose": {
+      "KC_E": "ê",
+      "S(KC_E)": "Ê",
+      "KC_I": "î",
+      "S(KC_I)": "Î",
+      "KC_O": "ô",
+      "S(KC_O)": "Ô",
+      "KC_Q": "â",
+      "S(KC_Q)": "Â",
+      "KC_U": "û",
+      "S(KC_U)": "Û"
+     }
+    },
+    "S(KC_LBRC)": {
+     "space": "¨",
+     "compose": {
+      "KC_E": "ë",
+      "S(KC_E)": "Ë",
+      "KC_I": "ï",
+      "S(KC_I)": "Ï",
+      "KC_O": "ö",
+      "S(KC_O)": "Ö",
+      "KC_Q": "ä",
+      "S(KC_Q)": "Ä",
+      "KC_U": "ü",
+      "S(KC_U)": "Ü",
+      "KC_Y": "ÿ"
+     }
+    }
+   }
+  }
+ }
+}

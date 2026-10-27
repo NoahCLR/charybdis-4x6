@@ -8,8 +8,10 @@
 #include <stdint.h>
 
 #include "profile_split_authority.h"
+#include "profile_split_exchange.h"
 #include "profile_split_protocol_v1.h"
-#include "../storage/profile_peer_store_backend.h"
+#include "../storage/profile_other_half_store_backend.h"
+#include "../storage/profile_storage_layout.h"
 
 enum {
     NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS = 50u,
@@ -17,36 +19,52 @@ enum {
     // Mutating RPC callbacks acknowledge mailbox admission with BUSY; the
     // receiver's next matrix scan publishes the actual result. Collect that
     // expected acknowledgement promptly without weakening the exponential
-    // backoff used when the peer remains busy or transport fails.
+    // backoff used when the other half remains busy or transport fails.
     NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS = 5u,
-    NOAH_PROFILE_SPLIT_POLL_MS            = 1000u,
+    // While the other half still holds the request (admitted, mailbox full, or
+    // copying a reuse range and advancing), keep collecting at that pace this
+    // many times in a row before falling back to the backoff. A larger frame
+    // or a slow scan can outlast one 5 ms wait; the backoff's next step is
+    // 100 ms, twenty times as long.
+    NOAH_PROFILE_SPLIT_ADMISSION_RETRIES = 8u,
+    // A fully received copy validates/prepares/commits asynchronously. Its
+    // correlated STORE_WORKING reply is expected work, not a lost mailbox.
+    // Collect completion promptly without spending an RPC every 5 ms.
+    NOAH_PROFILE_SPLIT_STORE_POLL_MS = 25u,
+    // The receiver copies at most a flash page of a PAYLOAD_REUSE range in a
+    // scan, in writes of at most a candidate chunk, so a scan programs at
+    // most one page (D-F29, "Pacing"). A chunk that arrives is written whole.
+    NOAH_PROFILE_SPLIT_OTHER_HALF_SCAN_BYTES = NOAH_PROFILE_STORAGE_PAGE_SIZE,
+    NOAH_PROFILE_SPLIT_POLL_MS         = 1000u,
     // A passive half cannot actively probe the link. Missing three normal
-    // master polls invalidates its peer observation and therefore activation.
-    NOAH_PROFILE_SPLIT_PEER_TIMEOUT_MS = 3000u,
-    // A receiver holds staged peer storage only while the sender remains
+    // master polls invalidates the other-half observation and therefore
+    // activation.
+    NOAH_PROFILE_SPLIT_OTHER_HALF_TIMEOUT_MS = 3000u,
+    // A receiver holds staged other-half storage only while the sender remains
     // active. This is a pre-marker lease; expiry never interrupts COMMITTING
     // or a durability-unknown recovery state.
     NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS = 3000u,
     // Times a prepared copy is sent again after the receiver fails to store it.
     NOAH_PROFILE_SPLIT_PREPARED_STORAGE_RETRIES = 2u,
-    // How long a cancelled prepared push waits for the peer to acknowledge its
-    // ABORT before the sender releases its own side. It is well past any
-    // legitimate BUSY a responsive peer gives (a durable prepare or commit
-    // step sequence), and well inside the owner's no-progress window. After
-    // it, the peer may still hold the provisional lease: the sender records
-    // that, keeps retrying the ABORT, and refuses a new prepared push until
-    // the peer confirms. No marker exists on either half at this point, so
-    // releasing never changes durable authority.
+    // How long a cancelled prepared push waits for the other half to
+    // acknowledge its ABORT before the sender releases its own side. It is well
+    // past any legitimate BUSY a responsive other half gives (a durable prepare
+    // or commit step sequence), and well inside the owner's no-progress window.
+    // After it, the other half may still hold the provisional lease: the sender
+    // records that, keeps retrying the ABORT, and refuses a new prepared push
+    // until the other half confirms. No marker exists on either half at this
+    // point, so releasing never changes durable authority.
     NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS = 15000u,
     // Firmware-state regression policy, not an RP2040 SRAM-capacity claim.
-    NOAH_PROFILE_SPLIT_RECONCILER_STATE_BUDGET_32BIT = 768u,
+    // It rose from 896 when the cached reply grew from 32 to 128 bytes, the
+    // size of a pulled chunk's frame (D-F28).
+    NOAH_PROFILE_SPLIT_RECONCILER_STATE_BUDGET_32BIT = 1024u,
 };
 
 typedef enum {
     NOAH_PROFILE_SPLIT_RECONCILER_UNINITIALIZED = 0u,
     NOAH_PROFILE_SPLIT_RECONCILER_PASSIVE,
     NOAH_PROFILE_SPLIT_RECONCILER_DISCOVER,
-    NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND,
     NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN,
     NOAH_PROFILE_SPLIT_RECONCILER_PUSH_READ,
     NOAH_PROFILE_SPLIT_RECONCILER_PUSH_SEND,
@@ -55,7 +73,6 @@ typedef enum {
     NOAH_PROFILE_SPLIT_RECONCILER_PUSH_COMMIT,
     NOAH_PROFILE_SPLIT_RECONCILER_PUSH_ABORT,
     NOAH_PROFILE_SPLIT_RECONCILER_PULL_BEGIN,
-    NOAH_PROFILE_SPLIT_RECONCILER_PULL_BIND,
     NOAH_PROFILE_SPLIT_RECONCILER_PULL_REQUEST,
     NOAH_PROFILE_SPLIT_RECONCILER_PULL_WRITE,
     NOAH_PROFILE_SPLIT_RECONCILER_PULL_COMMIT_BEGIN,
@@ -66,29 +83,59 @@ typedef enum {
 } noah_profile_split_reconciler_state_t;
 
 typedef bool (*noah_profile_split_local_descriptor_fn)(void *context, noah_profile_split_descriptor_t *descriptor);
-typedef bool (*noah_profile_split_local_read_fn)(void *context, const noah_profile_split_descriptor_t *descriptor, uint16_t offset, uint8_t *bytes, uint8_t length);
-typedef bool (*noah_profile_split_local_binding_fn)(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t *via_generation, uint32_t *via_digest);
-typedef bool (*noah_profile_split_exchange_fn)(void *context, const uint8_t request[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE], uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]);
+typedef bool (*noah_profile_split_local_read_fn)(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t offset, uint8_t *bytes, uint8_t length);
+
+// A range of a prepared copy the other half can fill from its own active
+// profile:
+// destination `offset` in the copy, `source_offset` in the named source.
+typedef struct {
+    noah_profile_split_v1_source_t source;
+    uint32_t                       offset;
+    uint32_t                       source_offset;
+    uint32_t                       length;
+} noah_profile_split_reuse_range_t;
+
+// Returns the first reuse range of the copy that ends after `offset`, or
+// false when none does. Called with the prepared source's context.
+typedef bool (*noah_profile_split_reuse_plan_fn)(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t offset, noah_profile_split_reuse_range_t *range);
 
 typedef struct {
     void                                  *local_context;
     noah_profile_split_local_descriptor_fn local_descriptor;
+    // Optional, with local_context. A count that moves whenever what
+    // local_descriptor returns may have changed; a scan reads the descriptor
+    // only once it moved. Without it, every scan reads the descriptor.
+    uint32_t (*local_descriptor_revision)(void *context);
     noah_profile_split_local_read_fn       local_read;
-    noah_profile_split_local_binding_fn    local_binding;
     void                                  *transport_context;
+    // Sends one request of 32 bytes up to the largest frame and reads the
+    // reply into the request's noah_profile_split_v1_reply_capacity (32, or
+    // up to the largest frame for a PAYLOAD_REQUEST).
     noah_profile_split_exchange_fn         exchange;
-    noah_profile_peer_store_backend_t     *peer_store;
+    noah_profile_other_half_store_backend_t *other_half_store;
+    // Optional. A prepared push asks it which ranges the other half can copy
+    // from its own active profile and sends PAYLOAD_REUSE for those instead of
+    // their bytes. Background repair always sends bytes.
+    noah_profile_split_reuse_plan_fn prepared_reuse_plan;
+    // Optional. Whether this half's storage step is not running just now
+    // (profile_store_runtime.c): a request it cannot take yet is then answered
+    // BUSY_STORAGE_PAUSED, not MAILBOX_FULL. Called from the RPC callback.
+    bool (*storage_paused)(void *context);
+    void *storage_paused_context;
 } noah_profile_split_reconciler_config_t;
 
 typedef struct {
     noah_profile_split_reconciler_state_t state;
     noah_profile_split_v1_status_t        last_status;
-    uint16_t                              transfer_offset;
-    uint16_t                              transfer_length;
+    uint32_t                              transfer_offset;
+    uint32_t                              transfer_length;
+    // Bytes of the current copy the other half filled from its own profile.
+    uint32_t                              reused_bytes;
     uint32_t                              transport_failure_count;
     uint32_t                              retry_count;
-    // The last ACK/BUSY the peer sent: why, and what its store held. With the
-    // count of BUSY replies in a row they show what a stalled copy waits on.
+    // The last ACK/BUSY the other half sent: why, and what its store held. With
+    // the count of BUSY replies in a row they show what a stalled copy waits
+    // on.
     uint16_t                              busy_streak;
     uint8_t                               last_busy_reason;
     uint8_t                               last_busy_store_state;
@@ -98,11 +145,14 @@ typedef struct {
     bool                                  master;
     bool                                  mailbox_pending;
     bool                                  transfer_pending;
-    // A cancelled prepared push was released without the peer acknowledging
-    // its ABORT. Cleared when the peer does; until then no new prepared push
-    // starts, and a peer that never answers needs a restart.
+    // A cancelled prepared push was released without the other half
+    // acknowledging its ABORT. Cleared when the other half does; until then no
+    // new prepared push starts; if it never answers, a restart clears it.
     bool peer_cleanup_pending;
     bool prepared_push_active;
+    // Highest correlated other-half work phase for this copy; repetitions are not
+    // progress.
+    uint8_t prepare_progress_phase;
 } noah_profile_split_reconciler_status_t;
 
 typedef enum {
@@ -112,11 +162,11 @@ typedef enum {
 } noah_profile_split_transfer_owner_t;
 
 typedef enum {
-    // Normal arbitration may import a newer peer profile.
+    // Normal arbitration may import a newer other-half profile.
     NOAH_PROFILE_SPLIT_RECONCILE_FULL = 0u,
     // Used while HOST owns the shared candidate backend. Metadata exchange,
     // serving local payload, and pushing the host's durable record continue;
-    // starting or advancing a local peer import is refused with BUSY.
+    // starting or advancing a local other-half import is refused with BUSY.
     NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY,
 } noah_profile_split_reconcile_mode_t;
 
@@ -126,8 +176,9 @@ typedef struct {
     noah_profile_split_reconciler_config_t config;
     noah_profile_split_authority_t         authority;
     noah_profile_split_descriptor_t        local_descriptor;
-    noah_profile_split_descriptor_t        peer_descriptor;
-    noah_profile_split_descriptor_t        provisional_peer_descriptor;
+    uint32_t                               local_descriptor_revision; // the one local_descriptor was read at
+    noah_profile_split_descriptor_t        other_half_descriptor;
+    noah_profile_split_descriptor_t        provisional_other_half_descriptor;
     noah_profile_split_descriptor_t        transfer_descriptor;
     noah_profile_split_descriptor_t        stopped_local_descriptor;
     noah_profile_split_reconciler_state_t  state;
@@ -137,7 +188,7 @@ typedef struct {
     noah_profile_split_local_read_fn       prepared_source_read;
     uint32_t                               next_attempt_at;
     uint32_t                               retry_ms;
-    uint32_t                               last_peer_activity_at;
+    uint32_t                               last_other_half_activity_at;
     uint32_t                               lease_activity_at; // last request for the leased copy
     uint32_t                               transport_failure_count;
     uint32_t                               retry_count;
@@ -147,59 +198,86 @@ typedef struct {
     uint8_t                                last_busy_owner;
     uint8_t                                last_busy_admission;
     uint8_t                                prepared_storage_retries;
+    // Busy replies in a row while the other half still held the request.
+    uint8_t admission_retries;
     // This half's store state, transfer owner and storage admission as of its
     // last scan, for BUSY replies the split callback writes before any scan.
     volatile uint8_t                       published_store_state;
     volatile uint8_t                       published_owner;
     volatile uint8_t                       published_admission;
-    uint32_t                               prepared_via_generation;
-    uint32_t                               prepared_via_digest;
     // While a prepared push is cancelled, when it is released without the
-    // peer's ABORT acknowledgement; after that, when the ABORT is next retried.
+    // other half's ABORT acknowledgement; after that, when the ABORT is next
+    // retried.
     uint32_t                               abort_deadline;
-    uint32_t                               incoming_via_generation;
-    uint32_t                               incoming_via_digest;
-    uint32_t                               incoming_profile_generation;
-    uint32_t                               incoming_profile_digest;
-    uint16_t                               transfer_offset;
+    uint32_t                               transfer_offset;
+    uint32_t                               reused_bytes;
+    // Prepared-push diagnostics, reset on a new push and retained afterward.
+    // Scans count reconciler invocations, not every QMK matrix scan.
+    uint32_t                               prepared_scans;
+    uint32_t                               prepared_exchanges;
+    uint16_t                               reuse_exchanges;
+    uint16_t                               source_unavailable_replies;
     uint8_t                                outbound_chunk_length;
     uint8_t                                outbound_chunk[NOAH_PROFILE_SPLIT_V1_CHUNK_MAX];
-    uint8_t                                mailbox_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
-    uint8_t                                cached_request_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
-    uint8_t                                cached_response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    // The next frame is PAYLOAD_REUSE for this range rather than a chunk.
+    noah_profile_split_reuse_range_t outbound_reuse;
+    uint32_t                         outbound_reuse_progress; // the other half's offset in it so far
+    // A receiver's PAYLOAD_REUSE range it copies over several scans: where
+    // the request started in the copy and in the source, and where it ends.
+    noah_profile_split_v1_source_t         incoming_reuse_source;
+    uint32_t                               incoming_reuse_offset;
+    uint32_t                               incoming_reuse_source_offset;
+    uint32_t                               incoming_reuse_end;
+    uint8_t                                mailbox_length;
+    uint8_t                                cached_request_length;
+    uint8_t                                cached_response_length;
+    uint8_t                                mailbox_wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
+    uint8_t                                cached_request_wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
+    // A pulled chunk's reply is as large as a pushed chunk's request.
+    uint8_t                                cached_response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
     uint8_t                                metadata_response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
     noah_runtime_publication_generation_t  mailbox_sequence;
     noah_runtime_publication_generation_t  response_sequence;
     noah_runtime_publication_generation_t  metadata_sequence;
-    volatile uint8_t                       peer_activity_sequence;
+    volatile uint8_t                       other_half_activity_sequence;
     uint8_t                                mailbox_consumed_sequence;
-    uint8_t                                observed_peer_activity_sequence;
+    uint8_t                                observed_other_half_activity_sequence;
     bool                                   initialized;
     bool                                   role_known;
     bool                                   master;
     bool                                   cached_response_valid;
+    // Whether the cached reply is a BUSY, set where it is cached, so a scan
+    // learns it without decoding the reply.
+    bool                                   cached_response_busy;
+    bool                                   local_descriptor_revision_known;
     bool                                   metadata_response_valid;
-    bool                                   peer_activity_known;
+    bool                                   other_half_activity_known;
     bool                                   lease_activity_known;
-    bool                                   provisional_peer_descriptor_known;
+    bool                                   provisional_other_half_descriptor_known;
     bool                                   prepared_push_active;
     bool                                   prepared_remote_started;
     bool                                   prepared_commit_authorized;
     bool                                   prepared_cancel_refused;
     bool                                   abort_deadline_known;
     // A released push's ABORT is still unacknowledged. `transfer_descriptor`
-    // keeps naming it: no other transfer starts until the peer confirms.
+    // keeps naming it: no other transfer starts until the other half confirms.
     bool                                   orphan_pending;
-    bool                                   prepared_logical;
-    bool                                   incoming_logical_binding;
     bool                                   attempt_immediate;
+    bool                                   outbound_reuse_pending;
+    // The other half refused a PAYLOAD_REUSE source; send the rest of this copy
+    // as bytes.
+    bool                                   reuse_unavailable;
+    bool incoming_reuse_active;
+    uint8_t prepare_progress_phase;
 } noah_profile_split_reconciler_t;
 
 void noah_profile_split_reconciler_init(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_reconciler_config_t *config);
 
 // QMK RPC/callback side. It performs strict frame decode, at most one bounded
 // mailbox copy, and a cached response copy. EEPROM, validation, and provider
-// operations are deliberately absent from this path.
+// operations are deliberately absent from this path. `response_length` is the
+// reply buffer the requester asked for (FRAME_SIZE up to FRAME_MAX); the reply
+// frame starts it and the rest is zero.
 bool noah_profile_split_reconciler_receive(noah_profile_split_reconciler_t *reconciler, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length);
 
 // Matrix-scan side. Each call performs at most one RPC, one payload read/write,
@@ -210,21 +288,20 @@ bool noah_profile_split_reconciler_scan_mode(noah_profile_split_reconciler_t *re
 
 // Starts a provisional outbound transfer from caller-owned staged storage.
 // The reconciler transfers and ACKs every payload byte, then pauses in
-// PUSH_PREPARED until the owner explicitly authorizes the peer commit.
+// PUSH_PREPARED until the owner explicitly authorizes the other-half commit.
 bool noah_profile_split_reconciler_prepared_push_begin(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor, void *source_context, noah_profile_split_local_read_fn source_read);
-bool noah_profile_split_reconciler_prepared_push_begin_logical(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor, void *source_context, noah_profile_split_local_read_fn source_read, uint32_t via_generation, uint32_t via_digest);
 bool noah_profile_split_reconciler_prepared_push_ready(const noah_profile_split_reconciler_t *reconciler, noah_profile_split_descriptor_t *descriptor);
 bool noah_profile_split_reconciler_prepared_push_authorize_commit(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor);
-// Cancellation is scan-owned: once the peer admitted PREPARE_BEGIN, this
+// Cancellation is scan-owned: once the other half admitted PREPARE_BEGIN, this
 // schedules an idempotent protocol ABORT rather than touching storage here.
 // The ABORT is bounded by NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS; past
 // it the push is released and the ABORT continues as peer cleanup.
 bool noah_profile_split_reconciler_prepared_push_cancel(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor);
 
-// PREPARE_BEGIN intent is deliberately separate from durable peer metadata.
-// This lets the owner arbitrate simultaneous candidates without publishing a
-// provisional record as committed split authority.
-bool noah_profile_split_reconciler_provisional_peer_descriptor(const noah_profile_split_reconciler_t *reconciler, noah_profile_split_descriptor_t *descriptor);
+// PREPARE_BEGIN intent is deliberately separate from durable other-half
+// metadata. This lets the owner arbitrate simultaneous candidates without
+// publishing a provisional record as committed split authority.
+bool noah_profile_split_reconciler_provisional_other_half_descriptor(const noah_profile_split_reconciler_t *reconciler, noah_profile_split_descriptor_t *descriptor);
 
 // Refresh and publish local durable authority immediately, even while normal
 // retry/poll backoff would otherwise defer the next metadata exchange.
@@ -232,6 +309,17 @@ bool noah_profile_split_reconciler_refresh_authority(noah_profile_split_reconcil
 
 const noah_profile_split_authority_t *noah_profile_split_reconciler_authority(const noah_profile_split_reconciler_t *reconciler);
 bool                                  noah_profile_split_reconciler_status(const noah_profile_split_reconciler_t *reconciler, noah_profile_split_reconciler_status_t *status);
+// The two fields a host save watches for other-half progress, without copying
+// the whole status onto the scan path's stack.
+bool noah_profile_split_reconciler_progress(const noah_profile_split_reconciler_t *reconciler, uint32_t *transfer_offset, uint8_t *prepare_progress_phase);
+
+// The other half's storage is paused: the latest of an unbroken run of BUSY
+// replies said it waits for a quiet keyboard before it can erase
+// (BUSY_STORAGE_PAUSED, D-F32). That is not a stalled copy. Static inline:
+// the owner asks it on the scan path.
+static inline bool noah_profile_split_reconciler_slave_storage_paused(const noah_profile_split_reconciler_t *reconciler) {
+    return reconciler && reconciler->busy_streak != 0u && reconciler->last_busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED;
+}
 
 #ifdef NOAH_PROFILE_SPLIT_TEST_HOOKS
 void noah_profile_split_test_local_validation(void);

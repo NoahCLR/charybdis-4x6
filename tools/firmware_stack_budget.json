@@ -11,18 +11,31 @@
         "kind": "elf_map_symbol",
         "symbol": "__process_stack_size__",
         "minimum_bytes": 2560,
-        "reserve": {"fraction": 0.25, "minimum_bytes": 512}
+        "reserve": {
+          "fraction": 0.25,
+          "minimum_bytes": 512
+        }
       },
       "indirect_edges": [
         {
-          "caller": "noah_process_record_user",
+          "caller": "process_record_user",
           "callee": "key_runtime_process_stage_handled_key",
-          "reason": "process stage table dispatches the handled-key stage through stage->handler"
+          "reason": "GCC 15 inlines the userspace process flow into the chained keymap process_record_user; its stage table invokes this handler indirectly."
         },
         {
-          "caller": "noah_process_record_user",
+          "caller": "process_record_user",
           "callee": "key_runtime_process_stage_non_handled_release_cleanup",
-          "reason": "process stage table dispatches non-handled release cleanup through stage->handler"
+          "reason": "GCC 15 inlines the userspace process flow into the chained keymap process_record_user; its stage table invokes this handler indirectly."
+        },
+        {
+          "caller": "matrix_scan",
+          "callee": "macro_slot_provider_load_next",
+          "reason": "GCC 15 inlines the macro scan engine into matrix_scan; its window-refill callback is the active stored slot provider."
+        },
+        {
+          "caller": "macro_slot_provider_load_window",
+          "callee": "profile_macro_provider_load_ir",
+          "reason": "The active provider supplies the profile load callback; stored banks decode a bounded window and compiled defaults compile the authored payload into the same window."
         },
         {
           "caller": "macro_payload_finish",
@@ -30,29 +43,69 @@
           "reason": "the active macro engine invokes the finish callback registered by its pinned slot provider"
         },
         {
-          "caller": "noah_action_tap_at",
+          "caller": "noah_emit_action_tap_at",
           "callee": "noah_action_tap_literal",
-          "reason": "action-kind dispatch table selects the literal tap implementation for the reviewed emission branch"
+          "reason": "GCC 15 inlines emission and action tap dispatch into noah_emit_action_tap_at; its literal tap branch calls through the action-kind operations table."
+        },
+        {
+          "caller": "noah_emit_action_tap_at",
+          "callee": "noah_action_tap_custom_key",
+          "reason": "GCC 15 inlines emission and action tap dispatch into noah_emit_action_tap_at; a step that sends a custom key taps its shortcut through the action-kind operations table (D-F26)."
         },
         {
           "caller": "io_read",
-          "callee": "noah_qmk_profile_eeprom_read",
-          "reason": "the read-only profile store invokes the QMK EEPROM adapter through its injected storage IO callback"
+          "callee": "flash_read",
+          "reason": "the profile store reads the slot flash region in place through its injected flash backend (D-F29)"
         },
         {
-          "caller": "noah_qmk_durable_io_matrix_scan",
-          "callee": "noah_profile_store_runtime_matrix_scan_step",
-          "reason": "the shared master/slave durable-I/O scheduler dispatches profile discovery through its rotating step table"
+          "caller": "noah_profile_reader_read",
+          "callee": "staged_reader_read",
+          "reason": "Published key-behavior views read the retained saved profile's slot through their installed snapshot reader."
         },
         {
-          "caller": "noah_qmk_durable_io_matrix_scan",
-          "callee": "noah_qmk_via_split_mirror_matrix_scan_step",
-          "reason": "the shared master/slave durable-I/O scheduler dispatches the VIA mirror mailbox through its rotating step table"
+          "caller": "staged_reader_read",
+          "callee": "flash_read",
+          "reason": "the staged profile reader reads the slot flash region in place through the installed flash backend (D-F29)"
         },
         {
-          "caller": "noah_qmk_durable_io_matrix_scan",
-          "callee": "noah_qmk_via_split_sync_matrix_scan_step",
-          "reason": "the shared master/slave durable-I/O scheduler dispatches durable VIA reconciliation through its rotating step table"
+          "caller": "read_flash",
+          "callee": "rp2040_read",
+          "reason": "the flash backend reads through its driver's XIP read (D-F29)"
+        },
+        {
+          "caller": "noah_active_profile_macro_read_byte",
+          "callee": "staged_reader_read",
+          "reason": "Macro window decoding reads the published saved profile's slot through the active reader's callback, inside the range found at publication."
+        },
+        {
+          "caller": "noah_active_profile_macro_bank_read",
+          "callee": "staged_reader_read",
+          "reason": "The macro slot search reads the published saved profile's slot through the active reader's callback, inside the range found at publication."
+        },
+        {
+          "caller": "process_record_user",
+          "callee": "key_runtime_process_stage_preflight",
+          "reason": "GCC 15 inlines the userspace process flow into the chained keymap process_record_user; its stage table invokes this handler indirectly."
+        },
+        {
+          "caller": "process_record_user",
+          "callee": "key_runtime_process_stage_release_slot_keycode",
+          "reason": "GCC 15 inlines the userspace process flow into the chained keymap process_record_user; its stage table invokes this handler indirectly."
+        },
+        {
+          "caller": "process_record_user",
+          "callee": "key_runtime_process_stage_direct_action",
+          "reason": "GCC 15 inlines the userspace process flow into the chained keymap process_record_user; its stage table invokes this handler indirectly."
+        },
+        {
+          "caller": "process_record_user",
+          "callee": "key_runtime_process_stage_native_overlap",
+          "reason": "GCC 15 inlines the userspace process flow into the chained keymap process_record_user; its stage table invokes this handler indirectly."
+        },
+        {
+          "caller": "process_record_user",
+          "callee": "key_runtime_process_stage_idle_custom_key",
+          "reason": "GCC 15 inlines the userspace process flow into the chained keymap process_record_user; its stage table invokes this handler indirectly."
         }
       ],
       "cycle_bounds": [
@@ -60,6 +113,11 @@
           "function": "key_runtime_transition_execute_plan",
           "max_occurrences": 2,
           "reason": "an emitted action may synchronously settle one pending fallback-hold plan"
+        },
+        {
+          "function": "key_runtime_transition_drain_plan",
+          "max_occurrences": 2,
+          "reason": "fallback settlement drains its plan beneath the projection that settles it, whether that projection is an execute or a full streaming plan's auto-drain"
         },
         {
           "function": "key_runtime_core_project_effect",
@@ -70,67 +128,79 @@
       "paths": [
         {
           "name": "press observation materialization",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_core_observe_process_record_event", "key_runtime_core_observe_process_record_press", "handled_key_materialize_hold", "handled_key_transparent_source_at_position", "handled_key_lookup_tap_count_into"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_core_observe_process_record_press", "key_runtime_core_press_token_begin", "handled_key_materialize_hold", "handled_key_transparent_source_at_position", "handled_key_lookup_row_tap_count_into"]
         },
         {
           "name": "press observation token allocation",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_core_observe_process_record_event", "key_runtime_core_observe_process_record_press", "key_runtime_core_allocate_token_id"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_core_observe_process_record_press", "key_runtime_core_press_token_begin", "key_runtime_core_allocate_token_id"]
         },
         {
           "name": "handled press planning",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_process_plan_handled_key_press", "key_runtime_transition_plan_append_core_plan", "key_runtime_transition_plan_push"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_process_plan_handled_key_press", "key_runtime_core_effect_plan_push_delayed_action_with_flags", "key_runtime_core_effect_plan_push"]
         },
         {
           "name": "handled press projection with fallback settlement",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_run_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
+        },
+        {
+          "name": "handled press fallback settlement preempting a held pointing mode",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "key_runtime_core_pd_projection_preempt_held_actions_for_mode", "held_action_unregister", "held_action_or_modifier_release_owned_by_key", "held_action_remove_slot", "noah_action_release", "pointing_mode_apply_command", "pointing_mode_apply_activate_mode", "pointing_mode_transition_unlock", "pointing_mode_transition_deactivate_with_lock_state", "noah_pd_engine_exit", "keyboard_mod_ownership_unregister", "keyboard_mod_ownership_unregister_mods", "send_6kro_report", "macro_payload_output_keys"]
         },
         {
           "name": "handled press literal action projection",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_run_at", "noah_action_tap_at", "noah_action_tap_literal", "owned_keycode_tap_literal", "register_code16", "register_code"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_action_tap_literal", "owned_keycode_tap_literal", "register_code16", "register_code"]
         },
         {
           "name": "handled active release decision",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_process_plan_handled_key_release", "key_runtime_transition_handled_key_release", "key_runtime_core_try_active_release", "key_runtime_release_decide", "key_runtime_release_query_quick_immediate_hold", "key_runtime_release_query_quick_tap", "key_runtime_release_query_momentary_layer_tap_suppresses_quick_tap", "key_runtime_release_contract_for_interaction"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_process_plan_handled_key_release", "key_runtime_core_try_active_release", "key_runtime_release_decide", "key_runtime_release_query_quick_immediate_hold", "key_runtime_release_query_quick_tap", "key_runtime_release_query_momentary_layer_tap_suppresses_quick_tap", "key_runtime_release_contract_for_interaction"]
         },
         {
           "name": "handled pending multi-tap release decision",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_process_plan_handled_key_release", "key_runtime_transition_handled_key_release", "key_runtime_core_try_pending_multi_tap_release", "key_runtime_release_decide", "key_runtime_release_query_quick_immediate_hold", "key_runtime_release_query_quick_tap", "key_runtime_release_query_momentary_layer_tap_suppresses_quick_tap", "key_runtime_release_contract_for_interaction"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_process_plan_handled_key_release", "key_runtime_core_try_pending_multi_tap_release", "key_runtime_release_decide", "key_runtime_release_query_quick_immediate_hold", "key_runtime_release_query_quick_tap", "key_runtime_release_query_momentary_layer_tap_suppresses_quick_tap", "key_runtime_release_contract_for_interaction"]
         },
         {
           "name": "handled unmatched release core fallback",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_process_plan_handled_key_release", "key_runtime_transition_handled_key_release", "key_runtime_core_plan_unmatched_release", "handled_key_resolution_materializes_momentary_layer", "handled_key_transparent_source_at_position", "handled_key_lookup_tap_count_into"]
-        },
-        {
-          "name": "handled unmatched release transition fallback",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_process_plan_handled_key_release", "key_runtime_transition_handled_key_release", "key_runtime_transition_append_unmatched_release_effects", "handled_key_resolution_materializes_momentary_layer", "handled_key_transparent_source_at_position", "handled_key_lookup_tap_count_into"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_process_plan_handled_key_release", "key_runtime_core_plan_unmatched_release", "handled_key_resolution_materializes_momentary_layer", "handled_key_transparent_source_at_position", "handled_key_lookup_row_tap_count_into"]
         },
         {
           "name": "handled release projection with fallback settlement",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_run_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
         },
         {
           "name": "handled release literal action projection",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_run_at", "noah_action_tap_at", "noah_action_tap_literal", "owned_keycode_tap_literal", "register_code16", "register_code"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_action_tap_literal", "owned_keycode_tap_literal", "register_code16", "register_code"]
+        },
+        {
+          "name": "handled press custom-key shortcut hold",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "owned_keycode_acquire_chord", "owned_keycode_acquire_usages", "register_code", "send_6kro_report"]
+        },
+        {
+          "name": "handled press custom-key shortcut tap",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_action_tap_custom_key", "owned_keycode_acquire_chord", "owned_keycode_acquire_usages", "register_code", "send_6kro_report"]
+        },
+        {
+          "name": "handled release custom-key shortcut release",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "held_action_unregister", "held_action_or_modifier_release_owned_by_key", "held_action_remove_slot", "owned_keycode_release_chord", "owned_keycode_release_usages", "unregister_code", "send_6kro_report"]
         },
         {
           "name": "handled release bounded deferred fallback settlement",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_emit_run_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
         },
         {
           "name": "non-handled release cleanup lookup",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_non_handled_release_cleanup", "key_runtime_process_resolution", "handled_key_lookup_tap_count_into"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_non_handled_release_cleanup", "key_runtime_process_resolution", "handled_key_lookup_row_tap_count_into"]
         },
         {
           "name": "held-back record replay into handled press projection",
-          "functions": ["main", "matrix_scan", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_run_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
+          "functions": ["main", "matrix_scan", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
         },
         {
           "name": "matrix scan projection with fallback settlement",
-          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_run_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "noah_key_runtime_scan_core", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
         },
         {
           "name": "matrix scan bounded deferred fallback settlement",
-          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_emit_run_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
         },
         {
           "name": "matrix scan combo-origin candidate retirement",
@@ -146,11 +216,11 @@
         },
         {
           "name": "matrix scan macro text press",
-          "functions": ["main", "matrix_scan", "macro_payload_start_text_char", "macro_payload_start_transient", "owned_keycode_acquire", "owned_keycode_acquire_components", "register_code", "send_6kro_report"]
+          "functions": ["main", "matrix_scan", "macro_payload_start_text_char", "macro_payload_start_strokes", "macro_payload_start_transient", "macro_payload_key_acquire", "owned_keycode_acquire", "owned_keycode_acquire_usages", "register_code", "send_6kro_report"]
         },
         {
           "name": "matrix scan macro transient chord press",
-          "functions": ["main", "matrix_scan", "macro_payload_start_transient", "owned_keycode_acquire", "owned_keycode_acquire_components", "register_code", "send_6kro_report"]
+          "functions": ["main", "matrix_scan", "macro_payload_start_transient", "macro_payload_key_acquire", "owned_keycode_acquire", "owned_keycode_acquire_usages", "register_code", "send_6kro_report"]
         },
         {
           "name": "matrix scan macro persistent hold press",
@@ -158,51 +228,43 @@
         },
         {
           "name": "matrix scan macro owned release",
-          "functions": ["main", "matrix_scan", "owned_keycode_release", "owned_keycode_release_components", "unregister_code", "send_6kro_report"]
+          "functions": ["main", "matrix_scan", "macro_payload_key_release", "owned_keycode_release", "owned_keycode_release_usages", "unregister_code", "send_6kro_report"]
         },
         {
           "name": "matrix scan macro provider completion",
           "functions": ["main", "matrix_scan", "macro_payload_finish", "macro_slot_provider_finish"]
         },
         {
-          "name": "handled VIA macro IR preflight",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "noah_process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_run_at", "noah_action_tap_at", "via_macro_provider_try_play", "macro_payload_start_ir", "macro_payload_ir_next"]
+          "name": "handled profile macro IR preflight",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_start", "macro_payload_ir_next"]
         },
         {
-          "name": "matrix scan VIA default macro seed",
-          "functions": ["main", "matrix_scan", "apply_via_default_macros", "seed_via_default_macros", "via_macro_defaults_load_ir", "macro_payload_lookup_keycode", "strlen"]
+          "name": "handled profile macro window decode held sequence",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_start", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "macro_payload_flush_pending_qmk_sequence", "macro_payload_ir_write_key_action", "macro_payload_hold_balance_note_down"]
         },
         {
-          "name": "matrix scan VIA canonical digest read",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_storage_digest_step", "noah_qmk_via_storage_region_read", "nvm_dynamic_keymap_macro_read_buffer", "eeprom_read_byte", "wear_leveling_read"]
+          "name": "handled profile macro slot search",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_start", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "profile_macro_provider_find_slot", "noah_active_profile_macro_bank_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "handled profile macro window storage read",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_start", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_active_profile_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "matrix scan macro window refill held sequence",
+          "functions": ["main", "matrix_scan", "macro_slot_provider_load_next", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "macro_payload_flush_pending_qmk_sequence", "macro_payload_ir_write_key_action", "macro_payload_hold_balance_note_down"]
+        },
+        {
+          "name": "matrix scan macro window refill storage read",
+          "functions": ["main", "matrix_scan", "macro_slot_provider_load_next", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_active_profile_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "matrix scan macro persistent hold owned press",
+          "functions": ["main", "matrix_scan", "macro_payload_key_acquire", "owned_keycode_acquire", "owned_keycode_acquire_usages", "register_code", "send_6kro_report"]
         },
         {
           "name": "matrix scan live-profile boot discovery",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "io_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
-        },
-        {
-          "name": "matrix scan VIA metadata and snapshot RPC",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_rpc_exchange", "transaction_rpc_exec", "transport_execute_transaction"]
-        },
-        {
-          "name": "matrix scan VIA pulled macro fragment write",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_storage_region_write", "nvm_dynamic_keymap_macro_update_buffer", "eeprom_update_byte", "wear_leveling_write"]
-        },
-        {
-          "name": "matrix scan VIA verified generation commit",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_sync_state_complete_mutation", "noah_qmk_via_sync_state_persist", "eeprom_update_dword", "wear_leveling_write"]
-        },
-        {
-          "name": "matrix scan VIA two-dirty default recovery",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "eeconfig_init_via", "dynamic_keymap_reset", "nvm_dynamic_keymap_update_keycode", "eeprom_update_byte", "wear_leveling_write"]
-        },
-        {
-          "name": "matrix scan queued VIA mirror keymap write",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_mirror_matrix_scan_step", "nvm_dynamic_keymap_update_buffer", "eeprom_update_byte", "wear_leveling_write"]
-        },
-        {
-          "name": "matrix scan queued VIA mirror macro write",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_mirror_matrix_scan_step", "nvm_dynamic_keymap_macro_update_buffer", "eeprom_update_byte", "wear_leveling_write"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "noah_profile_store_boot_select_step", "io_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "pointing task dragscroll accumulation",
@@ -210,15 +272,115 @@
         },
         {
           "name": "pointing task directional tap fallback settlement",
-          "functions": ["main", "pointing_device_task", "directional_step", "emit_tap", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
+          "functions": ["main", "pointing_device_task", "directional_drain", "emit_tap", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
         },
         {
           "name": "pointing task directional literal tap",
-          "functions": ["main", "pointing_device_task", "directional_step", "emit_tap", "owned_keycode_tap_literal", "register_code16", "register_code"]
+          "functions": ["main", "pointing_device_task", "directional_drain", "emit_tap", "owned_keycode_tap_literal", "register_code16", "register_code"]
         },
         {
-          "name": "pointing task directional QMK-function tap",
-          "functions": ["main", "pointing_device_task", "directional_step", "emit_tap", "noah_dispatch_synthetic_qmk_tap", "noah_dispatch_synthetic_qmk_record", "process_record"]
+          "name": "pointing task directional profile macro window decode held sequence",
+          "functions": ["main", "pointing_device_task", "directional_drain", "emit_tap", "noah_profile_macro_start", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "macro_payload_flush_pending_qmk_sequence", "macro_payload_ir_write_key_action", "macro_payload_hold_balance_note_down"]
+        },
+        {
+          "name": "pointing task directional profile macro window storage read",
+          "functions": ["main", "pointing_device_task", "directional_drain", "emit_tap", "noah_profile_macro_start", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_active_profile_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "physical press participation indexed behavior lookup",
+          "functions": ["main", "action_exec", "noah_participation_behavior", "behavior_definition", "noah_active_profile_key_behavior_lookup", "noah_active_profile_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "native tapping indexed behavior lookup",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "is_tap_record", "key_behavior_view_build", "noah_active_profile_key_behavior_lookup", "noah_active_profile_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "completed chord output behavior permission",
+          "functions": ["main", "action_exec", "noah_participation_combo_output", "noah_participation_behavior_generated", "behavior_definition", "noah_active_profile_key_behavior_lookup", "noah_active_profile_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "generated output captured behavior permission",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "is_tap_record", "noah_qmk_combo_origin_capture_record", "noah_participation_combo_output", "noah_participation_behavior_generated", "behavior_definition", "noah_active_profile_key_behavior_lookup", "noah_active_profile_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "generated output origin reconstruction",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "noah_qmk_combo_origin_normalize_record", "combo_origin_combo_build_from_pressed_keys", "combo_origin_combo_get", "noah_active_profile_combo_get"]
+        },
+        {
+          "name": "physical origin reconstruction combo enable",
+          "functions": ["main", "action_exec", "combo_origin_combo_build_from_pressed_keys", "noah_participation_combo_row", "noah_active_profile_combo_enabled", "noah_active_profile_combo_count"]
+        },
+        {
+          "name": "physical origin reconstruction combo allowed layer",
+          "functions": ["main", "action_exec", "combo_origin_combo_build_from_pressed_keys", "noah_participation_combo_row", "noah_active_profile_combo_allowed_layers"]
+        },
+        {
+          "name": "generated origin reconstruction combo enable",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "noah_qmk_combo_origin_normalize_record", "combo_origin_combo_build_from_pressed_keys", "noah_participation_combo_row", "noah_active_profile_combo_enabled", "noah_active_profile_combo_count"]
+        },
+        {
+          "name": "generated origin reconstruction combo allowed layer",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "noah_qmk_combo_origin_normalize_record", "combo_origin_combo_build_from_pressed_keys", "noah_participation_combo_row", "noah_active_profile_combo_allowed_layers"]
+        },
+        {
+          "name": "handled compiled-default macro parse",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_start", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_compile", "macro_payload_ir_write_text"]
+        },
+        {
+          "name": "physical key profile lookup",
+          "functions": ["main", "action_exec", "keymap_key_to_keycode", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "release preflight projection with fallback settlement",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_preflight_settle_before_release", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
+        },
+        {
+          "name": "release preflight missed-scan auto-drain with fallback settlement",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_preflight_settle_before_release", "key_runtime_core_plan_missed_scans_for_token", "key_runtime_core_plan_active_scan_for_token", "key_runtime_core_plan_threshold_hold_effects", "key_runtime_core_effect_plan_push_feedback_pulse", "key_runtime_core_effect_plan_push", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
+        },
+        {
+          "name": "press preflight projection with fallback settlement",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_preflight", "key_runtime_preflight_settle_before_press", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
+        },
+        {
+          "name": "press preflight missed-scan auto-drain with fallback settlement",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_preflight", "key_runtime_preflight_settle_before_press", "key_runtime_core_plan_missed_scans_for_token", "key_runtime_core_plan_active_scan_for_token", "key_runtime_core_plan_threshold_hold_effects", "key_runtime_core_effect_plan_push_feedback_pulse", "key_runtime_core_effect_plan_push", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
+        },
+        {
+          "name": "layer-tap settlement before a press projection with fallback settlement",
+          "functions": ["main", "action_exec", "noah_key_runtime_settle_layer_taps_before_press", "noah_key_runtime_settle_foreign_layer_taps", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
+        },
+        {
+          "name": "layer-tap settlement before a press auto-drain with fallback settlement",
+          "functions": ["main", "action_exec", "noah_key_runtime_settle_layer_taps_before_press", "noah_key_runtime_settle_foreign_layer_taps", "key_runtime_core_flush_foreign_layer_multi_tap", "key_runtime_core_tap_series_flush_plan_series", "key_runtime_core_effect_plan_push_tap_commit_feedback_pulse", "key_runtime_core_effect_plan_push_feedback_pulse", "key_runtime_core_effect_plan_push", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
+        },
+        {
+          "name": "layer-tap settlement before a press indexed behavior lookup",
+          "functions": ["main", "action_exec", "noah_key_runtime_settle_layer_taps_before_press", "key_behavior_view_build", "noah_active_profile_key_behavior_lookup", "noah_active_profile_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "matrix scan auto-drain projection with fallback settlement",
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "noah_key_runtime_scan_core", "key_runtime_core_plan_active_scan_for_token", "key_runtime_core_plan_threshold_hold_effects", "key_runtime_core_effect_plan_push_feedback_pulse", "key_runtime_core_effect_plan_push", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
+        },
+        {
+          "name": "handled press projection deciding which fallback holds are due",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_pending_fallback_holds"]
+        },
+        {
+          "name": "release slot keycode stage token lookup",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_release_slot_keycode", "key_runtime_core_press_token_at", "key_runtime_core_ownership_press_token_state", "handled_key_keypos_in_bounds"]
+        },
+        {
+          "name": "direct action stage tap with fallback settlement",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_direct_action", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
+        },
+        {
+          "name": "native overlap stage report",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_native_overlap", "key_runtime_process_settle_report_ownership", "send_6kro_report"]
+        },
+        {
+          "name": "idle custom key stage",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_idle_custom_key"]
         }
       ]
     },
@@ -232,26 +394,56 @@
         "working_area_fixed_overhead_bytes": 172,
         "working_area_alignment_bytes": 8,
         "expected_working_area_bytes": 1200,
-        "reserve": {"fraction": 0.25, "minimum_bytes": 256}
+        "reserve": {
+          "fraction": 0.25,
+          "minimum_bytes": 256
+        }
       },
       "indirect_edges": [
-        {"caller": "SlaveThread", "callee": "slave_rpc_exec_callback", "reason": "vendor serial transaction table dispatches EXECUTE_RPC through transaction->slave_callback"},
-        {"caller": "slave_rpc_exec_callback", "callee": "split_runtime_sync_slave_base_rpc", "reason": "local split RPC registry base-state callback"},
-        {"caller": "slave_rpc_exec_callback", "callee": "split_runtime_sync_slave_combo_rpc", "reason": "local split RPC registry combo-state callback"},
-        {"caller": "slave_rpc_exec_callback", "callee": "split_runtime_sync_slave_key_feedback_semantic_rpc", "reason": "local split RPC registry semantic-feedback callback"},
-        {"caller": "slave_rpc_exec_callback", "callee": "split_runtime_sync_slave_key_feedback_branch_rpc", "reason": "local split RPC registry branch-feedback callback"},
-        {"caller": "slave_rpc_exec_callback", "callee": "noah_qmk_via_split_sync_rpc", "reason": "local split RPC registry dispatches the durable VIA reconciliation callback"},
-        {"caller": "slave_rpc_exec_callback", "callee": "noah_qmk_via_split_mirror_rpc", "reason": "local split RPC registry dispatches the best-effort VIA mirror callback"}
+        {
+          "caller": "SlaveThread",
+          "callee": "slave_rpc_exec_callback",
+          "reason": "vendor serial transaction table dispatches EXECUTE_RPC through transaction->slave_callback"
+        },
+        {
+          "caller": "slave_rpc_exec_callback",
+          "callee": "split_runtime_sync_slave_base_rpc",
+          "reason": "local split RPC registry base-state callback"
+        },
+        {
+          "caller": "slave_rpc_exec_callback",
+          "callee": "split_runtime_sync_slave_combo_rpc",
+          "reason": "local split RPC registry combo-state callback"
+        },
+        {
+          "caller": "slave_rpc_exec_callback",
+          "callee": "split_runtime_sync_slave_key_feedback_semantic_rpc",
+          "reason": "local split RPC registry semantic-feedback callback"
+        },
+        {
+          "caller": "slave_rpc_exec_callback",
+          "callee": "split_runtime_sync_slave_key_feedback_branch_rpc",
+          "reason": "local split RPC registry branch-feedback callback"
+        }
       ],
       "cycle_bounds": [],
       "paths": [
-        {"name": "base-state RPC", "functions": ["SlaveThread", "slave_rpc_exec_callback", "split_runtime_sync_slave_base_rpc", "pd_mode_apply_command"]},
-        {"name": "combo-state RPC", "functions": ["SlaveThread", "slave_rpc_exec_callback", "split_runtime_sync_slave_combo_rpc"]},
-        {"name": "semantic-feedback RPC", "functions": ["SlaveThread", "slave_rpc_exec_callback", "split_runtime_sync_slave_key_feedback_semantic_rpc"]},
-        {"name": "branch-feedback RPC", "functions": ["SlaveThread", "slave_rpc_exec_callback", "split_runtime_sync_slave_key_feedback_branch_rpc"]},
-        {"name": "VIA durable request mailbox admission", "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_via_split_sync_rpc", "noah_qmk_via_sync_frame_decode", "noah_qmk_via_sync_crc8"]},
-        {"name": "VIA mirror mailbox admission", "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_via_split_mirror_rpc"]},
-        {"name": "VIA structured acknowledgement encode", "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_via_split_sync_rpc", "noah_qmk_via_respond_status", "noah_qmk_via_encode_response", "noah_qmk_via_sync_frame_encode", "noah_qmk_via_sync_crc8"]}
+        {
+          "name": "base-state RPC",
+          "functions": ["SlaveThread", "slave_rpc_exec_callback", "split_runtime_sync_slave_base_rpc", "pointing_mode_apply_command"]
+        },
+        {
+          "name": "combo-state RPC",
+          "functions": ["SlaveThread", "slave_rpc_exec_callback", "split_runtime_sync_slave_combo_rpc"]
+        },
+        {
+          "name": "semantic-feedback RPC",
+          "functions": ["SlaveThread", "slave_rpc_exec_callback", "split_runtime_sync_slave_key_feedback_semantic_rpc"]
+        },
+        {
+          "name": "branch-feedback RPC",
+          "functions": ["SlaveThread", "slave_rpc_exec_callback", "split_runtime_sync_slave_key_feedback_branch_rpc"]
+        }
       ]
     }
   ]

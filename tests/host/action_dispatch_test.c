@@ -2,8 +2,11 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "users/noah/lib/action/action_dispatch.h"
+#include "users/noah/lib/action/custom_key_shortcut.h"
+#include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/profile/runtime/profile_action_placement_v1.h"
 #include "users/noah/lib/profile/runtime/profile_action_runtime_v1.h"
@@ -42,6 +45,15 @@ static uint8_t action_tap_call_count;
 static uint8_t synthetic_qmk_tap_call_count;
 static uint8_t literal_tap_call_count;
 
+// Keyboard reports R, waits W and literal taps T, in order.
+static char     event_trace[32];
+static uint8_t  event_count;
+static uint32_t waited_ms;
+
+static void test_trace(char event) {
+    if (event_count < sizeof(event_trace) - 1u) event_trace[event_count++] = event;
+}
+
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
     exit(1);
@@ -72,6 +84,9 @@ static void test_reset_stubs(void) {
     action_tap_call_count                    = 0;
     synthetic_qmk_tap_call_count             = 0;
     literal_tap_call_count                   = 0;
+    memset(event_trace, 0, sizeof(event_trace));
+    event_count = 0;
+    waited_ms   = 0;
 
     for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
         layer_locked_state[layer] = false;
@@ -141,6 +156,12 @@ void clear_oneshot_locked_mods(void) {
 
 void send_keyboard_report(void) {
     send_keyboard_report_count++;
+    test_trace('R');
+}
+
+void wait_ms(uint16_t ms) {
+    waited_ms += ms;
+    test_trace('W');
 }
 
 bool noah_key_runtime_settle_pending_fallback_hold(void) {
@@ -177,19 +198,19 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
     return true;
 }
 
-const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
+const pointing_mode_def_t *pointing_mode_lock_action_lookup(uint16_t action) {
     (void)action;
     return NULL;
 }
 
-bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
+bool pointing_mode_toggle_lock_state(pointing_mode_mask_t mode) {
     (void)mode;
     return false;
 }
 
-bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
+bool pointing_mode_toggle_lock_state_at(pointing_mode_mask_t mode, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_toggle_lock_state(mode);
+    return pointing_mode_toggle_lock_state(mode);
 }
 
 void noah_action_tap(uint16_t action) {
@@ -265,18 +286,19 @@ void unregister_code16(uint16_t keycode) {
 void tap_code16(uint16_t keycode) {
     literal_tap_call = test_current_tap_call(keycode);
     literal_tap_call_count++;
+    test_trace('T');
 }
 
-#define NOAH_PD_MODE_TEST_ROW(name, mode_keycode) [PD_MODE_INDEX_##name] = {.mode_flag = PD_MODE_##name, .keycode = (mode_keycode), .lock_action = mode_keycode##_LOCK},
-const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(NOAH_PD_MODE_TEST_ROW)};
-#undef NOAH_PD_MODE_TEST_ROW
+#define NOAH_POINTING_MODE_TEST_ROW(name, mode_keycode) [POINTING_MODE_INDEX_##name] = {.mode_flag = POINTING_MODE_##name, .keycode = (mode_keycode), .lock_action = mode_keycode##_LOCK},
+const pointing_mode_def_t pointing_modes[POINTING_MODE_COUNT] = {NOAH_POINTING_MODE_LIST(NOAH_POINTING_MODE_TEST_ROW)};
+#undef NOAH_POINTING_MODE_TEST_ROW
 
-bool is_pd_mode_lock_action(uint16_t action) {
-    return action == PD_SLOT_4_LOCK;
+bool is_pointing_mode_lock_action(uint16_t action) {
+    return action == PD_MODE_4_LOCK;
 }
 
-pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
-    return keycode == PD_SLOT_4 ? PD_MODE_ARROW : 0;
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
+    return keycode == PD_MODE_4 ? POINTING_MODE_ARROW : 0;
 }
 
 static void test_action_descriptor_classifies_common_actions(void) {
@@ -287,9 +309,9 @@ static void test_action_descriptor_classifies_common_actions(void) {
     noah_action_desc_t layer_toggle = noah_action_describe(TG(2));
     noah_action_desc_t layer_jump   = noah_action_describe(TO(5));
     noah_action_desc_t qmk_behavior = noah_action_describe(OSM(MOD_LSFT));
-    noah_action_desc_t pd_key       = noah_action_describe(PD_SLOT_4);
-    noah_action_desc_t pd_lock      = noah_action_describe(PD_SLOT_4_LOCK);
-    noah_action_desc_t macro_action = noah_action_describe(VIA_MACRO_0);
+    noah_action_desc_t pd_key       = noah_action_describe(PD_MODE_4);
+    noah_action_desc_t pd_lock      = noah_action_describe(PD_MODE_4_LOCK);
+    noah_action_desc_t macro_action = noah_action_describe(MACRO_0);
     noah_action_desc_t custom       = noah_action_describe(CUSTOM_KEY_0 + 1);
     noah_action_desc_t literal      = noah_action_describe(KC_C);
 
@@ -427,10 +449,18 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_keycode_dual_role_hold(MT(MOD_LSFT | MOD_LGUI, KC_S)) == LSG(KC_NO));
     CHECK(noah_action_keycode_dual_role_hold(OSM(MOD_RALT)) == 0x1400u);
     CHECK(noah_action_keycode_dual_role_hold(LT(1, KC_A)) == MO(1));
+    // LT() carries four layer bits: in a sixteen-layer bank each of them names
+    // a layer, so the last one holds and none is out of the bank.
+    CHECK(noah_action_keycode_dual_role_hold(LT(LAYER_COUNT - 1, KC_A)) == MO(LAYER_COUNT - 1));
+#if LAYER_COUNT < 16
     CHECK(noah_action_keycode_dual_role_hold(LT(LAYER_COUNT, KC_A)) == KC_NO);
+#endif
     CHECK(noah_action_keycode_dual_role_hold(MO(1)) == KC_NO);
     CHECK(noah_action_keycode_dual_role_hold(KC_LEFT_SHIFT) == KC_NO);
+#if LAYER_COUNT < 16
     CHECK(noah_action_describe(LM(LAYER_COUNT, MOD_LSFT)).kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
+#endif
+    CHECK(noah_action_describe(MO(LAYER_COUNT)).kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
 
     CHECK(layer_jump.kind == NOAH_ACTION_KIND_LAYER_GOTO);
     CHECK(noah_action_desc_is_layer_goto(layer_jump));
@@ -463,9 +493,9 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_supports_fallback_hold(qmk_behavior));
     CHECK(noah_action_desc_default_tap_action(qmk_behavior) == OSM(MOD_LSFT));
 
-    CHECK(pd_key.pd_mode == PD_MODE_ARROW);
-    CHECK(pd_key.kind == NOAH_ACTION_KIND_PD_MODE_HOLD);
-    CHECK(noah_action_desc_is_pd_mode_action(pd_key));
+    CHECK(pd_key.pointing_mode == POINTING_MODE_ARROW);
+    CHECK(pd_key.kind == NOAH_ACTION_KIND_POINTING_MODE_HOLD);
+    CHECK(noah_action_desc_is_pointing_mode_action(pd_key));
     CHECK(noah_action_desc_supported_as_behavior_keycode(pd_key));
     CHECK(noah_action_desc_supported_as_authored_action(pd_key, NOAH_ACTION_AUTHORED_USE_TAP));
     CHECK(noah_action_desc_supported_as_authored_action(pd_key, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
@@ -480,9 +510,9 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_supports_fallback_hold(pd_key));
     CHECK(noah_action_desc_default_tap_action(pd_key) == KC_NO);
 
-    CHECK(pd_lock.kind == NOAH_ACTION_KIND_PD_MODE_LOCK);
+    CHECK(pd_lock.kind == NOAH_ACTION_KIND_POINTING_MODE_LOCK);
     CHECK(noah_action_desc_is_press_only(pd_lock));
-    CHECK(noah_action_desc_has_capability(pd_lock, NOAH_ACTION_CAP_PD_MODE_AFFECTING));
+    CHECK(noah_action_desc_has_capability(pd_lock, NOAH_ACTION_CAP_POINTING_MODE_AFFECTING));
     CHECK(noah_action_desc_consumes_direct_press(pd_lock));
     CHECK(!noah_action_desc_is_runtime_handled_keycode(pd_lock));
     CHECK(!noah_action_desc_uses_held_lifecycle_for_press_and_hold(pd_lock));
@@ -508,14 +538,15 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_supports_fallback_hold(macro_action));
     CHECK(noah_action_desc_default_tap_action(macro_action) == KC_NO);
 
-    // A custom key is a row's own keycode and a combo output, never a step.
+    // A custom key is a row's own keycode, a combo output and, sending only
+    // its shortcut, a step (D-F26).
     CHECK(custom.kind == NOAH_ACTION_KIND_CUSTOM_KEY);
     CHECK(noah_action_desc_supported_as_behavior_keycode(custom));
     CHECK(noah_action_desc_supported_as_combo_output(custom));
-    CHECK(!noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_TAP));
-    CHECK(!noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
-    CHECK(!noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
-    CHECK(noah_action_describe(CUSTOM_KEY_63).kind == NOAH_ACTION_KIND_CUSTOM_KEY && noah_action_describe(PD_SLOT_0).kind != NOAH_ACTION_KIND_CUSTOM_KEY);
+    CHECK(noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_TAP));
+    CHECK(noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
+    CHECK(noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
+    CHECK(noah_action_describe(CUSTOM_KEY_63).kind == NOAH_ACTION_KIND_CUSTOM_KEY && noah_action_describe(PD_MODE_0).kind != NOAH_ACTION_KIND_CUSTOM_KEY);
     CHECK(noah_action_desc_uses_held_lifecycle_for_press_and_hold(custom));
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(custom));
     CHECK(!noah_action_desc_is_pure_modifier_literal(custom));
@@ -663,7 +694,7 @@ static void test_action_placement_rules(void) {
     }
 
     // Layer holds need a held key: a key, a press-and-hold branch or a combo,
-    // never a tap or another hold mode.
+    // never a tap or another hold style.
     CHECK(noah_action_supported_at(MO(2), NOAH_ACTION_PLACEMENT_KEY));
     CHECK(noah_action_supported_at(MO(2), NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD));
     CHECK(!noah_action_supported_at(MO(2), NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER));
@@ -683,7 +714,13 @@ static void test_action_placement_rules(void) {
     CHECK(!noah_action_supported_at(LM(1, MOD_LSFT), NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP));
     CHECK(!noah_action_supported_at(LM(1, MOD_LSFT), NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD));
 
-    const uint16_t unowned[] = {DF(1), PDF(1), LM(LAYER_COUNT, MOD_LSFT), TG(LAYER_COUNT), OSL(LAYER_COUNT)};
+    // LT() and LM() carry four layer bits, so a sixteen-layer bank leaves
+    // them no out-of-bank layer; the five-bit layer actions still have one.
+    const uint16_t unowned[] = {DF(1), PDF(1), TG(LAYER_COUNT), OSL(LAYER_COUNT), MO(LAYER_COUNT), TT(LAYER_COUNT), TO(LAYER_COUNT),
+#if LAYER_COUNT < 16
+                                LM(LAYER_COUNT, MOD_LSFT),
+#endif
+    };
     for (uint8_t i = 0; i < ARRAY_SIZE(unowned); i++) {
         CHECK(!noah_action_supported_at(unowned[i], NOAH_ACTION_PLACEMENT_KEY));
         CHECK(!noah_action_supported_at(unowned[i], NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP));
@@ -692,20 +729,133 @@ static void test_action_placement_rules(void) {
     }
 }
 
+// Every layer of the bank, up to its last, is reachable by each owned layer
+// action (D-F14).
+static void test_last_layer_actions(void) {
+    const uint8_t last = LAYER_COUNT - 1u;
+    CHECK(LAYER_COUNT == 16);
+    CHECK(noah_action_supported_at(MO(last), NOAH_ACTION_PLACEMENT_KEY));
+    CHECK(noah_action_supported_at(TG(last), NOAH_ACTION_PLACEMENT_KEY));
+    CHECK(noah_action_supported_at(TT(last), NOAH_ACTION_PLACEMENT_KEY));
+    CHECK(noah_action_supported_at(OSL(last), NOAH_ACTION_PLACEMENT_KEY));
+    CHECK(noah_action_supported_at(LT(last, KC_A), NOAH_ACTION_PLACEMENT_KEY));
+    CHECK(noah_action_supported_at(LM(last, MOD_LSFT), NOAH_ACTION_PLACEMENT_KEY));
+    CHECK(noah_action_supported_at(LOCK_LAYER(last), NOAH_ACTION_PLACEMENT_KEY));
+    CHECK(noah_action_supported_at(MO(last), NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
+    CHECK(noah_action_supported_at(OSL(last), NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP));
+    CHECK(QK_LAYER_TAP_GET_LAYER(LT(last, KC_A)) == last && QK_LAYER_MOD_GET_LAYER(LM(last, MOD_LSFT)) == last);
+    // The lock block reserves 32 codes; those past the bank are not layers.
+    CHECK(!noah_action_supported_at(LOCK_LAYER(LAYER_COUNT), NOAH_ACTION_PLACEMENT_KEY));
+}
+
+// Macros fill QMK's QK_MACRO range, 128 of them (D-F14): every one is a
+// key, a behaviour action and a combo output, and maps to and from the profile
+// by its slot; past the last there is no macro.
+static void test_macro_bank_ends_at_127(void) {
+    static const uint8_t slots[] = {0, 31, 32, 63, 64, 127};
+    CHECK(MACRO_SLOT_COUNT == 128 && QK_MACRO_0 + 127 == QK_MACRO_MAX);
+    for (uint8_t i = 0; i < ARRAY_SIZE(slots); i++) {
+        uint16_t                 macro = (uint16_t)(QK_MACRO_0 + slots[i]);
+        noah_profile_action_v1_t action;
+        uint16_t                 native = 0;
+        CHECK(noah_action_supported_at(macro, NOAH_ACTION_PLACEMENT_KEY));
+        CHECK(noah_action_supported_at(macro, NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP));
+        CHECK(noah_action_supported_at(macro, NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
+        CHECK(noah_profile_action_runtime_v1_from_native(macro, &action) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
+        CHECK(action.kind == NOAH_PROFILE_ACTION_V1_MACRO && action.operand == slots[i]);
+        CHECK(noah_profile_action_runtime_v1_to_native(&action, &native) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && native == macro);
+    }
+    noah_profile_action_v1_t past = {.kind = NOAH_PROFILE_ACTION_V1_MACRO, .operand = 128};
+    uint16_t                 native = 0;
+    CHECK(noah_profile_action_runtime_v1_to_native(&past, &native) != NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
+    CHECK(!IS_QK_MACRO(QK_MACRO_MAX + 1u));
+}
+
+// Custom keys 0..127 at 0x7f00 (D-F14): each is a key, a combo output and a
+// behaviour step (D-F26), and maps to and from the profile by slot; slot 128
+// is refused.
+static void test_custom_key_block_holds_128(void) {
+    static const uint8_t slots[] = {0, 63, 64, 127};
+    CHECK(CUSTOM_KEY_SLOT_COUNT == 128 && CUSTOM_KEY_0 == 0x7f00 && CUSTOM_KEY_127 == 0x7f7f);
+    for (uint8_t i = 0; i < ARRAY_SIZE(slots); i++) {
+        uint16_t                 key = (uint16_t)(CUSTOM_KEY_0 + slots[i]);
+        noah_profile_action_v1_t action;
+        uint16_t                 native = 0;
+        CHECK(NOAH_KEYCODE_IS_CUSTOM_KEY(key));
+        CHECK(noah_action_supported_at(key, NOAH_ACTION_PLACEMENT_KEY));
+        CHECK(noah_action_supported_at(key, NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
+        CHECK(noah_action_supported_at(key, NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP));
+        CHECK(noah_action_supported_at(key, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD));
+        CHECK(noah_profile_action_runtime_v1_from_native(key, &action) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
+        CHECK(action.kind == NOAH_PROFILE_ACTION_V1_CUSTOM_KEY && action.operand == slots[i]);
+        CHECK(noah_profile_action_runtime_v1_to_native(&action, &native) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && native == key);
+    }
+    noah_profile_action_v1_t past = {.kind = NOAH_PROFILE_ACTION_V1_CUSTOM_KEY, .operand = 128};
+    uint16_t                 native = 0;
+    CHECK(noah_profile_action_runtime_v1_to_native(&past, &native) != NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
+    // An old custom-key code is not one any more.
+    noah_profile_action_v1_t old;
+    CHECK(!NOAH_KEYCODE_IS_CUSTOM_KEY(NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE) && !NOAH_KEYCODE_IS_CUSTOM_KEY(NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE + 63));
+    CHECK(noah_profile_action_runtime_v1_from_native(NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE, &old) != NOAH_PROFILE_ACTION_RUNTIME_V1_OK || old.kind != NOAH_PROFILE_ACTION_V1_CUSTOM_KEY);
+}
+
+// The live shortcuts, as the settings runtime would report them.
+static noah_custom_key_shortcut_t test_shortcuts[CUSTOM_KEY_SLOT_COUNT];
+
+noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
+    return slot < CUSTOM_KEY_SLOT_COUNT ? test_shortcuts[slot] : (noah_custom_key_shortcut_t){0};
+}
+
+// A custom key with a shortcut stands where an ordinary key's own keycode
+// does (D-F26): its default tap, its fallback hold, and a runtime-handled key
+// without a row. Without one it keeps having no native action.
+static void test_custom_key_shortcut_is_its_native_action(void) {
+    memset(test_shortcuts, 0, sizeof(test_shortcuts));
+    test_shortcuts[9] = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT), .keys = {KC_K}};
+    test_shortcuts[10] = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_RIGHT_GUI)};
+
+    noah_action_desc_t with    = noah_action_describe(CUSTOM_KEY_9);
+    noah_action_desc_t mods    = noah_action_describe(CUSTOM_KEY_10);
+    noah_action_desc_t without = noah_action_describe(CUSTOM_KEY_11);
+
+    CHECK(noah_custom_key_has_shortcut(CUSTOM_KEY_9) && noah_custom_key_has_shortcut(CUSTOM_KEY_10) && !noah_custom_key_has_shortcut(CUSTOM_KEY_11));
+    CHECK(!noah_custom_key_has_shortcut(KC_A));
+    CHECK(noah_action_desc_default_tap_uses_action_keycode(with) && noah_action_desc_default_tap_action(with) == CUSTOM_KEY_9);
+    CHECK(noah_action_desc_supports_fallback_hold(with) && noah_action_desc_is_runtime_handled_keycode(with));
+    CHECK(noah_action_desc_default_tap_action(mods) == CUSTOM_KEY_10 && noah_action_desc_supports_fallback_hold(mods));
+    CHECK(!noah_action_desc_default_tap_uses_action_keycode(without) && noah_action_desc_default_tap_action(without) == KC_NO);
+    CHECK(!noah_action_desc_supports_fallback_hold(without) && !noah_action_desc_is_runtime_handled_keycode(without));
+    memset(test_shortcuts, 0, sizeof(test_shortcuts));
+}
+
 // A userspace code no block assigns does nothing and goes nowhere: not a
 // behaviour's key, a step or a combo output. The blocks' last codes keep
 // their kinds.
 static void test_unassigned_userspace_codes_are_refused_everywhere(void) {
-    const uint16_t unassigned[] = {NOAH_KEYCODE_PD_HOLD_BASE + PD_MODE_COUNT, NOAH_KEYCODE_PD_LOCK_BASE + NOAH_KEYCODE_PD_RESERVED - 1, LAYER_LOCK_BASE + LAYER_COUNT, NOAH_KEYCODE_USERSPACE_END, QK_USER_MAX};
+    // The retired custom-key block (D-F14) is unassigned: its first and last
+    // codes invoke nothing, neither a custom key nor a pointing hold.
+    const uint16_t unassigned[] = {NOAH_KEYCODE_PD_HOLD_BASE + POINTING_MODE_COUNT, NOAH_KEYCODE_PD_LOCK_BASE + NOAH_KEYCODE_PD_RESERVED - 1, LAYER_LOCK_BASE + LAYER_COUNT, NOAH_KEYCODE_USERSPACE_END, NOAH_KEYCODE_CUSTOM_KEY_BASE - 1, NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE, NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE + 63};
     const noah_action_placement_t placements[] = {NOAH_ACTION_PLACEMENT_KEY, NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER, NOAH_ACTION_PLACEMENT_COMBO_OUTPUT};
     for (uint8_t i = 0; i < ARRAY_SIZE(unassigned); i++) {
         CHECK(noah_action_describe(unassigned[i]).kind == NOAH_ACTION_KIND_UNASSIGNED_USER);
         for (uint8_t p = 0; p < ARRAY_SIZE(placements); p++)
             CHECK(!noah_action_supported_at(unassigned[i], placements[p]));
     }
+    // The last block is the runtime's own (what a Tap-toggle or One-shot custom
+    // key's tap does to its layers, D-F26): it names its kind, and a profile
+    // still places it nowhere.
+    const uint16_t runtime_only[] = {CUSTOM_KEY_127 + 1, CUSTOM_KEY_LAYER_TAP(0), CUSTOM_KEY_LAYER_TAP(CUSTOM_KEY_SLOT_COUNT - 1), QK_USER_MAX};
+    for (uint8_t i = 0; i < ARRAY_SIZE(runtime_only); i++) {
+        CHECK(noah_action_describe(runtime_only[i]).kind == NOAH_ACTION_KIND_CUSTOM_KEY_LAYER_TAP);
+        for (uint8_t p = 0; p < ARRAY_SIZE(placements); p++)
+            CHECK(!noah_action_supported_at(runtime_only[i], placements[p]));
+        const noah_profile_action_v1_t stored = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = runtime_only[i]};
+        CHECK(!noah_profile_action_placement_v1_supported(&stored, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
+    }
     CHECK(noah_action_describe(CUSTOM_KEY_63).kind == NOAH_ACTION_KIND_CUSTOM_KEY);
-    CHECK(noah_action_describe(PD_SLOT_4).kind == NOAH_ACTION_KIND_PD_MODE_HOLD);
-    CHECK(noah_action_describe(PD_SLOT_4_LOCK).kind == NOAH_ACTION_KIND_PD_MODE_LOCK);
+    CHECK(noah_action_describe(CUSTOM_KEY_127).kind == NOAH_ACTION_KIND_CUSTOM_KEY);
+    CHECK(noah_action_describe(PD_MODE_4).kind == NOAH_ACTION_KIND_POINTING_MODE_HOLD);
+    CHECK(noah_action_describe(PD_MODE_4_LOCK).kind == NOAH_ACTION_KIND_POINTING_MODE_LOCK);
     CHECK(noah_action_describe(LOCK_LAYER(LAYER_COUNT - 1)).kind == NOAH_ACTION_KIND_LAYER_LOCK);
     CHECK(noah_action_describe(QK_USER - 1).kind != NOAH_ACTION_KIND_UNASSIGNED_USER);
 
@@ -735,12 +885,78 @@ static void test_saved_profile_placement_matches_the_rules(void) {
     CHECK(noah_profile_action_placement_v1_supported(&oneshot, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
     CHECK(noah_profile_action_placement_v1_supported(&oneshot, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT));
     CHECK(!noah_profile_action_placement_v1_supported(&invalid, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
+
+    // A saved profile may name a custom key in any step (D-F26), with or
+    // without a shortcut: the validator does not look across domains.
+    const noah_profile_action_v1_t custom = {.kind = NOAH_PROFILE_ACTION_V1_CUSTOM_KEY, .operand = 127};
+    CHECK(noah_profile_action_placement_v1_supported(&custom, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_KEY));
+    CHECK(noah_profile_action_placement_v1_supported(&custom, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
+    CHECK(noah_profile_action_placement_v1_supported(&custom, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD));
+    CHECK(noah_profile_action_placement_v1_supported(&custom, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_OTHER));
+    CHECK(noah_profile_action_placement_v1_supported(&custom, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT));
+}
+
+// A click keeps the modifiers it may keep, and hides the rest only around the
+// button: a hiding report leads the button by the settle time and the restore
+// trails its release by it. Nothing hidden means no wait.
+static void test_owned_click_orders_modifier_changes_around_the_button(void) {
+    const uint8_t shift = MOD_BIT(KC_LEFT_SHIFT), alt = MOD_BIT(KC_LEFT_ALT), gui = MOD_BIT(KC_RIGHT_GUI);
+
+    test_reset_stubs();
+    fake_mods = shift;
+    noah_emit_owned_click(MS_BTN3, 0u, false);
+    CHECK(fallback_hold_activation_count == 1);
+    CHECK(literal_tap_call.fallback_hold_active);
+    CHECK(literal_tap_call.keycode == MS_BTN3 && literal_tap_call.real == shift);
+    CHECK(strcmp(event_trace, "RTR") == 0 && waited_ms == 0u);
+    CHECK(fake_mods == shift);
+
+    test_reset_stubs();
+    fake_mods      = shift | alt;
+    fake_weak_mods = shift;
+    noah_emit_owned_click(MS_BTN4, shift, false);
+    CHECK(literal_tap_call.keycode == MS_BTN4 && literal_tap_call.real == alt && literal_tap_call.weak == 0u);
+    CHECK(strcmp(event_trace, "RWTWR") == 0 && waited_ms == 2u * OWNED_KEYCODE_MOD_TO_MOUSE_SETTLE_MS);
+    CHECK(fake_mods == (shift | alt) && fake_weak_mods == shift);
+
+    test_reset_stubs();
+    fake_mods = alt;
+    noah_emit_owned_click(MS_BTN4, shift, false);
+    CHECK(literal_tap_call.real == alt);
+    CHECK(strcmp(event_trace, "RTR") == 0 && waited_ms == 0u);
+
+    test_reset_stubs();
+    fake_mods                = alt;
+    fake_weak_mods           = shift;
+    fake_oneshot_mods        = MOD_BIT(KC_LEFT_CTRL);
+    fake_oneshot_locked_mods = gui;
+    noah_emit_owned_click(MS_BTN1, 0u, true);
+    CHECK(literal_tap_call.real == 0u && literal_tap_call.weak == 0u && literal_tap_call.oneshot == 0u && literal_tap_call.oneshot_locked == 0u);
+    CHECK(strcmp(event_trace, "RWTWR") == 0);
+    CHECK(fake_mods == alt && fake_weak_mods == shift && fake_oneshot_mods == MOD_BIT(KC_LEFT_CTRL) && fake_oneshot_locked_mods == gui);
+
+    test_reset_stubs();
+    noah_emit_owned_click(MS_BTN8, 0u, true);
+    CHECK(literal_tap_call.keycode == MS_BTN8);
+    CHECK(strcmp(event_trace, "RTR") == 0 && waited_ms == 0u);
+
+    // A fallback hold settled first is ambient like any other modifier.
+    test_reset_stubs();
+    fallback_hold_settle_real_mods = gui;
+    noah_emit_owned_click(MS_BTN2, 0u, true);
+    CHECK(literal_tap_call.real == 0u);
+    CHECK(strcmp(event_trace, "RWTWR") == 0);
+    CHECK(fake_mods == gui);
 }
 
 int main(void) {
     test_action_placement_rules();
     test_saved_profile_placement_matches_the_rules();
     test_unassigned_userspace_codes_are_refused_everywhere();
+    test_last_layer_actions();
+    test_macro_bank_ends_at_127();
+    test_custom_key_block_holds_128();
+    test_custom_key_shortcut_is_its_native_action();
     test_action_descriptor_classifies_common_actions();
     test_action_dispatch_keeps_runtime_default_policy();
     test_explicit_action_emit_can_skip_fallback_hold_settlement();
@@ -748,6 +964,7 @@ int main(void) {
     test_synthetic_qmk_emit_settles_fallback_hold_without_touching_mod_state();
     test_masked_synthetic_qmk_emit_settles_fallback_hold_and_restores_post_settlement_mod_state();
     test_literal_emit_can_suspend_and_restore_mods();
+    test_owned_click_orders_modifier_changes_around_the_button();
 
     puts("action_dispatch host tests passed");
     return 0;

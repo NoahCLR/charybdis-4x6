@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "users/noah/lib/profile/runtime/active_profile_pd_runtime.h"
 #include "users/noah/lib/state/diagnostics/runtime_diag.h"
 #include "users/noah/noah_runtime.h"
 
@@ -49,26 +50,8 @@ static void test_expect_sequence(const char *const *expected, uint8_t count) {
     }
 }
 
-void noah_via_macro_defaults_eeconfig_init(void) {
-    test_log_stage("via_macro_defaults_eeconfig_init");
-}
-
-bool noah_via_macro_defaults_last_seed_succeeded(void) {
-    test_log_stage("via_macro_defaults_last_seed_succeeded");
-    return true;
-}
-
-void noah_qmk_via_sync_state_reset_after_defaults(bool defaults_committed) {
-    CHECK(defaults_committed);
-    test_log_stage("qmk_via_sync_state_reset_after_defaults");
-}
-
-void noah_via_macro_defaults_matrix_scan(void) {
-    test_log_stage("via_macro_defaults_matrix_scan");
-}
-
-void noah_qmk_durable_io_matrix_scan(void) {
-    test_log_stage("qmk_durable_io_matrix_scan");
+void noah_profile_store_runtime_matrix_scan(void) {
+    test_log_stage("profile_store_runtime_matrix_scan");
 }
 
 void noah_qmk_combo_origin_scan(void) {
@@ -81,6 +64,15 @@ void noah_key_runtime_scan(void) {
 
 void noah_record_admission_task(void) {
     test_log_stage("record_admission_task");
+}
+
+const noah_pd_config_t noah_pd_defaults[NOAH_PROFILE_PD_V1_SLOT_COUNT];
+
+// An image without a profile owner warms the pointing slots from the compiled
+// defaults; with one, the owner publishes them.
+void noah_active_profile_pd_load_compiled_defaults(const noah_pd_config_t defaults[NOAH_PROFILE_PD_V1_SLOT_COUNT]) {
+    CHECK(defaults == noah_pd_defaults);
+    test_log_stage("active_profile_pd_load_compiled_defaults");
 }
 
 void noah_record_admission_reset(void) {
@@ -100,16 +92,32 @@ void macro_payload_engine_init(void) {
     test_log_stage("macro_payload_engine_init");
 }
 
-void split_runtime_sync_tick(void) {
+// The pass's one clock read, and what each scheduler was handed.
+static uint32_t test_clock_ms = 41000u;
+static uint32_t split_tick_now;
+static uint32_t cpi_refresh_now;
+
+uint32_t timer_read32(void) {
+    test_log_stage("timer_read32");
+    return ++test_clock_ms;
+}
+
+void split_runtime_sync_tick(uint32_t now) {
     test_log_stage("split_runtime_sync_tick");
+    split_tick_now = now;
+}
+
+void pointing_mode_refresh_applied_dpi(uint32_t now) {
+    test_log_stage("pointing_mode_refresh_applied_dpi");
+    cpi_refresh_now = now;
 }
 
 void held_repeat_tick(void) {
     test_log_stage("held_repeat_tick");
 }
 
-void noah_via_macro_defaults_keyboard_post_init(void) {
-    test_log_stage("via_macro_defaults_keyboard_post_init");
+void noah_qmk_profile_flash_pre_init(void) {
+    test_log_stage("qmk_profile_flash_pre_init");
 }
 
 void noah_profile_store_runtime_init(void) {
@@ -132,19 +140,23 @@ void split_runtime_sync_init(void) {
     test_log_stage("split_runtime_sync_init");
 }
 
-void noah_qmk_via_split_sync_init(void) {
-    test_log_stage("qmk_via_split_sync_init");
-}
-
-void noah_qmk_via_split_mirror_init(void) {
-    test_log_stage("qmk_via_split_mirror_init");
-}
-
-void noah_qmk_durable_io_init(void) {
-    test_log_stage("qmk_durable_io_init");
-}
-
 void noah_runtime_diag_post_init(void) {}
+
+void noah_qmk_usb_product_name_pre_init(void) {
+    test_log_stage("qmk_usb_product_name_pre_init");
+}
+
+void noah_qmk_usb_product_name_task(void) {
+    test_log_stage("qmk_usb_product_name_task");
+}
+
+void noah_qmk_profile_flash_housekeeping(void) {
+    test_log_stage("qmk_profile_flash_housekeeping");
+}
+
+void noah_qmk_keyboard_restart_task(void) {
+    test_log_stage("qmk_keyboard_restart_task");
+}
 
 void noah_runtime_diag_scope_enter(noah_runtime_diag_stage_t stage) {
     (void)stage;
@@ -152,16 +164,18 @@ void noah_runtime_diag_scope_enter(noah_runtime_diag_stage_t stage) {
 
 void noah_runtime_diag_scope_leave(void) {}
 
+void pointing_mode_forget_applied_dpi(void) {
+    test_log_stage("pointing_mode_forget_applied_dpi");
+}
+
 void noah_runtime_diag_heartbeat(void) {
     test_log_stage("runtime_diag_heartbeat");
 }
 
 static void test_eeconfig_init_order(void) {
     static const char *const expected[] = {
-        "macro_payload_engine_cancel",
-        "via_macro_defaults_eeconfig_init",
-        "via_macro_defaults_last_seed_succeeded",
-        "qmk_via_sync_state_reset_after_defaults",
+        // QMK's Charybdis EEPROM reset wrote the sensor's CPI just before.
+        "macro_payload_engine_cancel", "pointing_mode_forget_applied_dpi",
     };
 
     test_log_reset();
@@ -169,19 +183,22 @@ static void test_eeconfig_init_order(void) {
     test_expect_sequence(expected, ARRAY_SIZE(expected));
 }
 
+// One clock read a pass serves every scheduler that runs on it: the split
+// sync's sends and the pointer CPI refresh.
 static void test_matrix_scan_order(void) {
     static const char *const expected[] = {
-        "via_macro_defaults_matrix_scan", "qmk_durable_io_matrix_scan", "qmk_combo_origin_scan", "key_runtime_scan", "record_admission_task", "macro_payload_engine_scan", "split_runtime_sync_tick",
+        "profile_store_runtime_matrix_scan", "qmk_combo_origin_scan", "key_runtime_scan", "record_admission_task", "macro_payload_engine_scan", "timer_read32", "split_runtime_sync_tick", "pointing_mode_refresh_applied_dpi",
     };
 
     test_log_reset();
     noah_matrix_scan_user();
     test_expect_sequence(expected, ARRAY_SIZE(expected));
+    CHECK(split_tick_now == test_clock_ms && cpi_refresh_now == test_clock_ms);
 }
 
 static void test_matrix_slave_scan_order(void) {
     static const char *const expected[] = {
-        "qmk_durable_io_matrix_scan",
+        "profile_store_runtime_matrix_scan",
     };
 
     test_log_reset();
@@ -193,7 +210,13 @@ static void test_keyboard_post_init_order(void) {
     static const char *const expected[] = {
         // Core defaults must land before any stage can observe key runtime
         // core state.
-        "runtime_shared_state_post_init", "qmk_combo_origin_init", "record_admission_reset", "macro_payload_engine_init", "via_macro_defaults_keyboard_post_init", "profile_store_runtime_init", "rgb_runtime_post_init", "split_runtime_sync_init", "qmk_via_split_sync_init", "qmk_via_split_mirror_init", "qmk_durable_io_init",
+        "runtime_shared_state_post_init",
+        // QMK's Charybdis post-init wrote the sensor's CPI just before.
+        "pointing_mode_forget_applied_dpi", "qmk_combo_origin_init", "record_admission_reset", "macro_payload_engine_init", "profile_store_runtime_init",
+#ifndef NOAH_LIVE_PROFILE_OWNER_ENABLE
+        "active_profile_pd_load_compiled_defaults",
+#endif
+        "rgb_runtime_post_init", "split_runtime_sync_init",
     };
 
     test_log_reset();
@@ -201,10 +224,26 @@ static void test_keyboard_post_init_order(void) {
     test_expect_sequence(expected, ARRAY_SIZE(expected));
 }
 
+// Before USB starts: an EEPROM reset forgets the saved profiles (D-F29),
+// then the USB product name (D-F25) is read from what remains.
+static void test_keyboard_pre_init_order(void) {
+    static const char *const expected[] = {
+        "qmk_profile_flash_pre_init",
+        "qmk_usb_product_name_pre_init",
+    };
+
+    test_log_reset();
+    noah_keyboard_pre_init_user();
+    test_expect_sequence(expected, ARRAY_SIZE(expected));
+}
+
 static void test_housekeeping_order(void) {
     static const char *const expected[] = {
         "held_repeat_tick",
         "runtime_diag_heartbeat",
+        "qmk_usb_product_name_task",
+        "qmk_profile_flash_housekeeping",
+        "qmk_keyboard_restart_task",
     };
 
     test_log_reset();
@@ -228,6 +267,7 @@ int main(void) {
     test_eeconfig_init_order();
     test_matrix_scan_order();
     test_matrix_slave_scan_order();
+    test_keyboard_pre_init_order();
     test_housekeeping_order();
     test_suspend_power_down_feeds_watchdog_only();
     test_keyboard_post_init_order();

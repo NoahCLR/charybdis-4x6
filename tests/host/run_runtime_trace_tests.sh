@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 
@@ -19,7 +20,6 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DNOAH_RUNTIME_TRACE_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
-    -DNOAH_PD_PROFILE_ENABLE \
     -DSPLIT_TRANSACTION_IDS_USER \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
@@ -27,11 +27,11 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/tests/host/runtime_trace_test.c" \
     "$ROOT/users/noah/lib/key/runtime/trace.c" \
     "$ROOT/users/noah/lib/key/runtime/slot/origin_registry.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_snapshot.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_registry.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_lifecycle.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_state.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_snapshot.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_registry.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_lifecycle.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_key_runtime_bridge.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_state.c" \
     "$ROOT/users/noah/lib/state/ownership/layer_ownership.c" \
     "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
     "$ROOT/users/noah/lib/state/shared/runtime_shared_state.c" \

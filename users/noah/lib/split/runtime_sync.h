@@ -9,9 +9,10 @@
 // - authored key-feedback truth (semantic state + broad owner state + tap branch state)
 //
 // The master periodically re-sends each surface as a heartbeat so a rebooted
-// or rejoined half can recover even if the relevant state did not change. Heavy
-// combo/key-feedback surfaces are rebuilt only while active, dirty, forced, or
-// heartbeat-due so idle scans do not spend time deriving unchanged RGB packets.
+// or rejoined half can recover even if the relevant state did not change. The
+// combo packet is built every pass and sent only when it changed, is forced, or
+// its heartbeat is due. The heavier key-feedback packets are built only while
+// active, dirty, forced, or heartbeat-due, so idle scans do not derive them.
 // A shared transport-health gate stops a send pass after its first failure and
 // suppresses packet building until a bounded recovery-probe deadline.
 //
@@ -27,7 +28,7 @@
 
 #include "../key/runtime/feedback.h"
 #include "../key/runtime/slot/origin_registry.h"
-#include "../pointing/defs/pd_mode_flags.h"
+#include "../pointing/defs/pointing_mode_flags.h"
 #include "../state/shared/runtime_publication.h"
 
 #ifndef RPC_M2S_BUFFER_SIZE
@@ -35,12 +36,12 @@
 #endif
 
 typedef struct __attribute__((packed)) {
-    uint16_t     automouse_progress;
-    pd_mode_id_t active_mode_id;
-    pd_mode_id_t locked_mode_id;
-#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-    uint8_t pd_mode_owner_sides;
-    uint8_t pd_mode_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    uint16_t           automouse_progress;
+    pointing_mode_id_t active_mode_id;
+    pointing_mode_id_t locked_mode_id;
+#ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
+    uint8_t pointing_mode_owner_sides;
+    uint8_t pointing_mode_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 #endif
     uint8_t key_preview_layer;
 } split_runtime_base_sync_packet_t;
@@ -61,12 +62,12 @@ typedef struct __attribute__((packed)) {
 } split_runtime_key_feedback_branch_packet_t;
 
 typedef struct {
-    uint16_t     automouse_progress;
-    pd_mode_id_t active_mode_id;
-    pd_mode_id_t locked_mode_id;
-#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-    uint8_t pd_mode_owner_sides;
-    uint8_t pd_mode_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    uint16_t           automouse_progress;
+    pointing_mode_id_t active_mode_id;
+    pointing_mode_id_t locked_mode_id;
+#ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
+    uint8_t pointing_mode_owner_sides;
+    uint8_t pointing_mode_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 #endif
     uint8_t key_preview_layer;
     uint8_t combo_underlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
@@ -115,14 +116,14 @@ typedef struct {
 } split_runtime_sync_debug_transport_t;
 #endif
 
-#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+#ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
 #    define SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT                                             \
         {                                                                                    \
             .automouse_progress                   = 0,                                       \
-            .active_mode_id                       = PD_MODE_ID_NONE,                         \
-            .locked_mode_id                       = PD_MODE_ID_NONE,                         \
-            .pd_mode_owner_sides                  = SPLIT_SIDE_MASK_NONE,                    \
-            .pd_mode_owner_bitmap                 = {0},                                     \
+            .active_mode_id                       = POINTING_MODE_ID_NONE,                   \
+            .locked_mode_id                       = POINTING_MODE_ID_NONE,                   \
+            .pointing_mode_owner_sides            = SPLIT_SIDE_MASK_NONE,                    \
+            .pointing_mode_owner_bitmap           = {0},                                     \
             .key_preview_layer                    = UINT8_MAX,                               \
             .combo_underlay_bitmap                = {0},                                     \
             .combo_overlay_bitmap                 = {0},                                     \
@@ -139,8 +140,8 @@ typedef struct {
 #    define SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT                                             \
         {                                                                                    \
             .automouse_progress                   = 0,                                       \
-            .active_mode_id                       = PD_MODE_ID_NONE,                         \
-            .locked_mode_id                       = PD_MODE_ID_NONE,                         \
+            .active_mode_id                       = POINTING_MODE_ID_NONE,                   \
+            .locked_mode_id                       = POINTING_MODE_ID_NONE,                   \
             .key_preview_layer                    = UINT8_MAX,                               \
             .combo_underlay_bitmap                = {0},                                     \
             .combo_overlay_bitmap                 = {0},                                     \
@@ -165,7 +166,8 @@ _Static_assert(sizeof(split_runtime_key_feedback_branch_packet_t) <= RPC_M2S_BUF
 extern split_runtime_sync_remote_t split_runtime_sync_remote;
 
 void split_runtime_sync_init(void);
-void split_runtime_sync_tick(void);
+// Once a main-loop pass, with the pass's one clock read.
+void split_runtime_sync_tick(uint32_t now);
 void split_runtime_sync_elapsed(uint16_t raw_elapsed);
 void split_runtime_sync(void);
 void split_runtime_sync_mark_combo_dirty(void);
@@ -188,7 +190,9 @@ static inline void split_runtime_sync_notify_key_feedback_dirty(void) {
 static const split_runtime_sync_remote_t split_runtime_sync_remote = SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
 
 static inline void split_runtime_sync_init(void) {}
-static inline void split_runtime_sync_tick(void) {}
+static inline void split_runtime_sync_tick(uint32_t now) {
+    (void)now;
+}
 static inline void split_runtime_sync_elapsed(uint16_t raw_elapsed) {
     (void)raw_elapsed;
 }

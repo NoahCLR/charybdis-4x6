@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "users/noah/lib/action/action_lifecycle.h"
+#include "users/noah/lib/action/owned_keycode.h"
 #include "key_runtime_integration_harness.h"
 #include "print.h"
 #include "transactions.h"
@@ -15,9 +16,9 @@
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/key/runtime/feedback.h"
 #include "users/noah/lib/key/runtime/slot/origin_registry.h"
-#include "users/noah/lib/pointing/defs/pd_modes.h"
-#include "users/noah/lib/pointing/modes/pd_mode_configured.h"
-#include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
+#include "users/noah/lib/pointing/modes/pointing_mode_configured.h"
+#include "users/noah/lib/profile/runtime/active_profile_pd_runtime.h"
 #include "users/noah/lib/key/runtime/projection/projection.h"
 #include "users/noah/lib/key/runtime/reducer/runtime.h"
 #include "users/noah/lib/key/runtime/reducer/state_query.h"
@@ -127,7 +128,7 @@ static uint8_t test_highest_active_layer(void) {
     return LAYER_BASE;
 }
 
-// A key a test puts on the Pointing layer in place of the profile's.
+// A key a test puts on the pointer layer in place of the profile's.
 static uint16_t test_pointer_key_override = KC_NO;
 static keypos_t test_pointer_key_override_pos;
 
@@ -617,7 +618,7 @@ void wait_ms(uint16_t ms) {
     (void)ms;
 }
 
-bool noah_qmk_contract_try_play_via_macro(uint16_t action) {
+bool noah_profile_macro_try_play(uint16_t action) {
     (void)action;
     return false;
 }
@@ -678,6 +679,14 @@ void owned_keycode_tap_literal(uint16_t keycode) {
     tap_code16(keycode);
 }
 
+// The keymap gives no custom key a shortcut (D-F26); this only satisfies the
+// link.
+bool owned_keycode_tap_chord(uint8_t mods, const uint8_t keys[OWNED_KEYCODE_CHORD_KEYS]) {
+    (void)mods;
+    (void)keys;
+    return false;
+}
+
 void owned_keycode_track_physical_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
@@ -696,11 +705,6 @@ bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_
 }
 
 void keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
-}
-
-void keyboard_mod_ownership_track_mod_tap_hold_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
 }
@@ -860,31 +864,30 @@ void pointing_device_set_cpi(uint16_t cpi) {
     current_cpi = cpi;
 }
 
-static const uint8_t test_pd_records[8][96] = {
-    [0] = {[0] = 0, [1] = 2, [4] = 100},
-    [1] = {[0] = 1, [1] = 1},
-    [2] = {[0] = 2, [1] = 1},
-    [3] = {[0] = 3, [1] = 1},
-    [4] = {[0] = 4, [1] = 1, [2] = 1},
-    [5] = {[0] = 5, [1] = 2, [6] = 8},
+static const noah_pd_config_t test_pd_records[8] = {
+    [0] = {.id = 0, .kind = NOAH_PD_KIND_SCROLLING, .dpi = 100},
+    [1] = {.id = 1, .kind = NOAH_PD_KIND_DIRECTIONAL},
+    [2] = {.id = 2, .kind = NOAH_PD_KIND_DIRECTIONAL},
+    [3] = {.id = 3, .kind = NOAH_PD_KIND_DIRECTIONAL},
+    [4] = {.id = 4, .kind = NOAH_PD_KIND_DIRECTIONAL, .pointer_layer = NOAH_PD_POINTER_LAYER_PREFER_TYPING},
+    [5] = {.id = 5, .kind = NOAH_PD_KIND_SCROLLING, .held_modifiers = MOD_BIT(KC_LEFT_GUI)},
 };
-static const uint8_t *active_pd_record;
+static const noah_pd_config_t *active_pd_record;
 
-const uint8_t *noah_effective_pd_for_mask(uint32_t mode) {
+const noah_pd_config_t *noah_active_profile_pd_for_mask(uint32_t mode) {
     for (uint8_t slot = 0; slot < 6; slot++) {
-        if (mode == (UINT32_C(1) << slot)) return test_pd_records[slot];
+        if (mode == (UINT32_C(1) << slot)) return &test_pd_records[slot];
     }
     return NULL;
 }
 
 void noah_pd_engine_exit(void) {
-    if (active_pd_record && active_pd_record[0] == 0) reset_dragscroll_count++;
+    if (active_pd_record && active_pd_record->id == 0) reset_dragscroll_count++;
     active_pd_record = NULL;
 }
-void noah_pd_engine_enter(const uint8_t *record) { active_pd_record = record; }
+void noah_pd_engine_enter(const noah_pd_config_t *slot) { active_pd_record = slot; }
 report_mouse_t noah_pd_engine_motion(report_mouse_t report) { return report; }
-bool noah_pd_engine_key(uint16_t keycode, keyrecord_t *record) { (void)keycode; (void)record; return false; }
-uint8_t noah_pd_engine_masked_mods(const uint8_t *record) { (void)record; return 0; }
+uint8_t noah_pd_engine_masked_mods(const noah_pd_config_t *slot) { (void)slot; return 0; }
 
 bool is_keyboard_master(void) {
     return true;
@@ -1527,14 +1530,14 @@ static void test_right_thumb_quadruple_tap_dispatches_previous_track(void) {
 }
 
 static void test_pointer_pinch_double_tap_queues_zoom_chord(void) {
-    keypos_t pinch_pos = test_find_keypos_on_layer(LAYER_POINTER, PD_SLOT_5);
+    keypos_t pinch_pos = test_find_keypos_on_layer(LAYER_POINTER, PD_MODE_5);
 
     CHECK(test_keypos_valid(pinch_pos));
 
     test_reset_state();
     layer_state = noah_layer_state_set_user(test_layer_mask(LAYER_BASE) | test_layer_mask(LAYER_POINTER));
 
-    CHECK(test_resolve_keycode(pinch_pos) == PD_SLOT_5);
+    CHECK(test_resolve_keycode(pinch_pos) == PD_MODE_5);
     test_run_quick_tap(pinch_pos);
     test_advance_thumb_multi_tap_gap();
     test_run_quick_tap(pinch_pos);
@@ -1549,13 +1552,13 @@ static void test_pointer_pinch_double_tap_queues_zoom_chord(void) {
 
     CHECK(test_tap_code16_count == 0);
     CHECK(test_delayed_action_count == 1);
-    CHECK(test_last_delayed_action == VIA_MACRO_6);
-    CHECK(pd_mode_local_active_snapshot() == 0);
+    CHECK(test_last_delayed_action == MACRO_6);
+    CHECK(pointing_mode_local_active_snapshot() == 0);
     test_assert_thumb_runtime_quiescent(pinch_pos);
 }
 
 static void test_pointer_pinch_double_tap_salvos_queue_zoom_chord_cleanly(void) {
-    keypos_t pinch_pos = test_find_keypos_on_layer(LAYER_POINTER, PD_SLOT_5);
+    keypos_t pinch_pos = test_find_keypos_on_layer(LAYER_POINTER, PD_MODE_5);
 
     CHECK(test_keypos_valid(pinch_pos));
 
@@ -1577,8 +1580,8 @@ static void test_pointer_pinch_double_tap_salvos_queue_zoom_chord_cleanly(void) 
 
         CHECK(test_tap_code16_count == 0);
         CHECK(test_delayed_action_count == (uint16_t)(salvo + 1u));
-        CHECK(test_last_delayed_action == VIA_MACRO_6);
-        CHECK(pd_mode_local_active_snapshot() == 0);
+        CHECK(test_last_delayed_action == MACRO_6);
+        CHECK(pointing_mode_local_active_snapshot() == 0);
         test_assert_thumb_runtime_quiescent(pinch_pos);
 
         key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
@@ -1586,10 +1589,10 @@ static void test_pointer_pinch_double_tap_salvos_queue_zoom_chord_cleanly(void) 
     }
 }
 
-// A third press on a two-branch pointer key wraps the tap index back to the base
-// branch instead of ending the gesture, so nothing is deferred and nothing is sent
-// twice. The series simply carries on at count one.
-static void test_pointer_terminal_double_tap_wraps_on_exact_third_press(uint16_t keycode) {
+// A third quick tap goes past the Double tap, the deepest tap count these
+// pointer keys set, so the run types (D-F33): the first tap, the key
+// underneath, three times, and never the Double tap's action.
+static void test_pointer_terminal_third_quick_tap_types_the_first_tap(uint16_t keycode, uint16_t double_tap_action) {
     keypos_t key_pos;
 
     key_pos = test_find_keypos_on_layer(LAYER_POINTER, keycode);
@@ -1603,38 +1606,32 @@ static void test_pointer_terminal_double_tap_wraps_on_exact_third_press(uint16_t
     test_advance_thumb_multi_tap_gap();
     test_run_quick_tap(key_pos);
     test_advance_thumb_multi_tap_gap();
-
-    test_press_resolved(key_pos);
-
-    CHECK(test_tap_code16_count == 0);
-    CHECK(test_delayed_action_count == 0);
-    CHECK(noah_runtime_debug_deferred_release_count() == 0u);
-    CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 1u);
-    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == keycode);
-
+    test_run_quick_tap(key_pos);
     key_runtime_integration_scan();
 
-    CHECK(test_delayed_action_count == 0);
-    CHECK(noah_runtime_debug_deferred_release_count() == 0u);
-
-    test_release_resolved(key_pos);
-
-    CHECK(noah_runtime_debug_deferred_release_count() == 0u);
     CHECK(noah_runtime_debug_slot_has_pending_multi_tap(key_pos));
+    CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 1u);
 
     test_flush_pending_tap_branch();
 
-    CHECK(pd_mode_local_active_snapshot() == 0);
+    CHECK(test_delayed_action_count == 3u);
+    for (uint8_t index = 0u; index < 3u; index++) {
+        CHECK(test_delayed_actions[index] == test_delayed_actions[0]);
+    }
+    CHECK(test_delayed_actions[0] != KC_NO && test_delayed_actions[0] != KC_TRNS && test_delayed_actions[0] != double_tap_action);
+    CHECK(noah_runtime_debug_deferred_release_count() == 0u);
+    CHECK(pointing_mode_local_active_snapshot() == 0);
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
+    CHECK(!noah_runtime_debug_slot_has_pending_multi_tap(key_pos));
 }
 
-static void test_pointer_pinch_exact_third_tap_defers_zoom_chord_until_release(void) {
-    test_pointer_terminal_double_tap_wraps_on_exact_third_press(PD_SLOT_5);
+static void test_pointer_pinch_third_quick_tap_types_the_key_underneath(void) {
+    test_pointer_terminal_third_quick_tap_types_the_first_tap(PD_MODE_5, MACRO_6);
 }
 
-static void test_pointer_volume_exact_third_tap_defers_mute_until_release(void) {
-    test_pointer_terminal_double_tap_wraps_on_exact_third_press(PD_SLOT_1);
+static void test_pointer_volume_third_quick_tap_types_the_key_underneath(void) {
+    test_pointer_terminal_third_quick_tap_types_the_first_tap(PD_MODE_1, KC_MUTE);
 }
 
 // Drag Window is a custom key, so find it the way its own tap tier
@@ -1672,7 +1669,7 @@ static void test_pointer_drag_window_tap_falls_through_to_the_base_layer_key(voi
 // that produced it -- those never reach QMK's auto-mouse stage.
 static void test_click_spam_combo_output_keeps_the_pointer_layer_anchored(void) {
     static const uint16_t click_spam_combo_keys[] = {
-        PD_SLOT_5,
+        PD_MODE_5,
         MS_BTN3,
     };
 
@@ -1692,7 +1689,7 @@ static void test_click_spam_combo_output_keeps_the_pointer_layer_anchored(void) 
 
 static void test_click_spam_combo_uses_authored_combo_owner(void) {
     static const uint16_t click_spam_combo_keys[] = {
-        PD_SLOT_5,
+        PD_MODE_5,
         MS_BTN3,
     };
 
@@ -1706,12 +1703,12 @@ static void test_click_spam_combo_uses_authored_combo_owner(void) {
     test_reset_state();
     layer_state = noah_layer_state_set_user(test_layer_mask(LAYER_BASE) | test_layer_mask(LAYER_POINTER));
 
-    btn1_pos = test_find_keypos_on_layer(LAYER_POINTER, PD_SLOT_5);
+    btn1_pos = test_find_keypos_on_layer(LAYER_POINTER, PD_MODE_5);
     btn2_pos = test_find_keypos_on_layer(LAYER_POINTER, MS_BTN3);
 
     CHECK(test_keypos_valid(btn1_pos));
     CHECK(test_keypos_valid(btn2_pos));
-    CHECK(test_resolve_keycode(btn1_pos) == PD_SLOT_5);
+    CHECK(test_resolve_keycode(btn1_pos) == PD_MODE_5);
     CHECK(test_resolve_keycode(btn2_pos) == MS_BTN3);
 
     combo_index = test_find_combo_index_for_exact_keys(click_spam_combo_keys, ARRAY_SIZE(click_spam_combo_keys));
@@ -1845,7 +1842,7 @@ static void test_right_nav_layer_hold_dispatches_nav_taps_immediately(void) {
     // typed. Once held past its term, Nav keys dispatch immediately.
     test_press_resolved(nav_hold_pos);
     CHECK(!test_layer_active(LAYER_NAV));
-    CHECK(!pd_mode_auto_sniping_layer_active());
+    CHECK(!pointing_mode_auto_sniping_layer_active());
 
     key_runtime_integration_advance(&fake_time, key_behavior_lookup(nav_hold_keycode).tap_hold_term - 1u);
     key_runtime_integration_scan();
@@ -1854,7 +1851,7 @@ static void test_right_nav_layer_hold_dispatches_nav_taps_immediately(void) {
     key_runtime_integration_advance(&fake_time, 1u);
     key_runtime_integration_scan();
     CHECK(test_layer_active(LAYER_NAV));
-    CHECK(pd_mode_auto_sniping_layer_active());
+    CHECK(pointing_mode_auto_sniping_layer_active());
     CHECK(!sniping_enabled);
 
     key_runtime_integration_scan();
@@ -1877,7 +1874,7 @@ static void test_right_nav_layer_hold_dispatches_nav_taps_immediately(void) {
     CHECK(test_tap_code16_count == 1);
     CHECK(test_delayed_action_count == 0);
     CHECK(test_last_delayed_action == KC_NO);
-    CHECK(!pd_mode_auto_sniping_layer_active());
+    CHECK(!pointing_mode_auto_sniping_layer_active());
     CHECK(!sniping_enabled);
     CHECK(current_cpi == charybdis_get_pointer_default_dpi());
 }
@@ -1927,8 +1924,8 @@ static void test_assert_dragscroll_overlap_quiescent(keypos_t parent_pos, keypos
     CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == KC_NO);
     CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&(keypos_t){0}));
     CHECK(!test_layer_active(LAYER_NAV));
-    CHECK(pd_mode_local_active_snapshot() == 0);
-    CHECK(pd_mode_local_locked_snapshot() == 0);
+    CHECK(pointing_mode_local_active_snapshot() == 0);
+    CHECK(pointing_mode_local_locked_snapshot() == 0);
     CHECK(reset_dragscroll_count == 1);
     CHECK(current_cpi == charybdis_get_pointer_default_dpi());
     CHECK(fake_mods == 0);
@@ -1948,8 +1945,8 @@ static void test_assert_direct_dragscroll_quiescent(keypos_t dragscroll_pos, uin
     CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == KC_NO);
     CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == KC_NO);
     CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&(keypos_t){0}));
-    CHECK(pd_mode_local_active_snapshot() == 0);
-    CHECK(pd_mode_local_locked_snapshot() == 0);
+    CHECK(pointing_mode_local_active_snapshot() == 0);
+    CHECK(pointing_mode_local_locked_snapshot() == 0);
     CHECK(reset_dragscroll_count == expected_reset_count);
     CHECK(fake_mods == 0);
     CHECK(fake_weak_mods == 0);
@@ -1962,7 +1959,7 @@ static void test_assert_direct_dragscroll_quiescent(keypos_t dragscroll_pos, uin
 }
 
 static void test_direct_dragscroll_repeated_quick_taps_stay_quiescent(uint8_t layer_num) {
-    keypos_t dragscroll_pos       = test_find_keypos_on_layer(layer_num, PD_SLOT_0);
+    keypos_t dragscroll_pos       = test_find_keypos_on_layer(layer_num, PD_MODE_0);
     uint8_t  expected_reset_count = 0u;
 
     CHECK(test_keypos_valid(dragscroll_pos));
@@ -1971,14 +1968,14 @@ static void test_direct_dragscroll_repeated_quick_taps_stay_quiescent(uint8_t la
     layer_state = noah_layer_state_set_user(test_layer_mask(LAYER_BASE) | test_layer_mask(layer_num));
 
     for (uint8_t iteration = 0; iteration < 8u; iteration++) {
-        CHECK(test_resolve_keycode(dragscroll_pos) == PD_SLOT_0);
+        CHECK(test_resolve_keycode(dragscroll_pos) == PD_MODE_0);
 
         test_press_resolved(dragscroll_pos);
-        if (pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL) {
+        if (pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL) {
             expected_reset_count++;
-            CHECK(pd_mode_local_locked_snapshot() == 0);
-            CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_SLOT_0);
-            CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_SLOT_0);
+            CHECK(pointing_mode_local_locked_snapshot() == 0);
+            CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_MODE_0);
+            CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_MODE_0);
             CHECK(auto_mouse_key_tracker == 1);
         }
 
@@ -1986,13 +1983,10 @@ static void test_direct_dragscroll_repeated_quick_taps_stay_quiescent(uint8_t la
         key_runtime_integration_scan();
         test_assert_direct_dragscroll_quiescent(dragscroll_pos, expected_reset_count);
 
-        if ((iteration % 2u) == 0u) {
-            CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1u);
-            CHECK(noah_runtime_debug_slot_pending_multi_tap_count(dragscroll_pos) == 1u);
-        } else {
-            CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0u);
-            CHECK(noah_runtime_debug_slot_pending_multi_tap_count(dragscroll_pos) == 0u);
-        }
+        // The run counts to the Double tap, the deepest tap count the row
+        // sets; past it every press is a single tap of its own (D-F33).
+        CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1u);
+        CHECK(noah_runtime_debug_slot_pending_multi_tap_count(dragscroll_pos) == (iteration == 1u ? 2u : 1u));
 
         key_runtime_integration_advance(&fake_time, 10u);
     }
@@ -2000,6 +1994,12 @@ static void test_direct_dragscroll_repeated_quick_taps_stay_quiescent(uint8_t la
     key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
     key_runtime_integration_scan();
     CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
+    // Each of the eight taps types the key underneath, once.
+    CHECK(test_delayed_action_count == 8u);
+    for (uint8_t index = 1u; index < ARRAY_SIZE(test_delayed_actions); index++) {
+        CHECK(test_delayed_actions[index] == test_delayed_actions[0]);
+    }
+    CHECK(test_delayed_actions[0] != KC_NO && test_delayed_actions[0] != KC_TRNS);
 }
 
 static void test_nav_dragscroll_repeated_quick_taps_stay_quiescent(void) {
@@ -2011,34 +2011,34 @@ static void test_pointer_dragscroll_repeated_quick_taps_stay_quiescent(void) {
 }
 
 static void test_same_locked_nav_dragscroll_press_unlocks_and_holds_until_release(void) {
-    keypos_t dragscroll_pos = test_find_keypos_on_layer(LAYER_NAV, PD_SLOT_0);
+    keypos_t dragscroll_pos = test_find_keypos_on_layer(LAYER_NAV, PD_MODE_0);
     uint16_t previous_tap_count;
 
     CHECK(test_keypos_valid(dragscroll_pos));
 
     test_reset_state();
     layer_state = noah_layer_state_set_user(test_layer_mask(LAYER_BASE) | test_layer_mask(LAYER_NAV));
-    CHECK(test_resolve_keycode(dragscroll_pos) == PD_SLOT_0);
+    CHECK(test_resolve_keycode(dragscroll_pos) == PD_MODE_0);
 
-    CHECK(pd_mode_set_lock_state(PD_MODE_DRAGSCROLL, true));
-    CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
-    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_DRAGSCROLL);
+    CHECK(pointing_mode_set_lock_state(POINTING_MODE_DRAGSCROLL, true));
+    CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
+    CHECK(pointing_mode_local_locked_snapshot() == POINTING_MODE_DRAGSCROLL);
     CHECK(reset_dragscroll_count == 0u);
 
     previous_tap_count = test_tap_code16_count;
     test_press_resolved(dragscroll_pos);
 
-    CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
-    CHECK(pd_mode_local_locked_snapshot() == 0);
-    CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_SLOT_0);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_SLOT_0);
+    CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
+    CHECK(pointing_mode_local_locked_snapshot() == 0);
+    CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_MODE_0);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_MODE_0);
     CHECK(test_tap_code16_count == previous_tap_count);
     CHECK(reset_dragscroll_count == 1u);
 
     key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
-    CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
-    CHECK(pd_mode_local_locked_snapshot() == 0);
+    CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
+    CHECK(pointing_mode_local_locked_snapshot() == 0);
     CHECK(test_tap_code16_count == previous_tap_count);
 
     test_release_resolved(dragscroll_pos);
@@ -2048,7 +2048,7 @@ static void test_same_locked_nav_dragscroll_press_unlocks_and_holds_until_releas
 }
 
 static void test_dragscroll_overlap_stays_quiescent(keypos_t parent_pos, bool requires_parent_scan) {
-    keypos_t dragscroll_pos = test_find_keypos_on_layer(LAYER_NAV, PD_SLOT_0);
+    keypos_t dragscroll_pos = test_find_keypos_on_layer(LAYER_NAV, PD_MODE_0);
     keypos_t follow_on_pos  = test_find_keypos_on_layer(LAYER_BASE, KC_C);
 
     CHECK(test_keypos_valid(parent_pos));
@@ -2067,28 +2067,28 @@ static void test_dragscroll_overlap_stays_quiescent(keypos_t parent_pos, bool re
         }
 
         CHECK(test_layer_active(LAYER_NAV));
-        CHECK(test_resolve_keycode(dragscroll_pos) == PD_SLOT_0);
+        CHECK(test_resolve_keycode(dragscroll_pos) == PD_MODE_0);
         test_press_resolved(dragscroll_pos);
-        CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
-        CHECK(pd_mode_local_locked_snapshot() == 0);
-        CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_SLOT_0);
-        CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_SLOT_0);
+        CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
+        CHECK(pointing_mode_local_locked_snapshot() == 0);
+        CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_MODE_0);
+        CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_MODE_0);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
         CHECK(auto_mouse_key_tracker == 1);
         CHECK(reset_dragscroll_count == 0);
 
         key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
         key_runtime_integration_scan();
-        CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
-        CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_SLOT_0);
-        CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_SLOT_0);
+        CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
+        CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_MODE_0);
+        CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_MODE_0);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
         CHECK(auto_mouse_key_tracker == 1);
 
         if (release_parent_first) {
             test_release_resolved(parent_pos);
             CHECK(noah_runtime_debug_slot_owner_keycode(parent_pos) == KC_NO);
-            CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
+            CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
         }
 
         test_release_resolved(dragscroll_pos);
@@ -2231,7 +2231,7 @@ static void test_gui_double_tap_hold_with_right_alt_arrow_mode_lock_stays_usable
 
         test_press_resolved(right_alt_pos);
         CHECK(noah_runtime_debug_slot_owner_keycode(right_alt_pos) == KC_RIGHT_ALT);
-        CHECK(noah_runtime_debug_slot_tap_action(right_alt_pos) == PD_SLOT_4_LOCK);
+        CHECK(noah_runtime_debug_slot_tap_action(right_alt_pos) == PD_MODE_4_LOCK);
         CHECK(noah_runtime_debug_slot_held_action_keycode(right_alt_pos) == KC_NO);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
 
@@ -2246,8 +2246,8 @@ static void test_gui_double_tap_hold_with_right_alt_arrow_mode_lock_stays_usable
         test_delayed_actions_dispatch = true;
         test_flush_pending_tap_branch();
         test_delayed_actions_dispatch = false;
-        CHECK(pd_mode_local_active_snapshot() == PD_MODE_ARROW);
-        CHECK(pd_mode_local_locked_snapshot() == PD_MODE_ARROW);
+        CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_ARROW);
+        CHECK(pointing_mode_local_locked_snapshot() == POINTING_MODE_ARROW);
         CHECK(noah_runtime_debug_slot_owner_keycode(right_alt_pos) == KC_NO);
         CHECK(noah_runtime_debug_slot_held_action_keycode(right_alt_pos) == KC_NO);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
@@ -2271,9 +2271,9 @@ static void test_gui_double_tap_hold_with_right_alt_arrow_mode_lock_stays_usable
         CHECK(key_runtime_integration_process_record(KC_C, follow_on_pos, true));
         CHECK(key_runtime_integration_process_record(KC_C, follow_on_pos, false));
 
-        CHECK(pd_mode_toggle_lock_state(PD_MODE_ARROW));
-        CHECK(pd_mode_local_active_snapshot() == 0);
-        CHECK(pd_mode_local_locked_snapshot() == 0);
+        CHECK(pointing_mode_toggle_lock_state(POINTING_MODE_ARROW));
+        CHECK(pointing_mode_local_active_snapshot() == 0);
+        CHECK(pointing_mode_local_locked_snapshot() == 0);
         CHECK(noah_runtime_debug_active_slot_count() == 0);
         CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
@@ -2311,8 +2311,8 @@ static void test_assert_gui_dragscroll_overlap_quiescent(keypos_t gui_pos, keypo
     CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&(keypos_t){0}));
     CHECK(!test_layer_active(LAYER_NAV));
     CHECK(!test_layer_locked(LAYER_NAV));
-    CHECK(pd_mode_local_active_snapshot() == 0);
-    CHECK(pd_mode_local_locked_snapshot() == 0);
+    CHECK(pointing_mode_local_active_snapshot() == 0);
+    CHECK(pointing_mode_local_locked_snapshot() == 0);
     CHECK(reset_dragscroll_count == 1);
     CHECK(current_cpi == charybdis_get_pointer_default_dpi());
     CHECK(fake_mods == 0);
@@ -2382,18 +2382,18 @@ static void test_gui_double_tap_hold_keeps_nav_arrow_taps_immediate_across_relea
 
         test_press_resolved(child_pos);
 
+        // The arrow types once, immediately: at its own release, or at the
+        // release of GUI's Alt hold or the Nav thumb if one comes first, which
+        // settles it while its modifier or layer is still on (D-F27).
+        bool child_typed = false;
         for (uint8_t release_index = 0; release_index < ARRAY_SIZE(release_order->order); release_index++) {
-            switch (release_order->order[release_index]) {
-                case TEST_RELEASE_TARGET_CHILD: {
-                    uint16_t previous_tap_count     = test_tap_code16_count;
-                    uint16_t previous_delayed_count = test_delayed_action_count;
+            uint16_t previous_tap_count     = test_tap_code16_count;
+            uint16_t previous_delayed_count = test_delayed_action_count;
 
+            switch (release_order->order[release_index]) {
+                case TEST_RELEASE_TARGET_CHILD:
                     test_release_resolved(child_pos);
-                    CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + 1));
-                    CHECK(test_last_tap_code16 == KC_LEFT);
-                    CHECK(test_delayed_action_count == previous_delayed_count);
                     break;
-                }
                 case TEST_RELEASE_TARGET_PARENT:
                     test_release_resolved(parent_pos);
                     break;
@@ -2401,6 +2401,10 @@ static void test_gui_double_tap_hold_keeps_nav_arrow_taps_immediate_across_relea
                     test_release_resolved(gui_pos);
                     break;
             }
+            CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + (child_typed ? 0u : 1u)));
+            CHECK(test_last_tap_code16 == KC_LEFT);
+            CHECK(test_delayed_action_count == previous_delayed_count);
+            child_typed = true;
         }
 
         key_runtime_integration_scan();
@@ -2432,18 +2436,18 @@ static void test_gui_double_tap_hold_keeps_nav_arrow_hold_release_immediate_acro
         test_press_resolved(child_pos);
         key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
 
+        // The arrow types once, immediately: at its own release, or at the
+        // release of GUI's Alt hold or the Nav thumb if one comes first, which
+        // settles it while its modifier or layer is still on (D-F27).
+        bool child_typed = false;
         for (uint8_t release_index = 0; release_index < ARRAY_SIZE(release_order->order); release_index++) {
-            switch (release_order->order[release_index]) {
-                case TEST_RELEASE_TARGET_CHILD: {
-                    uint16_t previous_tap_count     = test_tap_code16_count;
-                    uint16_t previous_delayed_count = test_delayed_action_count;
+            uint16_t previous_tap_count     = test_tap_code16_count;
+            uint16_t previous_delayed_count = test_delayed_action_count;
 
+            switch (release_order->order[release_index]) {
+                case TEST_RELEASE_TARGET_CHILD:
                     test_release_resolved(child_pos);
-                    CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + 1));
-                    CHECK(test_last_tap_code16 == A(KC_LEFT));
-                    CHECK(test_delayed_action_count == previous_delayed_count);
                     break;
-                }
                 case TEST_RELEASE_TARGET_PARENT:
                     test_release_resolved(parent_pos);
                     break;
@@ -2451,6 +2455,10 @@ static void test_gui_double_tap_hold_keeps_nav_arrow_hold_release_immediate_acro
                     test_release_resolved(gui_pos);
                     break;
             }
+            CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + (child_typed ? 0u : 1u)));
+            CHECK(test_last_tap_code16 == A(KC_LEFT));
+            CHECK(test_delayed_action_count == previous_delayed_count);
+            child_typed = true;
         }
 
         key_runtime_integration_scan();
@@ -2531,17 +2539,17 @@ static void test_gui_pending_double_tap_hold_keeps_nav_arrow_hold_release_immedi
         test_press_resolved(child_pos);
         test_commit_pending_gui_double_tap_alt_hold(gui_pos);
 
+        // The arrow's release hold goes out once, immediately: at its own
+        // release, or at the release of GUI's Alt hold or the Nav thumb if one
+        // comes first (D-F27).
+        bool child_typed = false;
         for (uint8_t release_index = 0; release_index < ARRAY_SIZE(release_order->order); release_index++) {
-            switch (release_order->order[release_index]) {
-                case TEST_RELEASE_TARGET_CHILD: {
-                    uint16_t previous_tap_count = test_tap_code16_count;
+            uint16_t previous_tap_count = test_tap_code16_count;
 
+            switch (release_order->order[release_index]) {
+                case TEST_RELEASE_TARGET_CHILD:
                     test_release_resolved(child_pos);
-                    CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + 1));
-                    CHECK(test_last_tap_code16 == A(KC_LEFT));
-                    CHECK(test_delayed_action_count == 0);
                     break;
-                }
                 case TEST_RELEASE_TARGET_PARENT:
                     test_release_resolved(parent_pos);
                     break;
@@ -2549,6 +2557,10 @@ static void test_gui_pending_double_tap_hold_keeps_nav_arrow_hold_release_immedi
                     test_release_resolved(gui_pos);
                     break;
             }
+            CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + (child_typed ? 0u : 1u)));
+            CHECK(test_last_tap_code16 == A(KC_LEFT));
+            CHECK(test_delayed_action_count == 0);
+            child_typed = true;
         }
 
         key_runtime_integration_scan();
@@ -2562,7 +2574,7 @@ static void test_gui_pending_double_tap_hold_keeps_nav_arrow_hold_release_immedi
 
 static void test_gui_pending_double_tap_hold_with_nav_dragscroll_keeps_runtime_quiescent(keypos_t parent_pos, uint16_t parent_keycode, bool requires_threshold_scan) {
     keypos_t gui_pos        = test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_GUI);
-    keypos_t dragscroll_pos = test_find_keypos_on_layer(LAYER_NAV, PD_SLOT_0);
+    keypos_t dragscroll_pos = test_find_keypos_on_layer(LAYER_NAV, PD_MODE_0);
     keypos_t follow_on_pos  = test_find_keypos_on_layer(LAYER_BASE, KC_C);
 
     CHECK(test_keypos_valid(gui_pos));
@@ -2578,15 +2590,15 @@ static void test_gui_pending_double_tap_hold_with_nav_dragscroll_keeps_runtime_q
 
         test_activate_gui_double_tap_alt_hold_pending(gui_pos);
         test_activate_nav_parent_hold(parent_pos, parent_keycode, requires_threshold_scan);
-        CHECK(test_resolve_keycode(dragscroll_pos) == PD_SLOT_0);
+        CHECK(test_resolve_keycode(dragscroll_pos) == PD_MODE_0);
 
         test_press_resolved(dragscroll_pos);
-        CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
-        CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_SLOT_0);
-        CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_SLOT_0);
+        CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
+        CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_MODE_0);
+        CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_MODE_0);
 
         test_commit_pending_gui_double_tap_alt_hold(gui_pos);
-        CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
+        CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
 
         for (uint8_t release_index = 0; release_index < ARRAY_SIZE(release_order->order); release_index++) {
@@ -2756,7 +2768,7 @@ static void test_gui_pending_double_tap_hold_with_right_thumb_nav_hold_keeps_arr
 
 static void test_gui_double_tap_hold_with_nav_dragscroll_keeps_runtime_quiescent(keypos_t parent_pos, uint16_t parent_keycode, bool requires_threshold_scan) {
     keypos_t gui_pos        = test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_GUI);
-    keypos_t dragscroll_pos = test_find_keypos_on_layer(LAYER_NAV, PD_SLOT_0);
+    keypos_t dragscroll_pos = test_find_keypos_on_layer(LAYER_NAV, PD_MODE_0);
     keypos_t follow_on_pos  = test_find_keypos_on_layer(LAYER_BASE, KC_C);
 
     CHECK(test_keypos_valid(gui_pos));
@@ -2772,21 +2784,21 @@ static void test_gui_double_tap_hold_with_nav_dragscroll_keeps_runtime_quiescent
 
         test_activate_gui_double_tap_alt_hold(gui_pos);
         test_activate_nav_parent_hold(parent_pos, parent_keycode, requires_threshold_scan);
-        CHECK(test_resolve_keycode(dragscroll_pos) == PD_SLOT_0);
+        CHECK(test_resolve_keycode(dragscroll_pos) == PD_MODE_0);
 
         test_press_resolved(dragscroll_pos);
-        CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
-        CHECK(pd_mode_local_locked_snapshot() == 0);
-        CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_SLOT_0);
-        CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_SLOT_0);
+        CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
+        CHECK(pointing_mode_local_locked_snapshot() == 0);
+        CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_MODE_0);
+        CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_MODE_0);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
         CHECK(reset_dragscroll_count == 0);
 
         key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
         key_runtime_integration_scan();
-        CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
-        CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_SLOT_0);
-        CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_SLOT_0);
+        CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
+        CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_MODE_0);
+        CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_MODE_0);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
 
         for (uint8_t release_index = 0; release_index < ARRAY_SIZE(release_order->order); release_index++) {
@@ -2845,7 +2857,7 @@ static void test_gui_pending_double_tap_hold_with_right_thumb_nav_hold_keeps_arr
 }
 
 static void test_nav_dragscroll_hold_keeps_arrow_taps_immediate(keypos_t parent_pos, uint16_t parent_keycode, bool requires_threshold_scan) {
-    keypos_t dragscroll_pos = test_find_keypos_on_layer(LAYER_NAV, PD_SLOT_0);
+    keypos_t dragscroll_pos = test_find_keypos_on_layer(LAYER_NAV, PD_MODE_0);
     keypos_t child_pos      = test_find_keypos_on_layer(LAYER_NAV, KC_LEFT);
     uint16_t previous_tap_count;
 
@@ -2857,9 +2869,9 @@ static void test_nav_dragscroll_hold_keeps_arrow_taps_immediate(keypos_t parent_
     test_activate_nav_parent_hold(parent_pos, parent_keycode, requires_threshold_scan);
 
     test_press_resolved(dragscroll_pos);
-    CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
-    CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_SLOT_0);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_SLOT_0);
+    CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
+    CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_MODE_0);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_MODE_0);
 
     previous_tap_count = test_tap_code16_count;
     test_press_resolved(child_pos);
@@ -2893,7 +2905,7 @@ static void test_right_thumb_dragscroll_hold_keeps_arrow_taps_immediate(void) {
 
 static void test_gui_double_tap_hold_with_nav_dragscroll_active_keeps_arrow_taps_immediate(keypos_t parent_pos, uint16_t parent_keycode, bool requires_threshold_scan) {
     keypos_t gui_pos        = test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_GUI);
-    keypos_t dragscroll_pos = test_find_keypos_on_layer(LAYER_NAV, PD_SLOT_0);
+    keypos_t dragscroll_pos = test_find_keypos_on_layer(LAYER_NAV, PD_MODE_0);
     keypos_t child_pos      = test_find_keypos_on_layer(LAYER_NAV, KC_LEFT);
     uint16_t previous_tap_count;
 
@@ -2907,9 +2919,9 @@ static void test_gui_double_tap_hold_with_nav_dragscroll_active_keeps_arrow_taps
     test_activate_nav_parent_hold(parent_pos, parent_keycode, requires_threshold_scan);
 
     test_press_resolved(dragscroll_pos);
-    CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
-    CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_SLOT_0);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_SLOT_0);
+    CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
+    CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_MODE_0);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_MODE_0);
 
     previous_tap_count = test_tap_code16_count;
     test_press_resolved(child_pos);
@@ -2953,13 +2965,13 @@ static void test_gui_pending_double_tap_hold_with_right_thumb_nav_hold_keeps_dra
 static void test_key_runtime_core_raw_nav_dragscroll_shadow_scenario(void) {
     const uint16_t nav_hold_keycode = LT(LAYER_NAV, KC_SLSH);
     keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
-    keypos_t       dragscroll_pos   = test_find_keypos_on_layer(LAYER_NAV, PD_SLOT_0);
+    keypos_t       dragscroll_pos   = test_find_keypos_on_layer(LAYER_NAV, PD_MODE_0);
 
     CHECK(test_keypos_valid(nav_hold_pos));
     CHECK(test_keypos_valid(dragscroll_pos));
 
     test_activate_nav_parent_hold(nav_hold_pos, nav_hold_keycode, true);
-    CHECK(test_resolve_keycode(dragscroll_pos) == PD_SLOT_0);
+    CHECK(test_resolve_keycode(dragscroll_pos) == PD_MODE_0);
 
     test_press_resolved(dragscroll_pos);
     key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
@@ -3044,6 +3056,44 @@ static void test_normal_press_and_matched_release_use_bounded_authored_lookups(v
     key_behavior_lookup_test_counters_snapshot(&counters);
     CHECK(counters.search_count == 0u);
     CHECK(counters.row_comparison_count == 0u);
+}
+
+// The real thumbs preview the layer every outcome lands on, on each tap tier;
+// the authored `/` LT row previews nothing, because its tap types a key.
+static void test_preview_shows_only_where_every_outcome_lands(void) {
+    keypos_t left  = test_left_thumb_pos();
+    keypos_t right = test_right_thumb_pos();
+    keypos_t slash = test_find_keypos_on_layer(LAYER_BASE, LT(LAYER_NAV, KC_SLSH));
+
+    test_reset_state();
+    test_press_resolved(left);
+    CHECK(key_feedback_preview_layer() == LAYER_SYM);
+    test_release_resolved(left);
+    test_advance_thumb_multi_tap_gap();
+    test_press_resolved(left); // second tier: tap locks Num, hold is Num
+    CHECK(key_feedback_preview_layer() == LAYER_NUM);
+    test_release_resolved(left);
+    key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
+    key_runtime_integration_scan();
+
+    test_reset_state();
+    test_press_resolved(right);
+    CHECK(key_feedback_preview_layer() == LAYER_NAV);
+    test_release_resolved(right);
+
+    test_reset_state();
+    CHECK(test_keypos_valid(slash));
+    test_press_resolved(slash);
+    CHECK(key_feedback_preview_layer() == UINT8_MAX);
+    CHECK(key_runtime_core_undecided_dual_role_key_pos(NULL));
+    // No key-local hold colour replaces it: the layer's own light is the cue.
+    CHECK(test_feedback_semantic_for_key(slash) == KEY_FEEDBACK_SEMANTIC_NONE);
+    // Past the row's 150 ms hold term.
+    key_runtime_integration_advance(&fake_time, 160); key_runtime_integration_scan();
+    CHECK(test_layer_active(LAYER_NAV));
+    CHECK(key_feedback_preview_layer() == UINT8_MAX);
+    CHECK(test_feedback_semantic_for_key(slash) == KEY_FEEDBACK_SEMANTIC_NONE);
+    test_release_resolved(slash);
 }
 
 static void test_preview_query_visits_only_active_presses(void) {
@@ -3301,26 +3351,36 @@ static void test_oneshot_layer_serves_the_next_key(void) {
     test_assert_thumb_runtime_quiescent(oneshot_pos);
 }
 
-// A plain LT() with no authored row keeps QMK's tap/hold decision, which
-// arrives as the record's tap count. Its hold goes through layer ownership, so
-// releasing it no longer turns a locked layer off; its tap still goes to QMK.
-static void test_plain_layer_tap_hold_is_owned_and_its_tap_is_qmks(void) {
+// A plain LT() with no authored row is the runtime's too (D-F27): held past
+// the dual-role time, its layer goes through layer ownership, so releasing it
+// no longer turns a locked layer off, and a tap types its tap keycode. (This
+// pinned QMK's tap/hold decision, arriving as the record's tap count, before.)
+static void test_plain_layer_tap_is_the_runtimes(void) {
     keypos_t lt_pos  = {.row = 2, .col = 5};
     keypos_t tg_pos  = {.row = 2, .col = 6};
     uint16_t keycode = LT(LAYER_NAV, KC_F);
 
     test_reset_state();
+    CHECK(key_behavior_lookup(keycode).handled);
 
-    CHECK(!key_runtime_integration_process_tap_record(keycode, lt_pos, true, 0u));
-    CHECK(test_layer_active(LAYER_NAV));
-    CHECK(!key_runtime_integration_process_tap_record(keycode, lt_pos, false, 0u));
+    CHECK(!key_runtime_integration_process_record(keycode, lt_pos, true));
+    key_runtime_integration_advance(&fake_time, TAPPING_TERM - 1u);
+    key_runtime_integration_scan();
     CHECK(!test_layer_active(LAYER_NAV));
+    key_runtime_integration_advance(&fake_time, 1u);
+    key_runtime_integration_scan();
+    CHECK(test_layer_active(LAYER_NAV));
+    CHECK(!key_runtime_integration_process_record(keycode, lt_pos, false));
+    CHECK(!test_layer_active(LAYER_NAV));
+    CHECK(test_last_tap_code16 == KC_NO);
 
     key_runtime_integration_process_record(TG(LAYER_NAV), tg_pos, true);
     key_runtime_integration_process_record(TG(LAYER_NAV), tg_pos, false);
     CHECK(test_layer_locked(LAYER_NAV));
-    CHECK(!key_runtime_integration_process_tap_record(keycode, lt_pos, true, 0u));
-    CHECK(!key_runtime_integration_process_tap_record(keycode, lt_pos, false, 0u));
+    CHECK(!key_runtime_integration_process_record(keycode, lt_pos, true));
+    key_runtime_integration_advance(&fake_time, TAPPING_TERM);
+    key_runtime_integration_scan();
+    CHECK(!key_runtime_integration_process_record(keycode, lt_pos, false));
     CHECK(test_layer_locked(LAYER_NAV));
     CHECK(test_layer_active(LAYER_NAV));
 
@@ -3328,9 +3388,8 @@ static void test_plain_layer_tap_hold_is_owned_and_its_tap_is_qmks(void) {
     key_runtime_integration_process_record(TG(LAYER_NAV), tg_pos, false);
     CHECK(!test_layer_active(LAYER_NAV));
 
-    CHECK(key_runtime_integration_process_tap_record(keycode, lt_pos, true, 1u));
-    CHECK(!test_layer_active(LAYER_NAV));
-    CHECK(key_runtime_integration_process_tap_record(keycode, lt_pos, false, 1u));
+    test_tap_key(keycode, lt_pos);
+    CHECK(test_last_tap_code16 == KC_F);
     CHECK(!test_layer_active(LAYER_NAV));
     test_assert_thumb_runtime_quiescent(lt_pos);
 }
@@ -3428,26 +3487,36 @@ static void test_pointer_layer_lock_holds_auto_mouse_until_unlocked(void) {
     CHECK(auto_mouse_key_tracker == 0);
 }
 
-// A layer key as a combo output, on the N+M combo for the duration of a test.
+// A layer key as a combo output, on an authored combo (N+M unless named) for
+// the duration of a test. Members press in order; QMK releases the output when
+// the first member comes up.
 typedef struct {
     int16_t  index;
     uint16_t original;
-    keypos_t n_pos;
-    keypos_t m_pos;
+    uint8_t  count;
+    keypos_t pos[4];
 } test_layer_combo_t;
+
+static test_layer_combo_t test_layer_combo_begin_on(const uint16_t *keys, uint8_t count, uint16_t output) {
+    test_layer_combo_t combo = {
+        .index = test_find_combo_index_for_exact_keys(keys, count),
+        .count = count,
+    };
+
+    CHECK(combo.index >= 0 && count <= ARRAY_SIZE(combo.pos));
+    for (uint8_t member = 0u; member < count; member++) {
+        combo.pos[member] = test_find_keypos_on_layer(LAYER_BASE, keys[member]);
+        CHECK(test_keypos_valid(combo.pos[member]));
+    }
+    combo.original                = key_combos[combo.index].keycode;
+    key_combos[combo.index].keycode = output;
+    return combo;
+}
 
 static test_layer_combo_t test_layer_combo_begin(uint16_t output) {
     static const uint16_t keys[] = {KC_N, KC_M};
-    test_layer_combo_t    combo  = {
-            .index = test_find_combo_index_for_exact_keys(keys, ARRAY_SIZE(keys)),
-            .n_pos = test_find_keypos_on_layer(LAYER_BASE, KC_N),
-            .m_pos = test_find_keypos_on_layer(LAYER_BASE, KC_M),
-    };
 
-    CHECK(combo.index >= 0 && test_keypos_valid(combo.n_pos) && test_keypos_valid(combo.m_pos));
-    combo.original                   = key_combos[combo.index].keycode;
-    key_combos[combo.index].keycode = output;
-    return combo;
+    return test_layer_combo_begin_on(keys, ARRAY_SIZE(keys), output);
 }
 
 static void test_layer_combo_end(const test_layer_combo_t *combo) {
@@ -3455,18 +3524,25 @@ static void test_layer_combo_end(const test_layer_combo_t *combo) {
 }
 
 static void test_layer_combo_press(const test_layer_combo_t *combo) {
-    test_observe_combo_member(combo->n_pos, true);
-    test_observe_combo_member(combo->m_pos, true);
+    for (uint8_t member = 0u; member < combo->count; member++) {
+        test_observe_combo_member(combo->pos[member], true);
+    }
     key_combos[combo->index].active = true;
     CHECK(!test_process_combo_output(key_combos[combo->index].keycode, true));
 }
 
-// QMK releases a combo's output when its first member comes up.
-static void test_layer_combo_release(const test_layer_combo_t *combo, bool n_first) {
+// first_up: the first member comes up first, otherwise the last one does.
+static void test_layer_combo_release(const test_layer_combo_t *combo, bool first_up) {
+    uint8_t lead = first_up ? 0u : (uint8_t)(combo->count - 1u);
+
     key_combos[combo->index].active = false;
-    test_observe_combo_member(n_first ? combo->n_pos : combo->m_pos, false);
+    test_observe_combo_member(combo->pos[lead], false);
     CHECK(!test_process_combo_output(key_combos[combo->index].keycode, false));
-    test_observe_combo_member(n_first ? combo->m_pos : combo->n_pos, false);
+    for (uint8_t member = 0u; member < combo->count; member++) {
+        if (member != lead) {
+            test_observe_combo_member(combo->pos[member], false);
+        }
+    }
 }
 
 // A layer hold from a combo is owned like one from a key: the layer is on
@@ -3481,7 +3557,7 @@ static void test_combo_layer_hold_is_owned(void) {
 
     test_layer_combo_press(&combo);
     CHECK(test_layer_active(LAYER_NAV));
-    CHECK(noah_runtime_debug_slot_owner_keycode(combo.m_pos) == MO(LAYER_NAV) || noah_runtime_debug_slot_owner_keycode(combo.n_pos) == MO(LAYER_NAV));
+    CHECK(noah_runtime_debug_slot_owner_keycode(combo.pos[1]) == MO(LAYER_NAV) || noah_runtime_debug_slot_owner_keycode(combo.pos[0]) == MO(LAYER_NAV));
     key_runtime_integration_advance(&fake_time, 300u);
     key_runtime_integration_scan();
     CHECK(test_layer_active(LAYER_NAV));
@@ -3513,6 +3589,188 @@ static void test_combo_layer_hold_is_owned(void) {
     test_layer_combo_end(&combo);
     CHECK(noah_runtime_debug_active_slot_count() == 0u);
     CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0u);
+}
+
+// Assert the public lighting projection, including both substages and every
+// member's key feedback. Layer activation must not add a confirmation pulse.
+static void test_assert_combo_layer_feedback_quiet(const test_layer_combo_t *combo) {
+    uint8_t underlay[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t overlay[KEY_ORIGIN_BITMAP_SIZE];
+
+    combo_feedback_bitmaps(underlay, overlay);
+    CHECK(!key_origin_bitmap_has_any(underlay));
+    CHECK(!key_origin_bitmap_has_any(overlay));
+    for (uint8_t member = 0u; member < combo->count; member++) {
+        CHECK(test_feedback_semantic_for_key(combo->pos[member]) == KEY_FEEDBACK_SEMANTIC_NONE);
+    }
+}
+
+static void test_combo_direct_layer_hold_shows_only_layer_feedback(void) {
+    test_reset_state();
+    test_layer_combo_t combo = test_layer_combo_begin(MO(LAYER_NAV));
+
+    test_layer_combo_press(&combo);
+    CHECK(test_layer_active(LAYER_NAV));
+    test_assert_combo_layer_feedback_quiet(&combo);
+    key_runtime_integration_advance(&fake_time, 300u);
+    key_runtime_integration_scan();
+    test_assert_combo_layer_feedback_quiet(&combo);
+    test_layer_combo_release(&combo, false);
+    key_runtime_integration_scan();
+    CHECK(!test_layer_active(LAYER_NAV));
+    test_assert_combo_layer_feedback_quiet(&combo);
+    CHECK(noah_runtime_debug_active_slot_count() == 0u);
+    test_layer_combo_end(&combo);
+}
+
+static void test_cross_half_combo_layer_hold_is_quiet(void) {
+    static const uint16_t original_keys[] = {KC_N, KC_M};
+    static const uint16_t cross_half_keys[] = {LT(LAYER_NAV, KC_F), KC_N, COMBO_END};
+    int16_t index = test_find_combo_index_for_exact_keys(original_keys, ARRAY_SIZE(original_keys));
+    CHECK(index >= 0);
+    const uint16_t *saved_keys = key_combos[index].keys;
+
+    test_reset_state();
+    key_combos[index].keys = cross_half_keys;
+    test_layer_combo_t combo = test_layer_combo_begin_on(cross_half_keys, 2u, MO(LAYER_NAV));
+    uint8_t footprint[KEY_ORIGIN_BITMAP_SIZE];
+    test_layer_combo_press(&combo);
+    key_origin_bitmap_clear(footprint);
+    for (uint8_t member = 0u; member < combo.count; member++) {
+        key_origin_bitmap_add_keypos(footprint, combo.pos[member]);
+    }
+    CHECK(key_origin_bitmap_side_mask(footprint) == SPLIT_SIDE_MASK_BOTH);
+    CHECK(test_layer_active(LAYER_NAV));
+    test_assert_combo_layer_feedback_quiet(&combo);
+    test_layer_combo_release(&combo, true);
+    key_runtime_integration_scan();
+    CHECK(!test_layer_active(LAYER_NAV));
+    test_assert_combo_layer_feedback_quiet(&combo);
+    test_layer_combo_end(&combo);
+    key_combos[index].keys = saved_keys;
+}
+
+static void test_combo_behavior_layer_hold_keeps_feedback_until_resolved(void) {
+    uint8_t underlay[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t overlay[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset_state();
+    test_layer_combo_t combo = test_layer_combo_begin(CUSTOM_KEY_0);
+    test_layer_combo_press(&combo);
+    CHECK(!test_layer_active(LAYER_NAV));
+    combo_feedback_bitmaps(underlay, overlay);
+    CHECK(key_origin_bitmap_has_any(underlay) || key_origin_bitmap_has_any(overlay));
+    for (uint8_t member = 0u; member < combo.count; member++) {
+        CHECK(key_origin_bitmap_has_keypos(underlay, combo.pos[member]) || key_origin_bitmap_has_keypos(overlay, combo.pos[member]));
+    }
+
+    key_runtime_integration_advance(&fake_time, 300u);
+    key_runtime_integration_scan();
+    CHECK(test_layer_active(LAYER_NAV));
+    test_assert_combo_layer_feedback_quiet(&combo);
+    test_layer_combo_release(&combo, true);
+    key_runtime_integration_scan();
+    CHECK(!test_layer_active(LAYER_NAV));
+    test_assert_combo_layer_feedback_quiet(&combo);
+    CHECK(noah_runtime_debug_active_slot_count() == 0u);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0u);
+    test_layer_combo_end(&combo);
+}
+
+// The split sync and the lighting build the combo feedback every pass. With no
+// combo output held there is nothing to place, so the build skips the walk of
+// the layer owners and returns the same empty bitmaps.
+static void test_combo_feedback_skips_owner_walk_without_held_combo(void) {
+    uint8_t underlay[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t overlay[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset_state();
+    memset(underlay, 0xff, sizeof(underlay));
+    memset(overlay, 0xff, sizeof(overlay));
+    key_feedback_test_combo_owner_walks_reset();
+    combo_feedback_bitmaps(underlay, overlay);
+    CHECK(key_feedback_test_combo_owner_walks() == 0u);
+    CHECK(!key_origin_bitmap_has_any(underlay) && !key_origin_bitmap_has_any(overlay));
+
+    test_layer_combo_t combo = test_layer_combo_begin(CUSTOM_KEY_0);
+    test_layer_combo_press(&combo);
+    combo_feedback_bitmaps(underlay, overlay);
+    CHECK(key_feedback_test_combo_owner_walks() == 1u);
+    for (uint8_t member = 0u; member < combo.count; member++) {
+        CHECK(key_origin_bitmap_has_keypos(underlay, combo.pos[member]) || key_origin_bitmap_has_keypos(overlay, combo.pos[member]));
+    }
+
+    test_layer_combo_release(&combo, true);
+    key_runtime_integration_scan();
+    key_feedback_test_combo_owner_walks_reset();
+    combo_feedback_bitmaps(underlay, overlay);
+    CHECK(key_feedback_test_combo_owner_walks() == 0u);
+    CHECK(!key_origin_bitmap_has_any(underlay) && !key_origin_bitmap_has_any(overlay));
+    test_layer_combo_end(&combo);
+}
+
+// These footprints overlap at M but have different output owners. Filtering
+// a layer combo must happen before unioning the footprints, never by clearing
+// its keys from the combined bitmap. Another layer owner also survives release.
+static void test_combo_layer_hold_preserves_overlapping_combo_feedback_and_owners(void) {
+    static const uint16_t other_keys[] = {KC_M, KC_COMM, KC_DOT};
+    const uint16_t other_outputs[] = {KC_LGUI, LM(LAYER_NAV, MOD_LSFT)};
+    uint8_t underlay[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t overlay[KEY_ORIGIN_BITMAP_SIZE];
+
+    for (uint8_t output = 0u; output < ARRAY_SIZE(other_outputs); output++) {
+        test_reset_state();
+        test_layer_combo_t layer_combo = test_layer_combo_begin(MO(LAYER_NAV));
+        test_layer_combo_t other_combo = test_layer_combo_begin_on(other_keys, ARRAY_SIZE(other_keys), other_outputs[output]);
+
+        // Capture both physical completions on the base layer before either
+        // output changes the layer, as QMK's buffered combo processing can do.
+        for (uint8_t member = 0u; member < layer_combo.count; member++) {
+            test_observe_combo_member(layer_combo.pos[member], true);
+        }
+        for (uint8_t member = 1u; member < other_combo.count; member++) {
+            test_observe_combo_member(other_combo.pos[member], true);
+        }
+        key_combos[layer_combo.index].active = true;
+        CHECK(!test_process_combo_output(MO(LAYER_NAV), true));
+        key_combos[other_combo.index].active = true;
+        CHECK(!test_process_combo_output(other_outputs[output], true));
+        key_runtime_integration_advance(&fake_time, 300u);
+        key_runtime_integration_scan();
+        CHECK(test_layer_active(LAYER_NAV));
+        combo_feedback_bitmaps(underlay, overlay);
+        CHECK(!key_origin_bitmap_has_any(underlay));
+        if (output == 0u) {
+            CHECK(!key_origin_bitmap_has_keypos(overlay, layer_combo.pos[0]));
+            for (uint8_t member = 0u; member < other_combo.count; member++) {
+                CHECK(key_origin_bitmap_has_keypos(overlay, other_combo.pos[member]));
+            }
+        } else {
+            CHECK(!key_origin_bitmap_has_any(overlay));
+        }
+
+        // N releases only the layer combo; M remains physically held for the
+        // other combo. Its output and lighting stay owned until Dot comes up.
+        key_combos[layer_combo.index].active = false;
+        test_observe_combo_member(layer_combo.pos[0], false);
+        CHECK(!test_process_combo_output(MO(LAYER_NAV), false));
+        key_runtime_integration_scan();
+        CHECK(test_layer_active(LAYER_NAV) == (output != 0u));
+        combo_feedback_bitmaps(underlay, overlay);
+        if (output == 0u) {
+            CHECK(key_origin_bitmap_has_keypos(overlay, other_combo.pos[0]));
+        } else {
+            CHECK(!key_origin_bitmap_has_any(underlay) && !key_origin_bitmap_has_any(overlay));
+        }
+        test_layer_combo_release(&other_combo, false);
+        key_runtime_integration_scan();
+        CHECK(!test_layer_active(LAYER_NAV));
+        CHECK(noah_runtime_debug_active_slot_count() == 0u);
+        combo_feedback_bitmaps(underlay, overlay);
+        CHECK(!key_origin_bitmap_has_any(underlay) && !key_origin_bitmap_has_any(overlay));
+        test_layer_combo_end(&other_combo);
+        test_layer_combo_end(&layer_combo);
+    }
 }
 
 // OSL() from a combo arms its one-shot for the next key; TT() from a combo
@@ -3698,7 +3956,7 @@ static void test_tap_toggle_taps_lock_and_holds_are_momentary(void) {
     test_assert_thumb_runtime_quiescent(key_pos);
 }
 
-// A behaviour's MO() hold of the Pointing (auto-mouse) layer reaches QMK only
+// A behaviour's MO() hold of the pointer layer reaches QMK only
 // as a layer change. The runtime counts it on QMK's auto-mouse tracker while it
 // is held, so QMK's timeout and non-mouse-key reset cannot turn the layer off
 // under the held key.
@@ -3723,8 +3981,13 @@ int main(void) {
     test_oneshot_layer_long_press_and_second_taps_follow_qmk();
     test_layer_mod_holds_its_layer_and_modifiers();
     test_combo_layer_hold_is_owned();
+    test_combo_direct_layer_hold_shows_only_layer_feedback();
+    test_cross_half_combo_layer_hold_is_quiet();
+    test_combo_behavior_layer_hold_keeps_feedback_until_resolved();
+    test_combo_feedback_skips_owner_walk_without_held_combo();
+    test_combo_layer_hold_preserves_overlapping_combo_feedback_and_owners();
     test_combo_oneshot_and_tap_toggle_are_owned();
-    test_plain_layer_tap_hold_is_owned_and_its_tap_is_qmks();
+    test_plain_layer_tap_is_the_runtimes();
     test_to_pointer_then_to_base_leaves_the_pointer_layer_free();
     test_pointer_layer_key_runs_as_itself_then_closes_the_layer();
     test_pointer_layer_lock_holds_auto_mouse_until_unlocked();
@@ -3733,6 +3996,7 @@ int main(void) {
     test_normal_press_and_matched_release_use_bounded_authored_lookups();
     test_active_scan_visit_baseline_is_measured();
     test_preview_query_visits_only_active_presses();
+    test_preview_shows_only_where_every_outcome_lands();
     test_preview_query_preserves_slot_order_across_bitmap_words();
     test_feedback_dirty_tracks_visible_deadline_change_once();
     test_feedback_dirty_tracks_pending_tap_window();
@@ -3751,8 +4015,8 @@ int main(void) {
     test_right_thumb_quadruple_tap_dispatches_previous_track();
     test_pointer_pinch_double_tap_queues_zoom_chord();
     test_pointer_pinch_double_tap_salvos_queue_zoom_chord_cleanly();
-    test_pointer_pinch_exact_third_tap_defers_zoom_chord_until_release();
-    test_pointer_volume_exact_third_tap_defers_mute_until_release();
+    test_pointer_pinch_third_quick_tap_types_the_key_underneath();
+    test_pointer_volume_third_quick_tap_types_the_key_underneath();
     test_pointer_drag_window_tap_falls_through_to_the_base_layer_key();
     test_click_spam_combo_output_keeps_the_pointer_layer_anchored();
     test_click_spam_combo_uses_authored_combo_owner();
@@ -3787,4 +4051,8 @@ int main(void) {
 
     puts("real_profile_thumb_layer_lock integration tests passed");
     return 0;
+}
+
+uint16_t keymap_key_to_keycode(uint8_t layer, keypos_t key) {
+    return keycode_at_keymap_location(layer, key.row, key.col);
 }

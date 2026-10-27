@@ -5,18 +5,15 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "../schema/profile_blob_v1.h"
 
 #include "profile_storage_layout.h"
 #include "../schema/profile_versions.h"
 
 enum {
-    NOAH_PROFILE_STORE_FORMAT_VERSION_LEGACY  = 1u,
-    NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL = 2u,
-    // Schema-2 PD owners and their host/split writers select format 3.
-    NOAH_PROFILE_STORE_FORMAT_VERSION_PD      = 3u,
     NOAH_PROFILE_STORE_FORMAT_VERSION         = NOAH_PROFILE_LOGICAL_STORE_VERSION,
     NOAH_PROFILE_STORE_SCHEMA_MAJOR           = NOAH_PROFILE_SCHEMA_MAJOR,
-    NOAH_PROFILE_STORE_SCHEMA_MINOR           = 0u,
+    NOAH_PROFILE_STORE_SCHEMA_MINOR           = NOAH_PROFILE_SCHEMA_MINOR,
     NOAH_PROFILE_STORE_IO_CHUNK_MAX           = 32u,
     NOAH_PROFILE_STORE_FLAG_OVERRIDE          = 1u << 0,
     NOAH_PROFILE_STORE_ALLOWED_FLAGS          = NOAH_PROFILE_STORE_FLAG_OVERRIDE,
@@ -35,7 +32,7 @@ typedef enum {
     NOAH_PROFILE_STORE_OK = 0u,
     NOAH_PROFILE_STORE_INVALID_ARGUMENT,
     NOAH_PROFILE_STORE_IO_ERROR,
-    NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE,
+    NOAH_PROFILE_STORE_NO_SAVED_PROFILE,
     NOAH_PROFILE_STORE_INVALID_HEADER,
     NOAH_PROFILE_STORE_INCOMPATIBLE_SCHEMA,
     NOAH_PROFILE_STORE_INCOMPATIBLE_COMPILED_DEFAULT,
@@ -55,6 +52,9 @@ typedef enum {
     // The final marker write may have become durable but could not be
     // confirmed. The caller must reconcile persistent status before retrying.
     NOAH_PROFILE_STORE_DURABILITY_UNKNOWN,
+    // The slot holds a record in an earlier store format or a retired format-6 test layout.
+    // It is never read or converted (D-F28).
+    NOAH_PROFILE_STORE_EARLIER_FORMAT,
 } noah_profile_store_result_t;
 
 typedef enum {
@@ -83,12 +83,25 @@ typedef enum {
     NOAH_PROFILE_STORE_BOOT_DONE,
 } noah_profile_store_boot_phase_t;
 
-typedef bool (*noah_profile_store_read_fn)(void *context, uint16_t address, uint8_t *target, uint16_t length);
-typedef bool (*noah_profile_store_write_fn)(void *context, uint16_t address, const uint8_t *source, uint16_t length);
+typedef bool (*noah_profile_store_read_fn)(void *context, noah_profile_storage_address_t address, uint8_t *target, uint32_t length);
+typedef bool (*noah_profile_store_write_fn)(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint32_t length);
+// Flash only (D-F29). Prepares [address, address + length) of one slot for
+// writing: before it returns, the slot's first sector (its header) is erased,
+// so the slot stops being a boot candidate at once; the rest may be erased
+// later, but before any write reaches it. Writes outside the range fail.
+typedef bool (*noah_profile_store_reset_fn)(void *context, noah_profile_storage_address_t address, uint32_t length);
+// Flash only: makes every write so far durable before it returns.
+typedef bool (*noah_profile_store_sync_fn)(void *context);
 
+// Storage the store reads and writes. Without reset the store invalidates a
+// slot by writing its marker byte, and without sync every write is durable
+// when it returns: byte-writable media, as the host test fakes are. The
+// firmware's flash backend provides both (profile_flash_store.h).
 typedef struct {
     noah_profile_store_read_fn  read;
     noah_profile_store_write_fn write;
+    noah_profile_store_reset_fn reset;
+    noah_profile_store_sync_fn  sync;
     void                       *context;
 } noah_profile_store_io_t;
 
@@ -119,25 +132,21 @@ typedef struct {
     uint8_t             format_version;
     uint8_t             schema_major;
     uint8_t             schema_minor;
-    // Derived from the checksummed canonical payload during slot validation;
-    // it is not an independent field in the fixed 32-byte header.
+    // The header's first byte, its own field in the fixed 36-byte header.
+    // Slot validation refuses a payload whose domains differ from it.
     uint8_t  domain_mask;
     uint8_t  flags;
     uint8_t  origin_half;
-    uint16_t payload_length;
+    uint32_t payload_length;
     uint32_t generation;
     uint32_t payload_crc32;
     uint32_t payload_digest;
     uint32_t compiled_default_digest;
     uint32_t action_abi_digest;
-    uint32_t via_generation;
-    uint32_t via_digest;
 } noah_profile_store_record_t;
 
 typedef struct {
-    // Zero keeps legacy format 1 for old callers. Logical transactions select
-    // format 2 (schema 1) or format 3 (schema 2), both with a nonzero VIA
-    // generation and digest. Format 3 is not yet enabled by runtime writers.
+    // Format 6 is required.
     uint8_t format_version;
     uint8_t schema_major;
     uint8_t schema_minor;
@@ -145,21 +154,19 @@ typedef struct {
     uint8_t  domain_mask;
     uint8_t  flags;
     uint8_t  origin_half;
-    uint16_t payload_length;
+    uint32_t payload_length;
     uint32_t generation;
     uint32_t payload_crc32;
     uint32_t payload_digest;
     uint32_t compiled_default_digest;
     uint32_t action_abi_digest;
-    uint32_t via_generation;
-    uint32_t via_digest;
 } noah_profile_store_candidate_t;
 
 typedef struct {
     noah_profile_store_io_t            io;
     noah_profile_store_reuse_guard_t   reuse_guard;
     noah_profile_store_compatibility_t compatibility;
-    noah_profile_store_record_t        committed;
+    noah_profile_store_record_t        saved;
     union {
         noah_profile_store_candidate_t candidate;
         struct {
@@ -168,17 +175,14 @@ typedef struct {
         };
     };
     noah_profile_slot_t               candidate_slot;
-    uint16_t                          candidate_written;
+    uint32_t                          candidate_written;
     uint32_t                          candidate_crc32_state;
     uint32_t                          candidate_digest_state;
     noah_profile_store_commit_phase_t commit_phase;
-    uint16_t                          commit_offset;
+    uint32_t                          commit_offset;
     uint32_t                          commit_crc32_state;
     uint32_t                          commit_digest_state;
-    uint8_t                           commit_domain_count;
-    uint8_t                           commit_domain_index;
-    uint8_t                           commit_prior_domain;
-    uint8_t                           commit_domain_mask;
+    noah_profile_envelope_t           commit_envelope;
     uint8_t                           commit_record_offset;
     bool                              boot_scanned;
     bool                              conflict;
@@ -187,21 +191,113 @@ typedef struct {
     bool                              prepared_durable;
     bool                              auto_commit_prepared;
     bool                              reuse_active;
-    uint8_t                           scratch[NOAH_PROFILE_STORE_IO_CHUNK_MAX];
+    // A slot holds an earlier store format and nothing was adopted: the
+    // keyboard runs its compiled defaults, and status says so.
+    bool                              earlier_format;
+    uint8_t                           scratch[NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE];
     noah_profile_store_result_t       boot_slot_a_result;
     noah_profile_store_result_t       boot_slot_b_result;
     noah_profile_store_result_t       boot_result;
     noah_profile_store_boot_phase_t   boot_phase;
-    uint16_t                          boot_payload_start;
-    uint16_t                          boot_offset;
+    noah_profile_storage_address_t    boot_payload_start;
+    uint32_t                          boot_offset;
     uint32_t                          boot_crc32_state;
     uint32_t                          boot_digest_state;
-    uint8_t                           boot_domain_count;
-    uint8_t                           boot_domain_index;
-    uint8_t                           boot_prior_domain;
-    uint8_t                           boot_expected_domain_mask;
+    noah_profile_envelope_t           boot_envelope;
 } noah_profile_store_t;
 
+// Where a slot starts in the slot region: its header first, then its payload.
+// The one home of slot addressing; the flash backend places these addresses
+// on flash pages (D-F29). False for no slot. Always inlined: as a call, its
+// out-parameter would hold the caller's address on its stack, and the
+// owner's scan entry, which adopts a saved record, is on every reviewed
+// storage path's frame.
+static inline __attribute__((always_inline)) bool noah_profile_store_slot_start(noah_profile_slot_t slot, noah_profile_storage_address_t *address) {
+    if (!address || (slot != NOAH_PROFILE_SLOT_A && slot != NOAH_PROFILE_SLOT_B)) {
+        return false;
+    }
+    *address = slot == NOAH_PROFILE_SLOT_A ? NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR : NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR;
+    return true;
+}
+
+static inline __attribute__((always_inline)) bool noah_profile_store_slot_payload_start(noah_profile_slot_t slot, noah_profile_storage_address_t *address) {
+    if (!noah_profile_store_slot_start(slot, address)) {
+        return false;
+    }
+    *address += NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE;
+    return true;
+}
+
+// The store answers its own state questions; callers ask these rather than
+// read its fields. Static inline: the compiler may keep one out of line as a small leaf of
+// its own; the reviewed stack paths are measured as built.
+
+// The record boot selection chose or the last commit made, or NULL while
+// the keyboard holds no saved profile.
+static inline const noah_profile_store_record_t *noah_profile_store_saved(const noah_profile_store_t *store) {
+    return store && store->saved.slot != NOAH_PROFILE_SLOT_NONE ? &store->saved : NULL;
+}
+
+// A prepare is admitted and has not finished or been aborted: the candidate
+// slot is out of boot selection and no other prepare can begin.
+static inline bool noah_profile_store_prepare_active(const noah_profile_store_t *store) {
+    return store && store->prepare_active;
+}
+
+// No prepare is open and no destructive-write reservation is outstanding
+// (an end callback that failed leaves one): boot selection may run and a
+// saved record may be adopted or published.
+static inline bool noah_profile_store_settled(const noah_profile_store_t *store) {
+    return store && !store->prepare_active && !store->reuse_active;
+}
+
+// The admitted candidate's identity while a prepare is active, else NULL.
+static inline const noah_profile_store_candidate_t *noah_profile_store_candidate(const noah_profile_store_t *store) {
+    return noah_profile_store_prepare_active(store) ? &store->candidate : NULL;
+}
+
+// Where the candidate slot's payload starts, for reading back what was
+// staged in it.
+static inline bool noah_profile_store_candidate_payload_start(const noah_profile_store_t *store, noah_profile_storage_address_t *address) {
+    return store && noah_profile_store_slot_payload_start(store->candidate_slot, address);
+}
+
+// Every declared payload byte of the active prepare is written and no commit
+// phase is running: the staged payload can be validated or read back.
+static inline bool noah_profile_store_fully_staged(const noah_profile_store_t *store) {
+    return noah_profile_store_prepare_active(store) && store->commit_phase == NOAH_PROFILE_STORE_COMMIT_IDLE && store->candidate_written == store->candidate.payload_length;
+}
+
+// The prepared marker is durable and nothing has begun since: the prepare
+// waits for its decision, and may still commit or abort.
+static inline bool noah_profile_store_durably_prepared(const noah_profile_store_t *store) {
+    return noah_profile_store_prepare_active(store) && store->prepared_durable && store->commit_phase == NOAH_PROFILE_STORE_COMMIT_IDLE;
+}
+
+// A final marker write could not be confirmed: only a boot scan can say
+// whether it landed, and until then no prepare begins.
+static inline bool noah_profile_store_reconciliation_required(const noah_profile_store_t *store) {
+    return store && store->reconciliation_required;
+}
+
+// A slot holds an earlier store format and boot selection adopted nothing,
+// so the keyboard runs its compiled defaults (D-F28).
+static inline bool noah_profile_store_earlier_format(const noah_profile_store_t *store) {
+    return store && store->earlier_format;
+}
+
+// What boot selection found in a slot: OK for a record it could adopt, or
+// why it refused the slot. Meaningful once selection is done.
+static inline noah_profile_store_result_t noah_profile_store_boot_slot_result(const noah_profile_store_t *store, noah_profile_slot_t slot) {
+    if (!store || store->boot_phase != NOAH_PROFILE_STORE_BOOT_DONE || (slot != NOAH_PROFILE_SLOT_A && slot != NOAH_PROFILE_SLOT_B)) {
+        return NOAH_PROFILE_STORE_INVALID_ARGUMENT;
+    }
+    return slot == NOAH_PROFILE_SLOT_A ? store->boot_slot_a_result : store->boot_slot_b_result;
+}
+
+// Reads any span of the slot region, in reads of at most
+// NOAH_PROFILE_STORE_IO_CHUNK_MAX bytes.
+bool                        noah_profile_store_read_span(const noah_profile_store_t *store, noah_profile_storage_address_t address, uint8_t *target, uint32_t length);
 void                        noah_profile_store_init(noah_profile_store_t *store, noah_profile_store_io_t io, noah_profile_store_compatibility_t compatibility);
 bool                        noah_profile_store_set_reuse_guard(noah_profile_store_t *store, const noah_profile_store_reuse_guard_t *guard);
 noah_profile_store_result_t noah_profile_store_boot_select(noah_profile_store_t *store, noah_profile_store_record_t *selected);
@@ -211,9 +307,8 @@ noah_profile_store_result_t noah_profile_store_boot_select(noah_profile_store_t 
 // result is idempotent.
 noah_profile_store_result_t noah_profile_store_boot_select_begin(noah_profile_store_t *store);
 noah_profile_store_result_t noah_profile_store_boot_select_step(noah_profile_store_t *store, uint8_t byte_budget, noah_profile_store_record_t *selected);
-noah_profile_store_result_t noah_profile_store_validate_slot(noah_profile_store_t *store, noah_profile_slot_t slot, bool require_commit, noah_profile_store_record_t *record);
 noah_profile_store_result_t noah_profile_store_prepare_begin(noah_profile_store_t *store, const noah_profile_store_candidate_t *candidate);
-noah_profile_store_result_t noah_profile_store_prepare_write(noah_profile_store_t *store, uint16_t offset, const uint8_t *bytes, uint16_t length);
+noah_profile_store_result_t noah_profile_store_prepare_write(noah_profile_store_t *store, uint32_t offset, const uint8_t *bytes, uint32_t length);
 // Validates the staged payload and persists transaction intent without making
 // it active authority. A prepared slot is ignored by ordinary boot selection
 // and may still be aborted safely.
@@ -222,15 +317,17 @@ noah_profile_store_result_t noah_profile_store_prepare_durable_step(noah_profile
 // Replaces the durable prepared marker with the logical decision marker. Once
 // this begins, failure is durability-unknown and must be resolved by boot scan.
 noah_profile_store_result_t noah_profile_store_prepared_commit_begin(noah_profile_store_t *store);
-noah_profile_store_result_t noah_profile_store_prepared_commit_step(noah_profile_store_t *store, uint8_t byte_budget, noah_profile_store_record_t *committed);
+noah_profile_store_result_t noah_profile_store_prepared_commit_step(noah_profile_store_t *store, uint8_t byte_budget, noah_profile_store_record_t *saved);
 // Starts and advances a marker-last commit without unbounded scan work. Begin
-// performs no EEPROM I/O. This compatibility API runs both durable prepare and
-// decision phases. Each step performs exactly one read or write of at most
-// byte_budget bytes; byte_budget must be 1..20. The final OK step returns the
-// committed record and releases the destructive-backing reservation.
+// performs no storage I/O. This compatibility API runs both durable prepare and
+// decision phases. Each step performs one read or write of at most
+// byte_budget bytes, except the payload readback, which reads up to a flash
+// page (NOAH_PROFILE_STORAGE_PAGE_SIZE) a step in reads of at most
+// byte_budget; byte_budget must be 1..20. The final OK step returns the
+// saved record and releases the destructive-backing reservation.
 noah_profile_store_result_t noah_profile_store_prepare_commit_begin(noah_profile_store_t *store);
-noah_profile_store_result_t noah_profile_store_prepare_commit_step(noah_profile_store_t *store, uint8_t byte_budget, noah_profile_store_record_t *committed);
+noah_profile_store_result_t noah_profile_store_prepare_commit_step(noah_profile_store_t *store, uint8_t byte_budget, noah_profile_store_record_t *saved);
 // Cold/test convenience wrapper around begin + bounded steps.
-noah_profile_store_result_t noah_profile_store_prepare_commit(noah_profile_store_t *store, noah_profile_store_record_t *committed);
+noah_profile_store_result_t noah_profile_store_prepare_commit(noah_profile_store_t *store, noah_profile_store_record_t *saved);
 noah_profile_store_result_t noah_profile_store_prepare_abort(noah_profile_store_t *store);
 bool                        noah_profile_store_next_generation(const noah_profile_store_t *store, uint32_t *generation);

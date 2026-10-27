@@ -40,12 +40,16 @@ import sys
 
 
 REQUIRED_SYMBOLS = (
-    "via_macro_slots",
+    "profile_macro_slots",
     "macro_slot_active_ir",
 )
 BOOKKEEPING_SYMBOLS = (
     "macro_slot_active_metadata",
     "macro_slot_active_stale",
+    "macro_slot_active_cursor",
+    "macro_slot_active_provider",
+    "macro_slot_active_slot",
+    "profile_macro_found",
 )
 LAYOUT_SYMBOLS = (
     "__bss_base__",
@@ -243,22 +247,20 @@ def main(argv=None):
     parser.add_argument("--max-static-bss", type=int, default=None)
     parser.add_argument(
         "--max-data-bss",
-        "--max-static-ram",
         dest="max_data_bss",
         type=int,
         # Regression tripwire above the largest supported variant (the
         # live-owner build at 51,820 B on 2026-09-04), not a hardware limit.
         default=57344,
-        help="policy ceiling for .data + .bss; --max-static-ram is a compatibility alias",
+        help="policy ceiling for .data + .bss",
     )
     parser.add_argument(
         "--min-sram0-free",
-        "--min-heap",
         dest="min_sram0_free",
         type=int,
         # Safety floor for the newlib arena; see the module docstring.
         default=4096,
-        help="minimum SRAM0-3 linker-managed free/core-memory span at boot; --min-heap is a compatibility alias",
+        help="minimum SRAM0-3 linker-managed free/core-memory span at boot",
     )
     args = parser.parse_args(argv)
 

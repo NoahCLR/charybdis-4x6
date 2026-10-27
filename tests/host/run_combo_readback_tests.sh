@@ -1,5 +1,6 @@
 #!/bin/sh
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
@@ -9,7 +10,7 @@ build_and_run() {
     name="$1"
     shift
     cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
-        -DVIA_ENABLE -DCOMBO_ENABLE -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+        -DRAW_ENABLE -DCOMBO_ENABLE -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         -DQMK_KEYBOARD_H='"qmk_stub.h"' "$@" \
         -I"$ROOT" -I"$ROOT/users/noah" -I"$ROOT/tests/host/include" \
         -include "$ROOT/tests/host/include/noah_compile_config.h" \
@@ -18,7 +19,8 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         -o "$BUILD_DIR/test_$name"
     if [ "$name" = normal ] || [ "$name" = sanitized ]; then
-        "$BUILD_DIR/test_$name" "$ROOT/tests/fixtures/combo_readback_eight_v2.fixture"
+        # NOAH_WRITE_COMBO_FIXTURE=1 regenerates the fixture after a deliberate format change.
+        "$BUILD_DIR/test_$name" "$ROOT/tests/fixtures/combo_readback_v3.fixture" ${NOAH_WRITE_COMBO_FIXTURE:+--write-fixture}
     else
         "$BUILD_DIR/test_$name"
     fi

@@ -30,7 +30,7 @@ typedef struct {
 typedef struct {
     key_runtime_release_tap_contract_t  tap;
     key_runtime_release_hold_contract_t hold;
-    pd_mode_mask_t                      quick_tap_pd_mode_lock;
+    pointing_mode_mask_t                quick_tap_pointing_mode_lock;
     bool                                suppress_tap_on_layer_interrupt;
     bool                                buffered_base_tap_dispatches_tap;
     bool                                quick_release_of_immediate_hold_dispatches_tap;
@@ -42,7 +42,7 @@ typedef enum {
     KEY_RUNTIME_RELEASE_DECISION_OUTCOME_NONE = 0,
     KEY_RUNTIME_RELEASE_DECISION_OUTCOME_TAP,
     KEY_RUNTIME_RELEASE_DECISION_OUTCOME_ACTION,
-    KEY_RUNTIME_RELEASE_DECISION_OUTCOME_PD_MODE_LOCK_TAP,
+    KEY_RUNTIME_RELEASE_DECISION_OUTCOME_POINTING_MODE_LOCK_TAP,
 } key_runtime_release_decision_outcome_t;
 
 typedef enum {
@@ -54,7 +54,7 @@ typedef enum {
 typedef struct {
     bool                                   buffered_base_tap_dispatches_tap;
     bool                                   quick_tap_dispatches_tap;
-    bool                                   pd_mode_lock_tap_allowed;
+    bool                                   pointing_mode_lock_tap_allowed;
     bool                                   quick_immediate_hold_dispatches_tap;
     bool                                   checks_fallback_hold_suppression;
     key_runtime_release_hold_action_mode_t hold_action_mode;
@@ -72,15 +72,15 @@ typedef struct {
     bool                                  repeat_active;
     bool                                  other_press_interrupted;
     bool                                  momentary_layer_tap_interrupted;
-    bool                                  pd_mode_was_locked_on_press;
-    bool                                  pd_mode_lock_consumed_on_press;
+    bool                                  pointing_mode_was_locked_on_press;
+    bool                                  pointing_mode_lock_consumed_on_press;
 } key_runtime_release_query_t;
 
 typedef struct {
     bool                                   release_owned_state;
     key_runtime_release_decision_outcome_t outcome;
     uint16_t                               action;
-    pd_mode_mask_t                         pd_mode_lock_tap;
+    pointing_mode_mask_t                   pointing_mode_lock_tap;
 } key_runtime_release_decision_t;
 
 static inline key_runtime_release_tap_contract_t key_runtime_release_tap_contract_for_interaction(const key_runtime_slot_interaction_t *interaction) {
@@ -126,7 +126,7 @@ static inline key_runtime_release_contract_t key_runtime_release_contract_for_in
     return (key_runtime_release_contract_t){
         .tap                                            = key_runtime_release_tap_contract_for_interaction(interaction),
         .hold                                           = key_runtime_release_hold_contract_for_interaction(interaction),
-        .quick_tap_pd_mode_lock                         = interaction->contract.quick_tap_pd_mode_lock,
+        .quick_tap_pointing_mode_lock                   = interaction->contract.quick_tap_pointing_mode_lock,
         .suppress_tap_on_layer_interrupt                = interaction->contract.suppress_tap_on_layer_interrupt,
         .buffered_base_tap_dispatches_tap               = interaction->contract.buffered_base_tap_dispatches_tap,
         .quick_release_of_immediate_hold_dispatches_tap = interaction->contract.quick_release_of_immediate_hold_dispatches_tap,
@@ -143,20 +143,20 @@ static inline bool key_runtime_release_hold_contract_has_any_action(key_runtime_
     return contract.primary_action != KC_NO || contract.long_action != KC_NO;
 }
 
-static inline bool key_runtime_release_hold_contract_long_ready(key_runtime_release_hold_contract_t contract, uint16_t elapsed, uint16_t longer_hold_term) {
-    return contract.long_action != KC_NO && elapsed >= longer_hold_term;
+static inline bool key_runtime_release_hold_contract_long_ready(key_runtime_release_hold_contract_t contract, uint16_t elapsed, uint16_t long_hold_term) {
+    return contract.long_action != KC_NO && elapsed >= long_hold_term;
 }
 
-static inline uint16_t key_runtime_release_hold_contract_select_action(key_runtime_release_hold_contract_t contract, uint16_t elapsed, uint16_t longer_hold_term) {
-    if (key_runtime_release_hold_contract_long_ready(contract, elapsed, longer_hold_term)) {
+static inline uint16_t key_runtime_release_hold_contract_select_action(key_runtime_release_hold_contract_t contract, uint16_t elapsed, uint16_t long_hold_term) {
+    if (key_runtime_release_hold_contract_long_ready(contract, elapsed, long_hold_term)) {
         return contract.long_action;
     }
 
     return contract.primary_action;
 }
 
-static inline uint16_t key_runtime_release_contract_select_hold_action(key_runtime_release_contract_t contract, uint16_t elapsed, uint16_t longer_hold_term) {
-    return key_runtime_release_hold_contract_select_action(contract.hold, elapsed, longer_hold_term);
+static inline uint16_t key_runtime_release_contract_select_hold_action(key_runtime_release_contract_t contract, uint16_t elapsed, uint16_t long_hold_term) {
+    return key_runtime_release_hold_contract_select_action(contract.hold, elapsed, long_hold_term);
 }
 
 static inline key_runtime_release_semantics_t key_runtime_release_semantics_for_phase(key_runtime_slot_phase_t phase) {
@@ -165,7 +165,7 @@ static inline key_runtime_release_semantics_t key_runtime_release_semantics_for_
             return (key_runtime_release_semantics_t){
                 .buffered_base_tap_dispatches_tap = true,
                 .quick_tap_dispatches_tap         = true,
-                .pd_mode_lock_tap_allowed         = true,
+                .pointing_mode_lock_tap_allowed   = true,
                 .checks_fallback_hold_suppression = true,
                 .hold_action_mode                 = KEY_RUNTIME_RELEASE_HOLD_ACTION_MODE_PRIMARY_ONLY,
                 .long_hold_dispatches_action      = true,
@@ -173,7 +173,7 @@ static inline key_runtime_release_semantics_t key_runtime_release_semantics_for_
             };
         case KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW:
             return (key_runtime_release_semantics_t){
-                .pd_mode_lock_tap_allowed            = true,
+                .pointing_mode_lock_tap_allowed      = true,
                 .quick_immediate_hold_dispatches_tap = true,
                 .long_hold_dispatches_action         = true,
             };
@@ -211,18 +211,18 @@ static inline bool key_runtime_release_query_quick_immediate_hold(const key_runt
     return query && query->interaction && contract.quick_release_of_immediate_hold_dispatches_tap && !query->other_press_interrupted && key_runtime_release_query_quick_tap(query);
 }
 
-static inline pd_mode_mask_t key_runtime_release_query_lock_tap_mode(const key_runtime_release_query_t *query) {
+static inline pointing_mode_mask_t key_runtime_release_query_lock_tap_mode(const key_runtime_release_query_t *query) {
     key_runtime_release_contract_t contract = key_runtime_release_contract_for_interaction(query ? query->interaction : NULL);
 
     if (!(query && query->interaction)) {
         return 0;
     }
 
-    if (!contract.quick_tap_pd_mode_lock) {
+    if (!contract.quick_tap_pointing_mode_lock) {
         return 0;
     }
 
-    if (query->pd_mode_lock_consumed_on_press || !query->pd_mode_was_locked_on_press || query->elapsed >= query->interaction->binding.tap_hold_term) {
+    if (query->pointing_mode_lock_consumed_on_press || !query->pointing_mode_was_locked_on_press || query->elapsed >= query->interaction->binding.tap_hold_term) {
         return 0;
     }
 
@@ -230,12 +230,12 @@ static inline pd_mode_mask_t key_runtime_release_query_lock_tap_mode(const key_r
         return 0;
     }
 
-    return contract.quick_tap_pd_mode_lock;
+    return contract.quick_tap_pointing_mode_lock;
 }
 
 static inline bool key_runtime_release_query_long_hold_ready(const key_runtime_release_query_t *query) {
     key_runtime_release_contract_t contract = key_runtime_release_contract_for_interaction(query ? query->interaction : NULL);
-    return query && query->interaction && key_runtime_release_hold_contract_long_ready(contract.hold, query->elapsed, query->interaction->binding.longer_hold_term);
+    return query && query->interaction && key_runtime_release_hold_contract_long_ready(contract.hold, query->elapsed, query->interaction->binding.long_hold_term);
 }
 
 static inline key_runtime_release_decision_t key_runtime_release_decision_base(const key_runtime_release_query_t *query) {
@@ -257,10 +257,10 @@ static inline key_runtime_release_decision_t key_runtime_release_decision_action
     return decision;
 }
 
-static inline key_runtime_release_decision_t key_runtime_release_decision_pd_mode_lock_tap(const key_runtime_release_query_t *query, pd_mode_mask_t mode) {
+static inline key_runtime_release_decision_t key_runtime_release_decision_pointing_mode_lock_tap(const key_runtime_release_query_t *query, pointing_mode_mask_t mode) {
     key_runtime_release_decision_t decision = key_runtime_release_decision_base(query);
-    decision.outcome                        = KEY_RUNTIME_RELEASE_DECISION_OUTCOME_PD_MODE_LOCK_TAP;
-    decision.pd_mode_lock_tap               = mode;
+    decision.outcome                        = KEY_RUNTIME_RELEASE_DECISION_OUTCOME_POINTING_MODE_LOCK_TAP;
+    decision.pointing_mode_lock_tap         = mode;
     return decision;
 }
 
@@ -269,7 +269,7 @@ static inline key_runtime_release_decision_t key_runtime_release_decide(const ke
     bool                           quick_tap;
     bool                           buffered_base_tap;
     bool                           quick_immediate_hold;
-    pd_mode_mask_t                 lock_tap_mode;
+    pointing_mode_mask_t           lock_tap_mode;
 
     if (!(query && query->interaction)) {
         return (key_runtime_release_decision_t){0};
@@ -281,7 +281,7 @@ static inline key_runtime_release_decision_t key_runtime_release_decide(const ke
     quick_immediate_hold = key_runtime_release_query_quick_immediate_hold(query);
     lock_tap_mode        = key_runtime_release_query_lock_tap_mode(query);
 
-    if (query->pd_mode_lock_consumed_on_press) {
+    if (query->pointing_mode_lock_consumed_on_press) {
         return key_runtime_release_decision_base(query);
     }
 
@@ -290,15 +290,15 @@ static inline key_runtime_release_decision_t key_runtime_release_decide(const ke
     }
 
     if (query->semantics.quick_tap_dispatches_tap && quick_tap) {
-        if (query->semantics.pd_mode_lock_tap_allowed && lock_tap_mode) {
-            return key_runtime_release_decision_pd_mode_lock_tap(query, lock_tap_mode);
+        if (query->semantics.pointing_mode_lock_tap_allowed && lock_tap_mode) {
+            return key_runtime_release_decision_pointing_mode_lock_tap(query, lock_tap_mode);
         }
 
         return key_runtime_release_decision_tap(query);
     }
 
-    if (query->semantics.pd_mode_lock_tap_allowed && lock_tap_mode) {
-        return key_runtime_release_decision_pd_mode_lock_tap(query, lock_tap_mode);
+    if (query->semantics.pointing_mode_lock_tap_allowed && lock_tap_mode) {
+        return key_runtime_release_decision_pointing_mode_lock_tap(query, lock_tap_mode);
     }
 
     if (query->semantics.quick_immediate_hold_dispatches_tap && quick_immediate_hold) {
@@ -312,12 +312,12 @@ static inline key_runtime_release_decision_t key_runtime_release_decide(const ke
     switch (query->semantics.hold_action_mode) {
         case KEY_RUNTIME_RELEASE_HOLD_ACTION_MODE_PRIMARY_ONLY:
             if (key_runtime_release_hold_contract_has_primary_action(contract.hold)) {
-                return key_runtime_release_decision_action(query, key_runtime_release_contract_select_hold_action(contract, query->elapsed, query->interaction->binding.longer_hold_term));
+                return key_runtime_release_decision_action(query, key_runtime_release_contract_select_hold_action(contract, query->elapsed, query->interaction->binding.long_hold_term));
             }
             break;
         case KEY_RUNTIME_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION:
             if (key_runtime_release_hold_contract_has_any_action(contract.hold)) {
-                return key_runtime_release_decision_action(query, key_runtime_release_contract_select_hold_action(contract, query->elapsed, query->interaction->binding.longer_hold_term));
+                return key_runtime_release_decision_action(query, key_runtime_release_contract_select_hold_action(contract, query->elapsed, query->interaction->binding.long_hold_term));
             }
             break;
         case KEY_RUNTIME_RELEASE_HOLD_ACTION_MODE_NONE:

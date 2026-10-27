@@ -18,10 +18,12 @@ void                                        key_runtime_core_observe_repeat_star
 bool                                        key_runtime_core_release_owned_state_by_key(keypos_t key_pos);
 bool                                        key_runtime_core_finalize_non_handled_release(keypos_t key_pos);
 uint16_t                                    key_runtime_core_held_action_keycode_at(keypos_t key_pos);
+// Whether the key at key_pos holds a layer or real modifiers now.
+bool                                        key_runtime_core_holds_layer_or_mods_at(keypos_t key_pos);
 bool                                        key_runtime_core_repeat_active_at(keypos_t key_pos);
 bool                                        key_runtime_core_flashing_feedback_visible_at(keypos_t key_pos);
 bool                                        key_runtime_core_flashing_feedback_sequence_at(keypos_t key_pos, uint32_t *out_sequence);
 const key_runtime_core_shadow_projection_t *key_runtime_core_shadow_projection(void);
 void                                        key_runtime_core_layer_lock_set(uint8_t layer, bool active);
 void                                        key_runtime_core_layer_oneshot_set(uint8_t layer, bool active);
-void                                        key_runtime_core_observe_pd_mode_lock_state(pd_mode_mask_t mode, bool active);
+void                                        key_runtime_core_observe_pointing_mode_lock_state(pointing_mode_mask_t mode, bool active);

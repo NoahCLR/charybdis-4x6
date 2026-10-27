@@ -7,11 +7,11 @@
 #if defined(NOAH_RUNTIME_TRACE_ENABLE)
 
 enum {
-    KEY_RUNTIME_CORE_POINTER_FLAG_ANCHORED       = 1u << 0,
-    KEY_RUNTIME_CORE_POINTER_FLAG_PD_MODE_ANCHOR = 1u << 1,
-    KEY_RUNTIME_CORE_POINTER_FLAG_PREFERS_TYPING = 1u << 2,
-    KEY_RUNTIME_CORE_POINTER_FLAG_TOGGLE         = 1u << 3,
-    KEY_RUNTIME_CORE_POINTER_FLAG_SNIPING        = 1u << 4,
+    KEY_RUNTIME_CORE_POINTER_FLAG_ANCHORED             = 1u << 0,
+    KEY_RUNTIME_CORE_POINTER_FLAG_POINTING_MODE_ANCHOR = 1u << 1,
+    KEY_RUNTIME_CORE_POINTER_FLAG_PREFERS_TYPING       = 1u << 2,
+    KEY_RUNTIME_CORE_POINTER_FLAG_TOGGLE               = 1u << 3,
+    KEY_RUNTIME_CORE_POINTER_FLAG_SNIPING              = 1u << 4,
 };
 
 static uint16_t key_runtime_core_trace_pack_keypos(keypos_t key_pos) {
@@ -75,8 +75,8 @@ void key_runtime_core_trace_record_projection_snapshot(const projection_snapshot
     if (snapshot->pointer_anchor_active) {
         pointer_flags |= KEY_RUNTIME_CORE_POINTER_FLAG_ANCHORED;
     }
-    if (snapshot->pointer_pd_mode_anchor_active) {
-        pointer_flags |= KEY_RUNTIME_CORE_POINTER_FLAG_PD_MODE_ANCHOR;
+    if (snapshot->pointer_pointing_mode_anchor_active) {
+        pointer_flags |= KEY_RUNTIME_CORE_POINTER_FLAG_POINTING_MODE_ANCHOR;
     }
     if (snapshot->pointer_prefers_typing_layer) {
         pointer_flags |= KEY_RUNTIME_CORE_POINTER_FLAG_PREFERS_TYPING;
@@ -92,8 +92,8 @@ void key_runtime_core_trace_record_projection_snapshot(const projection_snapshot
     noah_runtime_trace_emit(NOAH_TRACE_KEY_RUNTIME_CORE, NOAH_TRACE_KEY_RUNTIME_CORE_EVENT_OUTPUT_PROJECTION_LAYER_LOCKS, (uint16_t)(snapshot->locked_layer_mask & 0xFFFFu), (uint16_t)((snapshot->locked_layer_mask >> 16) & 0xFFFFu));
     noah_runtime_trace_emit(NOAH_TRACE_KEY_RUNTIME_CORE, NOAH_TRACE_KEY_RUNTIME_CORE_EVENT_OUTPUT_PROJECTION_MOD_STATE, (uint16_t)(((uint16_t)snapshot->keyboard_mod_state.real) | ((uint16_t)snapshot->keyboard_mod_state.weak << 8)), (uint16_t)(((uint16_t)snapshot->keyboard_mod_state.oneshot) | ((uint16_t)snapshot->keyboard_mod_state.oneshot_locked << 8)));
     noah_runtime_trace_emit(NOAH_TRACE_KEY_RUNTIME_CORE, NOAH_TRACE_KEY_RUNTIME_CORE_EVENT_OUTPUT_PROJECTION_MOD_OWNERSHIP, snapshot->keyboard_managed_mod_mask, snapshot->keyboard_physical_mod_mask);
-    noah_runtime_trace_emit(NOAH_TRACE_KEY_RUNTIME_CORE, NOAH_TRACE_KEY_RUNTIME_CORE_EVENT_OUTPUT_PROJECTION_PD_MODE_LOCAL, snapshot->pd_mode_local_active, snapshot->pd_mode_local_locked);
-    noah_runtime_trace_emit(NOAH_TRACE_KEY_RUNTIME_CORE, NOAH_TRACE_KEY_RUNTIME_CORE_EVENT_OUTPUT_PROJECTION_PD_MODE_DISPLAY, snapshot->pd_mode_display_active, snapshot->pd_mode_display_locked);
+    noah_runtime_trace_emit(NOAH_TRACE_KEY_RUNTIME_CORE, NOAH_TRACE_KEY_RUNTIME_CORE_EVENT_OUTPUT_PROJECTION_POINTING_MODE_LOCAL, snapshot->pointing_mode_local_active, snapshot->pointing_mode_local_locked);
+    noah_runtime_trace_emit(NOAH_TRACE_KEY_RUNTIME_CORE, NOAH_TRACE_KEY_RUNTIME_CORE_EVENT_OUTPUT_PROJECTION_POINTING_MODE_DISPLAY, snapshot->pointing_mode_display_active, snapshot->pointing_mode_display_locked);
     noah_runtime_trace_emit(NOAH_TRACE_KEY_RUNTIME_CORE, NOAH_TRACE_KEY_RUNTIME_CORE_EVENT_OUTPUT_PROJECTION_POINTER_LAYER, pointer_flags, (uint16_t)(((uint16_t)(uint8_t)snapshot->pointer_key_tracker << 8) | snapshot->pointer_layer));
     noah_runtime_trace_emit(NOAH_TRACE_KEY_RUNTIME_CORE, NOAH_TRACE_KEY_RUNTIME_CORE_EVENT_OUTPUT_PROJECTION_RUNTIME_COUNTS, (uint16_t)(((uint16_t)snapshot->active_slot_count) | ((uint16_t)snapshot->pending_multi_tap_slot_count << 8)), (uint16_t)(((uint16_t)snapshot->deferred_release_count) | ((uint16_t)snapshot->core_press_token_count << 8)));
     noah_runtime_trace_emit(NOAH_TRACE_KEY_RUNTIME_CORE, NOAH_TRACE_KEY_RUNTIME_CORE_EVENT_OUTPUT_PROJECTION_CORE_COUNTS, (uint16_t)(((uint16_t)snapshot->core_tap_series_count) | ((uint16_t)snapshot->core_lease_count << 8)), (uint16_t)(((uint16_t)snapshot->core_persistent_intent_count) | ((uint16_t)snapshot->core_pending_release_count << 8)));

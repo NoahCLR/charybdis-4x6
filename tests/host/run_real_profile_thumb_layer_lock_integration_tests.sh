@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 
@@ -19,13 +20,13 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DNOAH_HOST_TESTS \
     -DKEY_BEHAVIOR_LOOKUP_TEST_INSTRUMENTATION \
     -DKEY_RUNTIME_HOT_PATH_TEST_INSTRUMENTATION \
+    -DKEY_FEEDBACK_TEST_INSTRUMENTATION \
     -DSPLIT_RUNTIME_SYNC_DIRTY_TEST_INSTRUMENTATION \
     -DCONSOLE_ENABLE \
     -DCOMBO_ENABLE \
     -DNOAH_RUNTIME_TRACE_ENABLE \
     -DNOAH_RUNTIME_TRACE_CAPACITY=8191u \
     -DPOINTING_DEVICE_ENABLE \
-    -DNOAH_PD_PROFILE_ENABLE \
     -DRGB_MATRIX_ENABLE \
     -DRGB_MATRIX_WS2812 \
     -DSPLIT_TRANSACTION_IDS_USER \
@@ -56,6 +57,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/runtime/preflight.c" \
     "$ROOT/users/noah/lib/key/runtime/press.c" \
     "$ROOT/users/noah/lib/key/runtime/process.c" \
+    "$ROOT/users/noah/lib/macro/macro_input_guard.c" \
+    "$ROOT/users/noah/lib/key/behavior/participation.c" \
     "$ROOT/users/noah/lib/key/runtime/release.c" \
     "$ROOT/users/noah/lib/key/runtime/deferred_release.c" \
     "$ROOT/users/noah/lib/key/runtime/scan.c" \
@@ -73,12 +76,12 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/runtime/planning/scan_planner.c" \
     "$ROOT/users/noah/lib/key/runtime/planning/tap_series_flush.c" \
     "$ROOT/users/noah/lib/compat/qmk_combo_origin.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_snapshot.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_registry.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_lifecycle.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_snapshot.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_registry.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_lifecycle.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_runtime.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_state.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_key_runtime_bridge.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_state.c" \
     "$ROOT/users/noah/lib/pointing/policy/pointer_layer_policy.c" \
     "$ROOT/users/noah/lib/state/ownership/layer_ownership.c" \
     "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_policy.c" \

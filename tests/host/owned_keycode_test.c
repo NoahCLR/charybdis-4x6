@@ -584,7 +584,9 @@ static void test_legacy_modded_register_matches_lease_report_order(void) {
     CHECK(unregister_code_seq[0] < unregister_mods_seq[0]);
 }
 
-static void test_basic_saturation_unwinds_the_mods_it_already_registered(void) {
+// A usage the ledger cannot take any more refuses the whole lease before its
+// modifiers go down: no report is sent for a lease that holds nothing.
+static void test_basic_saturation_refuses_before_any_modifier_is_sent(void) {
     owned_keycode_lease_t          lease = {0};
     owned_keycode_debug_snapshot_t snapshot;
 
@@ -593,14 +595,15 @@ static void test_basic_saturation_unwinds_the_mods_it_already_registered(void) {
     for (uint16_t i = 0; i < UINT8_MAX; i++) {
         CHECK(owned_keycode_register(KC_C));
     }
+    register_code_count = 0;
+    call_sequence       = 0;
 
     CHECK(!owned_keycode_acquire(S(KC_C), &lease));
     CHECK(!lease.active);
-    CHECK(register_mods_count == 1);
-    CHECK(unregister_mods_count == 1);
-    CHECK(unregister_mods_calls[0] == MOD_BIT(KC_LEFT_SHIFT));
+    CHECK(register_mods_count == 0 && unregister_mods_count == 0);
+    CHECK(register_code_count == 0 && unregister_code_count == 0 && call_sequence == 0);
     owned_keycode_debug_snapshot(KC_C, &snapshot);
-    CHECK(snapshot.managed_count == UINT8_MAX);
+    CHECK(snapshot.managed_count == UINT8_MAX && snapshot.saturation_count == 1);
 }
 
 static void test_system_usage_shares_two_managed_owners(void) {
@@ -664,6 +667,31 @@ static void test_literal_tap_never_releases_another_owners_usage(void) {
     CHECK(owned_keycode_release(&hold));
 }
 
+// A pointing mode's click: a free button gets one balanced click; a button a
+// physical key holds gets no new edge and stays down until that key lets go.
+static void test_click_never_releases_a_physically_held_button(void) {
+    keyrecord_t                    press   = test_record(true);
+    keyrecord_t                    release = test_record(false);
+    owned_keycode_debug_snapshot_t snapshot;
+
+    test_reset_stubs();
+    owned_keycode_tap_literal(MS_BTN4);
+    CHECK(register_code_count == 1 && register_code_calls[0] == MS_BTN4 && unregister_code_count == 1 && tap_code16_count == 0);
+    CHECK(pointer_action_call_count == 2);
+
+    test_reset_stubs();
+    owned_keycode_track_physical_event(MS_BTN3, &press);
+    owned_keycode_tap_literal(MS_BTN3);
+    owned_keycode_tap_literal(MS_BTN3);
+    CHECK(register_code_count == 0 && unregister_code_count == 0 && tap_code16_count == 0);
+    owned_keycode_debug_snapshot(MS_BTN3, &snapshot);
+    CHECK(snapshot.physical_count == 1 && snapshot.managed_count == 0);
+    CHECK(!owned_keycode_should_suppress_default(MS_BTN3, &release));
+    owned_keycode_track_physical_event(MS_BTN3, &release);
+    owned_keycode_debug_snapshot(MS_BTN3, &snapshot);
+    CHECK(snapshot.physical_count == 0 && snapshot.underflow_count == 0);
+}
+
 static void test_literal_tap_keeps_qmk_for_keycodes_the_ledger_cannot_hold(void) {
     test_reset_stubs();
     owned_keycode_tap_literal(QK_BOOT);
@@ -671,7 +699,177 @@ static void test_literal_tap_keeps_qmk_for_keycodes_the_ledger_cannot_hold(void)
     CHECK(register_code_count == 0 && unregister_code_count == 0);
 }
 
+static void test_modded_modifier_keeps_both_components(void) {
+    const struct { uint16_t code; uint8_t mods; } cases[] = {
+        {S(KC_LEFT_CTRL), MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_CTRL)},
+        {RSFT(KC_LEFT_CTRL), MOD_BIT(KC_RIGHT_SHIFT) | MOD_BIT(KC_LEFT_CTRL)},
+        {C(KC_RIGHT_CTRL), MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_CTRL)},
+        {C(KC_LEFT_CTRL), MOD_BIT(KC_LEFT_CTRL)},
+    };
+    for (uint8_t i = 0; i < ARRAY_SIZE(cases); i++) {
+        owned_keycode_lease_t lease = {0};
+        test_reset_stubs();
+        CHECK(owned_keycode_acquire(cases[i].code, &lease));
+        CHECK(lease.mods == cases[i].mods);
+        CHECK(!lease.has_basic && register_code_count == 0);
+        CHECK(register_mods_count == 1 && register_mods_calls[0] == cases[i].mods);
+        CHECK(owned_keycode_release(&lease));
+        CHECK(unregister_mods_count == 1 && unregister_mods_calls[0] == cases[i].mods);
+    }
+}
+
+// Left Ctrl and Right Alt with K is a chord no keycode can name, as a custom
+// key's shortcut may hold (D-F26). It goes down as one lease, modifiers first,
+// and comes back up in reverse.
+static void test_chord_lease_holds_mixed_side_modifiers_and_a_key(void) {
+    owned_keycode_chord_lease_t lease = {0};
+
+    test_reset_stubs();
+
+    CHECK(owned_keycode_acquire_chord(MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT), (const uint8_t[OWNED_KEYCODE_CHORD_KEYS]){KC_K}, &lease));
+    CHECK(lease.active && lease.keys[0] == KC_K && lease.keys[1] == KC_NO && lease.mods == (MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT)));
+    CHECK(register_mods_count == 1 && register_mods_calls[0] == (MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT)));
+    CHECK(register_code_count == 1 && register_code_calls[0] == KC_K);
+    CHECK(register_mods_seq[0] < register_code_seq[0]);
+    CHECK(wait_call_count == 0);
+
+    CHECK(owned_keycode_release_chord(&lease));
+    CHECK(!lease.active);
+    CHECK(unregister_code_count == 1 && unregister_code_calls[0] == KC_K);
+    CHECK(unregister_mods_count == 1 && unregister_mods_calls[0] == (MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT)));
+    CHECK(unregister_code_seq[0] < unregister_mods_seq[0]);
+}
+
+// Six keys go down in order after the modifiers, all held together, and come
+// up last first, then the modifiers: a media key, a system key and mouse keys
+// among them, each a report usage of its own.
+static void test_chord_lease_holds_six_keys_in_order_and_releases_in_reverse(void) {
+    static const uint8_t        keys[OWNED_KEYCODE_CHORD_KEYS] = {KC_A, KC_LEFT, KC_MEDIA_PLAY_PAUSE, KC_SYSTEM_SLEEP, MS_WHLU, MS_UP};
+    owned_keycode_chord_lease_t lease                          = {0};
+
+    test_reset_stubs();
+    CHECK(owned_keycode_acquire_chord(MOD_BIT(KC_LEFT_SHIFT), keys, &lease));
+    CHECK(register_mods_count == 1 && register_code_count == OWNED_KEYCODE_CHORD_KEYS);
+    for (uint8_t key = 0; key < OWNED_KEYCODE_CHORD_KEYS; key++) {
+        CHECK(register_code_calls[key] == keys[key] && lease.keys[key] == keys[key]);
+        CHECK(register_code_seq[key] == key + 1u);
+    }
+    CHECK(unregister_code_count == 0 && owned_keycode_managed_usage_count() == OWNED_KEYCODE_CHORD_KEYS);
+
+    CHECK(owned_keycode_release_chord(&lease));
+    CHECK(unregister_code_count == OWNED_KEYCODE_CHORD_KEYS && unregister_mods_count == 1);
+    for (uint8_t key = 0; key < OWNED_KEYCODE_CHORD_KEYS; key++) {
+        CHECK(unregister_code_calls[key] == keys[OWNED_KEYCODE_CHORD_KEYS - 1u - key]);
+    }
+    CHECK(unregister_code_seq[OWNED_KEYCODE_CHORD_KEYS - 1u] < unregister_mods_seq[0]);
+    CHECK(owned_keycode_managed_usage_count() == 0);
+    // A second release changes nothing.
+    CHECK(owned_keycode_release_chord(&lease) && unregister_code_count == OWNED_KEYCODE_CHORD_KEYS);
+}
+
+// Modifiers alone and keys alone are both chords; a fresh modifier ahead of the
+// first mouse button gets the button's settle window once, as a modded click
+// does, and a key held by another owner gets no new edge.
+static void test_chord_lease_takes_modifiers_alone_keys_alone_and_clicks(void) {
+    owned_keycode_chord_lease_t lease = {0};
+    owned_keycode_lease_t       other = {0};
+
+    test_reset_stubs();
+    CHECK(owned_keycode_acquire_chord(0xffu, (const uint8_t[OWNED_KEYCODE_CHORD_KEYS]){0}, &lease));
+    CHECK(register_code_count == 0 && register_mods_calls[0] == 0xffu);
+    CHECK(owned_keycode_release_chord(&lease));
+    CHECK(unregister_mods_count == 1 && unregister_mods_calls[0] == 0xffu);
+
+    test_reset_stubs();
+    CHECK(owned_keycode_acquire_chord(0u, (const uint8_t[OWNED_KEYCODE_CHORD_KEYS]){KC_EXSEL, KC_AUDIO_VOL_UP}, &lease));
+    CHECK(register_mods_count == 0 && register_code_count == 2 && register_code_calls[1] == KC_AUDIO_VOL_UP);
+    CHECK(owned_keycode_release_chord(&lease));
+    CHECK(unregister_mods_count == 0 && unregister_code_calls[0] == KC_AUDIO_VOL_UP);
+
+    test_reset_stubs();
+    CHECK(owned_keycode_acquire_chord(MOD_BIT(KC_RIGHT_GUI), (const uint8_t[OWNED_KEYCODE_CHORD_KEYS]){KC_A, MS_BTN1, MS_BTN2}, &lease));
+    CHECK(register_mods_seq[0] < register_code_seq[0]);
+    CHECK(wait_call_count == 1 && wait_calls[0] == OWNED_KEYCODE_MOD_TO_MOUSE_SETTLE_MS);
+    CHECK(owned_keycode_release_chord(&lease));
+
+    test_reset_stubs();
+    CHECK(owned_keycode_acquire(KC_S, &other));
+    CHECK(owned_keycode_acquire_chord(0u, (const uint8_t[OWNED_KEYCODE_CHORD_KEYS]){KC_A, KC_S}, &lease));
+    CHECK(register_code_count == 2 && register_code_calls[1] == KC_A);
+    CHECK(owned_keycode_release_chord(&lease));
+    CHECK(unregister_code_count == 1 && unregister_code_calls[0] == KC_A && other.active);
+    CHECK(owned_keycode_release(&other));
+}
+
+// Nothing, a modifier key among the keys, a code that is no report usage or a
+// key named twice is refused with nothing held; keys after the first KC_NO are
+// not the chord's.
+static void test_chord_lease_refuses_what_is_not_a_shortcut(void) {
+    static const uint8_t        refused[] = {KC_LEFT_CTRL, KC_RIGHT_GUI, 0x01u, KC_A};
+    owned_keycode_chord_lease_t lease     = {0};
+
+    test_reset_stubs();
+    CHECK(!owned_keycode_acquire_chord(0u, (const uint8_t[OWNED_KEYCODE_CHORD_KEYS]){0}, &lease) && !lease.active);
+    CHECK(!owned_keycode_acquire_chord(0u, (const uint8_t[OWNED_KEYCODE_CHORD_KEYS]){KC_NO, KC_A}, &lease) && !lease.active);
+    for (uint8_t i = 0; i < ARRAY_SIZE(refused); i++) {
+        CHECK(!owned_keycode_acquire_chord(MOD_BIT(KC_LEFT_SHIFT), (const uint8_t[OWNED_KEYCODE_CHORD_KEYS]){KC_A, refused[i]}, &lease) && !lease.active);
+    }
+    CHECK(register_mods_count == 0 && register_code_count == 0);
+    CHECK(owned_keycode_acquire_chord(0u, (const uint8_t[OWNED_KEYCODE_CHORD_KEYS]){KC_A, KC_NO, KC_B}, &lease));
+    CHECK(register_code_count == 1 && lease.keys[2] == KC_NO);
+    CHECK(!owned_keycode_acquire_chord(0u, (const uint8_t[OWNED_KEYCODE_CHORD_KEYS]){KC_A}, &lease));
+    CHECK(owned_keycode_release_chord(&lease));
+}
+
+// A chord the ledger cannot take all of, a key or a modifier, is refused before
+// anything goes down: no modifier, no earlier key, no report, no settle wait.
+static void test_chord_lease_the_ledger_cannot_take_sends_nothing(void) {
+    owned_keycode_chord_lease_t    lease = {0};
+    owned_keycode_debug_snapshot_t snapshot;
+
+    test_reset_stubs();
+    for (unsigned i = 0; i < UINT8_MAX; i++) {
+        CHECK(owned_keycode_register(KC_D));
+    }
+    register_code_count       = 0;
+    pointer_action_call_count = 0;
+    call_sequence             = 0;
+    CHECK(!owned_keycode_acquire_chord(MOD_BIT(KC_LEFT_CTRL), (const uint8_t[OWNED_KEYCODE_CHORD_KEYS]){KC_A, MS_BTN1, KC_D}, &lease) && !lease.active);
+    CHECK(!owned_keycode_tap_chord(MOD_BIT(KC_LEFT_CTRL), (const uint8_t[OWNED_KEYCODE_CHORD_KEYS]){KC_A, KC_D}));
+    CHECK(register_mods_count == 0 && unregister_mods_count == 0 && register_code_count == 0 && unregister_code_count == 0);
+    CHECK(call_sequence == 0 && wait_call_count == 0 && pointer_action_call_count == 0);
+    owned_keycode_debug_snapshot(KC_A, &snapshot);
+    CHECK(snapshot.managed_count == 0 && snapshot.saturation_count == 2 && owned_keycode_managed_usage_count() == 1u);
+
+    test_reset_stubs();
+    can_register_mods = false;
+    CHECK(!owned_keycode_acquire_chord(MOD_BIT(KC_LEFT_CTRL), (const uint8_t[OWNED_KEYCODE_CHORD_KEYS]){KC_A}, &lease) && !lease.active);
+    CHECK(register_mods_count == 0 && register_code_count == 0 && call_sequence == 0);
+}
+
+// A tap holds the chord for one tap delay and lets go of what it took only:
+// a modifier another owner holds stays down. Caps Lock gets its longer delay.
+static void test_chord_tap_releases_only_what_it_took(void) {
+    owned_keycode_lease_t other = {0};
+
+    test_reset_stubs();
+    CHECK(owned_keycode_acquire(KC_LEFT_CTRL, &other));
+    CHECK(owned_keycode_tap_chord(MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_SHIFT), (const uint8_t[OWNED_KEYCODE_CHORD_KEYS]){KC_J, KC_MEDIA_NEXT_TRACK}));
+    CHECK(register_code_count == 2 && register_code_calls[0] == KC_J && register_code_calls[1] == KC_MEDIA_NEXT_TRACK);
+    CHECK(unregister_code_count == 2 && unregister_code_calls[0] == KC_MEDIA_NEXT_TRACK && unregister_code_calls[1] == KC_J);
+    CHECK(wait_call_count == 1 && wait_calls[0] == TAP_CODE_DELAY);
+    CHECK(register_code_seq[1] < unregister_code_seq[0]);
+    CHECK(other.active);
+    CHECK(owned_keycode_release(&other));
+    CHECK(!owned_keycode_tap_chord(0u, (const uint8_t[OWNED_KEYCODE_CHORD_KEYS]){0}));
+
+    test_reset_stubs();
+    CHECK(owned_keycode_tap_chord(0u, (const uint8_t[OWNED_KEYCODE_CHORD_KEYS]){KC_A, KC_CAPS_LOCK}));
+    CHECK(wait_call_count == 1 && wait_calls[0] == TAP_HOLD_CAPS_DELAY);
+}
+
 int main(void) {
+    test_modded_modifier_keeps_both_components();
     test_plain_key_registers_and_unregisters_directly();
     test_plain_modifier_uses_mod_ownership();
     test_modded_key_registers_mods_and_basic_key();
@@ -698,10 +896,17 @@ int main(void) {
     test_modded_non_mouse_usage_never_settles();
     test_bare_mouse_button_never_settles();
     test_legacy_modded_register_matches_lease_report_order();
-    test_basic_saturation_unwinds_the_mods_it_already_registered();
+    test_basic_saturation_refuses_before_any_modifier_is_sent();
     test_system_usage_shares_two_managed_owners();
     test_literal_tap_never_releases_another_owners_usage();
+    test_click_never_releases_a_physically_held_button();
     test_literal_tap_keeps_qmk_for_keycodes_the_ledger_cannot_hold();
+    test_chord_lease_holds_mixed_side_modifiers_and_a_key();
+    test_chord_lease_holds_six_keys_in_order_and_releases_in_reverse();
+    test_chord_lease_takes_modifiers_alone_keys_alone_and_clicks();
+    test_chord_lease_refuses_what_is_not_a_shortcut();
+    test_chord_lease_the_ledger_cannot_take_sends_nothing();
+    test_chord_tap_releases_only_what_it_took();
 
     puts("owned_keycode host tests passed");
     return 0;

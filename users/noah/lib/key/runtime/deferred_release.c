@@ -22,7 +22,7 @@ static bool key_runtime_deferred_release_effect_is_tap_commit_feedback_for_key(c
     return effect && effect->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE && effect->data.feedback_pulse.kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED && key_runtime_deferred_release_keypos_equal(effect->data.feedback_pulse.key_pos, key_pos);
 }
 
-void key_runtime_deferred_release_defer_dispatch_actions_until_release(keypos_t key_pos, key_runtime_transition_plan_t *plan) {
+void key_runtime_deferred_release_defer_dispatch_actions_until_release(keypos_t key_pos, key_runtime_core_effect_plan_t *plan) {
     keyboard_mod_state_t mods;
     uint8_t              write_index = 0u;
 

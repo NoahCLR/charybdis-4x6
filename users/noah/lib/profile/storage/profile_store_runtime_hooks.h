@@ -6,14 +6,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+// keyboard_post_init: starts the store (with an owner, the owner) and binds
+// this half's durable-I/O grant to its slot flash.
 void noah_profile_store_runtime_init(void);
+// This half's durable-I/O grant (qmk_durable_io.h): once per matrix scan on
+// both halves, owner and owner-free builds.
 void noah_profile_store_runtime_matrix_scan(void);
-bool noah_profile_store_runtime_matrix_scan_step(void);
-bool noah_profile_store_runtime_output_ready(void);
-
-// Host logical VIA staging belongs to the owner's candidate: admitted only for
-// that candidate's transaction and bound VIA identity, before its decision.
-// An admitted frame the VIA layer then queues is reported as progress, which
-// renews the candidate's lease. False without an owner.
-bool noah_profile_store_runtime_logical_via_admit(uint16_t transaction_id, uint32_t generation, uint32_t digest);
-void noah_profile_store_runtime_logical_via_progress(void);

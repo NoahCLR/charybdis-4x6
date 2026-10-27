@@ -6,21 +6,27 @@
 # tests/fixtures. Firmware only states what it is; the agreement check that
 # judges it lives with the client. Built with the production feature set
 # (users/noah/rules.mk defaults: live-profile owner and mutation, PD profile,
-# split, VIA, combos, RGB matrix, pointing device).
+# split, Raw HID, combos, RGB matrix, pointing device).
 #
 #   sh tests/host/run_contract_probe.sh [--output FILE]
 
 set -eu
 
-ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
-KEYMAP_PATH="$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah"
-OUTPUT=""
-if [ "${1:-}" = "--output" ] && [ -n "${2:-}" ]; then
-    OUTPUT="$2"
+# FILE is written here, from what the probe prints: run outside the build
+# image, the probe runs in Docker, which sees only the checkouts, and FILE may
+# be anywhere (a client's temporary directory, say).
+if [ "${1:-}" = "--output" ] && [ -n "${2:-}" ] && [ $# -eq 2 ]; then
+    sh "$0" >"$2.partial" || { rm -f "$2.partial"; exit 1; }
+    mv "$2.partial" "$2"
+    exit 0
 elif [ $# -gt 0 ]; then
     echo "Usage: sh tests/host/run_contract_probe.sh [--output FILE]" >&2
     exit 1
 fi
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+KEYMAP_PATH="$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah"
 BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
 
@@ -39,15 +45,13 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DPOINTING_DEVICE_ENABLE \
     -DRGB_MATRIX_ENABLE \
     -DRGB_MATRIX_WS2812 \
-    -DVIA_ENABLE \
     -DSPLIT_KEYBOARD \
     -DMCU_RP \
-    -DTOTAL_EEPROM_BYTE_COUNT=0x4800u \
-    -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+    -DTOTAL_EEPROM_BYTE_COUNT=0x1000u \
+    -DNOAH_HOST_PRODUCTION_MATRIX -DQMK_STUB_SUPPRESS_LAYER_COUNT \
     -DNOAH_LIVE_PROFILE_OWNER_ENABLE \
     -DNOAH_LIVE_PROFILE_MUTATION_ENABLE \
     -DNOAH_PORTABLE_PROFILE_ENABLE \
-    -DNOAH_PD_PROFILE_ENABLE \
     -DQMK_KEYBOARD_H='"noah_real_profile_keyboard.h"' \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
@@ -59,16 +63,29 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$KEYMAP_PATH/rgb_config.c" \
     "$ROOT/users/noah/lib/profile/protocol/profile_wire_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
-    "$ROOT/users/noah/lib/profile/runtime/effective_pd_runtime.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_pd_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_compiled_defaults_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/key_behavior_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_combo_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_pd_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_keymap_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_macros_compiled_v1.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_settings_defaults.c" \
     "$ROOT/users/noah/lib/profile/runtime/profile_action_runtime_v1.c" \
     "$ROOT/users/noah/lib/profile/runtime/profile_action_placement_v1.c" \
     "$ROOT/users/noah/lib/action/action_kind.c" \
-    "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_macros_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
     "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
@@ -76,20 +93,19 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 
 "$BUILD_DIR/contract_probe" >"$BUILD_DIR/pages.json"
 
-python3 - "$ROOT" "$BUILD_DIR/pages.json" "${OUTPUT:-}" <<'PY'
+python3 - "$ROOT" "$BUILD_DIR/pages.json" <<'PY'
 import hashlib, json, subprocess, sys
 from pathlib import Path
 
-root, pages, output = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
+root, pages = Path(sys.argv[1]), Path(sys.argv[2])
 report = json.loads(pages.read_text())
+capability_pages = [bytes.fromhex(page) for page in report["capabilityPages"]]
+assert len(capability_pages) == capability_pages[0][1], "Contract probe must report every advertised capability page"
+assert all(len(page) == 25 for page in capability_pages), "Capability pages must be complete Raw HID payloads"
 report["firmwareCommit"] = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"],
                                           capture_output=True, text=True).stdout.strip() or None
 report["qmkPin"] = json.loads((root / "qmk-pin.json").read_text())
 report["fixtures"] = {str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
                       for path in sorted((root / "tests/fixtures").rglob("*")) if path.is_file()}
-text = json.dumps(report, indent=2) + "\n"
-if output:
-    Path(output).write_text(text)
-else:
-    sys.stdout.write(text)
+sys.stdout.write(json.dumps(report, indent=2) + "\n")
 PY

@@ -4,12 +4,12 @@
 
 #include "handled_key_internal.h"
 
-void handled_key_lookup_tap_count_into(uint16_t keycode, uint8_t tap_count, handled_key_resolution_t *out) {
+void handled_key_lookup_row_tap_count_into(uint16_t keycode, uint8_t tap_count, bool use_row, handled_key_resolution_t *out) {
     if (!out) {
         return;
     }
 
-    key_behavior_view_t behavior = key_behavior_lookup(keycode);
+    key_behavior_view_t behavior = use_row ? key_behavior_lookup(keycode) : key_behavior_lookup_without_row(keycode);
     key_behavior_step_t step     = tap_count <= 1 ? behavior.single : key_behavior_view_step(&behavior, tap_count);
     bool                more     = key_behavior_view_has_more_taps(&behavior, tap_count);
 
@@ -18,14 +18,19 @@ void handled_key_lookup_tap_count_into(uint16_t keycode, uint8_t tap_count, hand
         .tap_count          = tap_count,
         .step               = step,
         .tap_hold_term      = behavior.tap_hold_term,
-        .longer_hold_term   = behavior.longer_hold_term,
+        .long_hold_term     = behavior.long_hold_term,
         .multi_tap_term     = behavior.multi_tap_term,
         .layer              = behavior.is_momentary_layer ? behavior_get_layer(behavior.keycode) : UINT8_MAX,
-        .pd_mode            = handled_key_pd_mode_for_behavior(behavior),
+        .pointing_mode      = handled_key_pointing_mode_for_behavior(behavior),
         .has_more_taps      = more,
         .authored_tap_depth = behavior.authored_tap_depth,
+        .first_tap          = behavior.single.tap,
         .flags              = handled_key_flags_from_behavior(behavior),
     };
+}
+
+void handled_key_lookup_tap_count_into(uint16_t keycode, uint8_t tap_count, handled_key_resolution_t *out) {
+    handled_key_lookup_row_tap_count_into(keycode, tap_count, true, out);
 }
 
 handled_key_resolution_t handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count) {

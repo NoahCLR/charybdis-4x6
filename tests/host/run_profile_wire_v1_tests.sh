@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 BUILD_DIR="$(mktemp -d)"
@@ -35,7 +36,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic -fsyntax-only 
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     -include "$ROOT/tests/host/include/noah_compile_config.h" \
-    "$ROOT/users/noah/lib/compat/qmk_via_profile_channel.c"
+    "$ROOT/users/noah/lib/compat/qmk_profile_channel.c"
 
 build_hook_and_run() {
     name="$1"
@@ -43,27 +44,26 @@ build_hook_and_run() {
     cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
         -DQMK_KEYBOARD_H='"qmk_stub.h"' \
         -DQMK_STUB_SUPPRESS_LAYER_COUNT \
-        -DVIA_ENABLE \
+        -DRAW_ENABLE \
         "$@" \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
         -I"$ROOT/tests/host/include" \
         -include "$ROOT/tests/host/include/noah_compile_config.h" \
-        "$ROOT/tests/host/qmk_via_profile_channel_test.c" \
-        "$ROOT/users/noah/lib/compat/qmk_via_profile_channel.c" \
-        "$ROOT/users/noah/lib/compat/qmk_via_logical_profile.c" \
+        "$ROOT/tests/host/qmk_profile_channel_test.c" \
+        "$ROOT/users/noah/lib/compat/qmk_profile_channel.c" \
         "$ROOT/users/noah/lib/profile/protocol/profile_wire_v1.c" \
         "$ROOT/users/noah/lib/profile/protocol/profile_candidate_v1.c" \
         "$ROOT/users/noah/lib/compat/qmk_combo_readback.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
-        -o "$BUILD_DIR/qmk_via_profile_channel_test_$name"
-    "$BUILD_DIR/qmk_via_profile_channel_test_$name"
+        -o "$BUILD_DIR/qmk_profile_channel_test_$name"
+    "$BUILD_DIR/qmk_profile_channel_test_$name"
 }
 
-build_hook_and_run via
-build_hook_and_run via_rgb -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812
-build_hook_and_run via_split -DSPLIT_KEYBOARD
-build_hook_and_run via_split_rgb -DSPLIT_KEYBOARD -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812
-build_hook_and_run via_owner_split_rgb -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DSPLIT_KEYBOARD -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812
-build_hook_and_run via_mutation_owner_split_rgb -DNOAH_LIVE_PROFILE_MUTATION_ENABLE -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DSPLIT_KEYBOARD -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812
-build_hook_and_run via_cadence -DNOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
+build_hook_and_run raw
+build_hook_and_run raw_rgb -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812
+build_hook_and_run raw_split -DSPLIT_KEYBOARD
+build_hook_and_run raw_split_rgb -DSPLIT_KEYBOARD -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812
+build_hook_and_run raw_owner_split_rgb -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DSPLIT_KEYBOARD -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812
+build_hook_and_run raw_mutation_owner_split_rgb -DNOAH_LIVE_PROFILE_MUTATION_ENABLE -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DSPLIT_KEYBOARD -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812
+build_hook_and_run raw_cadence -DNOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE

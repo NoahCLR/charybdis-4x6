@@ -27,7 +27,7 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "action_kind_registry_list.h"
-#include "../pointing/defs/pd_modes.h"
+#include "../pointing/defs/pointing_modes.h"
 
 typedef struct {
     bool settle_pending_fallback_holds;
@@ -49,6 +49,10 @@ static inline bool noah_action_keycode_is_layer_toggle(uint16_t action) {
 
 static inline uint8_t noah_action_keycode_layer_lock_layer(uint16_t action) {
     return noah_action_keycode_is_layer_toggle(action) ? (uint8_t)QK_TOGGLE_LAYER_GET_LAYER(action) : (uint8_t)(action - LAYER_LOCK_BASE);
+}
+
+static inline bool noah_action_keycode_is_momentary(uint16_t action) {
+    return IS_QK_MOMENTARY(action) && QK_MOMENTARY_GET_LAYER(action) < LAYER_COUNT;
 }
 
 static inline bool noah_action_keycode_is_layer_goto(uint16_t action) {
@@ -92,7 +96,7 @@ static inline uint16_t noah_action_keycode_dual_role_hold(uint16_t action) {
 
 // Keys that hold their layer while they are down: MO(), TT(), OSL() and LM().
 static inline bool noah_action_keycode_is_owned_momentary_layer(uint16_t action) {
-    return IS_QK_MOMENTARY(action) || noah_action_keycode_is_layer_tap_toggle(action) || noah_action_keycode_is_layer_oneshot(action) || noah_action_keycode_is_layer_mod(action);
+    return noah_action_keycode_is_momentary(action) || noah_action_keycode_is_layer_tap_toggle(action) || noah_action_keycode_is_layer_oneshot(action) || noah_action_keycode_is_layer_mod(action);
 }
 
 static inline uint8_t noah_action_keycode_momentary_layer(uint16_t action) {
@@ -146,7 +150,7 @@ typedef enum {
     NOAH_ACTION_CAP_PRESS_ONLY                             = (1u << 0),
     NOAH_ACTION_CAP_REQUIRES_KEY_OWNER                     = (1u << 1),
     NOAH_ACTION_CAP_LAYER_AFFECTING                        = (1u << 2),
-    NOAH_ACTION_CAP_PD_MODE_AFFECTING                      = (1u << 3),
+    NOAH_ACTION_CAP_POINTING_MODE_AFFECTING                = (1u << 3),
     NOAH_ACTION_CAP_BEHAVIOR_KEYCODE_SUPPORTED             = (1u << 4),
     NOAH_ACTION_CAP_AUTHORED_TAP_SUPPORTED                 = (1u << 5),
     NOAH_ACTION_CAP_AUTHORED_HOLD_PRESS_AND_HOLD_SUPPORTED = (1u << 6),
@@ -164,7 +168,7 @@ typedef struct {
     noah_action_kind_t kind;
     uint16_t           action;
     uint8_t            layer;
-    pd_mode_mask_t     pd_mode;
+    pointing_mode_mask_t pointing_mode;
 } noah_action_desc_t;
 
 bool     noah_action_desc_has_capability(noah_action_desc_t desc, noah_action_cap_t capability);
@@ -215,7 +219,7 @@ static inline bool noah_action_desc_is_layer_oneshot(noah_action_desc_t desc) {
 // top of the combo's is untested. Layer actions the runtime does not own are
 // refused everywhere.
 static inline bool noah_action_desc_supported_as_combo_output(noah_action_desc_t desc) {
-    return desc.kind != NOAH_ACTION_KIND_LAYER_TAP && desc.kind != NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION && desc.kind != NOAH_ACTION_KIND_UNASSIGNED_USER;
+    return desc.kind != NOAH_ACTION_KIND_LAYER_TAP && desc.kind != NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION && desc.kind != NOAH_ACTION_KIND_UNASSIGNED_USER && desc.kind != NOAH_ACTION_KIND_CUSTOM_KEY_LAYER_TAP;
 }
 
 static inline bool noah_action_desc_is_macro(noah_action_desc_t desc) {
@@ -246,8 +250,8 @@ static inline bool noah_action_desc_uses_shared_hold(noah_action_desc_t desc) {
     return !noah_action_desc_requires_owned_dispatch(desc);
 }
 
-static inline bool noah_action_desc_is_pd_mode_action(noah_action_desc_t desc) {
-    return noah_action_desc_has_capability(desc, NOAH_ACTION_CAP_PD_MODE_AFFECTING);
+static inline bool noah_action_desc_is_pointing_mode_action(noah_action_desc_t desc) {
+    return noah_action_desc_has_capability(desc, NOAH_ACTION_CAP_POINTING_MODE_AFFECTING);
 }
 
 static inline bool noah_action_desc_supported_as_behavior_keycode(noah_action_desc_t desc) {
@@ -290,4 +294,10 @@ void               noah_emit_action_tap_at(keypos_t key_pos, uint16_t action, no
 void               noah_emit_synthetic_qmk_tap(uint16_t keycode, noah_emit_policy_t policy);
 void               noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(uint16_t keycode, uint8_t masked_mods, bool settle_pending_fallback_holds);
 void               noah_emit_literal_tap(uint16_t keycode, noah_emit_policy_t policy);
+void               noah_emit_literal_tap_with_masked_keyboard_mods(uint16_t keycode, uint8_t masked_mods, bool settle_pending_fallback_holds);
+// A plain mouse-button click through the owned-keycode ledger, so it never
+// releases a button another owner still holds. `exact` hides every ambient
+// modifier for the click; otherwise `masked_mods` hides those, and zero keeps
+// them all. Settles a pending fallback hold first.
+void               noah_emit_owned_click(uint16_t keycode, uint8_t masked_mods, bool exact);
 void               action_dispatch(uint16_t action);

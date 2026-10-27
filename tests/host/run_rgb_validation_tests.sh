@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 
@@ -20,8 +21,8 @@ trap cleanup EXIT INT TERM
 
 cat >"$RGB_FEEDBACK_CONFIG" <<EOF
 #include "$ROOT/tests/host/include/noah_compile_config.h"
-#ifndef RGB_PD_MODE_FEEDBACK_ENABLE
-#    define RGB_PD_MODE_FEEDBACK_ENABLE
+#ifndef RGB_POINTING_MODE_FEEDBACK_ENABLE
+#    define RGB_POINTING_MODE_FEEDBACK_ENABLE
 #endif
 #ifndef RGB_COMBO_FEEDBACK_ENABLE
 #    define RGB_COMBO_FEEDBACK_ENABLE
@@ -36,8 +37,8 @@ EOF
 
 cat >"$RGB_FEEDBACK_NO_TRIGGER_HALF_CONFIG" <<EOF
 #include "$RGB_FEEDBACK_CONFIG"
-#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-#    undef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+#ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
+#    undef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
 #endif
 EOF
 
