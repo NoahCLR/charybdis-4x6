@@ -91,6 +91,8 @@ static void invalidate(void *context, uint32_t publication_count, noah_active_pr
     invalidation->log->entries[invalidation->log->count++] = invalidation->callback_id;
     assert(noah_active_profile_provider_copy_active(invalidation->provider, &copied) == NOAH_ACTIVE_PROFILE_BUSY);
     assert(noah_active_profile_provider_status(invalidation->provider, &status) == NOAH_ACTIVE_PROFILE_BUSY);
+    uint32_t count = 0xa5a5a5a5u;
+    assert(noah_active_profile_provider_publication_count(invalidation->provider, &count) == NOAH_ACTIVE_PROFILE_BUSY && count == 0xa5a5a5a5u);
     invalidation->saw_public_reader_guard = true;
     invalidation->saw_callback_view       = callback_view && callback_view->identity.generation == active.generation && callback_view->identity.payload_digest == active.payload_digest && noah_active_profile_snapshot_read(callback_view, 0u, magic, sizeof(magic)) && memcmp(magic, "NLP1", sizeof(magic)) == 0;
     invalidation->saw_active_generation   = invalidation->saw_callback_view;
@@ -216,7 +218,12 @@ static void test_initial_compiled_snapshot_and_fail_closed_copies(void) {
     memset(&status, 0xa5, sizeof(status));
     assert(noah_active_profile_provider_status(&provider, &status) == NOAH_ACTIVE_PROFILE_BUSY);
     assert(status.active.generation == 0xa5a5a5a5u);
+    uint32_t count = 0xa5a5a5a5u;
+    assert(noah_active_profile_provider_publication_count(&provider, &count) == NOAH_ACTIVE_PROFILE_BUSY && count == 0xa5a5a5a5u);
+    assert(noah_active_profile_provider_publication_count(&provider, NULL) == NOAH_ACTIVE_PROFILE_INVALID_ARGUMENT);
     provider.publication_sequence = 2u;
+    assert(noah_active_profile_provider_status(&provider, &status) == NOAH_ACTIVE_PROFILE_OK);
+    assert(noah_active_profile_provider_publication_count(&provider, &count) == NOAH_ACTIVE_PROFILE_OK && count == status.publication_count);
 }
 
 static void test_nested_domain_views_must_stay_inside_blob(void) {

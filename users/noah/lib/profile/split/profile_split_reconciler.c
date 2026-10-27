@@ -66,13 +66,23 @@ static noah_profile_split_descriptor_t unreadable_descriptor(void) {
     return descriptor;
 }
 
-// Return whether the normalized descriptor changed. Keep querying the owner
-// every scan so local authority changes are visible even during link backoff.
+// Return whether the normalized descriptor changed. Keep asking the owner
+// every scan so local authority changes are visible even during link
+// backoff; with a revision, the descriptor is read only once it moved.
 static bool refresh_local(noah_profile_split_reconciler_t *reconciler) {
     noah_profile_split_descriptor_t descriptor = unreadable_descriptor();
 
     if (!reconciler) {
         return false;
+    }
+    if (reconciler->config.local_descriptor_revision) {
+        uint32_t revision = reconciler->config.local_descriptor_revision(reconciler->config.local_context);
+
+        if (reconciler->local_descriptor_revision_known && revision == reconciler->local_descriptor_revision) {
+            return false;
+        }
+        reconciler->local_descriptor_revision       = revision;
+        reconciler->local_descriptor_revision_known = true;
     }
     if (!reconciler->config.local_descriptor || !reconciler->config.local_descriptor(reconciler->config.local_context, &descriptor)) {
         descriptor = unreadable_descriptor();
@@ -250,6 +260,10 @@ static bool encode_busy_response(const noah_profile_split_reconciler_t *reconcil
                response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE) != 0u;
 }
 
+static bool response_busy(const noah_profile_split_v1_frame_t *response) {
+    return response && response->kind == NOAH_PROFILE_SPLIT_V1_ACK && response->status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;
+}
+
 // A reply is one 32-byte frame, or a pulled chunk's frame; one that cannot
 // be encoded is answered as an invalid frame instead. It is encoded straight
 // into the cache: a second 128-byte buffer would sit on the scan's stack.
@@ -259,9 +273,12 @@ static void cache_response(noah_profile_split_reconciler_t *reconciler, const ui
     memmove(reconciler->cached_request_wire, request, request_length);
     reconciler->cached_request_length  = request_length;
     reconciler->cached_response_length = noah_profile_split_v1_frame_encode(response, reconciler->cached_response_wire, sizeof(reconciler->cached_response_wire));
+    // What an encoded BUSY decodes as; an invalid-frame answer is no BUSY.
+    reconciler->cached_response_busy = response_busy(response);
     if (reconciler->cached_response_length == 0u || (response->kind != NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK && reconciler->cached_response_length != NOAH_PROFILE_SPLIT_V1_FRAME_SIZE)) {
         (void)encode_invalid_response(reconciler->cached_response_wire);
         reconciler->cached_response_length = NOAH_PROFILE_SPLIT_V1_FRAME_SIZE;
+        reconciler->cached_response_busy   = false;
     }
     reconciler->cached_response_valid = true;
     noah_runtime_publication_end(&reconciler->response_sequence);
@@ -330,10 +347,6 @@ static noah_profile_split_v1_status_t map_other_half_error(noah_profile_other_ha
 
 static void other_half_error_reply(noah_profile_split_v1_frame_t *reply, noah_profile_other_half_store_result_t result, uint32_t generation, uint32_t digest, uint32_t offset, uint32_t length) {
     transfer_reply(reply, NOAH_PROFILE_SPLIT_V1_ERROR, map_other_half_error(result), generation, digest, offset, length);
-}
-
-static bool response_busy(const noah_profile_split_v1_frame_t *response) {
-    return response && response->kind == NOAH_PROFILE_SPLIT_V1_ACK && response->status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;
 }
 
 static bool response_ack_matches(const noah_profile_split_v1_frame_t *response, const noah_profile_split_descriptor_t *descriptor) {
@@ -769,9 +782,7 @@ static void update_remote_commit_response(noah_profile_split_reconciler_t *recon
 }
 
 static void release_transient_busy_response(noah_profile_split_reconciler_t *reconciler) {
-    noah_profile_split_v1_frame_t response;
-
-    if (!reconciler->cached_response_valid || !noah_profile_split_v1_frame_decode(reconciler->cached_response_wire, reconciler->cached_response_length, &response) || !response_busy(&response)) {
+    if (!reconciler->cached_response_valid || !reconciler->cached_response_busy) {
         return;
     }
     if (reconciler->incoming_reuse_active || noah_profile_other_half_store_backend_working(reconciler->config.other_half_store)) {

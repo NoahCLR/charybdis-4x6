@@ -185,3 +185,6 @@ noah_active_profile_result_t noah_active_profile_provider_publish_in_place(noah_
 
 noah_active_profile_result_t noah_active_profile_provider_copy_active(const noah_active_profile_provider_t *provider, noah_active_profile_snapshot_t *snapshot);
 noah_active_profile_result_t noah_active_profile_provider_status(const noah_active_profile_provider_t *provider, noah_active_profile_status_t *status);
+// The status's publication_count alone, read under the same sequence rules:
+// OK with the count, BUSY while a publication stays in flight.
+noah_active_profile_result_t noah_active_profile_provider_publication_count(const noah_active_profile_provider_t *provider, uint32_t *count);

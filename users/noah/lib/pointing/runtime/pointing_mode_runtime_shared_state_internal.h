@@ -61,6 +61,15 @@ typedef struct {
     bool                                  synthetic_auto_mouse_anchor_active;
     bool                                  active_dpi_sync_pending;
     bool                                  auto_sniping_layer_active;
+    // The CPI the DPI policy last wrote, while nothing else has written the
+    // sensor's since (pointing_mode_forget_applied_dpi).
+    bool                                  applied_cpi_known;
+    // Something wrote the sensor's CPI since the last refresh check, which
+    // starts the refresh period again at its pass's clock read.
+    bool                                  applied_cpi_written;
+    uint16_t                              applied_cpi;
+    // When the refresh period began (pointing_mode_refresh_applied_dpi).
+    uint32_t                              applied_cpi_period_start;
 } pointing_mode_runtime_shared_state_t;
 
 pointing_mode_runtime_shared_state_t *pointing_mode_runtime_shared_state(void);

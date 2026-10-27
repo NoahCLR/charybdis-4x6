@@ -20,6 +20,7 @@ for variant in normal sanitized; do
         -DSPLIT_KEYBOARD \
         -DSPLIT_TRANSACTION_IDS_USER \
         -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+        -Wl,--wrap=noah_profile_keyboard_name_equal \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
         -I"$ROOT/tests/host/include" \

@@ -705,6 +705,8 @@ void pointing_mode_transition_unlock(pointing_mode_mask_t mode) {
 
 void pointing_mode_service_active_dpi_sync(void) {}
 
+void pointing_mode_forget_applied_dpi(void) {}
+
 void noah_action_press(keypos_t key_pos, uint16_t action) {
     (void)key_pos;
     (void)action;

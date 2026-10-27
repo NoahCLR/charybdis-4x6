@@ -2661,6 +2661,7 @@ int main(void) {
     test_edit_status_flags_come_from_the_owner();
     test_ineligible_auto_saves_skip_admission_work();
     test_auto_save_modes_and_adjustments();
+    test_quiet_keyboard_is_asked_only_where_a_save_could_start();
     test_saving_the_saved_bytes_writes_nothing();
     test_auto_save_hour_bound();
     test_auto_save_power_cuts();

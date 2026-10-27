@@ -12,6 +12,7 @@
 #    include "../profile/schema/profile_settings_defaults.h"
 #    include "../profile/storage/profile_checksum.h"
 #    include "../profile/storage/profile_store_runtime.h"
+#    include "../pointing/defs/pointing_modes.h"
 
 // Cold readback workspace, never used by key events or RGB rendering.
 void noah_qmk_portable_storage_init(void) {
@@ -108,12 +109,15 @@ void noah_qmk_portable_apply(void) {
     set_auto_mouse_layer(projected_setting(NOAH_SETTING_AUTO_MOUSE_LAYER, get_auto_mouse_layer()));
     set_auto_mouse_timeout(projected_setting(NOAH_SETTING_AUTO_MOUSE_TIMEOUT, get_auto_mouse_timeout()));
     set_auto_mouse_debounce(projected_setting(NOAH_SETTING_AUTO_MOUSE_DEBOUNCE, get_auto_mouse_debounce()));
-    uint16_t dpi = projected_setting(NOAH_SETTING_DEFAULT_DPI, charybdis_get_pointer_default_dpi());
-    for (uint8_t i = 0; i < 16 && charybdis_get_pointer_default_dpi() != dpi; i++)
+    uint16_t dpi    = projected_setting(NOAH_SETTING_DEFAULT_DPI, charybdis_get_pointer_default_dpi());
+    bool     stepped = false;
+    for (uint8_t i = 0; i < 16 && charybdis_get_pointer_default_dpi() != dpi; i++, stepped = true)
         charybdis_cycle_pointer_default_dpi_noeeprom(true);
     dpi = projected_setting(NOAH_SETTING_SNIPING_DPI, charybdis_get_pointer_sniping_dpi());
-    for (uint8_t i = 0; i < 4 && charybdis_get_pointer_sniping_dpi() != dpi; i++)
+    for (uint8_t i = 0; i < 4 && charybdis_get_pointer_sniping_dpi() != dpi; i++, stepped = true)
         charybdis_cycle_pointer_sniping_dpi_noeeprom(true);
+    // Each of QMK's steps wrote the sensor's CPI.
+    if (stepped) pointing_mode_forget_applied_dpi();
     noah_qmk_portable_apply_lighting(projected_setting(NOAH_SETTING_RGB_MODE, noah_qmk_portable_live_setting(NOAH_SETTING_RGB_MODE)), projected_setting(NOAH_SETTING_RGB_COLOR, noah_qmk_portable_live_setting(NOAH_SETTING_RGB_COLOR)));
     default_layer_set(projected_setting(NOAH_SETTING_DEFAULT_LAYERS, default_layer_state));
     keymap_config.raw = projected_setting(NOAH_SETTING_KEYMAP_OPTIONS, keymap_config.raw);

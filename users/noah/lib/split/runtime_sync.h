@@ -166,7 +166,8 @@ _Static_assert(sizeof(split_runtime_key_feedback_branch_packet_t) <= RPC_M2S_BUF
 extern split_runtime_sync_remote_t split_runtime_sync_remote;
 
 void split_runtime_sync_init(void);
-void split_runtime_sync_tick(void);
+// Once a main-loop pass, with the pass's one clock read.
+void split_runtime_sync_tick(uint32_t now);
 void split_runtime_sync_elapsed(uint16_t raw_elapsed);
 void split_runtime_sync(void);
 void split_runtime_sync_mark_combo_dirty(void);
@@ -189,7 +190,9 @@ static inline void split_runtime_sync_notify_key_feedback_dirty(void) {
 static const split_runtime_sync_remote_t split_runtime_sync_remote = SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
 
 static inline void split_runtime_sync_init(void) {}
-static inline void split_runtime_sync_tick(void) {}
+static inline void split_runtime_sync_tick(uint32_t now) {
+    (void)now;
+}
 static inline void split_runtime_sync_elapsed(uint16_t raw_elapsed) {
     (void)raw_elapsed;
 }

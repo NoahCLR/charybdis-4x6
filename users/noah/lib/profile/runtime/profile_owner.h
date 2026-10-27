@@ -239,6 +239,9 @@ typedef struct {
     // within the host timeout is aborted, as an abandoned Apply is.
     uint32_t                             edit_activity_at;
     noah_profile_split_descriptor_t      saved_descriptor;
+    // Moves with every publication of saved_descriptor (the reconciler's
+    // local descriptor revision).
+    uint32_t                             descriptor_publications;
     noah_profile_candidate_v1_error_t    adoption_error;
     noah_profile_store_result_t          discovery_result;
 } noah_profile_owner_t;

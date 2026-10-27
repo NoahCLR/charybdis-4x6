@@ -486,6 +486,8 @@ void noah_emit_action_tap_at(keypos_t key_pos, uint16_t action, noah_emit_policy
 
 void pointing_mode_service_active_dpi_sync(void) {}
 
+void pointing_mode_forget_applied_dpi(void) {}
+
 bool is_pointing_mode_lock_action(uint16_t action) {
     (void)action;
     return false;

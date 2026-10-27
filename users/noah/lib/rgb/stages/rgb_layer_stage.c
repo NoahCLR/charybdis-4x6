@@ -21,22 +21,48 @@ typedef struct {
     bool    solid[LAYER_COUNT];
 } rgb_active_profile_layer_profile_t;
 
-static bool rgb_runtime_layer_stage_profile(const noah_active_profile_rgb_frame_t *frame, rgb_active_profile_layer_profile_t *profile) {
-    if (!profile || !rgb_active_profile_config_layer_stage_enabled(frame)) {
-        return false;
+// Every layer's colour, derived once per lighting publication instead of on
+// each chunk. It is used only while the frame's publication is still the
+// current one: an epoch is never reused while the runtime lives, so a
+// publication that landed while the rows were read can never be current again.
+static struct {
+    rgb_active_profile_layer_profile_t profile;
+    uint32_t                           epoch;
+    uint32_t                           publication_count;
+    bool                               live;
+    bool                               valid;
+} layer_profile_cache;
+
+static const rgb_active_profile_layer_profile_t *rgb_runtime_layer_stage_profile(const noah_active_profile_rgb_frame_t *frame) {
+    // Without a frame the accessors read the compiled view, as an uninstalled
+    // runtime's frame does.
+    uint32_t epoch             = frame ? frame->epoch : 0u;
+    uint32_t publication_count = frame ? frame->publication_count : 0u;
+    bool     live              = frame && frame->live;
+
+    if (!rgb_active_profile_config_layer_stage_enabled(frame)) {
+        return NULL;
     }
-    memset(profile, 0, sizeof(*profile));
+    if (layer_profile_cache.valid && layer_profile_cache.epoch == epoch && layer_profile_cache.publication_count == publication_count && layer_profile_cache.live == live) {
+        return &layer_profile_cache.profile;
+    }
+
+    layer_profile_cache.valid = false;
     for (uint8_t layer = 0u; layer < LAYER_COUNT; layer++) {
         layer_color_config_t config;
 
         if (!rgb_active_profile_config_layer_color(frame, layer, &config)) {
-            return false;
+            return NULL;
         }
-        profile->colors[layer] = hsv_to_rgb(config.color);
-        profile->modes[layer]  = config.mode;
-        profile->solid[layer]  = !(config.color.s == 0u && config.color.v == 0u);
+        layer_profile_cache.profile.colors[layer] = hsv_to_rgb(config.color);
+        layer_profile_cache.profile.modes[layer]  = config.mode;
+        layer_profile_cache.profile.solid[layer]  = !(config.color.s == 0u && config.color.v == 0u);
     }
-    return true;
+    layer_profile_cache.epoch             = epoch;
+    layer_profile_cache.publication_count = publication_count;
+    layer_profile_cache.live              = live;
+    layer_profile_cache.valid             = true;
+    return &layer_profile_cache.profile;
 }
 
 static bool rgb_runtime_layer_stage_paints_only_keys_present_on_this_layer(const rgb_active_profile_layer_profile_t *profile, uint8_t layer) {
@@ -120,7 +146,8 @@ void rgb_runtime_layer_stage_post_init(void) {
 }
 
 void rgb_runtime_layer_stage_invalidate_maps(void) {
-    layer_key_led_map_dirty = true;
+    layer_key_led_map_dirty   = true;
+    layer_profile_cache.valid = false;
 }
 
 static bool rgb_runtime_layer_stage_has_solid_color(const rgb_active_profile_layer_profile_t *profile, uint8_t layer) {
@@ -194,10 +221,10 @@ bool rgb_runtime_frame_fill(rgb_runtime_frame_t *frame, rgb_t color, uint8_t led
 // Layers first..end-1 only, each with its own rows; a split render lets a
 // linked pointing mode paint between them.
 static bool rgb_runtime_layer_stage_render_selection(rgb_runtime_frame_t *frame, layer_state_t state, uint8_t selected_layer, uint8_t first, uint8_t end, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
-    rgb_active_profile_layer_profile_t profile;
-    bool                          painted = false;
+    const rgb_active_profile_layer_profile_t *profile = rgb_runtime_layer_stage_profile(profile_frame);
+    bool                                      painted = false;
 
-    if (!rgb_runtime_layer_stage_profile(profile_frame, &profile)) {
+    if (!profile) {
         return false;
     }
 
@@ -205,11 +232,11 @@ static bool rgb_runtime_layer_stage_render_selection(rgb_runtime_frame_t *frame,
         if (!rgb_runtime_layer_stage_selection_contains(state, selected_layer, layer)) {
             continue;
         }
-        if (!rgb_runtime_layer_stage_has_solid_color(&profile, layer)) {
+        if (!rgb_runtime_layer_stage_has_solid_color(profile, layer)) {
             continue;
         }
 
-        painted |= rgb_runtime_frame_paint_layer(frame, &profile, layer, led_min, led_max);
+        painted |= rgb_runtime_frame_paint_layer(frame, profile, layer, led_min, led_max);
     }
 
     uint8_t group_count = rgb_active_profile_config_layer_group_count(profile_frame);
@@ -227,14 +254,14 @@ static bool rgb_runtime_layer_stage_render_selection(rgb_runtime_frame_t *frame,
         if (group_config.selector == RGB_LAYER_GROUP_ALL) {
             for (uint8_t layer = first; layer < end; layer++) {
                 if (rgb_runtime_layer_stage_selection_contains(state, selected_layer, layer)) {
-                    painted |= rgb_runtime_layer_stage_paint_group_for_layer(frame, &profile, &group_config, layer, led_min, led_max);
+                    painted |= rgb_runtime_layer_stage_paint_group_for_layer(frame, profile, &group_config, layer, led_min, led_max);
                 }
             }
             continue;
         }
 
         if (group_config.selector >= first && group_config.selector < end && rgb_runtime_layer_stage_selection_contains(state, selected_layer, group_config.selector)) {
-            painted |= rgb_runtime_layer_stage_paint_group_for_layer(frame, &profile, &group_config, group_config.selector, led_min, led_max);
+            painted |= rgb_runtime_layer_stage_paint_group_for_layer(frame, profile, &group_config, group_config.selector, led_min, led_max);
         }
     }
 

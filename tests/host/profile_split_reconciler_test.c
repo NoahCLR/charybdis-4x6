@@ -136,6 +136,14 @@ static noah_profile_split_descriptor_t saved_descriptor(const half_t *half, uint
 static uint32_t local_validations;
 void noah_profile_split_test_local_validation(void) { local_validations++; }
 
+// Linked with --wrap: every frame decode outside the codec is counted.
+static uint32_t frame_decodes;
+bool __real_noah_profile_split_v1_frame_decode(const uint8_t *wire, uint8_t length, noah_profile_split_v1_frame_t *frame);
+bool __wrap_noah_profile_split_v1_frame_decode(const uint8_t *wire, uint8_t length, noah_profile_split_v1_frame_t *frame) {
+    frame_decodes++;
+    return __real_noah_profile_split_v1_frame_decode(wire, length, frame);
+}
+
 static bool local_descriptor(void *context, noah_profile_split_descriptor_t *descriptor) {
     half_t *half = context;
 
@@ -2346,6 +2354,56 @@ static void test_converged_steady_state_cost_is_bounded_by_poll_deadline(bool sa
     assert(exchanges <= expected_polls + 1u);
 }
 
+// After any answered exchange the slave half keeps its reply for a
+// byte-identical retry. An idle scan decodes nothing to learn whether that
+// reply is a BUSY to release, and a BUSY is still released on the next scan
+// so its retry is admitted again.
+static void test_idle_scans_decode_no_cached_reply(void) {
+    half_t                        left;
+    half_t                        right;
+    noah_profile_split_v1_frame_t chunk = {
+        .kind           = NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK,
+        .status         = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
+        .generation     = 77u,
+        .payload_digest = 1u,
+        .payload_length = sizeof(empty_profile),
+        .chunk_length   = 1u,
+    };
+    noah_profile_split_v1_frame_t reply;
+    uint8_t                       request[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
+    uint8_t                       response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    uint8_t                       length;
+    uint32_t                      now = 1000000u;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    install_profile(&right, 5u, 1u);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    assert(left.reconciler.cached_response_valid);
+    frame_decodes = 0u;
+    for (uint32_t scan = 0u; scan < 1000u; scan++) {
+        (void)noah_profile_split_reconciler_scan(&left.reconciler, false, now);
+    }
+    assert(frame_decodes == 0u);
+    assert(left.reconciler.cached_response_valid);
+
+    chunk.chunk[0] = empty_profile[0];
+    length         = noah_profile_split_v1_frame_encode(&chunk, request, sizeof(request));
+    assert(length == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    // Admitted, then answered by the scan: no lease for that copy.
+    assert(noah_profile_split_reconciler_receive(&left.reconciler, request, length, response, sizeof(response)));
+    assert(noah_profile_split_v1_reply_decode(response, sizeof(response), &reply) && reply.status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY && reply.busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_ADMITTED);
+    (void)noah_profile_split_reconciler_scan(&left.reconciler, false, now);
+    assert(noah_profile_split_reconciler_receive(&left.reconciler, request, length, response, sizeof(response)));
+    assert(noah_profile_split_v1_reply_decode(response, sizeof(response), &reply) && reply.status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY && reply.busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_NO_LEASE);
+    // The next scan drops it, and the retry is admitted again.
+    (void)noah_profile_split_reconciler_scan(&left.reconciler, false, now);
+    assert(!left.reconciler.cached_response_valid);
+    assert(noah_profile_split_reconciler_receive(&left.reconciler, request, length, response, sizeof(response)));
+    assert(noah_profile_split_v1_reply_decode(response, sizeof(response), &reply) && reply.status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY && reply.busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_ADMITTED);
+}
+
 static void test_idle_scans_do_not_republish_unchanged_metadata(void) {
     half_t   left;
     half_t   right;
@@ -2394,12 +2452,64 @@ static void test_idle_scans_do_not_republish_unchanged_metadata(void) {
 typedef struct {
     noah_profile_split_descriptor_t value;
     bool available;
+    uint32_t revision;
+    uint32_t reads;
 } descriptor_fixture_t;
 
 static bool fixture_descriptor(void *context, noah_profile_split_descriptor_t *out) {
     descriptor_fixture_t *fixture = context;
+    fixture->reads++;
     *out = fixture->value; // A failing provider may leave nonzero output.
     return fixture->available;
+}
+
+static uint32_t fixture_revision(void *context) {
+    return ((descriptor_fixture_t *)context)->revision;
+}
+
+// With a revision to read, a scan reads the descriptor only once it moved:
+// every publication of the owner's descriptor moves it. A change still
+// reaches authority on the next scan, during backoff too, and is validated.
+static void test_descriptor_is_read_only_when_its_revision_moves(void) {
+    half_t left;
+    half_t right;
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    descriptor_fixture_t fixture = {.value = right.reconciler.local_descriptor, .available = true, .revision = 7u};
+    right.reconciler.config.local_descriptor = fixture_descriptor;
+    right.reconciler.config.local_descriptor_revision = fixture_revision;
+    right.reconciler.config.local_context = &fixture;
+    uint32_t now = right.reconciler.next_attempt_at - 1u;
+    uint32_t exchanges = right.link.exchanges;
+    assert(!noah_profile_split_reconciler_scan(&right.reconciler, true, now));
+    assert(fixture.reads == 1u);
+    for (uint32_t scan = 0u; scan < 1000u; scan++) {
+        assert(!noah_profile_split_reconciler_scan(&right.reconciler, true, now));
+    }
+    assert(fixture.reads == 1u);
+
+    local_validations = 0u;
+    fixture.value.compiled_default_digest++;
+    fixture.revision++;
+    assert(!noah_profile_split_reconciler_scan(&right.reconciler, true, now));
+    assert(fixture.reads == 2u && local_validations == 1u);
+    assert(right.reconciler.authority.status.local.compiled_default_digest == fixture.value.compiled_default_digest);
+    fixture.value.schema_major = UINT8_MAX;
+    fixture.revision++;
+    assert(!noah_profile_split_reconciler_scan(&right.reconciler, true, now));
+    assert(local_validations == 2u && !right.reconciler.authority.status.local.readable);
+    fixture.available = false;
+    fixture.revision++;
+    assert(!noah_profile_split_reconciler_scan(&right.reconciler, true, now));
+    assert(fixture.reads == 4u && !right.reconciler.authority.status.local.readable);
+    // A publication that changes nothing is read and publishes nothing new.
+    uint32_t publications = right.reconciler.authority.status.publication_count;
+    fixture.revision++;
+    assert(!noah_profile_split_reconciler_scan(&right.reconciler, true, now));
+    assert(fixture.reads == 5u && right.reconciler.authority.status.publication_count == publications);
+    assert(right.link.exchanges == exchanges);
 }
 
 static void test_descriptor_changes_are_validated_before_backoff(void) {
@@ -2709,6 +2819,7 @@ int main(int argc, char **argv) {
     test_an_unencodable_reuse_plan_sends_bytes();
     test_a_cancel_ends_a_reuse_range_midway();
     test_descriptor_changes_are_validated_before_backoff();
+    test_descriptor_is_read_only_when_its_revision_moves();
     test_compiled_convergence();
     test_newer_master_pushes_exact_record();
     test_newer_slave_is_pulled_without_role_authority();
@@ -2755,6 +2866,7 @@ int main(int argc, char **argv) {
     test_idle_scans_do_not_republish_unchanged_metadata();
     test_converged_steady_state_cost_is_bounded_by_poll_deadline(false);
     test_converged_steady_state_cost_is_bounded_by_poll_deadline(true);
+    test_idle_scans_decode_no_cached_reply();
     puts("profile split reconciler host tests passed");
     return 0;
 }

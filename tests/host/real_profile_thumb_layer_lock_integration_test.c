@@ -3677,6 +3677,38 @@ static void test_combo_behavior_layer_hold_keeps_feedback_until_resolved(void) {
     test_layer_combo_end(&combo);
 }
 
+// The split sync and the lighting build the combo feedback every pass. With no
+// combo output held there is nothing to place, so the build skips the walk of
+// the layer owners and returns the same empty bitmaps.
+static void test_combo_feedback_skips_owner_walk_without_held_combo(void) {
+    uint8_t underlay[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t overlay[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset_state();
+    memset(underlay, 0xff, sizeof(underlay));
+    memset(overlay, 0xff, sizeof(overlay));
+    key_feedback_test_combo_owner_walks_reset();
+    combo_feedback_bitmaps(underlay, overlay);
+    CHECK(key_feedback_test_combo_owner_walks() == 0u);
+    CHECK(!key_origin_bitmap_has_any(underlay) && !key_origin_bitmap_has_any(overlay));
+
+    test_layer_combo_t combo = test_layer_combo_begin(CUSTOM_KEY_0);
+    test_layer_combo_press(&combo);
+    combo_feedback_bitmaps(underlay, overlay);
+    CHECK(key_feedback_test_combo_owner_walks() == 1u);
+    for (uint8_t member = 0u; member < combo.count; member++) {
+        CHECK(key_origin_bitmap_has_keypos(underlay, combo.pos[member]) || key_origin_bitmap_has_keypos(overlay, combo.pos[member]));
+    }
+
+    test_layer_combo_release(&combo, true);
+    key_runtime_integration_scan();
+    key_feedback_test_combo_owner_walks_reset();
+    combo_feedback_bitmaps(underlay, overlay);
+    CHECK(key_feedback_test_combo_owner_walks() == 0u);
+    CHECK(!key_origin_bitmap_has_any(underlay) && !key_origin_bitmap_has_any(overlay));
+    test_layer_combo_end(&combo);
+}
+
 // These footprints overlap at M but have different output owners. Filtering
 // a layer combo must happen before unioning the footprints, never by clearing
 // its keys from the combined bitmap. Another layer owner also survives release.
@@ -3952,6 +3984,7 @@ int main(void) {
     test_combo_direct_layer_hold_shows_only_layer_feedback();
     test_cross_half_combo_layer_hold_is_quiet();
     test_combo_behavior_layer_hold_keeps_feedback_until_resolved();
+    test_combo_feedback_skips_owner_walk_without_held_combo();
     test_combo_layer_hold_preserves_overlapping_combo_feedback_and_owners();
     test_combo_oneshot_and_tap_toggle_are_owned();
     test_plain_layer_tap_is_the_runtimes();

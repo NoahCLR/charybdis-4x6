@@ -68,6 +68,10 @@ static inline uint32_t pd_runtime_idle_noise_any_activity_elapsed(void) {
 #endif
 
 void noah_pointing_device_init_user(void) {
+#if defined(POINTING_DEVICE_ENABLE)
+    // The sensor's init has just set its own CPI.
+    pointing_mode_forget_applied_dpi();
+#endif
 #if defined(NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE)
     pd_runtime_idle_noise_note_pointer_activity();
 #endif

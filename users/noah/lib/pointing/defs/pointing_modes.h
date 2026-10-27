@@ -113,6 +113,27 @@ bool pointing_mode_auto_sniping_layer_active(void);
 // Charybdis's configured sniping CPI before the slot's DPI.
 void pointing_mode_apply_active_dpi(void);
 
+// Something other than the policy above wrote the sensor's CPI: the sensor's
+// own init, or QMK's Charybdis code (its keys, its DPI steps, its EEPROM
+// reset). The next apply writes the policy's CPI even if it is the one it
+// wrote last. Every such writer calls this, after its write or before it with
+// no apply between.
+void pointing_mode_forget_applied_dpi(void);
+
+// A brownout or glitch can reset the sensor to its own default CPI without
+// resetting the MCU, and nothing sees it: the policy writes only a CPI that
+// changed. So it writes the CPI it intends again this long after anything
+// last wrote the sensor's, even unchanged: one write (two register writes and
+// their busy-waits, about 360 us) every five seconds.
+#define POINTING_MODE_CPI_REFRESH_MS 5000u
+
+// Once a main-loop pass on the master half, after the scan, with the pass's
+// one clock read: writes the policy's CPI again once a refresh period has
+// passed since the last write. On a master without the sensor the write only
+// hands QMK the CPI it already sends; the sensor's half compares the sensor's
+// CPI with it every pass.
+void pointing_mode_refresh_applied_dpi(uint32_t now);
+
 // The policy traits the mode's effective slot implies; none for a disabled or
 // unknown mode.
 pointing_mode_traits_t pointing_mode_effective_traits(pointing_mode_mask_t mode);

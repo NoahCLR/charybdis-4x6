@@ -1,5 +1,7 @@
 #include QMK_KEYBOARD_H
 #include "qmk_profile_adjustments.h"
+#include "qmk_pointing_contract.h"
+#include "../pointing/defs/pointing_modes.h"
 
 #if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE) && defined(NOAH_PORTABLE_PROFILE_ENABLE)
 #    include "qmk_portable_profile.h"
@@ -40,6 +42,7 @@ __attribute__((noinline)) bool noah_qmk_profile_adjustment_process(uint16_t keyc
         case POINTER_DEFAULT_DPI_REVERSE:
             if (record->event.pressed) {
                 charybdis_cycle_pointer_default_dpi_noeeprom((keycode == POINTER_DEFAULT_DPI_FORWARD) != dpi_shifted);
+                pointing_mode_forget_applied_dpi(); // QMK's step wrote the CPI
                 (void)noah_profile_store_runtime_adjust(NOAH_SETTING_DEFAULT_DPI, charybdis_get_pointer_default_dpi());
             }
             return false;
@@ -47,6 +50,7 @@ __attribute__((noinline)) bool noah_qmk_profile_adjustment_process(uint16_t keyc
         case POINTER_SNIPING_DPI_REVERSE:
             if (record->event.pressed) {
                 charybdis_cycle_pointer_sniping_dpi_noeeprom((keycode == POINTER_SNIPING_DPI_FORWARD) != dpi_shifted);
+                pointing_mode_forget_applied_dpi(); // QMK's step wrote the CPI
                 (void)noah_profile_store_runtime_adjust(NOAH_SETTING_SNIPING_DPI, charybdis_get_pointer_sniping_dpi());
             }
             return false;
@@ -71,6 +75,11 @@ __attribute__((noinline)) bool noah_qmk_profile_adjustment_process(uint16_t keyc
             setting = NOAH_SETTING_RGB_COLOR;
             break;
         default:
+#    ifdef POINTING_DEVICE_ENABLE
+            // QMK's own sniping and drag-scroll keys write the sensor's CPI
+            // once this record path lets them through.
+            if (noah_qmk_contract_pointer_keycode_sets_cpi(keycode)) pointing_mode_forget_applied_dpi();
+#    endif
             return true; // participation and pointing toggles stay RAM overrides
     }
 #    ifdef RGB_TRIGGER_ON_KEYDOWN
@@ -120,8 +129,14 @@ __attribute__((noinline)) bool noah_qmk_profile_adjustment_process(uint16_t keyc
 }
 #else
 bool noah_qmk_profile_adjustment_process(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
     (void)record;
+#    ifdef POINTING_DEVICE_ENABLE
+    // QMK's Charybdis keys write the sensor's CPI once this record path lets
+    // them through.
+    if (noah_qmk_contract_pointer_keycode_sets_cpi(keycode)) pointing_mode_forget_applied_dpi();
+#    else
+    (void)keycode;
+#    endif
     return true;
 }
 #endif

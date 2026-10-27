@@ -11,14 +11,17 @@
 #endif
 
 static noah_active_profile_rgb_runtime_t *installed_runtime;
+#ifdef NOAH_ACTIVE_PROFILE_RGB_RUNTIME_TEST_BACKEND
+static uint32_t test_frame_copies;
+#endif
 
 static uint32_t next_epoch(uint32_t current) {
     current++;
     return current == 0u ? 1u : current;
 }
 
-static bool identity_equal(noah_active_profile_identity_t left, noah_active_profile_identity_t right) {
-    return left.generation == right.generation && left.payload_crc32 == right.payload_crc32 && left.payload_digest == right.payload_digest && left.compiled_default_digest == right.compiled_default_digest && left.action_abi_digest == right.action_abi_digest && left.origin == right.origin && left.kind == right.kind;
+static bool identity_equal(const noah_active_profile_identity_t *left, const noah_active_profile_identity_t *right) {
+    return left->generation == right->generation && left->payload_crc32 == right->payload_crc32 && left->payload_digest == right->payload_digest && left->compiled_default_digest == right->compiled_default_digest && left->action_abi_digest == right->action_abi_digest && left->origin == right->origin && left->kind == right->kind;
 }
 
 void noah_active_profile_rgb_runtime_init(noah_active_profile_rgb_runtime_t *runtime) {
@@ -59,7 +62,7 @@ void noah_active_profile_rgb_runtime_invalidate(void *context, uint32_t publicat
     next.identity          = active;
     next.publication_count = publication_count;
     next.epoch             = runtime->next_epoch;
-    next.valid             = callback_view && identity_equal(callback_view->identity, active);
+    next.valid             = callback_view && identity_equal(&callback_view->identity, &active);
     if (next.valid && (active.kind == NOAH_ACTIVE_PROFILE_KIND_VALIDATED_PROFILE || active.kind == NOAH_ACTIVE_PROFILE_KIND_WORKING_COPY) && (callback_view->profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB) != 0u) {
         next.view = callback_view->profile.rgb;
         next.live = true;
@@ -95,6 +98,9 @@ static noah_active_profile_rgb_result_t copy_active(const noah_active_profile_rg
             continue;
         }
         copied = runtime->banks[runtime->active_index];
+#ifdef NOAH_ACTIVE_PROFILE_RGB_RUNTIME_TEST_BACKEND
+        test_frame_copies++;
+#endif
         if (noah_runtime_publication_settled(&runtime->publication_sequence, observed)) {
             *frame = copied;
             if (!copied.valid) {
@@ -114,21 +120,36 @@ noah_active_profile_rgb_result_t noah_active_profile_rgb_runtime_capture_frame(c
     return copy_active(runtime, frame);
 }
 
+// Every stage checks its frame before each record it reads, so this compares
+// the active bank's stamp in place under the publication sequence rather than
+// copying the frame out of it.
 noah_active_profile_rgb_result_t noah_active_profile_rgb_runtime_frame_status(const noah_active_profile_rgb_runtime_t *runtime, const noah_active_profile_rgb_frame_t *frame) {
-    noah_active_profile_rgb_frame_t  active;
-    noah_active_profile_rgb_result_t result;
+    uint8_t attempt;
 
-    if (!frame || !frame->valid) {
+    if (!frame || !frame->valid || !runtime || !runtime->initialized) {
         return NOAH_ACTIVE_PROFILE_RGB_INVALID_ARGUMENT;
     }
-    result = copy_active(runtime, &active);
-    if (result != NOAH_ACTIVE_PROFILE_RGB_OK && result != NOAH_ACTIVE_PROFILE_RGB_COMPILED_FALLBACK) {
-        return result;
+    for (attempt = 0u; attempt < NOAH_RUNTIME_PUBLICATION_READ_ATTEMPTS; attempt++) {
+        uint8_t                                observed = noah_runtime_publication_observe(&runtime->publication_sequence);
+        const noah_active_profile_rgb_frame_t *active;
+        noah_active_profile_rgb_result_t       result;
+
+        if (noah_runtime_publication_in_flight(observed)) {
+            continue;
+        }
+        active = &runtime->banks[runtime->active_index];
+        if (!active->valid) {
+            result = NOAH_ACTIVE_PROFILE_RGB_INVALID_ARGUMENT;
+        } else if (active->epoch != frame->epoch || active->publication_count != frame->publication_count || !identity_equal(&active->identity, &frame->identity) || active->live != frame->live) {
+            result = NOAH_ACTIVE_PROFILE_RGB_STALE;
+        } else {
+            result = active->live ? NOAH_ACTIVE_PROFILE_RGB_OK : NOAH_ACTIVE_PROFILE_RGB_COMPILED_FALLBACK;
+        }
+        if (noah_runtime_publication_settled(&runtime->publication_sequence, observed)) {
+            return result;
+        }
     }
-    if (active.epoch != frame->epoch || active.publication_count != frame->publication_count || !identity_equal(active.identity, frame->identity) || active.live != frame->live) {
-        return NOAH_ACTIVE_PROFILE_RGB_STALE;
-    }
-    return result;
+    return NOAH_ACTIVE_PROFILE_RGB_BUSY;
 }
 
 noah_active_profile_rgb_result_t noah_active_profile_rgb_capture_frame(noah_active_profile_rgb_frame_t *frame) {
@@ -158,3 +179,13 @@ _Static_assert(sizeof(noah_active_profile_rgb_frame_t) <= NOAH_ACTIVE_PROFILE_RG
 uint32_t noah_active_profile_rgb_publication_epoch(void) {
     return installed_runtime ? installed_runtime->next_epoch : 0u;
 }
+
+#ifdef NOAH_ACTIVE_PROFILE_RGB_RUNTIME_TEST_BACKEND
+void noah_active_profile_rgb_runtime_test_reset_frame_copies(void) {
+    test_frame_copies = 0u;
+}
+
+uint32_t noah_active_profile_rgb_runtime_test_frame_copies(void) {
+    return test_frame_copies;
+}
+#endif

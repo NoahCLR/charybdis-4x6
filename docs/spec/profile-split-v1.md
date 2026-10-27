@@ -373,16 +373,17 @@ Each half compares its own descriptor with the other half's:
   or saved converged with no transfer pending, and treats a failed read
   as unresolved. Invalid metadata is itself published, so an older converged
   result never outlives a malformed observation.
-- This half's descriptor is read every scan, also during backoff. A changed
-  value is validated, and an invalid one becomes unreadable; the change
-  republishes the `METADATA` reply and the authority before any deadline
-  returns.
+- This half's descriptor is checked every scan, also during backoff: read
+  again whenever the owner has published it since the last read (each
+  publication moves a count the scan compares). A changed value is
+  validated, and an invalid one becomes unreadable; the change republishes
+  the `METADATA` reply and the authority before any deadline returns.
 - `PREPARE_BEGIN` is recorded as the other half's provisional intent,
   separately from its last saved descriptor, and never published as
   authority. How two provisional candidates are arbitrated is
   [`logical-profile-transaction-v1.md`](logical-profile-transaction-v1.md)'s.
 
-Held by: `tests/host/run_profile_split_foundation_tests.sh` (`test_authority_decision_table`, `test_authority_publication_and_activation_observer`), `tests/host/run_profile_split_reconciler_tests.sh` (`test_concurrent_commit_stops_without_overwrite`, `test_same_tuple_corruption_stops_without_overwrite`, `test_incompatible_firmware_stops_without_write`, `test_refresh_publishes_new_local_authority_during_backoff`, `test_descriptor_changes_are_validated_before_backoff`).
+Held by: `tests/host/run_profile_split_foundation_tests.sh` (`test_authority_decision_table`, `test_authority_publication_and_activation_observer`), `tests/host/run_profile_split_reconciler_tests.sh` (`test_concurrent_commit_stops_without_overwrite`, `test_same_tuple_corruption_stops_without_overwrite`, `test_incompatible_firmware_stops_without_write`, `test_refresh_publishes_new_local_authority_during_backoff`, `test_descriptor_changes_are_validated_before_backoff`, `test_descriptor_is_read_only_when_its_revision_moves`).
 
 ## Receiving a copy
 

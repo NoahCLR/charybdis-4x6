@@ -536,6 +536,28 @@ noah_active_profile_result_t noah_active_profile_provider_status(const noah_acti
     return NOAH_ACTIVE_PROFILE_BUSY;
 }
 
+noah_active_profile_result_t noah_active_profile_provider_publication_count(const noah_active_profile_provider_t *provider, uint32_t *count) {
+    uint8_t attempt;
+
+    if (!provider || !provider->initialized || !count) {
+        return NOAH_ACTIVE_PROFILE_INVALID_ARGUMENT;
+    }
+    for (attempt = 0u; attempt < NOAH_RUNTIME_PUBLICATION_READ_ATTEMPTS; attempt++) {
+        uint8_t  observed = noah_runtime_publication_observe(&provider->publication_sequence);
+        uint32_t copied;
+
+        if (noah_runtime_publication_in_flight(observed)) {
+            continue;
+        }
+        copied = provider->publication_count;
+        if (noah_runtime_publication_settled(&provider->publication_sequence, observed)) {
+            *count = copied;
+            return NOAH_ACTIVE_PROFILE_OK;
+        }
+    }
+    return NOAH_ACTIVE_PROFILE_BUSY;
+}
+
 #if UINTPTR_MAX == UINT32_MAX
 _Static_assert(sizeof(noah_active_profile_provider_t) <= NOAH_ACTIVE_PROFILE_PROVIDER_STATE_BUDGET_32BIT, "active-profile provider exceeds its 32-bit state policy");
 #endif

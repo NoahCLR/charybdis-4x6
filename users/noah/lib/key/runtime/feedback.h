@@ -287,4 +287,7 @@ void    combo_feedback_overlay_bitmap(uint8_t *out_bitmap);
 #ifdef KEY_FEEDBACK_TEST_INSTRUMENTATION
 void     key_feedback_test_slot_visits_reset(void);
 uint16_t key_feedback_test_slot_visits(void);
+// Layer-owner walks combo_feedback_bitmaps() has made since the last reset.
+void     key_feedback_test_combo_owner_walks_reset(void);
+uint16_t key_feedback_test_combo_owner_walks(void);
 #endif

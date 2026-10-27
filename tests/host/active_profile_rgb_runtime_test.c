@@ -190,6 +190,69 @@ static void test_callback_only_live_view_and_frame_staleness(const char *fixture
     assert(noah_active_profile_rgb_runtime_frame_status(&runtime, &fallback_frame) == NOAH_ACTIVE_PROFILE_RGB_STALE);
 }
 
+// The stages check their frame before every record they read, about 25 times
+// a chunk at idle, so the check compares the publication in place instead of
+// copying the whole frame out of its bank.
+static void test_frame_status_reads_the_publication_in_place(const char *fixture_path) {
+    uint8_t                           payload[TEST_BUFFER_SIZE];
+    size_t                            payload_length = fixture_hex(fixture_path, "payload.hex", payload, sizeof(payload));
+    noah_profile_rgb_v1_limits_t      limits         = fixture_limits(fixture_path);
+    noah_active_profile_rgb_runtime_t runtime;
+    noah_active_profile_rgb_frame_t   frame;
+    noah_active_profile_rgb_frame_t   next_frame;
+    noah_active_profile_identity_t    first  = identity(30u, NOAH_ACTIVE_PROFILE_KIND_VALIDATED_PROFILE);
+    noah_active_profile_identity_t    second = identity(31u, NOAH_ACTIVE_PROFILE_KIND_VALIDATED_PROFILE);
+    noah_active_profile_snapshot_t    first_snapshot  = live_rgb_snapshot(first, (noah_profile_rgb_v1_view_t){0});
+    noah_active_profile_snapshot_t    second_snapshot = live_rgb_snapshot(second, (noah_profile_rgb_v1_view_t){0});
+    noah_profile_rgb_v1_error_t       error;
+
+    assert(noah_profile_rgb_v1_decode(payload, payload_length, &limits, &first_snapshot.profile.rgb, &error) == NOAH_PROFILE_RGB_V1_OK);
+    second_snapshot.profile.rgb = first_snapshot.profile.rgb;
+    noah_active_profile_rgb_runtime_init(&runtime);
+    noah_active_profile_rgb_runtime_invalidate(&runtime, 1u, identity(0u, NOAH_ACTIVE_PROFILE_KIND_COMPILED_DEFAULTS), first, &first_snapshot);
+
+    noah_active_profile_rgb_runtime_test_reset_frame_copies();
+    assert(noah_active_profile_rgb_runtime_capture_frame(&runtime, &frame) == NOAH_ACTIVE_PROFILE_RGB_OK);
+    assert(noah_active_profile_rgb_runtime_test_frame_copies() == 1u);
+    for (uint8_t check = 0u; check < 25u; check++) {
+        assert(noah_active_profile_rgb_runtime_frame_status(&runtime, &frame) == NOAH_ACTIVE_PROFILE_RGB_OK);
+    }
+    assert(noah_active_profile_rgb_runtime_test_frame_copies() == 1u);
+
+    // Every field the check compares still refuses a frame on its own.
+    next_frame = frame;
+    next_frame.epoch++;
+    assert(noah_active_profile_rgb_runtime_frame_status(&runtime, &next_frame) == NOAH_ACTIVE_PROFILE_RGB_STALE);
+    next_frame = frame;
+    next_frame.publication_count++;
+    assert(noah_active_profile_rgb_runtime_frame_status(&runtime, &next_frame) == NOAH_ACTIVE_PROFILE_RGB_STALE);
+    next_frame = frame;
+    next_frame.identity.payload_digest++;
+    assert(noah_active_profile_rgb_runtime_frame_status(&runtime, &next_frame) == NOAH_ACTIVE_PROFILE_RGB_STALE);
+    next_frame = frame;
+    next_frame.live = false;
+    assert(noah_active_profile_rgb_runtime_frame_status(&runtime, &next_frame) == NOAH_ACTIVE_PROFILE_RGB_STALE);
+    next_frame = frame;
+    next_frame.valid = false;
+    assert(noah_active_profile_rgb_runtime_frame_status(&runtime, &next_frame) == NOAH_ACTIVE_PROFILE_RGB_INVALID_ARGUMENT);
+
+    // A publication in flight is busy, and a settled one supersedes the frame.
+    runtime.publication_sequence++;
+    assert(noah_active_profile_rgb_runtime_frame_status(&runtime, &frame) == NOAH_ACTIVE_PROFILE_RGB_BUSY);
+    runtime.publication_sequence++;
+    assert(noah_active_profile_rgb_runtime_frame_status(&runtime, &frame) == NOAH_ACTIVE_PROFILE_RGB_OK);
+    noah_active_profile_rgb_runtime_invalidate(&runtime, 2u, first, second, &second_snapshot);
+    assert(noah_active_profile_rgb_runtime_frame_status(&runtime, &frame) == NOAH_ACTIVE_PROFILE_RGB_STALE);
+    assert(noah_active_profile_rgb_runtime_test_frame_copies() == 1u);
+    assert(noah_active_profile_rgb_runtime_capture_frame(&runtime, &next_frame) == NOAH_ACTIVE_PROFILE_RGB_OK);
+    assert(noah_active_profile_rgb_runtime_frame_status(&runtime, &next_frame) == NOAH_ACTIVE_PROFILE_RGB_OK);
+    assert(noah_active_profile_rgb_runtime_test_frame_copies() == 2u);
+
+    // A bank that holds no valid view refuses every frame, as before.
+    noah_active_profile_rgb_runtime_invalidate(&runtime, 3u, second, first, &second_snapshot);
+    assert(noah_active_profile_rgb_runtime_frame_status(&runtime, &next_frame) == NOAH_ACTIVE_PROFILE_RGB_INVALID_ARGUMENT);
+}
+
 static void test_invalid_callback_identity_fails_closed(void) {
     noah_active_profile_rgb_runtime_t runtime;
     noah_active_profile_rgb_frame_t   frame;
@@ -208,6 +271,7 @@ int main(int argc, char **argv) {
     test_init_install_and_fail_closed_capture();
     test_callback_only_live_view_and_frame_staleness(argv[1]);
     test_invalid_callback_identity_fails_closed();
+    test_frame_status_reads_the_publication_in_place(argv[1]);
     puts("active-profile RGB runtime tests: PASS");
     return 0;
 }

@@ -33,6 +33,8 @@ void              noah_qmk_combo_origin_observe_physical_key_event(uint16_t keyc
 void              noah_qmk_combo_origin_normalize_record(uint16_t keycode, keyrecord_t *record);
 void              noah_qmk_combo_origin_pressed_combo_bitmap(uint8_t *out_bitmap);
 bool              noah_qmk_combo_origin_pressed_combo_matches(uint16_t keycode, keypos_t owner_key_pos, uint16_t since, uint16_t term_ms);
+// Whether any combo output is held: without one the partition below is empty.
+bool              noah_qmk_combo_origin_any_active(void);
 // Active combo footprints, split by owner: a combo owning the preview or PD
 // state goes underneath them, any other above. A combo whose owner key is in
 // quiet_owner_bitmap (may be NULL) contributes to neither.
@@ -41,6 +43,12 @@ bool              noah_qmk_combo_origin_event_owner_keypos(const keyrecord_t *re
 bool              noah_qmk_combo_origin_event_bitmap(const keyrecord_t *record, uint8_t *out_bitmap);
 split_side_mask_t noah_qmk_combo_origin_event_side_mask(const keyrecord_t *record);
 void              noah_qmk_combo_origin_debug_snapshot(noah_qmk_combo_origin_debug_snapshot_t *out);
+
+#ifdef COMBO_ORIGIN_TEST_INSTRUMENTATION
+// Pending-output slots the reconcile pass has looked at since the last reset.
+void     noah_qmk_combo_origin_test_pending_slot_visits_reset(void);
+uint16_t noah_qmk_combo_origin_test_pending_slot_visits(void);
+#endif
 
 // Read-only generated-output layer context, before tapping/admission queues.
 uint8_t noah_qmk_combo_origin_record_source_layer(uint16_t keycode, const keyrecord_t *record);

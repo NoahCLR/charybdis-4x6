@@ -38,6 +38,14 @@ static struct {
     uint8_t  domain_mask;
 } invalidations;
 
+// Linked with --wrap: every full provider status snapshot is counted.
+static uint32_t status_snapshots;
+noah_active_profile_result_t __real_noah_active_profile_provider_status(const noah_active_profile_provider_t *provider, noah_active_profile_status_t *status);
+noah_active_profile_result_t __wrap_noah_active_profile_provider_status(const noah_active_profile_provider_t *provider, noah_active_profile_status_t *status) {
+    status_snapshots++;
+    return __real_noah_active_profile_provider_status(provider, status);
+}
+
 static uint32_t safe_boundary(void *context) {
     (void)context;
     return boundary_reasons;
@@ -183,6 +191,30 @@ static void test_keymap_edit_publishes_in_place(void) {
     invalidations.count = 0u;
     assert(noah_profile_working_copy_revert(&copy, 3u, SESSION, 2u) == NOAH_PROFILE_WORKING_OK && invalidations.count == 0u && copy.revision == 2u);
     puts("keymap edit publishes in place; revert returns to the saved profile");
+}
+
+// The owner observes every scan whether anything else published (an Apply,
+// a save activating, the other half's profile): it reads the publication
+// count alone, never a whole status snapshot, and sees each publication once.
+static void test_observing_reads_only_the_publication_count(void) {
+    static uint8_t                other_bytes[CAPACITY];
+    static noah_profile_working_copy_t other;
+    const uint8_t                 key[2] = {0x04u, 0x00u}; // KC_A
+    noah_profile_working_splice_t splice = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .offset = KEYMAP_KEY, .remove = 2u, .insert = 2u};
+
+    setup();
+    noah_profile_working_copy_init(&other, other_bytes, sizeof(other_bytes), &provider, &rules, &rules, SESSION);
+    status_snapshots = 0u;
+    for (uint32_t scan = 0u; scan < 100u; scan++) {
+        assert(!noah_profile_working_copy_observe(&other, false));
+    }
+    assert(status_snapshots == 0u);
+    // Another copy's publication is observed once.
+    assert(edit(1u, &splice, 1u, key, sizeof(key)) == NOAH_PROFILE_WORKING_OK);
+    assert(!noah_profile_working_copy_observe(&copy, false));
+    assert(noah_profile_working_copy_observe(&other, false));
+    assert(!noah_profile_working_copy_observe(&other, false));
+    puts("observing a publication reads its count, never a status snapshot");
 }
 
 static void test_stale_and_refused_edits_change_nothing(void) {
@@ -425,6 +457,7 @@ int main(int argc, char **argv) {
     assert(argc == 2);
     load_fixture(argv[1]);
     test_keymap_edit_publishes_in_place();
+    test_observing_reads_only_the_publication_count();
     test_every_domain_is_checked_alone();
     test_stale_and_refused_edits_change_nothing();
     test_edit_waits_for_a_safe_boundary();

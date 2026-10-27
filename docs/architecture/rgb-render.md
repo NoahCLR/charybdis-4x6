@@ -49,14 +49,21 @@ active profile's lighting domain, or the compiled view
 
 - `rgb_active_profile_config.c` is the stages' only reader. Every accessor
   checks the captured frame is still current and its stage bit is set, and reads
-  one record. Without an installed runtime (narrow host and feature builds) its
-  weak fallbacks serve the compiled view.
+  one record. The check compares the published bank's epoch, publication
+  count, identity and live flag in place; only the capture copies a frame.
+  Without an installed runtime (narrow host and feature builds) its weak
+  fallbacks serve the compiled view.
 - Each stage asks `rgb_active_profile_config_frame_current` after painting and
   clears its scratch frame if a newer generation was published meanwhile, so
   a frame never shows two profiles.
 - The mapped-only key map (`rgb_layer_stage.c`) rebuilds when
   `noah_active_profile_rgb_publication_epoch` moves, since the keymap changed
   with the profile.
+- The layer stage derives every layer's colour, mode and solid flag once per
+  publication, keyed by the frame's epoch and publication count, and uses them
+  only once the frame has passed the check above. An epoch is never reused
+  while the runtime lives, so colours read across a publication are never
+  shown.
 - The key runtime reads the tap-commit policy through the same view
   (`key_feedback_tap_commit_mode` in `rgb_active_profile_config.c`), and a stale
   or busy read is off.
@@ -153,14 +160,18 @@ lights all its keys.
 ## How the slave half gets it
 
 1. `noah_matrix_scan_user` (`runtime_init.c`) runs, on the master half, the
-   key runtime scan and then `split_runtime_sync_tick`. One `timer_read32`
-   serves the whole pass: scheduling, every domain's last-sent time.
+   key runtime scan and then `split_runtime_sync_tick`. Its one `timer_read32`
+   serves the whole pass: scheduling, every domain's last-sent time, and the
+   pointer CPI refresh after the tick.
 2. The tick builds the base and combo packets every pass and the key-feedback
    packets when dirty, forced, last sent active, or heartbeat due; it sends
-   base, combo, semantic, branch in that order, stopping at the first failure.
-   A domain's dirty flag and last-sent copy change only after it succeeds.
-   Fade progress is read from QMK's timer whenever auto-mouse is on, not only
-   while the pointer moves, because the fade runs after movement stops.
+   base, combo, semantic, branch in that order, stopping at the first failure,
+   and at most one heartbeat a pass. The combo build is empty at once while no
+   combo output is held. A domain's dirty flag and last-sent copy change only
+   after it succeeds. Fade progress is read from QMK's timer whenever
+   auto-mouse is on and the pointer layer is on, not only while the pointer
+   moves, because the fade runs after movement stops; with the layer off the
+   packet carries the finished fade.
 3. On the slave half the RPC callbacks run in QMK's split worker thread,
    which can preempt the main loop. Each publishes its domain into
    `split_runtime_sync_remote` between `noah_runtime_publication_begin` and

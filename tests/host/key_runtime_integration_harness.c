@@ -113,6 +113,8 @@ __attribute__((weak)) void pointing_mode_apply_remote_snapshot(pointing_mode_mas
 
 __attribute__((weak)) void pointing_mode_service_active_dpi_sync(void) {}
 
+__attribute__((weak)) void pointing_mode_forget_applied_dpi(void) {}
+
 __attribute__((weak)) uint8_t pointing_mode_active_keyboard_event_masked_real_mods(void) {
     return 0u;
 }

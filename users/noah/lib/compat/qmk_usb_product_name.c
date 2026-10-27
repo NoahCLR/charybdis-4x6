@@ -84,14 +84,19 @@ static uint32_t                     live_publication;
 static uint32_t                     last_host_frame;
 static bool                         live_known;
 static bool                         host_frame_seen;
+// Whether `live` equals `enumerated`, compared only when either changes, so
+// a housekeeping pass with nothing new compares no names.
+static bool                         live_enumerated;
+static bool                         live_enumerated_known;
 
 static void serve(const noah_profile_keyboard_name_t *name) {
     uint8_t *next = served == descriptors[0] ? descriptors[1] : descriptors[0];
 
     // An empty name, or one that cannot be encoded, serves QMK's built-in
     // name. Either way this name is settled, so it never restarts USB again.
-    served     = noah_qmk_usb_product_name_encode(name, next, sizeof(descriptors[0])) ? next : NULL;
-    enumerated = *name;
+    served                = noah_qmk_usb_product_name_encode(name, next, sizeof(descriptors[0])) ? next : NULL;
+    enumerated            = *name;
+    live_enumerated_known = false;
 }
 
 // LTO inlines a function called once into its caller, and both entry points
@@ -120,10 +125,15 @@ __attribute__((noinline)) void noah_qmk_usb_product_name_task(void) {
     uint32_t publication = noah_active_profile_settings_publication();
     if (!live_known || publication != live_publication) {
         noah_active_profile_settings_keyboard_name(&live);
-        live_publication = publication;
-        live_known       = true;
+        live_publication      = publication;
+        live_known            = true;
+        live_enumerated_known = false;
     }
-    if (noah_profile_keyboard_name_equal(&live, &enumerated) || !NOAH_USB_ACTIVE() || (host_frame_seen && timer_elapsed32(last_host_frame) < NOAH_QMK_USB_PRODUCT_NAME_QUIET_MS)) {
+    if (!live_enumerated_known) {
+        live_enumerated       = noah_profile_keyboard_name_equal(&live, &enumerated);
+        live_enumerated_known = true;
+    }
+    if (live_enumerated || !NOAH_USB_ACTIVE() || (host_frame_seen && timer_elapsed32(last_host_frame) < NOAH_QMK_USB_PRODUCT_NAME_QUIET_MS)) {
         return;
     }
     if (!noah_profile_store_runtime_usb_restart_safe()) {

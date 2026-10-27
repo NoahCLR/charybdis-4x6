@@ -33,9 +33,11 @@ what a mode does is
 the local active and locked mode and the active mode's source (its key or its
 linked layers, D-F62), the owner keys (one entry per key position, every entry
 the active mode's), the slave half's mirrored display state in two banks under
-a publication counter, and three flags (synthetic auto-mouse anchor, DPI sync
-pending, an auto-sniping layer on). The layers a key-started mode's key turns
-on are `layer_ownership`'s, not this store's.
+a publication counter, three flags (synthetic auto-mouse anchor, DPI sync
+pending, an auto-sniping layer on), the CPI the DPI policy last wrote
+while nothing else has written the sensor's since, and when its refresh
+period began. The layers a key-started
+mode's key turns on are `layer_ownership`'s, not this store's.
 
 - Local state changes only through `pointing_mode_apply_command()`; each command
   returns a before-and-after snapshot. Split sync samples the state on its

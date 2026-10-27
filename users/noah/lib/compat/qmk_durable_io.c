@@ -22,10 +22,12 @@ static uint32_t owner_now(const noah_qmk_durable_io_grant_t *grant, uint32_t now
     return now - grant->paused_total - (grant->paused ? now - grant->paused_since : 0u);
 }
 
-// Once per grant, before its first step: whether the step may not run. Out
-// of line, as the step and the repeat are: inlined into the step, it widens
-// the frame every reviewed storage path carries (docs/spec/resource-policy.md, D-F32).
-static __attribute__((noinline)) void noah_qmk_durable_io_note_paused(noah_qmk_durable_io_grant_t *grant, bool paused) {
+// Once per grant, before its first step: whether the step may not run, noted
+// at the scan time it returns, which the first step's owner clock also reads
+// (each timer read takes a lock). Out of line, as the step and the repeat
+// are: inlined into the step, it widens the frame every reviewed storage
+// path carries (docs/spec/resource-policy.md, D-F32).
+static __attribute__((noinline)) uint32_t noah_qmk_durable_io_note_paused(noah_qmk_durable_io_grant_t *grant, bool paused) {
     uint32_t now = timer_read32();
 
     if (paused && !grant->paused) {
@@ -35,21 +37,23 @@ static __attribute__((noinline)) void noah_qmk_durable_io_note_paused(noah_qmk_d
         grant->paused_total += now - grant->paused_since;
         grant->paused = false;
     }
+    return now;
 }
 
 // The store's step waits while its flash says so: a save needs a sector
 // erased and the keyboard is busy, or the grant's flash time is spent (D-F29).
 static __attribute__((noinline)) bool noah_qmk_durable_io_profile_step(noah_qmk_durable_io_grant_t *grant, bool first_in_grant) {
-    bool may_write = noah_profile_flash_store_may_write(grant->flash);
+    bool     may_write = noah_profile_flash_store_may_write(grant->flash);
+    uint32_t now       = first_in_grant ? noah_qmk_durable_io_note_paused(grant, !may_write) : 0u;
 
-    if (first_in_grant) {
-        noah_qmk_durable_io_note_paused(grant, !may_write);
-    }
     if (!may_write) {
         return false;
     }
+    if (!first_in_grant) {
+        now = timer_read32();
+    }
     // A repeated step visits only the subsystem whose step just worked.
-    return noah_qmk_durable_io_store_step(grant->context, !first_in_grant, owner_now(grant, timer_read32()));
+    return noah_qmk_durable_io_store_step(grant->context, !first_in_grant, owner_now(grant, now));
 }
 
 void noah_qmk_durable_io_init(noah_qmk_durable_io_grant_t *grant, noah_profile_flash_store_t *flash, void *context) {

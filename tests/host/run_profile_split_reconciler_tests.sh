@@ -22,6 +22,7 @@ build_and_run() {
         -DQMK_KEYBOARD_H='"qmk_stub.h"' \
         -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         -DNOAH_PROFILE_SPLIT_TEST_HOOKS \
+        -Wl,--wrap=noah_profile_split_v1_frame_decode \
         -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \

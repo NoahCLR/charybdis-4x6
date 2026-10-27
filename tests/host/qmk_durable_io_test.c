@@ -59,6 +59,7 @@ typedef struct {
 
 static uint32_t scan_ms;
 static unsigned hook_calls;
+static unsigned timer_reads;
 
 static void check(bool condition, const char *message) {
     if (!condition) {
@@ -68,6 +69,7 @@ static void check(bool condition, const char *message) {
 }
 
 uint32_t timer_read32(void) {
+    timer_reads++;
     return scan_ms;
 }
 
@@ -204,6 +206,17 @@ static void test_an_idle_store_gets_one_grant_and_one_step_per_scan(void) {
     }
     check(half->repeated == 0u && !paused(half), "an idle grant's one step is a full round");
     check(half->quiet_calls == 0u && half->chip.erases == 0u && half->chip.programs == 0u, "idle grants never inspect the matrix");
+    // Each read of the timer takes a lock: a grant reads it once for its
+    // pause note and its first step's owner clock together.
+    timer_reads = 0u;
+    for (unsigned grant = 0u; grant < 64u; grant++) {
+        (void)scan(half);
+    }
+    check(timer_reads == 64u, "an idle grant reads the millisecond timer once");
+    // A repeated step reads it afresh, as a step later in the grant always did.
+    half->busy  = true;
+    timer_reads = 0u;
+    check(scan(half) == NOAH_QMK_DURABLE_IO_STEPS_MAX && timer_reads == NOAH_QMK_DURABLE_IO_STEPS_MAX, "a grant reads the timer once per step");
 }
 
 // A save waiting for a quiet keyboard: no erase and no step, and the owner's
