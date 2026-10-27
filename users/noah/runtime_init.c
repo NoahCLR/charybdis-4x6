@@ -25,6 +25,7 @@
 #include "lib/compat/qmk_usb_product_name.h"
 #include "lib/profile/storage/profile_store_runtime_hooks.h"
 #include "lib/profile/runtime/active_profile_pd_runtime.h"
+#include "lib/pointing/defs/pointing_modes.h"
 #include "lib/rgb/core/rgb_runtime.h"
 #include "lib/state/diagnostics/runtime_diag.h"
 #include "lib/state/shared/runtime_reset.h"
@@ -42,9 +43,13 @@ void noah_eeconfig_init_user(void) {
     // An EEPROM reset forgets the saved profiles at boot (D-F29); nothing
     // else of ours lives in QMK's EEPROM (D-F31).
     (void)macro_payload_engine_cancel();
+    // QMK's Charybdis EEPROM reset has just written the sensor's CPI.
+    pointing_mode_forget_applied_dpi();
 }
 
 void noah_matrix_scan_user(void) {
+    uint32_t now;
+
 #if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE)
     noah_runtime_cadence_note_matrix_scan();
 #endif
@@ -60,7 +65,11 @@ void noah_matrix_scan_user(void) {
     macro_payload_engine_scan();
 
     noah_runtime_diag_stage_mark(NOAH_RUNTIME_DIAG_STAGE_SPLIT_SYNC);
-    split_runtime_sync_tick();
+    // One clock read serves every scheduler on the pass: QMK's timer takes a
+    // lock and a 64-bit divide.
+    now = timer_read32();
+    split_runtime_sync_tick(now);
+    pointing_mode_refresh_applied_dpi(now);
     noah_runtime_diag_stage_mark(NOAH_RUNTIME_DIAG_STAGE_QMK_TASKS);
 }
 
@@ -99,7 +108,9 @@ void noah_keyboard_pre_init_user(void) {
 
 void noah_keyboard_post_init_user(void) {
     static const noah_runtime_init_stage_fn_t stages[] = {
-        noah_runtime_shared_state_post_init, key_origin_registry_init, noah_qmk_combo_origin_init, noah_record_admission_reset, macro_payload_engine_init, noah_qmk_portable_storage_init, noah_profile_store_runtime_init,
+        // pointing_mode_forget_applied_dpi: QMK's Charybdis post-init has just
+        // written the sensor's CPI.
+        noah_runtime_shared_state_post_init, pointing_mode_forget_applied_dpi, key_origin_registry_init, noah_qmk_combo_origin_init, noah_record_admission_reset, macro_payload_engine_init, noah_qmk_portable_storage_init, noah_profile_store_runtime_init,
 #if !defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
         noah_runtime_init_compiled_pd,
 #endif

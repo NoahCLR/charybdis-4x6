@@ -22,6 +22,7 @@ run_variant() {
 
     cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
         -DCOMBO_ENABLE \
+        -DCOMBO_ORIGIN_TEST_INSTRUMENTATION \
         -DQMK_KEYBOARD_H='"qmk_stub.h"' \
         -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         "$@" \

@@ -118,9 +118,33 @@ retaken when found gone; a mouse button's count
 
 `noah_layer_state_set_user` and every mode transition only request a sync;
 `pointing_mode_service_active_dpi_sync`, at the end of `noah_key_runtime_scan`,
-calls `pointing_mode_apply_active_dpi`, which writes `pointing_device_set_cpi`
-in the order the spec gives, reading BK's default and sniping DPI through
-`compat/qmk_pointing_contract.h`.
+calls `pointing_mode_apply_active_dpi`, which works out the CPI in the order
+the spec gives, reading BK's default and sniping DPI through
+`compat/qmk_pointing_contract.h`, and writes it with `pointing_device_set_cpi`
+unless the sensor already holds it. QMK's auto-mouse turns its layer on again
+every debounce window while the ball moves, and each write is a register
+write with busy-waits that drops the sensor out of burst mode.
+
+The policy writes again whatever it wrote last once anything else may have
+written the sensor's CPI, each of which calls `pointing_mode_forget_applied_dpi`:
+the sensor's init (`noah_pointing_device_init_user`), QMK's Charybdis
+post-init and EEPROM reset (`noah_keyboard_post_init_user`,
+`noah_eeconfig_init_user`), its DPI steps (`compat/qmk_profile_adjustments.c`,
+`compat/qmk_portable_profile.c`) and its own keys reaching `process_record_kb`
+(`noah_qmk_profile_adjustment_process`, or `key_runtime_process_finish` in an
+image without the owner). `run_qmk_contract_checks.sh` holds QMK to
+writing the CPI only there.
+
+A sensor can lose its CPI on its own, to a brownout or glitch that resets it
+to its default without resetting the MCU, and a policy that writes only a
+changed CPI would never put it back. So `pointing_mode_refresh_applied_dpi`,
+after the split tick in `noah_matrix_scan_user`, on the pass's one clock
+read, writes the policy's CPI again `POINTING_MODE_CPI_REFRESH_MS` (5 s) after
+anything last wrote it, even unchanged: one write each period. Any other
+write, the policy's own or one that forgets it, starts the period again. On
+the master half that has the sensor the write reaches it; on the other master
+it only hands QMK the CPI it already sends, and the sensor's half compares the
+sensor's CPI with that every pass and writes it back itself.
 
 ## The slave half
 

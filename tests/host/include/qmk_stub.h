@@ -105,6 +105,18 @@ static inline uint16_t pgm_read_word(const void *addr_) {
 #ifndef POINTER_SNIPING_DPI_REVERSE
 #    define POINTER_SNIPING_DPI_REVERSE QK_KB_3
 #endif
+#ifndef SNIPING_MODE
+#    define SNIPING_MODE QK_KB_4
+#endif
+#ifndef SNIPING_MODE_TOGGLE
+#    define SNIPING_MODE_TOGGLE QK_KB_5
+#endif
+#ifndef DRAGSCROLL_MODE
+#    define DRAGSCROLL_MODE QK_KB_6
+#endif
+#ifndef DRAGSCROLL_MODE_TOGGLE
+#    define DRAGSCROLL_MODE_TOGGLE QK_KB_7
+#endif
 
 #ifndef DPI_MOD
 #    define DPI_MOD POINTER_DEFAULT_DPI_FORWARD

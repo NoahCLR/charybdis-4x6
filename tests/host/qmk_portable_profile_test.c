@@ -95,6 +95,11 @@ void charybdis_cycle_pointer_sniping_dpi(bool forward) {
     (void)forward;
     durable_writes++;
 }
+// QMK's DPI steps write the sensor's CPI behind the DPI policy.
+static unsigned cpi_forgets;
+void pointing_mode_forget_applied_dpi(void) {
+    cpi_forgets++;
+}
 void charybdis_cycle_pointer_default_dpi_noeeprom(bool forward) {
     (void)forward;
     default_dpi = forward ? (default_dpi >= 3400u ? 400u : default_dpi + 200u) : (default_dpi <= 400u ? 3400u : default_dpi - 200u);
@@ -345,11 +350,15 @@ int main(int argc, char **argv) {
     assert(combo_ref_from_layer(15) == 2 && combo_ref_from_layer(14) == 14 && combo_ref_from_layer(16) == 16);
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
     pending_adjustment = true;
+    cpi_forgets        = 0u;
     noah_qmk_portable_apply();
-    assert(default_dpi == 1800u && durable_writes == 0u);
+    assert(default_dpi == 1800u && durable_writes == 0u && cpi_forgets == 1u);
     pending_adjustment = false;
     noah_qmk_portable_apply();
-    assert(default_dpi == noah_setting(NOAH_SETTING_DEFAULT_DPI, 400u) && durable_writes == 0u);
+    assert(default_dpi == noah_setting(NOAH_SETTING_DEFAULT_DPI, 400u) && durable_writes == 0u && cpi_forgets == 2u);
+    // QMK already runs the profile's DPIs: no step, nothing written behind the policy.
+    noah_qmk_portable_apply();
+    assert(cpi_forgets == 2u);
 #endif
     puts("portable settings readback streams the live domain");
     return 0;

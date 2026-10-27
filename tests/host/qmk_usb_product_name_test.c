@@ -13,7 +13,14 @@
 static bool                         master, usb_active, settled, boot_found;
 static noah_profile_keyboard_name_t boot_name, live_name, compiled_name;
 static uint32_t                     publication, now;
-static unsigned                     restarts, boot_reads;
+static unsigned                     restarts, boot_reads, name_compares;
+
+// Linked with --wrap, so every comparison the module makes is counted.
+bool __real_noah_profile_keyboard_name_equal(const noah_profile_keyboard_name_t *a, const noah_profile_keyboard_name_t *b);
+bool __wrap_noah_profile_keyboard_name_equal(const noah_profile_keyboard_name_t *a, const noah_profile_keyboard_name_t *b) {
+    name_compares++;
+    return __real_noah_profile_keyboard_name_equal(a, b);
+}
 
 bool is_keyboard_master(void) {
     return master;
@@ -209,6 +216,35 @@ static void test_unencodable_name_settles(void) {
     assert(restarts == 1u);
 }
 
+// Housekeeping runs every main-loop pass: with nothing published and nothing
+// served since the last pass, it compares no names.
+static void test_an_idle_pass_compares_no_names(void) {
+    boot("Desk", true);
+    noah_qmk_usb_product_name_task();
+    name_compares = 0u;
+    for (int i = 0; i < 100; i++)
+        noah_qmk_usb_product_name_task();
+    assert(name_compares == 0u && restarts == 0u);
+    // A publication is compared once, whatever the passes after it.
+    publish("Desk");
+    for (int i = 0; i < 100; i++)
+        noah_qmk_usb_product_name_task();
+    assert(name_compares == 1u && restarts == 0u);
+    // A rename waiting for a safe moment is compared once too, and still served.
+    publish("Travel");
+    settled = false;
+    for (int i = 0; i < 100; i++)
+        noah_qmk_usb_product_name_task();
+    assert(name_compares == 2u && restarts == 0u);
+    settled = true;
+    noah_qmk_usb_product_name_task();
+    assert(restarts == 1u);
+    serves("Travel");
+    for (int i = 0; i < 100; i++)
+        noah_qmk_usb_product_name_task();
+    assert(restarts == 1u && name_compares == 3u);
+}
+
 int main(void) {
     test_encoding();
     test_boot_serves_the_saved_name();
@@ -217,6 +253,7 @@ int main(void) {
     test_half_without_usb_never_restarts();
     test_boot_activates_a_different_profile();
     test_unencodable_name_settles();
+    test_an_idle_pass_compares_no_names();
     puts("qmk USB product name tests passed");
     return 0;
 }

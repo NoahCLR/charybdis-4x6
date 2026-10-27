@@ -43,7 +43,10 @@ what they draw is [rgb-domain-v1.md](../../../../docs/spec/rgb-domain-v1.md#draw
   the compiled lighting; host tests use it.
 
 The scratch frames are static and LED-frame-sized (one in `rgb_runtime.c`,
-three in the fade stage); a new stage reuses the shared one.
+three in the fade stage); a new stage reuses the shared one. The layer stage
+also keeps, for one publication, each layer's colour, mode and solid flag and
+the mapped-only key map, so a chunk reads only its layer groups' records;
+`rgb_runtime_layer_stage_invalidate_maps` drops both.
 
 A new stage needs its compile flag, a stage bit and its records in
 `profile/schema/profile_rgb_v1`, its accessors here, its call in

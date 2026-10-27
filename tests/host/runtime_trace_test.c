@@ -432,7 +432,7 @@ static void test_split_failure_and_recovery_trace_is_bounded(void) {
     CHECK(rpc_send_count == 1u);
 
     for (uint8_t index = 0u; index < 20u; index++) {
-        split_runtime_sync_tick();
+        split_runtime_sync_tick(timer_read32());
     }
 
     snapshot = test_trace_snapshot();
@@ -444,7 +444,7 @@ static void test_split_failure_and_recovery_trace_is_bounded(void) {
 
     fake_time32 += 50u;
     fake_rpc_send_result = true;
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
 
     snapshot = test_trace_snapshot();
     CHECK(snapshot.count == 3u);

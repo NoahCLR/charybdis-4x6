@@ -6,6 +6,9 @@
 static uint8_t mods, oneshot, last_setting;
 static uint32_t calls, queued;
 static uint8_t last_action;
+static uint32_t forgets;
+// QMK's DPI steps write the sensor's CPI behind the DPI policy.
+void pointing_mode_forget_applied_dpi(void) { forgets++; }
 uint8_t get_mods(void) { return mods; }
 uint8_t get_oneshot_mods(void) { return oneshot; }
 uint16_t charybdis_get_pointer_default_dpi(void) { return 800u; }
@@ -79,16 +82,23 @@ int main(void) {
             uint32_t prior = calls;
             for (uint8_t pressed = 0u; pressed < 2u; pressed++) {
                 keyrecord_t record = {.event.pressed = pressed};
+                uint32_t    prior_forgets = forgets;
+                bool        dpi = cases[i].setting == NOAH_SETTING_DEFAULT_DPI || cases[i].setting == NOAH_SETTING_SNIPING_DPI;
                 assert(!noah_qmk_profile_adjustment_process(cases[i].key, &record));
                 if (pressed == trigger) assert(calls == prior + 1u && queued == calls && last_setting == cases[i].setting && last_action == (shift ? cases[i].shifted : cases[i].normal));
+                assert(forgets == prior_forgets + (pressed == trigger && dpi ? 1u : 0u));
                 prior = calls;
             }
         }
     }
     uint32_t prior = calls;
     keyrecord_t record = {.event.pressed = true};
+    uint32_t prior_forgets = forgets;
     assert(noah_qmk_profile_adjustment_process(CM_TOGG, &record));
+    assert(forgets == prior_forgets);
+    // QMK's own toggle goes on to QMK, which writes the CPI.
     assert(noah_qmk_profile_adjustment_process(SNIPING_MODE_TOGGLE, &record));
+    assert(forgets == prior_forgets + 1u);
     assert(calls == prior && queued == calls);
     mods = 0u; oneshot = MOD_MASK_SHIFT;
     assert(!noah_qmk_profile_adjustment_process(POINTER_DEFAULT_DPI_FORWARD, &record) && last_action == 2u);

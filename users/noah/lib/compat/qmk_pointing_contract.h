@@ -29,6 +29,13 @@ static inline uint16_t noah_qmk_contract_pointer_sniping_dpi(void) {
     return charybdis_get_pointer_sniping_dpi();
 }
 
+// QMK's Charybdis keycodes, its DPI steps through its drag-scroll toggle, set
+// the sensor's CPI themselves in process_record_kb once process_record_user
+// lets them through (run_qmk_contract_checks.sh).
+static inline bool noah_qmk_contract_pointer_keycode_sets_cpi(uint16_t keycode) {
+    return keycode >= POINTER_DEFAULT_DPI_FORWARD && keycode <= DRAGSCROLL_MODE_TOGGLE;
+}
+
 // QMK sends a mouse button's report at once, from the report the pointing task
 // is still building, which carries this poll's motion until the task's own
 // result replaces it. A pointing mode that clicks drops that motion first, so
@@ -58,6 +65,11 @@ static inline uint16_t noah_qmk_contract_pointer_default_dpi(void) {
 
 static inline uint16_t noah_qmk_contract_pointer_sniping_dpi(void) {
     return 0;
+}
+
+static inline bool noah_qmk_contract_pointer_keycode_sets_cpi(uint16_t keycode) {
+    (void)keycode;
+    return false;
 }
 
 static inline void noah_qmk_contract_pointer_drop_pending_motion(void) {}

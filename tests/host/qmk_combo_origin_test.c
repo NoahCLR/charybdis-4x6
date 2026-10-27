@@ -23,6 +23,7 @@ layer_state_t default_layer_state = (layer_state_t)1u << LAYER_BASE;
 
 static uint16_t test_keymaps[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 static uint16_t fake_time;
+static uint16_t timer_read_count;
 static uint8_t test_source_layer;
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
 extern const uint8_t noah_combo_count;
@@ -182,6 +183,7 @@ static void test_reset(void) {
 }
 
 uint16_t timer_read(void) {
+    timer_read_count++;
     return fake_time;
 }
 
@@ -944,6 +946,99 @@ static void test_deadline_expiry_boundaries_and_timer_wrap(void) {
     CHECK(!key_origin_bitmap_has_any(bitmap));
 }
 
+// The scan runs every matrix pass. With no completion waiting it has nothing to
+// reconcile, so it reads no clock and looks at no pending slot.
+static void test_idle_scan_reads_no_clock_and_visits_no_slot(void) {
+    test_reset();
+    timer_read_count = 0u;
+    noah_qmk_combo_origin_test_pending_slot_visits_reset();
+
+    for (uint8_t pass = 0u; pass < 3u; pass++) {
+        noah_qmk_combo_origin_scan();
+    }
+
+    CHECK(timer_read_count == 0u);
+    CHECK(noah_qmk_combo_origin_test_pending_slot_visits() == 0u);
+}
+
+// A scan with completions waiting looks only at their slots, still retires an
+// expired one on the scan, and goes back to costing nothing once none waits.
+static void test_scan_visits_only_used_slots_and_still_expires_them(void) {
+    noah_qmk_combo_origin_debug_snapshot_t snapshot;
+    uint8_t                                bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset();
+    test_observe_physical_key(test_key(0, 0), true); // A + B: combo 0
+    test_observe_physical_key(test_key(1, 0), true);
+    test_observe_physical_key(test_key(2, 0), true); // E + F + G: combo 2
+    test_observe_physical_key(test_key(4, 1), true);
+    test_observe_physical_key(test_key(5, 1), true);
+    for (uint8_t row = 0u; row < 6u; row++) {
+        for (uint8_t col = 0u; col < 2u; col++) {
+            test_observe_physical_key(test_key(row, col), false);
+        }
+    }
+    noah_qmk_combo_origin_debug_snapshot(&snapshot);
+    CHECK(snapshot.pending_count == 2u);
+
+    timer_read_count = 0u;
+    noah_qmk_combo_origin_test_pending_slot_visits_reset();
+    noah_qmk_combo_origin_scan();
+    CHECK(noah_qmk_combo_origin_test_pending_slot_visits() == 2u);
+    CHECK(timer_read_count == 1u);
+
+    fake_time = (uint16_t)(fake_time + COMBO_TERM + 1u);
+    noah_qmk_combo_origin_scan();
+    noah_qmk_combo_origin_pressed_combo_bitmap(bitmap);
+    CHECK(test_bitmap_has(bitmap, 0, 0) && test_bitmap_has(bitmap, 5, 1));
+    noah_qmk_combo_origin_scan();
+    noah_qmk_combo_origin_pressed_combo_bitmap(bitmap);
+    CHECK(!key_origin_bitmap_has_any(bitmap));
+    noah_qmk_combo_origin_debug_snapshot(&snapshot);
+    CHECK(snapshot.pending_count == 0u && snapshot.deadline_expiry_count == 2u);
+
+    timer_read_count = 0u;
+    noah_qmk_combo_origin_test_pending_slot_visits_reset();
+    noah_qmk_combo_origin_scan();
+    CHECK(timer_read_count == 0u);
+    CHECK(noah_qmk_combo_origin_test_pending_slot_visits() == 0u);
+}
+
+// A completion dispatched as a press leaves its slot, and one superseded by a
+// newer completion of the same combo keeps a single slot. The held output is
+// what the combo feedback reads; its release leaves no combo held.
+static void test_dispatched_and_superseded_completions_free_their_slot(void) {
+    keyrecord_t                            combo_press   = test_combo_record(true);
+    keyrecord_t                            combo_release = test_combo_record(false);
+    noah_qmk_combo_origin_debug_snapshot_t snapshot;
+
+    test_reset();
+    test_observe_physical_key(test_key(0, 0), true);
+    test_observe_physical_key(test_key(1, 0), true);
+    test_observe_physical_key(test_key(1, 0), false);
+    test_observe_physical_key(test_key(1, 0), true); // completes combo 0 again
+    noah_qmk_combo_origin_test_pending_slot_visits_reset();
+    noah_qmk_combo_origin_scan();
+    CHECK(noah_qmk_combo_origin_test_pending_slot_visits() == 1u);
+
+    CHECK(!noah_qmk_combo_origin_any_active());
+    test_set_combo_active(0, true);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_LEFT, &combo_press);
+    noah_qmk_combo_origin_debug_snapshot(&snapshot);
+    CHECK(snapshot.pending_count == 0u && snapshot.active_count == 1u);
+    CHECK(noah_qmk_combo_origin_any_active());
+
+    timer_read_count = 0u;
+    noah_qmk_combo_origin_test_pending_slot_visits_reset();
+    noah_qmk_combo_origin_scan();
+    CHECK(timer_read_count == 0u);
+    CHECK(noah_qmk_combo_origin_test_pending_slot_visits() == 0u);
+
+    test_set_combo_active(0, false);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_LEFT, &combo_release);
+    CHECK(!noah_qmk_combo_origin_any_active());
+}
+
 // Candidates are keyed by combo, so a burst of complete chords cannot crowd
 // one out and silently drop it to delivery-time timing.
 static void test_chord_burst_keeps_every_candidate(void) {
@@ -1211,6 +1306,9 @@ int main(void) {
     test_overlap_disabled_candidate_retires_before_feedback_bitmap();
     test_delayed_output_gets_final_deadline_scan_opportunity();
     test_deadline_expiry_boundaries_and_timer_wrap();
+    test_idle_scan_reads_no_clock_and_visits_no_slot();
+    test_scan_visits_only_used_slots_and_still_expires_them();
+    test_dispatched_and_superseded_completions_free_their_slot();
     test_chord_burst_keeps_every_candidate();
     test_recompleted_combo_supersedes_its_candidate();
     test_unmatched_output_is_observable_and_does_not_create_origin();

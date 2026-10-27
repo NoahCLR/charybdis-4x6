@@ -63,3 +63,9 @@ noah_active_profile_rgb_result_t noah_active_profile_rgb_frame_status(const noah
 
 // Scan-owner invalidation stamp for derived matrix coverage maps.
 uint32_t noah_active_profile_rgb_publication_epoch(void);
+
+#ifdef NOAH_ACTIVE_PROFILE_RGB_RUNTIME_TEST_BACKEND
+// Whole-frame copies out of a bank since the last reset, across runtimes.
+void     noah_active_profile_rgb_runtime_test_reset_frame_copies(void);
+uint32_t noah_active_profile_rgb_runtime_test_frame_copies(void);
+#endif

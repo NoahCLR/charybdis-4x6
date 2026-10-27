@@ -374,6 +374,7 @@ const uint8_t key_behavior_count = ARRAY_SIZE(key_behaviors);
 
 static uint16_t              fake_time;
 static uint16_t              current_cpi;
+static uint32_t              cpi_writes;
 static uint16_t              default_dpi;
 static uint16_t              sniping_dpi;
 static uint8_t               split_sync_count;
@@ -571,6 +572,7 @@ static void test_reset_state(void) {
 
     fake_time                              = 1000;
     current_cpi                            = 0;
+    cpi_writes                             = 0;
     default_dpi                            = 900;
     sniping_dpi                            = 350;
     split_sync_count                       = 0;
@@ -1388,6 +1390,7 @@ void charybdis_set_pointer_sniping_enabled(bool enabled) {
 
 void pointing_device_set_cpi(uint16_t cpi) {
     current_cpi = cpi;
+    cpi_writes++;
 }
 
 void reset_dragscroll_mode(void) {
@@ -1436,6 +1439,32 @@ static void test_assert_pd_overlap_quiescent(keypos_t parent_pos, keypos_t child
     CHECK(!dragscroll_enabled);
 }
 
+
+// QMK's own Charybdis keys (here its sniping toggle) write the sensor's CPI in
+// process_record_kb once the record path lets them through. The DPI policy's
+// next request then writes its CPI again, though it is the one it wrote last.
+static void test_a_qmk_charybdis_key_has_the_policy_write_its_cpi_again(void) {
+    const key_runtime_integration_step_t steps[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(SNIPING_MODE_TOGGLE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(10),
+        KEY_RUNTIME_INTEGRATION_RELEASE(SNIPING_MODE_TOGGLE, 1, 2),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+
+    test_reset_state();
+    pointing_mode_request_active_dpi_sync();
+    pointing_mode_service_active_dpi_sync();
+    CHECK(current_cpi == default_dpi && cpi_writes == 1u);
+    pointing_mode_request_active_dpi_sync();
+    pointing_mode_service_active_dpi_sync();
+    CHECK(cpi_writes == 1u);
+
+    key_runtime_integration_run(&fake_time, steps, ARRAY_SIZE(steps));
+    current_cpi = sniping_dpi; // QMK's toggle, behind the policy
+    pointing_mode_request_active_dpi_sync();
+    pointing_mode_service_active_dpi_sync();
+    CHECK(current_cpi == default_dpi && cpi_writes == 2u);
+}
 
 static void test_authored_single_press_preserves_default_pointing_mode_hold(void) {
     keypos_t                             key_pos       = test_keypos(1, 2);
@@ -6138,6 +6167,7 @@ int main(int argc, char **argv) {
     test_mode_tap_registers_only_due_fallback_holds();
 #endif
     test_last_slot_hold_lock_dpi_and_disabled_slot();
+    test_a_qmk_charybdis_key_has_the_policy_write_its_cpi_again();
     test_authored_single_press_preserves_default_pointing_mode_hold();
     test_authored_single_press_pointing_mode_hold_dispatches_plain_taps_immediately();
     test_raw_lt_hold_dispatches_authored_tap_key_immediately();

@@ -50,20 +50,20 @@ static noah_profile_working_result_t finish(noah_profile_working_copy_t *copy, n
 }
 
 static void note_publications(noah_profile_working_copy_t *copy) {
-    noah_active_profile_status_t status;
+    uint32_t count;
 
-    if (copy->provider && noah_active_profile_provider_status(copy->provider, &status) == NOAH_ACTIVE_PROFILE_OK) {
-        copy->publication_count = status.publication_count;
+    if (copy->provider && noah_active_profile_provider_publication_count(copy->provider, &count) == NOAH_ACTIVE_PROFILE_OK) {
+        copy->publication_count = count;
     }
 }
 
 bool noah_profile_working_copy_observe(noah_profile_working_copy_t *copy, bool same_content) {
-    noah_active_profile_status_t status;
+    uint32_t count;
 
-    if (!copy || !copy->provider || noah_active_profile_provider_status(copy->provider, &status) != NOAH_ACTIVE_PROFILE_OK || status.publication_count == copy->publication_count) {
+    if (!copy || !copy->provider || noah_active_profile_provider_publication_count(copy->provider, &count) != NOAH_ACTIVE_PROFILE_OK || count == copy->publication_count) {
         return false;
     }
-    copy->publication_count = status.publication_count;
+    copy->publication_count = count;
     (void)noah_profile_working_copy_note_replaced(copy, !same_content);
     return true;
 }

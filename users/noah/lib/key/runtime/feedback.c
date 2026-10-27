@@ -24,8 +24,13 @@ static uint16_t key_feedback_slot_visits;
 void key_feedback_test_slot_visits_reset(void) { key_feedback_slot_visits = 0u; }
 uint16_t key_feedback_test_slot_visits(void) { return key_feedback_slot_visits; }
 #    define KEY_FEEDBACK_RECORD_SLOT_VISIT() (key_feedback_slot_visits++)
+static uint16_t key_feedback_combo_owner_walks;
+void key_feedback_test_combo_owner_walks_reset(void) { key_feedback_combo_owner_walks = 0u; }
+uint16_t key_feedback_test_combo_owner_walks(void) { return key_feedback_combo_owner_walks; }
+#    define KEY_FEEDBACK_RECORD_COMBO_OWNER_WALK() (key_feedback_combo_owner_walks++)
 #else
 #    define KEY_FEEDBACK_RECORD_SLOT_VISIT() ((void)0)
+#    define KEY_FEEDBACK_RECORD_COMBO_OWNER_WALK() ((void)0)
 #endif
 
 static key_feedback_semantic_t key_feedback_semantic_for_token(const press_token_t *token, keypos_t key_pos);
@@ -632,7 +637,9 @@ void combo_feedback_bitmaps(uint8_t *out_underlay_bitmap, uint8_t *out_overlay_b
         key_origin_bitmap_clear(out_overlay_bitmap);
     }
 
-    if (!(out_underlay_bitmap && out_overlay_bitmap)) {
+    // Built every pass for the split sync and the lighting; with no combo
+    // output held the partition is empty, so skip the owner lookups.
+    if (!(out_underlay_bitmap && out_overlay_bitmap) || !noah_qmk_combo_origin_any_active()) {
         return;
     }
 
@@ -640,6 +647,7 @@ void combo_feedback_bitmaps(uint8_t *out_underlay_bitmap, uint8_t *out_overlay_b
 #ifdef POINTING_DEVICE_ENABLE
     (void)pointing_mode_local_owner_key_pos_snapshot(&pd_owner_key_pos);
 #endif
+    KEY_FEEDBACK_RECORD_COMBO_OWNER_WALK();
     layer_ownership_momentary_owner_bitmap(layer_owner_bitmap);
     noah_qmk_combo_origin_active_bitmaps_partitioned(preview_owner_key_pos, pd_owner_key_pos, layer_owner_bitmap, out_underlay_bitmap, out_overlay_bitmap);
 }

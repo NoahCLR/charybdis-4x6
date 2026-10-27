@@ -77,8 +77,14 @@ build's packed C struct, sent whole.
 | `PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC` | key feedback owner map and tap branch map |
 
 - A packet is sent when it changed, when forced, and as a heartbeat: every
-  250 ms while it carries active state, every 1,000 ms otherwise. A locked
-  pointing mode sends no fade progress.
+  250 ms while it carries active state, every 1,000 ms otherwise. A pass
+  sends at most one heartbeat; one due behind another's goes out on a
+  following pass, and each packet's heartbeat counts from its own last send.
+  Changed and forced packets never wait.
+- Fade progress is active state only while the pointer layer is on, where
+  both halves draw it. With the layer off the packet carries the finished
+  fade, whatever the auto-mouse timer reads; with auto-mouse off, or a
+  locked pointing mode, it carries no fade progress.
 - A send pass stops at its first failed RPC. Until the retry delay passes
   (50 ms, doubling to 1,000 ms) no packet is built; the next pass is a
   recovery probe that sends the latest state. A role change clears the

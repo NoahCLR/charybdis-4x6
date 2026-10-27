@@ -15,6 +15,10 @@ static host_runtime_fixture_t runtime_fixture = HOST_RUNTIME_FIXTURE_INIT;
 #define fake_time32 runtime_fixture.time32
 #define fake_is_master runtime_fixture.is_master
 
+#define TEST_POINTER_LAYER 4u
+
+layer_state_t layer_state;
+
 static uint16_t             fake_auto_mouse_elapsed;
 static bool                 fake_auto_mouse_active;
 static bool                 fake_auto_mouse_enabled;
@@ -88,6 +92,7 @@ static void test_fail(const char *expr, const char *file, int line) {
 
 static void test_reset_stubs(void) {
     host_runtime_fixture_reset(&runtime_fixture);
+    layer_state             = (layer_state_t)1u << TEST_POINTER_LAYER;
     fake_auto_mouse_elapsed = 83u;
     fake_auto_mouse_active  = true;
     fake_auto_mouse_enabled = true;
@@ -196,6 +201,14 @@ uint16_t auto_mouse_get_time_elapsed_at(uint16_t now) {
     auto_mouse_elapsed_at_read_count++;
     auto_mouse_elapsed_at_last_now = now;
     return fake_auto_mouse_elapsed;
+}
+
+bool layer_state_cmp(layer_state_t state, uint8_t layer) {
+    return (state & ((layer_state_t)1u << layer)) != 0;
+}
+
+uint8_t get_auto_mouse_layer(void) {
+    return TEST_POINTER_LAYER;
 }
 
 bool is_auto_mouse_active(void) {
@@ -403,6 +416,35 @@ static void test_set_idle_runtime_state(void) {
     key_feedback_tap_branch_map_clear(fake_key_feedback_tap_branch_map);
 }
 
+// Heartbeats due together go out one per pass, in packet order, each on its
+// own clock: pass() runs one sync pass at the current time.
+static void test_check_heartbeats_one_per_pass(void (*pass)(void)) {
+    static const int8_t expected[] = {PUT_SPLIT_RUNTIME_BASE_SYNC, PUT_SPLIT_COMBO_FEEDBACK_SYNC, PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC, PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC};
+    split_runtime_sync_debug_clock_t clock;
+
+    test_reset_rpc_send_counts();
+    for (uint8_t index = 0u; index < (uint8_t)(sizeof(expected) / sizeof(expected[0])); index++) {
+        uint8_t sent_before = rpc_send_count;
+
+        pass();
+        CHECK(rpc_send_count == sent_before + 1u);
+        CHECK(rpc_send_ids[sent_before] == expected[index]);
+    }
+    pass();
+    CHECK(rpc_send_count == 4u);
+    split_runtime_sync_debug_clock_snapshot(&clock);
+    CHECK(clock.base_last_send == fake_time32 && clock.combo_last_send == fake_time32);
+    CHECK(clock.semantic_last_send == fake_time32 && clock.branch_last_send == fake_time32);
+}
+
+static void test_tick_pass(void) {
+    split_runtime_sync_tick(timer_read32());
+}
+
+static void test_elapsed_pass(void) {
+    split_runtime_sync_elapsed(fake_auto_mouse_elapsed);
+}
+
 static void test_init_registers_rpcs_and_sends_initial_packets_on_master(void) {
     test_reset_stubs();
 
@@ -473,22 +515,23 @@ static void test_elapsed_skips_unchanged_packets_until_heartbeat(void) {
     CHECK(rpc_send_count == 0u);
 
     fake_time32 += 1u;
-    split_runtime_sync_elapsed(fake_auto_mouse_elapsed);
-    CHECK(rpc_send_count == 4u);
+    test_check_heartbeats_one_per_pass(test_elapsed_pass);
     CHECK(rpc_send_count_base == 1u);
     CHECK(rpc_send_count_combo == 1u);
     CHECK(rpc_send_count_key_feedback_semantic == 1u);
     CHECK(rpc_send_count_key_feedback_branch == 1u);
 }
 
+// The main loop reads the clock once a pass and hands it to the tick, which
+// reads none of its own.
 static void test_tick_samples_one_shared_timestamp(void) {
     test_reset_stubs();
     split_runtime_sync_init();
     test_reset_timer_counts();
 
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(fake_time32);
 
-    CHECK(timer_read32_count == 1u);
+    CHECK(timer_read32_count == 0u);
     CHECK(timer_elapsed32_count == 0u);
     CHECK(timer_read_count == 0u);
     CHECK(timer_elapsed_count == 0u);
@@ -572,7 +615,7 @@ static void test_active_auto_mouse_uses_shared_low16_after_wrap(void) {
     test_reset_timer_counts();
 
     fake_time32 += 5u;
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
 
     CHECK(timer_read32_count == 1u);
     CHECK(timer_read_count == 0u);
@@ -590,16 +633,15 @@ static void test_active_heartbeat_is_wrap_safe(void) {
     test_reset_timer_counts();
 
     fake_time32 += 249u;
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
     CHECK(rpc_send_count == 0u);
     CHECK(timer_read32_count == 1u);
     CHECK(timer_elapsed32_count == 0u);
 
     test_reset_timer_counts();
     fake_time32 += 1u;
-    split_runtime_sync_tick();
-    CHECK(rpc_send_count == 4u);
-    CHECK(timer_read32_count == 1u);
+    test_check_heartbeats_one_per_pass(test_tick_pass);
+    CHECK(timer_read32_count == 5u);
     CHECK(timer_elapsed32_count == 0u);
 }
 
@@ -657,11 +699,11 @@ static void test_retry_schedule_caps_and_is_wrap_safe(void) {
 
         test_reset_rpc_send_counts();
         fake_time32 += delay - 1u;
-        split_runtime_sync_tick();
+        split_runtime_sync_tick(timer_read32());
         CHECK(rpc_send_count == 0u);
 
         fake_time32 += 1u;
-        split_runtime_sync_tick();
+        split_runtime_sync_tick(timer_read32());
         CHECK(rpc_send_count == 1u);
         CHECK(rpc_send_count_base == 1u);
         CHECK(rpc_send_times[0] == fake_time32);
@@ -697,11 +739,11 @@ static void test_recovery_sends_latest_state_and_preserves_later_dirty_domains(v
     fake_rpc_send_result = true;
 
     fake_time32 += 49u;
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
     CHECK(rpc_send_count == 0u);
 
     fake_time32 += 1u;
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
 
     CHECK(rpc_send_count == 4u);
     CHECK(rpc_send_ids[0] == PUT_SPLIT_RUNTIME_BASE_SYNC);
@@ -714,7 +756,7 @@ static void test_recovery_sends_latest_state_and_preserves_later_dirty_domains(v
     CHECK(transport.retry_delay_ms == 0u);
 
     test_reset_rpc_send_counts();
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
     CHECK(rpc_send_count == 0u);
 }
 
@@ -725,7 +767,7 @@ static void test_active_to_idle_clear_survives_outage(void) {
     test_set_idle_runtime_state();
     fake_rpc_send_result = false;
 
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
 
     CHECK(rpc_send_count == 1u);
     CHECK(rpc_send_count_base == 1u);
@@ -733,7 +775,7 @@ static void test_active_to_idle_clear_survives_outage(void) {
     test_reset_rpc_send_counts();
     fake_rpc_send_result = true;
     fake_time32 += 50u;
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
 
     CHECK(rpc_send_count == 4u);
     CHECK(rpc_last_base_packet.automouse_progress == 0u);
@@ -797,7 +839,7 @@ static void test_key_feedback_visibility_is_ignored_without_flashing_semantics(v
     test_reset_rpc_send_counts();
     key_origin_bitmap_clear(fake_key_feedback_flash_visibility_bitmap);
 
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
     CHECK(rpc_send_count == 0u);
     CHECK(rpc_send_count_base == 0u);
     CHECK(rpc_send_count_combo == 0u);
@@ -814,7 +856,7 @@ static void test_key_feedback_visibility_changes_when_flashing_semantics_are_pre
     test_reset_rpc_send_counts();
     key_origin_bitmap_clear(fake_key_feedback_flash_visibility_bitmap);
 
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
     CHECK(rpc_send_count == 1u);
     CHECK(rpc_send_count_base == 0u);
     CHECK(rpc_send_count_combo == 0u);
@@ -839,7 +881,7 @@ static void test_tick_sends_only_base_packet_when_only_automouse_changes(void) {
     test_reset_rpc_send_counts();
     fake_auto_mouse_elapsed = 91u;
 
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
 
     CHECK(rpc_send_count == 1u);
     CHECK(rpc_send_count_base == 1u);
@@ -857,7 +899,7 @@ static void test_tick_sends_only_combo_packet_when_only_combo_feedback_changes(v
 
     fake_combo_underlay_bitmap[0] = 0x01u;
 
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
 
     CHECK(rpc_send_count == 1u);
     CHECK(rpc_send_count_base == 0u);
@@ -886,7 +928,7 @@ static void test_quiet_combo_projection_clears_other_half_feedback(void) {
 
     key_origin_bitmap_clear(fake_combo_underlay_bitmap);
     key_origin_bitmap_clear(fake_combo_overlay_bitmap);
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
     CHECK(rpc_send_count_combo == 1u);
     CHECK(!key_origin_bitmap_has_any(rpc_last_combo_packet.combo_underlay_bitmap));
     CHECK(!key_origin_bitmap_has_any(rpc_last_combo_packet.combo_overlay_bitmap));
@@ -905,7 +947,7 @@ static void test_idle_combo_feedback_activation_sends_without_dirty_notification
 
     fake_combo_underlay_bitmap[0] = 0x02u;
 
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
 
     CHECK(combo_underlay_read_count == 1u);
     CHECK(combo_overlay_read_count == 1u);
@@ -926,7 +968,7 @@ static void test_tick_sends_only_key_feedback_packet_when_only_key_feedback_chan
 
     key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}, KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
 
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
 
     CHECK(rpc_send_count == 1u);
     CHECK(rpc_send_count_base == 0u);
@@ -945,7 +987,7 @@ static void test_tick_sends_only_key_feedback_branch_packet_when_only_tap_branch
 
     key_feedback_tap_branch_map_set(fake_key_feedback_tap_branch_map, (keypos_t){.row = 1, .col = 1}, 3u);
 
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
 
     CHECK(rpc_send_count == 1u);
     CHECK(rpc_send_count_base == 0u);
@@ -965,7 +1007,7 @@ static void test_tick_sends_only_key_feedback_branch_packet_when_only_broad_owne
     key_feedback_broad_owner_map_set(fake_key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_GLOBAL, (keypos_t){.row = 1, .col = 1});
     key_feedback_broad_owner_map_set(fake_key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_LEFT_HALF, (keypos_t){.row = 1, .col = 1});
 
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
 
     CHECK(rpc_send_count == 1u);
     CHECK(rpc_send_count_base == 0u);
@@ -986,7 +1028,7 @@ static void test_tick_sends_base_packet_when_only_pd_owner_bitmap_changes(void) 
     key_origin_bitmap_clear(fake_pd_owner_bitmap);
     key_origin_bitmap_fill_single(fake_pd_owner_bitmap, (keypos_t){.row = 4, .col = 1});
 
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
 
     CHECK(rpc_send_count == 1u);
     CHECK(rpc_send_count_base == 1u);
@@ -1007,12 +1049,11 @@ static void test_idle_packets_use_idle_heartbeat(void) {
     test_reset_rpc_send_counts();
 
     fake_time32 += 999u;
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
     CHECK(rpc_send_count == 0u);
 
     fake_time32 += 1u;
-    split_runtime_sync_tick();
-    CHECK(rpc_send_count == 4u);
+    test_check_heartbeats_one_per_pass(test_tick_pass);
     CHECK(rpc_send_count_base == 1u);
     CHECK(rpc_send_count_combo == 1u);
     CHECK(rpc_send_count_key_feedback_semantic == 1u);
@@ -1028,7 +1069,7 @@ static void test_idle_tick_keeps_combo_immediate_and_skips_key_feedback_builders
     test_reset_builder_counts();
 
     fake_time32 += 999u;
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
 
     CHECK(rpc_send_count == 0u);
     CHECK(pd_owner_bitmap_read_count == 0u);
@@ -1040,7 +1081,7 @@ static void test_idle_tick_keeps_combo_immediate_and_skips_key_feedback_builders
     CHECK(key_feedback_tap_branch_read_count == 0u);
 
     split_runtime_sync_mark_key_feedback_dirty();
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
 
     CHECK(rpc_send_count == 0u);
     CHECK(key_feedback_semantic_read_count == 1u);
@@ -1051,11 +1092,159 @@ static void test_idle_tick_keeps_combo_immediate_and_skips_key_feedback_builders
     CHECK(combo_overlay_read_count == 2u);
 
     split_runtime_sync_mark_combo_dirty();
-    split_runtime_sync_tick();
+    split_runtime_sync_tick(timer_read32());
 
     CHECK(rpc_send_count == 0u);
     CHECK(combo_underlay_read_count == 3u);
     CHECK(combo_overlay_read_count == 3u);
+}
+
+// After the auto-mouse timeout QMK turns the pointer layer off and zeroes its
+// activity timer, so elapsed reads as the 16-bit clock.
+static void test_set_pointer_layer_timed_out(void) {
+    layer_state &= ~((layer_state_t)1u << TEST_POINTER_LAYER);
+    fake_auto_mouse_active  = false;
+    fake_auto_mouse_elapsed = (uint16_t)fake_time32;
+}
+
+// Runs sync passes 1 ms apart for duration_ms, as the main loop does, and
+// returns how many base packets went out.
+static uint16_t test_run_timed_out_passes(uint32_t duration_ms) {
+    uint16_t base_sends = 0u;
+
+    for (uint32_t elapsed = 0u; elapsed < duration_ms; elapsed++) {
+        fake_time32++;
+        fake_auto_mouse_elapsed = (uint16_t)fake_time32;
+        test_reset_rpc_send_counts();
+        split_runtime_sync_tick(timer_read32());
+        base_sends = (uint16_t)(base_sends + rpc_send_count_base);
+    }
+    return base_sends;
+}
+
+// A finished fade is idle: with the pointer layer off neither half draws it,
+// so the base packet keeps its one-second heartbeat, and it still carries the
+// end of the fade, the value the timeout left the other half holding.
+static void test_finished_fade_uses_idle_heartbeat(void) {
+    uint16_t fade_end = automouse_rgb_quantize_progress(AUTO_MOUSE_TIME);
+
+    test_reset_stubs();
+    test_set_idle_runtime_state();
+    fake_time32 = 10000u;
+    test_set_pointer_layer_timed_out();
+    split_runtime_sync_init();
+    CHECK(rpc_last_base_packet.automouse_progress == fade_end);
+
+    CHECK(test_run_timed_out_passes(3000u) == 3u);
+    CHECK(rpc_last_base_packet.automouse_progress == fade_end);
+}
+
+// QMK's zeroed timer makes elapsed wrap with the 16-bit clock every 65.5 s.
+// With the pointer layer off that must not replay the fade into sends.
+static void test_finished_fade_does_not_sweep_across_clock_wrap(void) {
+    uint16_t fade_end = automouse_rgb_quantize_progress(AUTO_MOUSE_TIME);
+
+    test_reset_stubs();
+    test_set_idle_runtime_state();
+    fake_time32 = 0x10000u - 500u;
+    test_set_pointer_layer_timed_out();
+    split_runtime_sync_init();
+
+    CHECK(test_run_timed_out_passes(2000u) == 2u);
+    CHECK(rpc_last_base_packet.automouse_progress == fade_end);
+}
+
+// While the pointer layer is on and the timeout runs, movement has stopped but
+// the fade is drawn on both halves: every step of it is still sent, at the
+// active heartbeat. The timeout then turns the layer off at the end of the
+// fade, which needs no further send.
+static void test_running_fade_mirrors_until_timeout(void) {
+    uint16_t fade_end = automouse_rgb_quantize_progress(AUTO_MOUSE_TIME);
+    uint16_t last_progress;
+    uint16_t steps = 0u;
+
+    test_reset_stubs();
+    test_set_idle_runtime_state();
+    fake_auto_mouse_active  = false;
+    fake_auto_mouse_elapsed = 0u;
+    split_runtime_sync_init();
+    last_progress = rpc_last_base_packet.automouse_progress;
+    CHECK(last_progress == 0u);
+
+    for (uint16_t elapsed = 1u; elapsed <= AUTO_MOUSE_TIME; elapsed++) {
+        fake_time32++;
+        fake_auto_mouse_elapsed = elapsed;
+        test_reset_rpc_send_counts();
+        split_runtime_sync_tick(timer_read32());
+        if (automouse_rgb_quantize_progress(elapsed) != last_progress) {
+            CHECK(rpc_send_count_base == 1u);
+            CHECK(rpc_last_base_packet.automouse_progress == automouse_rgb_quantize_progress(elapsed));
+            last_progress = rpc_last_base_packet.automouse_progress;
+            steps++;
+        } else {
+            CHECK(rpc_send_count_base == 0u);
+        }
+    }
+    CHECK(steps == fade_end / AUTOMOUSE_RGB_SYNC_STEP);
+    CHECK(last_progress == fade_end);
+
+    // Held at the end with the layer still on, the fade is active state.
+    fake_time32 += 250u;
+    test_reset_rpc_send_counts();
+    split_runtime_sync_tick(timer_read32());
+    CHECK(rpc_send_count_base == 1u);
+
+    test_set_pointer_layer_timed_out();
+    test_reset_rpc_send_counts();
+    split_runtime_sync_tick(timer_read32());
+    CHECK(rpc_send_count_base == 0u);
+    CHECK(test_run_timed_out_passes(999u) == 0u);
+    CHECK(test_run_timed_out_passes(1u) == 1u);
+    CHECK(rpc_last_base_packet.automouse_progress == fade_end);
+}
+
+// A heartbeat waiting behind another's keeps its own clock afterwards, and a
+// change never waits for the heartbeat budget.
+static void test_heartbeats_keep_their_own_period_and_changes_do_not_wait(void) {
+    split_runtime_sync_debug_clock_t clock;
+
+    test_reset_stubs();
+    test_set_idle_runtime_state();
+    split_runtime_sync_init();
+
+    fake_time32 += 1000u;
+    split_runtime_sync_tick(timer_read32()); // base heartbeat
+    fake_time32 += 1u;
+    split_runtime_sync_tick(timer_read32()); // combo heartbeat
+    fake_time32 += 1u;
+    split_runtime_sync_tick(timer_read32()); // semantic heartbeat
+    fake_time32 += 1u;
+    split_runtime_sync_tick(timer_read32()); // branch heartbeat
+    split_runtime_sync_debug_clock_snapshot(&clock);
+    CHECK(clock.combo_last_send == clock.base_last_send + 1u);
+    CHECK(clock.semantic_last_send == clock.base_last_send + 2u);
+    CHECK(clock.branch_last_send == clock.base_last_send + 3u);
+
+    // Every packet comes due 1,000 ms after its own send, one per pass.
+    fake_time32 = clock.base_last_send + 999u;
+    for (uint8_t pass = 0u; pass < 6u; pass++) {
+        uint8_t before;
+
+        fake_time32++;
+        test_reset_rpc_send_counts();
+        before = rpc_send_count;
+        split_runtime_sync_tick(timer_read32());
+        CHECK(rpc_send_count == (uint8_t)(before + (pass < 4u ? 1u : 0u)));
+    }
+
+    // Base heartbeat due with a combo change in the same pass: both go out.
+    fake_time32 = clock.base_last_send + 2000u;
+    fake_combo_underlay_bitmap[0] = 0x04u;
+    test_reset_rpc_send_counts();
+    split_runtime_sync_tick(timer_read32());
+    CHECK(rpc_send_count_base == 1u);
+    CHECK(rpc_send_count_combo == 1u);
+    CHECK(rpc_send_count == 2u);
 }
 
 static void test_slave_rpcs_apply_exact_remote_state(void) {
@@ -1426,6 +1615,10 @@ int main(void) {
 #endif
     test_idle_packets_use_idle_heartbeat();
     test_idle_tick_keeps_combo_immediate_and_skips_key_feedback_builders_until_due_or_dirty();
+    test_finished_fade_uses_idle_heartbeat();
+    test_finished_fade_does_not_sweep_across_clock_wrap();
+    test_running_fade_mirrors_until_timeout();
+    test_heartbeats_keep_their_own_period_and_changes_do_not_wait();
     test_slave_rpcs_apply_exact_remote_state();
     test_slave_base_rpc_ignores_short_packets();
     test_combo_publication_is_atomic_for_readers();

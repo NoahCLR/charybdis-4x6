@@ -23,6 +23,7 @@
 #include "../../macro/macro_input_guard.h"
 #include "../../macro/macro_payload.h"
 #include "../../compat/qmk_native_report_contract.h"
+#include "../../compat/qmk_pointing_contract.h"
 #include "../../compat/qmk_source_layer_contract.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 #include "../../state/ownership/layer_ownership.h"
@@ -235,9 +236,12 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_idle_custom
 
 static bool key_runtime_process_finish(key_runtime_process_ctx_t *ctx, bool keep_processing) {
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+    // It also tells the DPI policy of QMK's Charybdis keys it passes on.
     if (keep_processing) keep_processing = noah_qmk_profile_adjustment_process(ctx->keycode, ctx->record);
 #else
-    (void)ctx;
+    // QMK writes the sensor's CPI for this key after this hook, before any
+    // scan applies the DPI policy again.
+    if (keep_processing && noah_qmk_contract_pointer_keycode_sets_cpi(ctx->keycode)) pointing_mode_forget_applied_dpi();
 #endif
     noah_runtime_diag_scope_leave();
     return keep_processing;

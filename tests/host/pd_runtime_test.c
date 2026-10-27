@@ -29,6 +29,7 @@ static uint16_t cpi_set_count;
 static uint16_t default_dpi;
 static uint16_t sniping_dpi;
 static uint32_t fake_timer_ms;
+static uint32_t timer_read_count;
 static uint32_t fake_last_input_idle_ms;
 static uint32_t fake_last_matrix_idle_ms;
 static uint8_t  last_input_activity_elapsed_count;
@@ -113,6 +114,7 @@ static void test_reset_stubs(void) {
     default_dpi                        = 900;
     sniping_dpi                        = 350;
     fake_timer_ms                      = 0;
+    timer_read_count                   = 0;
     fake_last_input_idle_ms            = 0;
     fake_last_matrix_idle_ms           = UINT32_MAX;
     last_input_activity_elapsed_count  = 0;
@@ -145,6 +147,7 @@ static void test_reset_stubs(void) {
 }
 
 uint16_t timer_read(void) {
+    timer_read_count++;
     return (uint16_t)fake_timer_ms;
 }
 
@@ -153,6 +156,7 @@ uint16_t timer_elapsed(uint16_t last) {
 }
 
 uint32_t timer_read32(void) {
+    timer_read_count++;
     return fake_timer_ms;
 }
 
@@ -607,10 +611,11 @@ static void test_layer_state_set_restores_active_mode_dpi_and_pointer_layer_afte
     test_reset_stubs();
 
     CHECK(pointing_mode_handle_keycode_press(PD_SLOT_1));
+    pointing_mode_set_auto_sniping_layer_active(true);
     pointing_mode_service_active_dpi_sync();
+    CHECK(current_cpi == sniping_dpi);
     current_cpi   = 0;
     cpi_set_count = 0;
-    pointing_mode_set_auto_sniping_layer_active(true);
 
     layer_state_t next = noah_layer_state_set_user((layer_state_t)1u << 0);
 
@@ -629,17 +634,17 @@ static void test_layer_state_set_strips_pointer_layer_for_arrow_mode(void) {
 
     CHECK(pointing_mode_handle_keycode_press(PD_SLOT_4));
     pointing_mode_service_active_dpi_sync();
-    current_cpi   = 0;
+    CHECK(current_cpi == POINTING_MODE_ARROW_DPI);
     cpi_set_count = 0;
 
     layer_state_t next = noah_layer_state_set_user(((layer_state_t)1u << 0) | ((layer_state_t)1u << AUTO_MOUSE_DEFAULT_LAYER));
 
     CHECK(!sniping_enabled);
-    CHECK(current_cpi == 0);
     CHECK(cpi_set_count == 0);
+    // The mode's DPI stays: the sensor already holds it, so nothing is written.
     pointing_mode_service_active_dpi_sync();
     CHECK(current_cpi == POINTING_MODE_ARROW_DPI);
-    CHECK(cpi_set_count == 1);
+    CHECK(cpi_set_count == 0);
     CHECK((next & ((layer_state_t)1u << 0)) != 0);
     CHECK((next & ((layer_state_t)1u << AUTO_MOUSE_DEFAULT_LAYER)) == 0);
 }
@@ -682,6 +687,175 @@ static void test_layer_state_set_snipes_on_every_sniping_layer(void) {
     CHECK(!pointing_mode_auto_sniping_layer_active());
     pointing_mode_service_active_dpi_sync();
     CHECK(current_cpi == default_dpi);
+}
+
+// QMK's auto-mouse turns its layer on again every debounce window while the
+// ball moves, and every layer change asks for the DPI policy. A CPI the sensor
+// already holds is not written again: each write is two register writes with
+// busy-waits and a drop out of burst mode.
+static void test_layer_changes_write_the_cpi_only_when_it_changes(void) {
+    const layer_state_t sniping = ((layer_state_t)1u << 0) | ((layer_state_t)1u << AUTO_MOUSE_DEFAULT_LAYER) | ((layer_state_t)1u << CHARYBDIS_AUTO_SNIPING_LAYER);
+    const layer_state_t pointer = ((layer_state_t)1u << 0) | ((layer_state_t)1u << AUTO_MOUSE_DEFAULT_LAYER);
+
+    test_reset_stubs();
+    (void)noah_layer_state_set_user(sniping);
+    pointing_mode_service_active_dpi_sync();
+    CHECK(current_cpi == sniping_dpi && cpi_set_count == 1);
+    for (int pass = 0; pass < 40; pass++) {
+        (void)noah_layer_state_set_user(sniping);
+        pointing_mode_service_active_dpi_sync();
+    }
+    CHECK(current_cpi == sniping_dpi && cpi_set_count == 1);
+
+    // A different CPI is written at once, and only once.
+    (void)noah_layer_state_set_user(pointer);
+    pointing_mode_service_active_dpi_sync();
+    (void)noah_layer_state_set_user(pointer);
+    pointing_mode_service_active_dpi_sync();
+    CHECK(current_cpi == default_dpi && cpi_set_count == 2);
+    // A mode with its own DPI, the same, and back.
+    CHECK(pointing_mode_handle_keycode_press(PD_SLOT_1));
+    pointing_mode_service_active_dpi_sync();
+    CHECK(current_cpi == POINTING_MODE_VOLUME_DPI && cpi_set_count == 3);
+    (void)noah_layer_state_set_user(pointer);
+    pointing_mode_service_active_dpi_sync();
+    CHECK(cpi_set_count == 3);
+    // Sniping over the mode, at a sniping DPI that changed meanwhile.
+    sniping_dpi = 400;
+    (void)noah_layer_state_set_user(sniping);
+    pointing_mode_service_active_dpi_sync();
+    (void)noah_layer_state_set_user(sniping);
+    pointing_mode_service_active_dpi_sync();
+    CHECK(current_cpi == 400 && cpi_set_count == 4);
+}
+
+// Whatever else writes the sensor's CPI (its own init, QMK's Charybdis code,
+// a DPI adjustment) says so, and the next request writes the policy's CPI
+// again even when it is the one written last.
+static void test_a_cpi_written_behind_the_policy_is_written_again(void) {
+    const layer_state_t pointer = ((layer_state_t)1u << 0) | ((layer_state_t)1u << AUTO_MOUSE_DEFAULT_LAYER);
+
+    test_reset_stubs();
+    (void)noah_layer_state_set_user(pointer);
+    pointing_mode_service_active_dpi_sync();
+    CHECK(current_cpi == default_dpi && cpi_set_count == 1);
+    pointing_device_set_cpi(1234);
+    pointing_mode_forget_applied_dpi();
+    (void)noah_layer_state_set_user(pointer);
+    pointing_mode_service_active_dpi_sync();
+    CHECK(current_cpi == default_dpi && cpi_set_count == 3);
+    // The pointing device's init (a sensor reset at boot) is one such writer.
+    pointing_device_set_cpi(1234);
+    noah_pointing_device_init_user();
+    (void)noah_layer_state_set_user(pointer);
+    pointing_mode_service_active_dpi_sync();
+    CHECK(current_cpi == default_dpi && cpi_set_count == 5);
+    // Nothing written behind it: nothing written again.
+    (void)noah_layer_state_set_user(pointer);
+    pointing_mode_service_active_dpi_sync();
+    CHECK(cpi_set_count == 5);
+}
+
+// One main-loop pass on the master half as far as the DPI policy sees it: the
+// scan services a requested sync, then the pass's one clock read is handed to
+// the refresh.
+static void test_dpi_pass(uint32_t now) {
+    pointing_mode_service_active_dpi_sync();
+    pointing_mode_refresh_applied_dpi(now);
+}
+
+// A brownout or glitch can reset the sensor to its own CPI without resetting
+// the MCU, and the policy writes only a CPI that changed. So it writes the CPI
+// it intends again once a period, even unchanged: never sooner, never twice in
+// one period, and with no clock read of its own on any pass.
+static void test_a_cpi_the_sensor_lost_is_restored_within_a_period(void) {
+    const layer_state_t pointer = ((layer_state_t)1u << 0) | ((layer_state_t)1u << AUTO_MOUSE_DEFAULT_LAYER);
+    const uint32_t      start   = 1000u;
+
+    test_reset_stubs();
+    (void)noah_layer_state_set_user(pointer);
+    test_dpi_pass(start);
+    CHECK(current_cpi == default_dpi && cpi_set_count == 1);
+
+    current_cpi = 500; // the sensor's own default, behind the firmware's back
+    timer_read_count = 0;
+    for (uint32_t now = start + 1u; now < start + POINTING_MODE_CPI_REFRESH_MS; now++) {
+        test_dpi_pass(now);
+    }
+    CHECK(current_cpi == 500 && cpi_set_count == 1);
+    test_dpi_pass(start + POINTING_MODE_CPI_REFRESH_MS);
+    CHECK(current_cpi == default_dpi && cpi_set_count == 2);
+
+    // Once a period: nothing more until the next one is over.
+    for (uint32_t now = start + POINTING_MODE_CPI_REFRESH_MS + 1u; now < start + 2u * POINTING_MODE_CPI_REFRESH_MS; now++) {
+        test_dpi_pass(now);
+    }
+    CHECK(cpi_set_count == 2);
+    test_dpi_pass(start + 2u * POINTING_MODE_CPI_REFRESH_MS);
+    CHECK(current_cpi == default_dpi && cpi_set_count == 3);
+    // Every pass ran on the time the loop already read.
+    CHECK(timer_read_count == 0u);
+}
+
+// The CPI written is the one the policy works out now, here the active mode's.
+static void test_the_refresh_writes_the_cpi_the_policy_intends(void) {
+    test_reset_stubs();
+    CHECK(pointing_mode_handle_keycode_press(PD_SLOT_1));
+    test_dpi_pass(10u);
+    CHECK(current_cpi == POINTING_MODE_VOLUME_DPI && cpi_set_count == 1);
+    current_cpi = 500;
+    test_dpi_pass(10u + POINTING_MODE_CPI_REFRESH_MS);
+    CHECK(current_cpi == POINTING_MODE_VOLUME_DPI && cpi_set_count == 2);
+}
+
+// The clock wraps after 49 days; the period runs across it.
+static void test_the_refresh_period_runs_across_the_clock_wrap(void) {
+    const layer_state_t pointer = ((layer_state_t)1u << 0) | ((layer_state_t)1u << AUTO_MOUSE_DEFAULT_LAYER);
+    const uint32_t      start   = UINT32_MAX - 1000u;
+
+    test_reset_stubs();
+    (void)noah_layer_state_set_user(pointer);
+    test_dpi_pass(start);
+    CHECK(cpi_set_count == 1);
+    test_dpi_pass(UINT32_MAX);
+    test_dpi_pass(0u);
+    test_dpi_pass(start + POINTING_MODE_CPI_REFRESH_MS - 1u);
+    CHECK(cpi_set_count == 1);
+    test_dpi_pass(start + POINTING_MODE_CPI_REFRESH_MS);
+    CHECK(cpi_set_count == 2);
+}
+
+// A write that happens anyway, the policy's own for a new CPI or another
+// writer's, restarts the period.
+static void test_a_write_that_happens_anyway_restarts_the_refresh_period(void) {
+    const layer_state_t sniping = ((layer_state_t)1u << 0) | ((layer_state_t)1u << AUTO_MOUSE_DEFAULT_LAYER) | ((layer_state_t)1u << CHARYBDIS_AUTO_SNIPING_LAYER);
+    const layer_state_t pointer = ((layer_state_t)1u << 0) | ((layer_state_t)1u << AUTO_MOUSE_DEFAULT_LAYER);
+    const uint32_t      changed = 4000u;
+    const uint32_t      forgot  = changed + 3000u;
+
+    test_reset_stubs();
+    (void)noah_layer_state_set_user(pointer);
+    test_dpi_pass(1000u);
+    CHECK(cpi_set_count == 1);
+    (void)noah_layer_state_set_user(sniping);
+    test_dpi_pass(changed);
+    CHECK(current_cpi == sniping_dpi && cpi_set_count == 2);
+    // The same CPI asked for again writes nothing and keeps the period.
+    (void)noah_layer_state_set_user(sniping);
+    test_dpi_pass(changed + 1000u);
+    test_dpi_pass(1000u + POINTING_MODE_CPI_REFRESH_MS);
+    CHECK(cpi_set_count == 2);
+
+    // QMK writes its own CPI and says so.
+    pointing_device_set_cpi(1234);
+    pointing_mode_forget_applied_dpi();
+    test_dpi_pass(forgot);
+    CHECK(current_cpi == 1234 && cpi_set_count == 3);
+    test_dpi_pass(changed + POINTING_MODE_CPI_REFRESH_MS);
+    test_dpi_pass(forgot + POINTING_MODE_CPI_REFRESH_MS - 1u);
+    CHECK(current_cpi == 1234 && cpi_set_count == 3);
+    test_dpi_pass(forgot + POINTING_MODE_CPI_REFRESH_MS);
+    CHECK(current_cpi == sniping_dpi && cpi_set_count == 4);
 }
 
 static void test_is_mouse_record_user_delegates_pointer_layer_policy(void) {
@@ -1017,6 +1191,12 @@ int main(void) {
     test_layer_state_set_strips_pointer_layer_for_arrow_mode();
     test_layer_state_set_enables_sniping_and_blocks_dpi_restore_while_sniping_layer_active();
     test_layer_state_set_snipes_on_every_sniping_layer();
+    test_layer_changes_write_the_cpi_only_when_it_changes();
+    test_a_cpi_written_behind_the_policy_is_written_again();
+    test_a_cpi_the_sensor_lost_is_restored_within_a_period();
+    test_the_refresh_writes_the_cpi_the_policy_intends();
+    test_the_refresh_period_runs_across_the_clock_wrap();
+    test_a_write_that_happens_anyway_restarts_the_refresh_period();
     test_is_mouse_record_user_delegates_pointer_layer_policy();
     test_an_empty_slot_hold_key_owns_nothing();
     test_a_locked_modes_anchor_is_not_taken_back_after_a_qmk_reset();

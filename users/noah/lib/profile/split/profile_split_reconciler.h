@@ -102,6 +102,10 @@ typedef bool (*noah_profile_split_reuse_plan_fn)(void *context, const noah_profi
 typedef struct {
     void                                  *local_context;
     noah_profile_split_local_descriptor_fn local_descriptor;
+    // Optional, with local_context. A count that moves whenever what
+    // local_descriptor returns may have changed; a scan reads the descriptor
+    // only once it moved. Without it, every scan reads the descriptor.
+    uint32_t (*local_descriptor_revision)(void *context);
     noah_profile_split_local_read_fn       local_read;
     void                                  *transport_context;
     // Sends one request of 32 bytes up to the largest frame and reads the
@@ -172,6 +176,7 @@ typedef struct {
     noah_profile_split_reconciler_config_t config;
     noah_profile_split_authority_t         authority;
     noah_profile_split_descriptor_t        local_descriptor;
+    uint32_t                               local_descriptor_revision; // the one local_descriptor was read at
     noah_profile_split_descriptor_t        other_half_descriptor;
     noah_profile_split_descriptor_t        provisional_other_half_descriptor;
     noah_profile_split_descriptor_t        transfer_descriptor;
@@ -241,6 +246,10 @@ typedef struct {
     bool                                   role_known;
     bool                                   master;
     bool                                   cached_response_valid;
+    // Whether the cached reply is a BUSY, set where it is cached, so a scan
+    // learns it without decoding the reply.
+    bool                                   cached_response_busy;
+    bool                                   local_descriptor_revision_known;
     bool                                   metadata_response_valid;
     bool                                   other_half_activity_known;
     bool                                   lease_activity_known;

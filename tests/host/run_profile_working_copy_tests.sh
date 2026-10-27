@@ -22,6 +22,7 @@ build_and_run() {
     name="$1"
     shift
     cc -std=c11 -Wall -Wextra -Werror -pedantic "$@" \
+        -Wl,--wrap=noah_active_profile_provider_status \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
         "$ROOT/tests/host/profile_working_copy_test.c" \

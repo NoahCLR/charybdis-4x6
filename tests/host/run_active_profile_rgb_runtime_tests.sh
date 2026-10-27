@@ -16,6 +16,7 @@ build_and_run() {
     name="$1"
     shift
     cc -std=c11 -Wall -Wextra -Werror -pedantic "$@" \
+        -DNOAH_ACTIVE_PROFILE_RGB_RUNTIME_TEST_BACKEND \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
         "$ROOT/tests/host/active_profile_rgb_runtime_test.c" \

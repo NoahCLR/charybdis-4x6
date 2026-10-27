@@ -193,6 +193,12 @@ static bool local_descriptor(void *context, noah_profile_split_descriptor_t *des
     return true;
 }
 
+// Moves with every publication below, the only writers of the descriptor
+// local_descriptor returns, so the reconciler reads it only after one.
+static uint32_t local_descriptor_revision(void *context) {
+    return ((const noah_profile_owner_t *)context)->descriptor_publications;
+}
+
 static void publish_compiled_descriptor(noah_profile_owner_t *owner) {
     owner->saved_descriptor = (noah_profile_split_descriptor_t){
         .compiled_default_digest = owner->compiled.metadata.digest,
@@ -202,6 +208,7 @@ static void publish_compiled_descriptor(noah_profile_owner_t *owner) {
         .readable                = true,
     };
     owner->descriptor_readable = true;
+    owner->descriptor_publications++;
 }
 
 static bool publish_validated_descriptor(noah_profile_owner_t *owner) {
@@ -226,6 +233,7 @@ static bool publish_validated_descriptor(noah_profile_owner_t *owner) {
         .has_profile             = true,
     };
     owner->descriptor_readable = noah_profile_split_descriptor_valid(&owner->saved_descriptor);
+    owner->descriptor_publications++;
     return owner->descriptor_readable;
 }
 
@@ -401,6 +409,7 @@ static __attribute__((noinline)) bool initialize_runtime_graph(noah_profile_owne
         split_config = (noah_profile_split_reconciler_config_t){
             .local_context       = owner,
             .local_descriptor    = local_descriptor,
+            .local_descriptor_revision = local_descriptor_revision,
             .local_read          = local_read,
             .transport_context   = owner->config.split_transport_context,
             .exchange            = owner->config.split_exchange,
@@ -942,9 +951,13 @@ static __attribute__((noinline)) bool scan_working(noah_profile_owner_t *owner, 
     return master ? noah_profile_working_sync_master_scan(&owner->working_sync, now_ms) : noah_profile_working_sync_slave_scan(&owner->working_sync);
 }
 
-static __attribute__((noinline)) void observe_working(noah_profile_owner_t *owner) {
+// The quiet interval an automatic save waits for (D-F32). Only the master
+// half's keyboard step reads it, and not after its attempt at the revision
+// until a new revision or adjustment restarts it, so the keyboard is asked
+// only where its answer can be read.
+static __attribute__((noinline)) void observe_working(noah_profile_owner_t *owner, bool master) {
     (void)noah_profile_working_copy_observe(&owner->working, owner->save.phase == NOAH_PROFILE_OWNER_SAVE_WAIT);
-    if (owner->auto_save.observed_revision != owner->working.revision || !owner->working.active || noah_profile_working_copy_busy(&owner->working) || !owner->config.keyboard_quiet || !owner->config.keyboard_quiet(owner->config.keyboard_quiet_context)) {
+    if (owner->auto_save.observed_revision != owner->working.revision || !owner->working.active || noah_profile_working_copy_busy(&owner->working) || !master || owner->auto_save.attempted || !owner->config.keyboard_quiet || !owner->config.keyboard_quiet(owner->config.keyboard_quiet_context)) {
         owner->auto_save.quiet_since = owner->now_ms;
     }
     if (owner->auto_save.observed_revision != owner->working.revision) {
@@ -966,7 +979,7 @@ static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_
     // Anything that published since the last scan (an Apply or a save
     // activating, the other half's newer profile) ended any working copy.
     if (owner->working_ready) {
-        observe_working(owner);
+        observe_working(owner, master);
     }
     noah_profile_storage_admission_owner_t admission = noah_profile_candidate_store_backend_admission_owner(candidate_backend(owner));
     uint32_t                               host_timeout_ms;

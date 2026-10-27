@@ -76,6 +76,35 @@ bool pointing_mode_auto_sniping_layer_active(void) {
     return pointing_mode_runtime_shared_state()->auto_sniping_layer_active;
 }
 
+void pointing_mode_forget_applied_dpi(void) {
+    pointing_mode_runtime_shared_state_t *state = pointing_mode_runtime_shared_state();
+
+    state->applied_cpi_known   = false;
+    state->applied_cpi_written = true;
+}
+
+// Out of line, so the main loop's frame carries only the check below.
+static __attribute__((noinline)) void pointing_mode_rewrite_active_dpi(void) {
+    pointing_mode_runtime_shared_state()->applied_cpi_known = false;
+    pointing_mode_apply_active_dpi();
+}
+
+void pointing_mode_refresh_applied_dpi(uint32_t now) {
+    pointing_mode_runtime_shared_state_t *state = pointing_mode_runtime_shared_state();
+
+    // A write since the last pass starts the period again; otherwise the
+    // period's end writes. Unsigned subtraction keeps it right across the
+    // clock's wrap.
+    if (!state->applied_cpi_written) {
+        if (now - state->applied_cpi_period_start < POINTING_MODE_CPI_REFRESH_MS) {
+            return;
+        }
+        pointing_mode_rewrite_active_dpi();
+    }
+    state->applied_cpi_written      = false;
+    state->applied_cpi_period_start = now;
+}
+
 void pointing_mode_service_active_dpi_sync(void) {
     if (!pointing_mode_runtime_shared_state()->active_dpi_sync_pending) {
         return;
@@ -84,31 +113,45 @@ void pointing_mode_service_active_dpi_sync(void) {
     pointing_mode_apply_active_dpi();
 }
 
-void pointing_mode_apply_active_dpi(void) {
-    pointing_mode_runtime_shared_state()->active_dpi_sync_pending = false;
-
+// The CPI the policy wants now.
+static uint16_t pointing_mode_active_cpi(void) {
     pointing_mode_snapshot_t snapshot   = pointing_mode_snapshot();
     bool                     sniping    = pointing_mode_auto_sniping_layer_active() || noah_qmk_contract_pointer_sniping_enabled();
     const noah_pd_config_t  *configured = noah_active_profile_pd_for_mask(snapshot.local.active_mode);
     uint16_t                 mode_dpi   = configured ? configured->dpi : 0;
 
     if (configured && configured->kind == NOAH_PD_KIND_SCROLLING) {
-        pointing_device_set_cpi(mode_dpi ? mode_dpi : noah_qmk_contract_pointer_default_dpi());
-        return;
+        return mode_dpi ? mode_dpi : noah_qmk_contract_pointer_default_dpi();
     }
 
     if (sniping) {
-        pointing_device_set_cpi(noah_qmk_contract_pointer_sniping_dpi());
-        return;
+        return noah_qmk_contract_pointer_sniping_dpi();
     }
 
     if (mode_dpi != 0) {
-        pointing_device_set_cpi(mode_dpi);
-        return;
+        return mode_dpi;
     }
 
     // No active mode with a custom DPI — restore Charybdis's configured default.
-    pointing_device_set_cpi(noah_qmk_contract_pointer_default_dpi());
+    return noah_qmk_contract_pointer_default_dpi();
+}
+
+void pointing_mode_apply_active_dpi(void) {
+    pointing_mode_runtime_shared_state_t *state = pointing_mode_runtime_shared_state();
+    uint16_t                              cpi;
+
+    state->active_dpi_sync_pending = false;
+    cpi                            = pointing_mode_active_cpi();
+    // The sensor already holds it: a write is a register write with
+    // busy-waits that drops the sensor out of burst mode, and QMK's
+    // auto-mouse asks for this on every debounce window while the ball moves.
+    if (state->applied_cpi_known && state->applied_cpi == cpi) {
+        return;
+    }
+    pointing_device_set_cpi(cpi);
+    state->applied_cpi         = cpi;
+    state->applied_cpi_known   = true;
+    state->applied_cpi_written = true;
 }
 
 void pointing_mode_transition_activate(pointing_mode_mask_t mode) {

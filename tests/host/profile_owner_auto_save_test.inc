@@ -47,8 +47,11 @@ static void test_ineligible_auto_saves_skip_admission_work(void) {
     puts("automatic admission snapshots are skipped without an eligible save or adjustment");
 }
 
+static unsigned auto_quiet_calls;
+
 static bool auto_keyboard_quiet(void *context) {
     (void)context;
+    auto_quiet_calls++;
     return auto_quiet;
 }
 
@@ -195,6 +198,54 @@ static void test_auto_save_modes_and_adjustments(void) {
         }
     }
     puts("automatic saves: quiet period, held keys, all modes, toggles, compound adjustments, mid-save edits and wrap pass");
+}
+
+// Only the master half's keyboard step can start an automatic save, and only
+// until it attempted one for the revision: the slave half never asks whether
+// its keyboard is quiet, nor does the master half after an attempt. Live +
+// review still asks, as a change to Live measures the interval from the
+// last held key whatever the mode was.
+static void test_quiet_keyboard_is_asked_only_where_a_save_could_start(void) {
+    static noah_profile_owner_t left, right;
+    static memory_t lm, rm;
+    split_link_t ll = split_link_to(&right), rl = split_link_to(&left);
+    split_fault_link_t lw = working_link_to(&right), rw = working_link_to(&left);
+    uint8_t settings[NOAH_SETTINGS_MIN_SIZE];
+    noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_SETTINGS, .insert = sizeof(settings), .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
+    uint32_t now = 0u;
+
+    erased_memory(&lm); erased_memory(&rm); auto_settings(settings);
+    boot_live_pair(&left, &lm, &right, &rm, &ll, &rl, &lw, &rw, 103u, &now);
+    scan_until_converged(&left, &right, &now);
+    left.config.keyboard_quiet = right.config.keyboard_quiet = auto_keyboard_quiet;
+    left.working_sync.mode.mode = right.working_sync.mode.mode = NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW;
+    assert(live_edit(&left, &right, 1u, &create, settings, sizeof(settings), &now) == NOAH_PROFILE_WORKING_OK);
+    scan_until_converged(&left, &right, &now);
+    assert(left.working.active && right.working.active);
+    auto_quiet = true;
+    auto_quiet_calls = 0u;
+    for (uint32_t scan = 0u; scan < 1000u; scan++) scan_half(&right, false, now++);
+    assert(auto_quiet_calls == 0u);
+    for (uint32_t scan = 0u; scan < 1000u; scan++) scan_half(&left, true, now++);
+    assert(auto_quiet_calls > 0u);
+    // After its one attempt (D-F32), nothing reads the interval until a new
+    // revision or adjustment restarts it.
+    left.working_sync.mode.mode = right.working_sync.mode.mode = NOAH_PROFILE_EDIT_MODE_LIVE;
+    left.auto_save.attempted = true;
+    auto_quiet_calls = 0u;
+    auto_scans(&left, &right, &now, 10000u);
+    assert(auto_quiet_calls == 0u && left.save.keyboard_saves == 0u && left.working.active);
+    // A new adjustment tries again, once the keyboard has been quiet.
+    auto_quiet = false;
+    assert(noah_profile_owner_adjust(&left, NOAH_SETTING_DEFAULT_DPI, 800u));
+    auto_scans(&left, &right, &now, 10000u);
+    assert(auto_quiet_calls > 0u && left.save.keyboard_saves == 0u);
+    auto_quiet = true;
+    auto_scans(&left, &right, &now, 2900u);
+    assert(left.save.keyboard_saves == 0u);
+    auto_scans(&left, &right, &now, 60000u);
+    assert(left.save.keyboard_saves == 1u && !left.working.active);
+    puts("only the master half asks whether its keyboard is quiet, and only until it attempted a save");
 }
 
 static void test_auto_save_hour_bound(void) {

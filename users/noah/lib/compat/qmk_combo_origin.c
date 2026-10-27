@@ -79,8 +79,14 @@ static combo_origin_physical_key_state_t physical_key_states[MATRIX_ROWS * MATRI
 // one. Bounded by construction; no burst of chords can refuse a candidate.
 #    define COMBO_ORIGIN_PENDING_CAPACITY NOAH_PROFILE_WIRE_V1_MAX_COMBOS
 
+#    define COMBO_ORIGIN_PENDING_USED_WORDS ((COMBO_ORIGIN_PENDING_CAPACITY + 31u) / 32u)
+
 static combo_origin_active_cache_entry_t      combo_active_cache[COMBO_BUFFER_LENGTH];
 static combo_origin_pending_output_entry_t    combo_pending_output_cache[COMBO_ORIGIN_PENDING_CAPACITY];
+// Which pending slots are active, so the per-scan reconcile costs nothing
+// while no completion waits and visits only the ones that do. Kept by
+// combo_origin_pending_output_store() and combo_origin_pending_output_entry_clear().
+static uint32_t                               combo_pending_output_used[COMBO_ORIGIN_PENDING_USED_WORDS];
 static noah_qmk_combo_origin_debug_snapshot_t combo_origin_diagnostics;
 static uint32_t                               combo_origin_press_sequence        = 0;
 static uint16_t                               combo_origin_delivery_sequence     = 0;
@@ -88,19 +94,50 @@ static uint16_t                               combo_origin_last_pressed_at      
 static keypos_t                               combo_origin_last_pressed_key_pos  = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
 static keypos_t                               combo_origin_last_released_key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
 
+#    ifdef COMBO_ORIGIN_TEST_INSTRUMENTATION
+static uint16_t combo_origin_pending_slot_visits;
+
+void noah_qmk_combo_origin_test_pending_slot_visits_reset(void) {
+    combo_origin_pending_slot_visits = 0u;
+}
+uint16_t noah_qmk_combo_origin_test_pending_slot_visits(void) {
+    return combo_origin_pending_slot_visits;
+}
+#        define COMBO_ORIGIN_RECORD_PENDING_SLOT_VISIT() (combo_origin_pending_slot_visits++)
+#    else
+#        define COMBO_ORIGIN_RECORD_PENDING_SLOT_VISIT() ((void)0)
+#    endif
+
 static void combo_origin_increment_counter(uint16_t *counter) {
     if (counter && *counter != UINT16_MAX) {
         (*counter)++;
     }
 }
 
+static void combo_origin_pending_output_mark_used(uint8_t index, bool used) {
+    uint32_t bit = (uint32_t)1u << (index % 32u);
+
+    if (used) {
+        combo_pending_output_used[index / 32u] |= bit;
+    } else {
+        combo_pending_output_used[index / 32u] &= ~bit;
+    }
+}
+
+static bool combo_origin_pending_output_any_used(void) {
+    for (uint8_t word = 0; word < COMBO_ORIGIN_PENDING_USED_WORDS; word++) {
+        if (combo_pending_output_used[word] != 0u) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static uint8_t combo_origin_pending_count(void) {
     uint8_t count = 0;
 
-    for (uint8_t index = 0; index < ARRAY_SIZE(combo_pending_output_cache); index++) {
-        if (combo_pending_output_cache[index].active) {
-            count++;
-        }
+    for (uint8_t word = 0; word < COMBO_ORIGIN_PENDING_USED_WORDS; word++) {
+        count = (uint8_t)(count + __builtin_popcount(combo_pending_output_used[word]));
     }
     return count;
 }
@@ -390,6 +427,7 @@ static void combo_origin_pending_output_entry_clear(combo_origin_pending_output_
     if (!entry) {
         return;
     }
+    combo_origin_pending_output_mark_used((uint8_t)(entry - combo_pending_output_cache), false);
     *entry               = (combo_origin_pending_output_entry_t){0};
     entry->combo_index   = UINT16_MAX;
     entry->keycode       = KC_NO;
@@ -420,6 +458,7 @@ static bool combo_origin_pending_output_store(uint16_t combo_index, uint32_t gen
         return true;
     }
 
+    combo_origin_pending_output_mark_used((uint8_t)combo_index, true);
     entry->active            = true;
     entry->applied           = false;
     entry->deadline_crossed  = false;
@@ -488,54 +527,60 @@ static uint16_t combo_origin_applied_wait_ms(void) {
 static void combo_origin_pending_output_reconcile(bool observe_deadline) {
     bool changed = false;
 
+    if (!combo_origin_pending_output_any_used()) {
+        return;
+    }
+
 #    ifndef COMBO_NO_TIMER
     uint16_t now = timer_read();
 #    else
     (void)observe_deadline;
 #    endif
 
-    for (uint8_t index = 0; index < ARRAY_SIZE(combo_pending_output_cache); index++) {
-        combo_origin_pending_output_entry_t *entry = &combo_pending_output_cache[index];
-        combo_t                             *combo;
-        bool                                 active;
+    // Ascending slot order, as a walk of the whole cache would visit them.
+    // Clearing the current slot does not disturb the copied word.
+    for (uint8_t word = 0; word < COMBO_ORIGIN_PENDING_USED_WORDS; word++) {
+        for (uint32_t used = combo_pending_output_used[word]; used != 0u; used &= used - 1u) {
+            combo_origin_pending_output_entry_t *entry = &combo_pending_output_cache[word * 32u + (uint8_t)__builtin_ctz(used)];
+            combo_t                             *combo;
+            bool                                 active;
 
-        if (!entry->active) {
-            continue;
-        }
-        combo  = combo_origin_combo_get(entry->combo_index);
-        active = combo_origin_combo_is_active(combo);
-        // QMK marks a fired combo both active and disabled (apply_combo, then
-        // drop_combo_from_buffer). Only a disabled combo that never fired was
-        // suppressed; a fired one keeps its footprint until its output arrives.
-        if (combo && active && !entry->applied) {
-            entry->applied          = true;
-            entry->applied_at       = timer_read();
-            entry->deadline_crossed = false;
-        }
-        if (!combo || (!entry->applied && combo_origin_combo_is_disabled(combo))) {
-            combo_origin_pending_output_entry_clear(entry);
-            combo_origin_increment_counter(&combo_origin_diagnostics.suppressed_retirement_count);
-            changed = true;
-            continue;
-        }
-#    ifndef COMBO_NO_TIMER
-        // QMK restarts its combo timer at every combo key press, so a
-        // completion not fired yet can legally wait from the latest press,
-        // which is never earlier than its own completing press. A delivered
-        // press waits in record admission for as long as the key ahead of it
-        // is undecided, which no one setting bounds (a row's own hold time, a
-        // long hold: D-F27), and admission always dispatches it, so its
-        // completion stays until then.
-        if (observe_deadline && !active && !entry->press_delivered && (entry->applied ? (uint16_t)(now - entry->applied_at) > combo_origin_applied_wait_ms() : (uint16_t)(now - combo_origin_last_pressed_at) > combo_origin_latest_legal_wait_ms())) {
-            if (!entry->deadline_crossed) {
-                entry->deadline_crossed = true;
-            } else {
-                combo_origin_pending_output_entry_clear(entry);
-                combo_origin_increment_counter(&combo_origin_diagnostics.deadline_expiry_count);
-                changed = true;
+            COMBO_ORIGIN_RECORD_PENDING_SLOT_VISIT();
+            combo  = combo_origin_combo_get(entry->combo_index);
+            active = combo_origin_combo_is_active(combo);
+            // QMK marks a fired combo both active and disabled (apply_combo, then
+            // drop_combo_from_buffer). Only a disabled combo that never fired was
+            // suppressed; a fired one keeps its footprint until its output arrives.
+            if (combo && active && !entry->applied) {
+                entry->applied          = true;
+                entry->applied_at       = timer_read();
+                entry->deadline_crossed = false;
             }
-        }
+            if (!combo || (!entry->applied && combo_origin_combo_is_disabled(combo))) {
+                combo_origin_pending_output_entry_clear(entry);
+                combo_origin_increment_counter(&combo_origin_diagnostics.suppressed_retirement_count);
+                changed = true;
+                continue;
+            }
+#    ifndef COMBO_NO_TIMER
+            // QMK restarts its combo timer at every combo key press, so a
+            // completion not fired yet can legally wait from the latest press,
+            // which is never earlier than its own completing press. A delivered
+            // press waits in record admission for as long as the key ahead of it
+            // is undecided, which no one setting bounds (a row's own hold time, a
+            // long hold: D-F27), and admission always dispatches it, so its
+            // completion stays until then.
+            if (observe_deadline && !active && !entry->press_delivered && (entry->applied ? (uint16_t)(now - entry->applied_at) > combo_origin_applied_wait_ms() : (uint16_t)(now - combo_origin_last_pressed_at) > combo_origin_latest_legal_wait_ms())) {
+                if (!entry->deadline_crossed) {
+                    entry->deadline_crossed = true;
+                } else {
+                    combo_origin_pending_output_entry_clear(entry);
+                    combo_origin_increment_counter(&combo_origin_diagnostics.deadline_expiry_count);
+                    changed = true;
+                }
+            }
 #    endif
+        }
     }
 
     if (changed) {
@@ -1009,6 +1054,15 @@ bool noah_qmk_combo_origin_pressed_combo_matches(uint16_t keycode, keypos_t owne
     return false;
 }
 
+bool noah_qmk_combo_origin_any_active(void) {
+    for (uint8_t index = 0; index < ARRAY_SIZE(combo_active_cache); index++) {
+        if (combo_active_cache[index].active) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void noah_qmk_combo_origin_active_bitmaps_partitioned(keypos_t preview_owner_key_pos, keypos_t pd_owner_key_pos, const uint8_t *quiet_owner_bitmap, uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap) {
     if (out_underlay_bitmap) {
         key_origin_bitmap_clear(out_underlay_bitmap);
@@ -1137,6 +1191,9 @@ bool noah_qmk_combo_origin_pressed_combo_matches(uint16_t keycode, keypos_t owne
     (void)owner_key_pos;
     (void)since;
     (void)term_ms;
+    return false;
+}
+bool noah_qmk_combo_origin_any_active(void) {
     return false;
 }
 void noah_qmk_combo_origin_active_bitmaps_partitioned(keypos_t preview_owner_key_pos, keypos_t pd_owner_key_pos, const uint8_t *quiet_owner_bitmap, uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap) {

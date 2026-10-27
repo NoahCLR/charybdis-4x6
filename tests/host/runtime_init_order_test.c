@@ -92,8 +92,24 @@ void macro_payload_engine_init(void) {
     test_log_stage("macro_payload_engine_init");
 }
 
-void split_runtime_sync_tick(void) {
+// The pass's one clock read, and what each scheduler was handed.
+static uint32_t test_clock_ms = 41000u;
+static uint32_t split_tick_now;
+static uint32_t cpi_refresh_now;
+
+uint32_t timer_read32(void) {
+    test_log_stage("timer_read32");
+    return ++test_clock_ms;
+}
+
+void split_runtime_sync_tick(uint32_t now) {
     test_log_stage("split_runtime_sync_tick");
+    split_tick_now = now;
+}
+
+void pointing_mode_refresh_applied_dpi(uint32_t now) {
+    test_log_stage("pointing_mode_refresh_applied_dpi");
+    cpi_refresh_now = now;
 }
 
 void held_repeat_tick(void) {
@@ -148,13 +164,18 @@ void noah_runtime_diag_scope_enter(noah_runtime_diag_stage_t stage) {
 
 void noah_runtime_diag_scope_leave(void) {}
 
+void pointing_mode_forget_applied_dpi(void) {
+    test_log_stage("pointing_mode_forget_applied_dpi");
+}
+
 void noah_runtime_diag_heartbeat(void) {
     test_log_stage("runtime_diag_heartbeat");
 }
 
 static void test_eeconfig_init_order(void) {
     static const char *const expected[] = {
-        "macro_payload_engine_cancel",
+        // QMK's Charybdis EEPROM reset wrote the sensor's CPI just before.
+        "macro_payload_engine_cancel", "pointing_mode_forget_applied_dpi",
     };
 
     test_log_reset();
@@ -162,14 +183,17 @@ static void test_eeconfig_init_order(void) {
     test_expect_sequence(expected, ARRAY_SIZE(expected));
 }
 
+// One clock read a pass serves every scheduler that runs on it: the split
+// sync's sends and the pointer CPI refresh.
 static void test_matrix_scan_order(void) {
     static const char *const expected[] = {
-        "profile_store_runtime_matrix_scan", "qmk_combo_origin_scan", "key_runtime_scan", "record_admission_task", "macro_payload_engine_scan", "split_runtime_sync_tick",
+        "profile_store_runtime_matrix_scan", "qmk_combo_origin_scan", "key_runtime_scan", "record_admission_task", "macro_payload_engine_scan", "timer_read32", "split_runtime_sync_tick", "pointing_mode_refresh_applied_dpi",
     };
 
     test_log_reset();
     noah_matrix_scan_user();
     test_expect_sequence(expected, ARRAY_SIZE(expected));
+    CHECK(split_tick_now == test_clock_ms && cpi_refresh_now == test_clock_ms);
 }
 
 static void test_matrix_slave_scan_order(void) {
@@ -186,7 +210,9 @@ static void test_keyboard_post_init_order(void) {
     static const char *const expected[] = {
         // Core defaults must land before any stage can observe key runtime
         // core state.
-        "runtime_shared_state_post_init", "qmk_combo_origin_init", "record_admission_reset", "macro_payload_engine_init", "profile_store_runtime_init",
+        "runtime_shared_state_post_init",
+        // QMK's Charybdis post-init wrote the sensor's CPI just before.
+        "pointing_mode_forget_applied_dpi", "qmk_combo_origin_init", "record_admission_reset", "macro_payload_engine_init", "profile_store_runtime_init",
 #ifndef NOAH_LIVE_PROFILE_OWNER_ENABLE
         "active_profile_pd_load_compiled_defaults",
 #endif

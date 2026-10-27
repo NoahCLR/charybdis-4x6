@@ -41,6 +41,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DRGB_MATRIX_WS2812 \
     -DAUTO_MOUSE_TIME=900 \
     -DRGB_MATRIX_LED_COUNT=4 \
+    -DNOAH_ACTIVE_PROFILE_RGB_RUNTIME_TEST_BACKEND \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \

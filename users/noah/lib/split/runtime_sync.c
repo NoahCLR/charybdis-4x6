@@ -103,15 +103,26 @@ __attribute__((weak)) void combo_feedback_bitmaps(uint8_t *out_underlay_bitmap, 
 
 static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force, uint32_t now);
 
+// Both halves draw the fade only while the pointer layer is on
+// (rgb_automouse_stage.c), so its progress is runtime state only then.
+static bool split_runtime_sync_pointer_layer_on(void) {
+#    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
+    return layer_state_cmp(layer_state, noah_qmk_contract_auto_mouse_layer());
+#    else
+    return false;
+#    endif
+}
+
 static uint16_t split_runtime_sync_auto_mouse_elapsed(uint32_t now) {
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
-    // Deliberately ungated. is_auto_mouse_active() reports "the pointer is in
-    // use right now", not "the pointer layer is on": QMK recomputes it from
-    // each mouse report, so it goes false the moment movement stops while the
-    // activity timer keeps counting toward the timeout. The fade renders that
-    // timeout, so gating on it zeroed the progress the slave mirrors for
-    // exactly the fade window, leaving the slave a solid color while the master
-    // -- which reads the clock directly -- still faded.
+    // Deliberately not gated on is_auto_mouse_active(): it reports "the
+    // pointer is in use right now", not "the pointer layer is on". QMK
+    // recomputes it from each mouse report, so it goes false the moment
+    // movement stops while the activity timer keeps counting toward the
+    // timeout. The fade renders that timeout, so gating on it zeroed the
+    // progress the slave mirrors for exactly the fade window, leaving the
+    // slave a solid color while the master -- which reads the clock directly
+    // -- still faded.
     //
     // The lock check stays in the packet builder, where the sent value is
     // decided, rather than being duplicated here.
@@ -121,6 +132,14 @@ static uint16_t split_runtime_sync_auto_mouse_elapsed(uint32_t now) {
     // timeout and park the slave's pointer layer at the fade destination.
     if (!noah_qmk_contract_auto_mouse_enabled()) {
         return 0u;
+    }
+    // With the pointer layer off the fade is finished. QMK zeroes the timer
+    // at the timeout, so elapsed then reads as the 16-bit clock: parked past
+    // the timeout until the clock wraps, then replaying the whole fade every
+    // 65.5 s. Report the finished fade instead: the value the timeout already
+    // left the other half holding, so turning the layer off sends nothing.
+    if (!split_runtime_sync_pointer_layer_on()) {
+        return UINT16_MAX;
     }
     return noah_qmk_contract_auto_mouse_elapsed_at(now);
 #    else
@@ -192,7 +211,7 @@ static bool split_runtime_base_packet_is_active(const split_runtime_base_sync_pa
         return false;
     }
 
-    return pkt->automouse_progress != 0u || pkt->active_mode_id != POINTING_MODE_ID_NONE || pkt->locked_mode_id != POINTING_MODE_ID_NONE
+    return (pkt->automouse_progress != 0u && split_runtime_sync_pointer_layer_on()) || pkt->active_mode_id != POINTING_MODE_ID_NONE || pkt->locked_mode_id != POINTING_MODE_ID_NONE
 #    ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
            || pkt->pointing_mode_owner_sides != SPLIT_SIDE_MASK_NONE || key_origin_bitmap_has_any(pkt->pointing_mode_owner_bitmap)
 #    endif
@@ -268,19 +287,35 @@ static bool split_runtime_sync_heartbeat_due(bool sent_once, uint32_t last_send,
     return !sent_once || split_runtime_sync_elapsed_since(now, last_send) >= heartbeat_ms;
 }
 
-static bool split_runtime_sync_should_build_packet(bool force, bool dirty, bool sent_once, uint32_t last_send, bool last_sent_active, uint32_t now) {
+// A pass sends at most one heartbeat. Each packet keeps its own clock, but
+// due together they would queue three or four RPCs into one pass; one due
+// behind another's goes out on a following pass. Changed and forced packets
+// never wait for it.
+static bool split_runtime_sync_should_send(bool force, bool unchanged, bool sent_once, uint32_t last_send, bool active, uint32_t now, bool *heartbeat_sent) {
+    if (force || !unchanged) {
+        return true;
+    }
+    if (*heartbeat_sent || !split_runtime_sync_heartbeat_due(sent_once, last_send, active, now)) {
+        return false;
+    }
+
+    *heartbeat_sent = true;
+    return true;
+}
+
+static bool split_runtime_sync_should_build_packet(bool force, bool dirty, bool sent_once, uint32_t last_send, bool last_sent_active, uint32_t now, bool heartbeat_sent) {
     if (force || dirty || last_sent_active) {
         return true;
     }
 
-    return split_runtime_sync_heartbeat_due(sent_once, last_send, false, now);
+    return !heartbeat_sent && split_runtime_sync_heartbeat_due(sent_once, last_send, false, now);
 }
 
-static bool split_runtime_sync_broadcast_base(const split_runtime_base_sync_packet_t *pkt, bool force, uint32_t now) {
+static bool split_runtime_sync_broadcast_base(const split_runtime_base_sync_packet_t *pkt, bool force, uint32_t now, bool *heartbeat_sent) {
     bool unchanged = split_runtime_base_sent_once && memcmp(&split_runtime_base_last_sent, pkt, sizeof(*pkt)) == 0;
     bool active    = split_runtime_base_packet_is_active(pkt);
 
-    if (!force && unchanged && !split_runtime_sync_heartbeat_due(split_runtime_base_sent_once, split_runtime_base_last_send, active, now)) {
+    if (!split_runtime_sync_should_send(force, unchanged, split_runtime_base_sent_once, split_runtime_base_last_send, active, now, heartbeat_sent)) {
         return true;
     }
 
@@ -295,11 +330,11 @@ static bool split_runtime_sync_broadcast_base(const split_runtime_base_sync_pack
     return false;
 }
 
-static bool split_runtime_sync_broadcast_combo(const split_runtime_combo_feedback_packet_t *pkt, bool force, uint32_t now) {
+static bool split_runtime_sync_broadcast_combo(const split_runtime_combo_feedback_packet_t *pkt, bool force, uint32_t now, bool *heartbeat_sent) {
     bool unchanged = split_runtime_combo_sent_once && memcmp(&split_runtime_combo_last_sent, pkt, sizeof(*pkt)) == 0;
     bool active    = split_runtime_combo_packet_is_active(pkt);
 
-    if (!force && unchanged && !split_runtime_sync_heartbeat_due(split_runtime_combo_sent_once, split_runtime_combo_last_send, active, now)) {
+    if (!split_runtime_sync_should_send(force, unchanged, split_runtime_combo_sent_once, split_runtime_combo_last_send, active, now, heartbeat_sent)) {
         return true;
     }
 
@@ -313,11 +348,11 @@ static bool split_runtime_sync_broadcast_combo(const split_runtime_combo_feedbac
     return false;
 }
 
-static bool split_runtime_sync_broadcast_key_feedback_semantic(const split_runtime_key_feedback_semantic_packet_t *pkt, bool force, uint32_t now) {
+static bool split_runtime_sync_broadcast_key_feedback_semantic(const split_runtime_key_feedback_semantic_packet_t *pkt, bool force, uint32_t now, bool *heartbeat_sent) {
     bool unchanged = split_runtime_key_feedback_semantic_sent_once && memcmp(&split_runtime_key_feedback_semantic_last_sent, pkt, sizeof(*pkt)) == 0;
     bool active    = split_runtime_key_feedback_semantic_packet_is_active(pkt);
 
-    if (!force && unchanged && !split_runtime_sync_heartbeat_due(split_runtime_key_feedback_semantic_sent_once, split_runtime_key_feedback_semantic_last_send, active, now)) {
+    if (!split_runtime_sync_should_send(force, unchanged, split_runtime_key_feedback_semantic_sent_once, split_runtime_key_feedback_semantic_last_send, active, now, heartbeat_sent)) {
         return true;
     }
 
@@ -331,11 +366,11 @@ static bool split_runtime_sync_broadcast_key_feedback_semantic(const split_runti
     return false;
 }
 
-static bool split_runtime_sync_broadcast_key_feedback_branch(const split_runtime_key_feedback_branch_packet_t *pkt, bool force, uint32_t now) {
+static bool split_runtime_sync_broadcast_key_feedback_branch(const split_runtime_key_feedback_branch_packet_t *pkt, bool force, uint32_t now, bool *heartbeat_sent) {
     bool unchanged = split_runtime_key_feedback_branch_sent_once && memcmp(&split_runtime_key_feedback_branch_last_sent, pkt, sizeof(*pkt)) == 0;
     bool active    = split_runtime_key_feedback_branch_packet_is_active(pkt);
 
-    if (!force && unchanged && !split_runtime_sync_heartbeat_due(split_runtime_key_feedback_branch_sent_once, split_runtime_key_feedback_branch_last_send, active, now)) {
+    if (!split_runtime_sync_should_send(force, unchanged, split_runtime_key_feedback_branch_sent_once, split_runtime_key_feedback_branch_last_send, active, now, heartbeat_sent)) {
         return true;
     }
 
@@ -485,15 +520,13 @@ void split_runtime_sync_init(void) {
     }
 }
 
-void split_runtime_sync_tick(void) {
+void split_runtime_sync_tick(uint32_t now) {
     uint16_t raw_elapsed;
-    uint32_t now;
 
     if (!split_runtime_sync_initialized || !is_keyboard_master()) {
         return;
     }
 
-    now = timer_read32();
     if (!split_runtime_sync_retry_due(now)) {
         return;
     }
@@ -504,13 +537,14 @@ void split_runtime_sync_tick(void) {
 
 static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force, uint32_t now) {
     bool recovery_probe = split_runtime_sync_transport.backoff_active;
+    bool heartbeat_sent = false;
 
     if (!split_runtime_sync_retry_due(now)) {
         return;
     }
 
     split_runtime_base_sync_packet_t base_packet = split_runtime_sync_build_base_packet(raw_elapsed);
-    if (!split_runtime_sync_broadcast_base(&base_packet, force || recovery_probe, now)) {
+    if (!split_runtime_sync_broadcast_base(&base_packet, force || recovery_probe, now, &heartbeat_sent)) {
         split_runtime_sync_note_failure(PUT_SPLIT_RUNTIME_BASE_SYNC, now);
         return;
     }
@@ -519,24 +553,24 @@ static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force
     }
 
     split_runtime_combo_feedback_packet_t combo_packet = split_runtime_sync_build_combo_packet();
-    if (!split_runtime_sync_broadcast_combo(&combo_packet, force, now)) {
+    if (!split_runtime_sync_broadcast_combo(&combo_packet, force, now, &heartbeat_sent)) {
         split_runtime_sync_note_failure(PUT_SPLIT_COMBO_FEEDBACK_SYNC, now);
         return;
     }
     split_runtime_sync_clear_combo_dirty();
 
-    if (split_runtime_sync_should_build_packet(force, split_runtime_sync_key_feedback_semantic_is_dirty(), split_runtime_key_feedback_semantic_sent_once, split_runtime_key_feedback_semantic_last_send, split_runtime_key_feedback_semantic_packet_is_active(&split_runtime_key_feedback_semantic_last_sent), now)) {
+    if (split_runtime_sync_should_build_packet(force, split_runtime_sync_key_feedback_semantic_is_dirty(), split_runtime_key_feedback_semantic_sent_once, split_runtime_key_feedback_semantic_last_send, split_runtime_key_feedback_semantic_packet_is_active(&split_runtime_key_feedback_semantic_last_sent), now, heartbeat_sent)) {
         split_runtime_key_feedback_semantic_packet_t key_feedback_semantic_packet = split_runtime_sync_build_key_feedback_semantic_packet();
-        if (!split_runtime_sync_broadcast_key_feedback_semantic(&key_feedback_semantic_packet, force, now)) {
+        if (!split_runtime_sync_broadcast_key_feedback_semantic(&key_feedback_semantic_packet, force, now, &heartbeat_sent)) {
             split_runtime_sync_note_failure(PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC, now);
             return;
         }
         split_runtime_sync_clear_key_feedback_semantic_dirty();
     }
 
-    if (split_runtime_sync_should_build_packet(force, split_runtime_sync_key_feedback_branch_is_dirty(), split_runtime_key_feedback_branch_sent_once, split_runtime_key_feedback_branch_last_send, split_runtime_key_feedback_branch_packet_is_active(&split_runtime_key_feedback_branch_last_sent), now)) {
+    if (split_runtime_sync_should_build_packet(force, split_runtime_sync_key_feedback_branch_is_dirty(), split_runtime_key_feedback_branch_sent_once, split_runtime_key_feedback_branch_last_send, split_runtime_key_feedback_branch_packet_is_active(&split_runtime_key_feedback_branch_last_sent), now, heartbeat_sent)) {
         split_runtime_key_feedback_branch_packet_t key_feedback_branch_packet = split_runtime_sync_build_key_feedback_branch_packet();
-        if (!split_runtime_sync_broadcast_key_feedback_branch(&key_feedback_branch_packet, force, now)) {
+        if (!split_runtime_sync_broadcast_key_feedback_branch(&key_feedback_branch_packet, force, now, &heartbeat_sent)) {
             split_runtime_sync_note_failure(PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC, now);
             return;
         }
