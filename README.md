@@ -26,7 +26,7 @@ keyboard.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/live-edit-dark.gif">
-    <img src="docs/images/readme/live-edit-light.gif" width="800"
+    <img src="docs/images/readme/live-edit-light.gif" width="880"
          alt="In Ark, Esc is double-clicked and changed to Mute from the Media keys; a bar says one unsaved change is running on the keyboard, Review shows Esc saved and Mute running now, and Revert puts Esc back">
   </picture>
   <br>
@@ -63,7 +63,7 @@ the keys from lower layers frosted.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/layers-dark.gif">
-    <img src="docs/images/readme/layers-light.gif" width="800"
+    <img src="docs/images/readme/layers-light.gif" width="880"
          alt="Ark showing layers stacked: Symbol, then Navigation on top of it, then Pointing on top of both, with keys from lower layers frosted">
   </picture>
   <br>
@@ -105,7 +105,7 @@ such a combo opens a second card with that behaviour.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/combo-cards-dark.gif">
-    <img src="docs/images/readme/combo-cards-light.gif" width="768"
+    <img src="docs/images/readme/combo-cards-light.gif" width="880"
          alt="Hover cards in Ark: V is part of a combo of eight bottom-row keys that sends Esc, and a second card shows Esc's double tap and long hold; N is part of N+M, which sends Left Command, with a second card for Command's double tap held and triple tap; Enter is part of Backspace+Enter, which sends the VoiceInk custom key's shortcut">
   </picture>
   <br>
