@@ -62,6 +62,9 @@ static const layer_led_group_t layer_led_groups_data[] = {
 const layer_led_group_t *const layer_led_groups      = layer_led_groups_data;
 const uint8_t                  layer_led_group_count = (uint8_t)ARRAY_SIZE(layer_led_groups_data);
 
+// Room for the compiled encoding of this test's lighting tables.
+EXPORT_RGB_COMPILED_CACHE(0u, ARRAY_SIZE(layer_led_groups_data), 0u, 0u, 0u);
+
 const automouse_fade_end_config_t automouse_fade_end_config = {
     .mode      = FOLLOW_REAL_DESTINATION,
     .end_color = HSV(200, 201, 202),
@@ -384,6 +387,7 @@ static void test_layer_colours_are_read_once_per_publication(const char *fixture
     rgb_t                             second_base     = rgb_from_hsv((hsv_t){.h = 50u, .s = 60u, .v = 70u});
     rgb_runtime_frame_t               frame;
     size_t                            group_reads;
+    size_t                            selector_reads;
 
     memcpy(second_payload, first_payload, length);
     second_payload[layer_offset + 1u] = 50u;
@@ -391,9 +395,21 @@ static void test_layer_colours_are_read_once_per_publication(const char *fixture
     second_payload[layer_offset + 3u] = 70u;
     CHECK(noah_profile_rgb_v1_decode_reader(&first_bytes, 0u, length, &limits, &first_snapshot.profile.rgb, &error) == NOAH_PROFILE_RGB_V1_OK);
     CHECK(noah_profile_rgb_v1_decode_reader(&second_bytes, 0u, length, &limits, &second_snapshot.profile.rgb, &error) == NOAH_PROFILE_RGB_V1_OK);
-    // Each layer row is one record and one read; a layer group is two (its row
-    // and its group), read on every chunk.
-    group_reads = 2u * first_snapshot.profile.rgb.layer_group_count;
+    // Each layer colour is one record and one read. A layer row's selector is
+    // read once per publication; a row that paints the base layer costs two
+    // more reads (its row and its group) on every chunk, and a row of another
+    // layer none (D-F63).
+    selector_reads = first_snapshot.profile.rgb.layer_group_count;
+    group_reads    = 0u;
+    for (uint8_t index = 0u; index < first_snapshot.profile.rgb.layer_group_count; index++) {
+        noah_profile_rgb_v1_group_row_t row;
+
+        CHECK(noah_profile_rgb_v1_layer_group_at(&first_snapshot.profile.rgb, index, &row, &error) == NOAH_PROFILE_RGB_V1_OK);
+        if (row.selector == 0u || row.selector == NOAH_PROFILE_RGB_V1_SELECTOR_ALL) {
+            group_reads += 2u;
+        }
+    }
+    CHECK(group_reads != 0u && group_reads < 2u * selector_reads);
     CHECK(first_snapshot.profile.rgb.layer_color_count == LAYER_COUNT);
 
     noah_active_profile_rgb_runtime_init(&runtime);
@@ -407,7 +423,7 @@ static void test_layer_colours_are_read_once_per_publication(const char *fixture
     first_reader.calls = 0u;
     CHECK(rgb_runtime_layer_stage_render_active_profile_frame(&frame, 0u, &profile_frame, 0u, 2u));
     check_frame_range(&frame, 0u, 2u, first_base);
-    CHECK(first_reader.calls == LAYER_COUNT + group_reads);
+    CHECK(first_reader.calls == LAYER_COUNT + selector_reads + group_reads);
     first_reader.calls = 0u;
     CHECK(rgb_runtime_layer_stage_render_active_profile_frame(&frame, 0u, &profile_frame, 2u, 3u));
     check_frame_range(&frame, 2u, 3u, first_base);
@@ -437,7 +453,7 @@ static void test_layer_colours_are_read_once_per_publication(const char *fixture
     second_reader.calls = 0u;
     CHECK(rgb_runtime_layer_stage_render_active_profile_frame(&frame, 0u, &profile_frame, 0u, 2u));
     check_frame_range(&frame, 0u, 2u, second_base);
-    CHECK(second_reader.calls == LAYER_COUNT + group_reads);
+    CHECK(second_reader.calls == LAYER_COUNT + selector_reads + group_reads);
     second_reader.calls = 0u;
     CHECK(rgb_runtime_layer_stage_render_active_profile_frame(&frame, 0u, &profile_frame, 2u, RGB_MATRIX_LED_COUNT));
     check_frame_range(&frame, 2u, RGB_MATRIX_LED_COUNT, second_base);
@@ -454,6 +470,23 @@ static void test_layer_colours_are_read_once_per_publication(const char *fixture
     CHECK(rgb_active_profile_config_capture_frame(&profile_frame) == NOAH_ACTIVE_PROFILE_RGB_OK);
     CHECK(rgb_runtime_layer_stage_render_active_profile_frame(&frame, 0u, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
     check_frame_range(&frame, 0u, RGB_MATRIX_LED_COUNT, second_base);
+
+    // A publication landing while the row selectors are read, just after the
+    // layer colours: that frame paints nothing, the selectors it read are never
+    // used, and the next frame reads the newest profile's afresh (D-F63).
+    noah_active_profile_rgb_runtime_invalidate(&runtime, 4u, second, first, &first_snapshot);
+    CHECK(rgb_active_profile_config_capture_frame(&profile_frame) == NOAH_ACTIVE_PROFILE_RGB_OK);
+    first_reader.calls              = 0u;
+    first_reader.invalidate_on_call = LAYER_COUNT + 1u;
+    CHECK(!rgb_runtime_layer_stage_render_active_profile_frame(&frame, 0u, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
+    check_frame_range_unpainted(&frame, 0u, RGB_MATRIX_LED_COUNT);
+    CHECK(first_reader.calls == LAYER_COUNT + 1u);
+    first_reader.invalidate_on_call = SIZE_MAX;
+    CHECK(rgb_active_profile_config_capture_frame(&profile_frame) == NOAH_ACTIVE_PROFILE_RGB_OK);
+    second_reader.calls = 0u;
+    CHECK(rgb_runtime_layer_stage_render_active_profile_frame(&frame, 0u, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));
+    check_frame_range(&frame, 0u, RGB_MATRIX_LED_COUNT, second_base);
+    CHECK(second_reader.calls == LAYER_COUNT + selector_reads + group_reads);
     noah_active_profile_rgb_runtime_uninstall(&runtime);
 }
 

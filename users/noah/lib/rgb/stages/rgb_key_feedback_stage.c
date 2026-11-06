@@ -259,34 +259,56 @@ static bool rgb_runtime_key_feedback_stage_paint_group(rgb_runtime_frame_t *fram
     return painted;
 }
 
+static const key_behavior_feedback_group_semantic_t all_group_semantics[] = {
+    KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING,
+    KEY_FEEDBACK_GROUP_TAP_COMMITTED,
+    KEY_FEEDBACK_GROUP_HOLD_ACTIVE,
+    KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE,
+};
+
+// The state a row naming this semantic follows, when that semantic shows.
+static bool rgb_runtime_key_feedback_stage_group_semantic_state(key_behavior_feedback_group_semantic_t group_semantic, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, key_feedback_render_state_t *state) {
+    key_feedback_broad_owner_slot_t group_slot;
+
+    if (!rgb_runtime_key_feedback_stage_group_owner_slot(group_semantic, &group_slot)) {
+        return false;
+    }
+    *state = rgb_runtime_key_feedback_stage_state_for_owner(semantic_map, tap_branch_map, flash_visibility_bitmap, broad_owner_map, group_slot);
+    return rgb_runtime_key_feedback_stage_group_semantic_matches(group_semantic, state->semantic);
+}
+
+static uint8_t rgb_runtime_key_feedback_stage_selector_semantic_count(uint8_t selector) {
+    return selector == NOAH_PROFILE_RGB_V1_SELECTOR_ALL ? (uint8_t)ARRAY_SIZE(all_group_semantics) : 1u;
+}
+
+static key_behavior_feedback_group_semantic_t rgb_runtime_key_feedback_stage_selector_semantic(uint8_t selector, uint8_t semantic_index) {
+    return selector == NOAH_PROFILE_RGB_V1_SELECTOR_ALL ? all_group_semantics[semantic_index] : (key_behavior_feedback_group_semantic_t)selector;
+}
+
+// Whether a row with this selector paints now: some semantic it names shows.
+static bool rgb_runtime_key_feedback_stage_selector_shown(uint8_t selector, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map) {
+    for (uint8_t semantic_index = 0u; semantic_index < rgb_runtime_key_feedback_stage_selector_semantic_count(selector); semantic_index++) {
+        key_feedback_render_state_t state;
+
+        if (rgb_runtime_key_feedback_stage_group_semantic_state(rgb_runtime_key_feedback_stage_selector_semantic(selector, semantic_index), semantic_map, tap_branch_map, flash_visibility_bitmap, broad_owner_map, &state)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool rgb_runtime_key_feedback_stage_render_group(const rgb_active_profile_key_feedback_t *config, rgb_runtime_frame_t *frame, const rgb_active_profile_key_group_t *group, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max) {
-    static const key_behavior_feedback_group_semantic_t all_semantics[] = {
-        KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING,
-        KEY_FEEDBACK_GROUP_TAP_COMMITTED,
-        KEY_FEEDBACK_GROUP_HOLD_ACTIVE,
-        KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE,
-    };
-    bool    painted        = false;
-    uint8_t semantic_count = 1u;
+    bool painted = false;
 
     if (!(config && frame && group)) {
         return false;
     }
-    if (group->selector == NOAH_PROFILE_RGB_V1_SELECTOR_ALL) {
-        semantic_count = (uint8_t)ARRAY_SIZE(all_semantics);
-    }
 
-    for (uint8_t semantic_index = 0u; semantic_index < semantic_count; semantic_index++) {
-        key_behavior_feedback_group_semantic_t group_semantic = group->selector == NOAH_PROFILE_RGB_V1_SELECTOR_ALL ? all_semantics[semantic_index] : (key_behavior_feedback_group_semantic_t)group->selector;
-        key_feedback_broad_owner_slot_t        group_slot;
-        key_feedback_render_state_t            group_state;
-        rgb_t                                  group_rgb;
+    for (uint8_t semantic_index = 0u; semantic_index < rgb_runtime_key_feedback_stage_selector_semantic_count(group->selector); semantic_index++) {
+        key_feedback_render_state_t group_state;
+        rgb_t                       group_rgb;
 
-        if (!rgb_runtime_key_feedback_stage_group_owner_slot(group_semantic, &group_slot)) {
-            continue;
-        }
-        group_state = rgb_runtime_key_feedback_stage_state_for_owner(semantic_map, tap_branch_map, flash_visibility_bitmap, broad_owner_map, group_slot);
-        if (!rgb_runtime_key_feedback_stage_group_semantic_matches(group_semantic, group_state.semantic)) {
+        if (!rgb_runtime_key_feedback_stage_group_semantic_state(rgb_runtime_key_feedback_stage_selector_semantic(group->selector, semantic_index), semantic_map, tap_branch_map, flash_visibility_bitmap, broad_owner_map, &group_state)) {
             continue;
         }
         if (rgb_hsv_is_inherit_color(group->color)) {
@@ -302,21 +324,29 @@ static bool rgb_runtime_key_feedback_stage_render_group(const rgb_active_profile
 }
 
 static bool rgb_runtime_key_feedback_stage_render_groups(const rgb_active_profile_key_feedback_t *config, rgb_runtime_frame_t *frame, const noah_active_profile_rgb_frame_t *profile_frame, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max) {
-    bool    painted     = false;
-    uint8_t group_count = rgb_active_profile_config_key_group_count(profile_frame);
+    rgb_active_profile_group_selectors_t selectors;
+    bool                                 painted = false;
 
+    if (!rgb_active_profile_config_group_selectors(profile_frame, &selectors)) {
+        rgb_runtime_frame_clear(frame, led_min, led_max);
+        return false;
+    }
+    // All-semantics rows paint first, then the rows naming one. Each pass
+    // reads only the rows whose semantic shows (D-F63), so a row is read at
+    // most once.
     for (uint8_t pass = 0u; pass < 2u; pass++) {
         bool all_base_pass = pass == 0u;
 
-        for (uint8_t group_index = 0u; group_index < group_count; group_index++) {
+        for (uint8_t group_index = 0u; group_index < selectors.key_count; group_index++) {
             rgb_active_profile_key_group_t group;
+            uint8_t                        selector = selectors.key[group_index];
 
+            if ((selector == NOAH_PROFILE_RGB_V1_SELECTOR_ALL) != all_base_pass || !rgb_runtime_key_feedback_stage_selector_shown(selector, semantic_map, tap_branch_map, flash_visibility_bitmap, broad_owner_map)) {
+                continue;
+            }
             if (!rgb_active_profile_config_key_group_at(profile_frame, group_index, &group)) {
                 rgb_runtime_frame_clear(frame, led_min, led_max);
                 return false;
-            }
-            if ((group.selector == NOAH_PROFILE_RGB_V1_SELECTOR_ALL) != all_base_pass) {
-                continue;
             }
             painted |= rgb_runtime_key_feedback_stage_render_group(config, frame, &group, semantic_map, tap_branch_map, flash_visibility_bitmap, broad_owner_map, led_min, led_max);
         }

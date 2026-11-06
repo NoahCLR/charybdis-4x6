@@ -23,8 +23,9 @@ static uint8_t hex_nibble(char c) {
 // argv[1]: limits line "stage layers brightness tap_branches pd_mask", then
 // one line per vector: expected code, payload-relative offset, name, hex.
 int main(int argc, char **argv) {
-    static char    hex[4096];
-    static uint8_t payload[2048];
+    // Room for the largest domain's vectors, 4,639 bytes (D-F63).
+    static char    hex[16384];
+    static uint8_t payload[8192];
     char           code[32], name[64];
     unsigned       stage, layers, brightness, branches;
     unsigned long  pd_mask;
@@ -42,7 +43,7 @@ int main(int argc, char **argv) {
     limits.maximum_brightness     = (uint8_t)brightness;
     limits.tap_branch_color_count = (uint8_t)branches;
     limits.supported_pointing_mode_mask = (uint32_t)pd_mask;
-    while (fscanf(file, "%31s %zu %63s %4095s", code, &offset, name, hex) == 4) {
+    while (fscanf(file, "%31s %zu %63s %16383s", code, &offset, name, hex) == 4) {
         size_t length = strlen(hex) / 2;
         assert(length <= sizeof(payload));
         for (size_t i = 0; i < length; i++) payload[i] = (uint8_t)(hex_nibble(hex[2 * i]) << 4 | hex_nibble(hex[2 * i + 1]));

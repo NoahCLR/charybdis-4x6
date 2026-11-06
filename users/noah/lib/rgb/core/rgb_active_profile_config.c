@@ -33,6 +33,13 @@ static noah_active_profile_rgb_result_t frame_status(const noah_active_profile_r
     return status;
 }
 
+#ifdef RGB_ACTIVE_PROFILE_CONFIG_TEST_BACKEND
+static rgb_active_profile_config_test_reads_t test_reads;
+#    define COUNT_READ(field_) (test_reads.field_++)
+#else
+#    define COUNT_READ(field_) ((void)0)
+#endif
+
 static hsv_t native_hsv(noah_profile_rgb_v1_hsv_t color) {
     return (hsv_t){.h = color.h, .s = color.s, .v = color.v};
 }
@@ -98,6 +105,7 @@ bool rgb_active_profile_config_layer_group_at(const noah_active_profile_rgb_fram
         noah_profile_rgb_v1_group_t     dictionary_group;
         noah_profile_rgb_v1_error_t     error;
 
+        COUNT_READ(layer_rows);
         if (noah_profile_rgb_v1_layer_group_at(view, index, &row, &error) != NOAH_PROFILE_RGB_V1_OK || row.group_id >= view->group_count || noah_profile_rgb_v1_group_at(view, row.group_id, &dictionary_group, &error) != NOAH_PROFILE_RGB_V1_OK || dictionary_group.id != row.group_id) {
             return false;
         }
@@ -234,6 +242,7 @@ bool rgb_active_profile_config_pd_group_at(const noah_active_profile_rgb_frame_t
         noah_profile_rgb_v1_group_t     dictionary_group;
         noah_profile_rgb_v1_error_t     error;
 
+        COUNT_READ(pd_rows);
         if (noah_profile_rgb_v1_pd_group_at(view, index, &row, &error) != NOAH_PROFILE_RGB_V1_OK || row.group_id >= view->group_count || noah_profile_rgb_v1_group_at(view, row.group_id, &dictionary_group, &error) != NOAH_PROFILE_RGB_V1_OK || dictionary_group.id != row.group_id) {
             return false;
         }
@@ -320,6 +329,7 @@ bool rgb_active_profile_config_combo_group_at(const noah_active_profile_rgb_fram
         noah_profile_rgb_v1_group_t           dictionary_group;
         noah_profile_rgb_v1_error_t           error;
 
+        COUNT_READ(combo_rows);
         if (noah_profile_rgb_v1_combo_group_at(view, index, &row, &error) != NOAH_PROFILE_RGB_V1_OK || row.group_id >= view->group_count || noah_profile_rgb_v1_group_at(view, row.group_id, &dictionary_group, &error) != NOAH_PROFILE_RGB_V1_OK || dictionary_group.id != row.group_id) {
             return false;
         }
@@ -437,6 +447,7 @@ bool rgb_active_profile_config_key_group_at(const noah_active_profile_rgb_frame_
         noah_profile_rgb_v1_group_t     dictionary_group;
         noah_profile_rgb_v1_error_t     error;
 
+        COUNT_READ(key_rows);
         if (noah_profile_rgb_v1_key_group_at(view, index, &row, &error) != NOAH_PROFILE_RGB_V1_OK || row.group_id >= view->group_count || noah_profile_rgb_v1_group_at(view, row.group_id, &dictionary_group, &error) != NOAH_PROFILE_RGB_V1_OK || dictionary_group.id != row.group_id) {
             return false;
         }
@@ -468,5 +479,106 @@ key_feedback_tap_commit_mode_t key_feedback_tap_commit_mode(void) {
         return KEY_FEEDBACK_TAP_COMMIT_OFF;
     }
     return tap_commit_mode;
+}
+#endif
+
+// The selectors of the frame's rows, keyed like the layer stage's colour cache
+// (rgb_layer_stage.c): by the frame's epoch, publication count and liveness.
+// An epoch is never reused while the runtime lives, so selectors read while a
+// publication landed can never be current again, and a frame that is no longer
+// current gets none.
+static struct {
+    uint8_t  selectors[NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS];
+    uint32_t epoch;
+    uint32_t publication_count;
+    uint8_t  layer_count;
+    uint8_t  pd_count;
+    uint8_t  key_count;
+    bool     live;
+    bool     valid;
+} selector_cache;
+
+#if UINTPTR_MAX == UINT32_MAX
+_Static_assert(sizeof(selector_cache) <= NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS + 16u, "the lighting selector cache is one byte per group row");
+#endif
+
+typedef noah_profile_rgb_v1_result_t (*group_row_reader_t)(const noah_profile_rgb_v1_view_t *view, uint8_t index, noah_profile_rgb_v1_group_row_t *row, noah_profile_rgb_v1_error_t *error);
+
+// One table's selectors, each row read only while the frame is current.
+static bool read_table_selectors(const noah_active_profile_rgb_frame_t *frame, group_row_reader_t read_row, uint8_t count, uint16_t *next) {
+    for (uint8_t index = 0u; index < count; index++) {
+        const noah_profile_rgb_v1_view_t *view;
+        noah_profile_rgb_v1_group_row_t   row;
+        noah_profile_rgb_v1_error_t       error;
+
+        COUNT_READ(selector_reads);
+        if (frame_status(frame, &view) != NOAH_ACTIVE_PROFILE_RGB_OK || read_row(view, index, &row, &error) != NOAH_PROFILE_RGB_V1_OK) {
+            return false;
+        }
+        selector_cache.selectors[(*next)++] = row.selector;
+    }
+    return true;
+}
+
+static bool read_group_selectors(const noah_active_profile_rgb_frame_t *frame) {
+    const noah_profile_rgb_v1_view_t *view;
+    uint16_t                          next  = 0u;
+    uint8_t                           layer = rgb_active_profile_config_layer_group_count(frame);
+    uint8_t                           pd    = rgb_active_profile_config_pd_group_count(frame);
+    uint8_t                           key   = rgb_active_profile_config_key_group_count(frame);
+
+    if ((uint16_t)layer + pd + key > NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS || !read_table_selectors(frame, noah_profile_rgb_v1_layer_group_at, layer, &next) || !read_table_selectors(frame, noah_profile_rgb_v1_pd_group_at, pd, &next) || !read_table_selectors(frame, noah_profile_rgb_v1_key_group_at, key, &next)) {
+        return false;
+    }
+    selector_cache.layer_count = layer;
+    selector_cache.pd_count    = pd;
+    selector_cache.key_count   = key;
+    // A publication that landed during the reads leaves nothing to keep.
+    return frame_status(frame, &view) == NOAH_ACTIVE_PROFILE_RGB_OK;
+}
+
+bool rgb_active_profile_config_group_selectors(const noah_active_profile_rgb_frame_t *frame, rgb_active_profile_group_selectors_t *selectors) {
+    // Without a frame the accessors read the compiled view, as an uninstalled
+    // runtime's frame does.
+    const noah_profile_rgb_v1_view_t *view;
+    uint32_t                          epoch             = frame ? frame->epoch : 0u;
+    uint32_t                          publication_count = frame ? frame->publication_count : 0u;
+    bool                              live              = frame && frame->live;
+
+    if (!selectors || frame_status(frame, &view) != NOAH_ACTIVE_PROFILE_RGB_OK) {
+        return false;
+    }
+    if (!(selector_cache.valid && selector_cache.epoch == epoch && selector_cache.publication_count == publication_count && selector_cache.live == live)) {
+        selector_cache.valid = false;
+        if (!read_group_selectors(frame)) {
+            return false;
+        }
+        selector_cache.epoch             = epoch;
+        selector_cache.publication_count = publication_count;
+        selector_cache.live              = live;
+        selector_cache.valid             = true;
+    }
+    *selectors = (rgb_active_profile_group_selectors_t){
+        .layer       = selector_cache.selectors,
+        .pd          = selector_cache.selectors + selector_cache.layer_count,
+        .key         = selector_cache.selectors + selector_cache.layer_count + selector_cache.pd_count,
+        .layer_count = selector_cache.layer_count,
+        .pd_count    = selector_cache.pd_count,
+        .key_count   = selector_cache.key_count,
+    };
+    return true;
+}
+
+void rgb_active_profile_config_invalidate_group_selectors(void) {
+    selector_cache.valid = false;
+}
+
+#ifdef RGB_ACTIVE_PROFILE_CONFIG_TEST_BACKEND
+void rgb_active_profile_config_test_reset_reads(void) {
+    test_reads = (rgb_active_profile_config_test_reads_t){0};
+}
+
+rgb_active_profile_config_test_reads_t rgb_active_profile_config_test_reads(void) {
+    return test_reads;
 }
 #endif

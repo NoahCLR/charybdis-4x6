@@ -111,7 +111,9 @@ static noah_profile_rgb_v1_validation_result_t drive_incremental(noah_profile_rg
         assert(context->calls - calls_before <= 1u);
         assert(context->bytes_read - bytes_before <= NOAH_PROFILE_RGB_V1_VALIDATION_READ_MAX);
         (*steps)++;
-        assert(*steps < 128u);
+        // A runaway guard above the largest domain's steps: one per record,
+        // at most 1 + 128 + 16 + 640 + 32 + 4 + 3, and its framing.
+        assert(*steps < 1024u);
     }
     return progress;
 }
@@ -342,9 +344,10 @@ static void test_headers_lengths_and_dictionary(const char *fixture_path) {
     mutated[10] = NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS + 1u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED);
     memcpy(mutated, valid, length);
-    mutated[6]  = NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS;
-    mutated[8]  = 1u;
-    mutated[9]  = 0u;
+    // 641 rows in all, each table within its byte (D-F63).
+    mutated[6]  = NOAH_PROFILE_RGB_V1_MAX_TABLE_GROUP_ROWS;
+    mutated[8]  = NOAH_PROFILE_RGB_V1_MAX_TABLE_GROUP_ROWS;
+    mutated[9]  = (uint8_t)(NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS + 1u - 2u * NOAH_PROFILE_RGB_V1_MAX_TABLE_GROUP_ROWS);
     mutated[11] = 0u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED);
 
@@ -471,7 +474,8 @@ static void test_canonical_empty_forms(void) {
 }
 
 static void test_maximum_dictionary_and_rows(void) {
-    uint8_t                                 payload[344] = {0};
+    // 128 groups and one table's 255 rows (D-F63).
+    uint8_t                                 payload[2467] = {0};
     size_t                                  offset;
     noah_profile_rgb_v1_limits_t            limits = noah_profile_rgb_v1_default_limits();
     noah_profile_rgb_v1_view_t              view;
@@ -486,19 +490,19 @@ static void test_maximum_dictionary_and_rows(void) {
     payload[2]  = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
     payload[4]  = NOAH_PROFILE_RGB_V1_MAX_GROUPS;
     payload[5]  = 1u;
-    payload[6]  = NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS;
+    payload[6]  = NOAH_PROFILE_RGB_V1_MAX_TABLE_GROUP_ROWS;
     payload[12] = NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT;
     payload[13] = NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE;
     offset      = NOAH_PROFILE_RGB_V1_HEADER_SIZE;
-    for (uint8_t group = 0u; group < NOAH_PROFILE_RGB_V1_MAX_GROUPS; group++) {
-        payload[offset]      = group;
-        payload[offset + 1u] = group;
+    for (uint16_t group = 0u; group < NOAH_PROFILE_RGB_V1_MAX_GROUPS; group++) {
+        payload[offset]      = (uint8_t)group;
+        payload[offset + 1u] = (uint8_t)group;
         offset += 9u;
     }
     offset += 5u; // one canonical layer-zero row
-    for (uint8_t row = 0u; row < NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS; row++) {
+    for (uint16_t row = 0u; row < NOAH_PROFILE_RGB_V1_MAX_TABLE_GROUP_ROWS; row++) {
         payload[offset]      = NOAH_PROFILE_RGB_V1_SELECTOR_ALL;
-        payload[offset + 4u] = 0u;
+        payload[offset + 4u] = (uint8_t)(row % NOAH_PROFILE_RGB_V1_MAX_GROUPS);
         offset += 5u;
     }
     assert(offset + 4u + 4u + 11u == sizeof(payload));
@@ -507,16 +511,82 @@ static void test_maximum_dictionary_and_rows(void) {
     limits.supported_pointing_mode_mask = 0u;
     expect_result(noah_profile_rgb_v1_decode(payload, sizeof(payload), &limits, &view, &error), NOAH_PROFILE_RGB_V1_OK);
     assert(view.group_count == NOAH_PROFILE_RGB_V1_MAX_GROUPS);
-    assert(view.layer_group_count == NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS);
+    assert(view.layer_group_count == NOAH_PROFILE_RGB_V1_MAX_TABLE_GROUP_ROWS);
 
     context = (instrumented_reader_t){.bytes = payload, .length = sizeof(payload)};
     reader  = (noah_profile_reader_t){.read = instrumented_read, .context = &context, .length = sizeof(payload)};
     assert(noah_profile_rgb_v1_validation_begin(&validation, &reader, 0u, sizeof(payload), &limits, &error) == NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS);
     progress = drive_incremental(&validation, &context, &error, &steps);
     assert(progress == NOAH_PROFILE_RGB_V1_VALIDATION_VALID);
-    assert(context.calls == 53u && context.bytes_read == sizeof(payload));
+    // The header, 128 groups, a layer colour, 255 rows and three fixed records.
+    assert(context.calls == 388u && context.bytes_read == sizeof(payload));
     assert(context.max_read == NOAH_PROFILE_RGB_V1_HEADER_SIZE);
-    assert(steps == 58u);
+    assert(steps == 393u);
+
+    // A 129th group is refused at the header.
+    payload[4] = NOAH_PROFILE_RGB_V1_MAX_GROUPS + 1u;
+    expect_decode(payload, sizeof(payload), &limits, NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED);
+}
+
+// 640 rows in all across the layer, pointing and key-feedback tables is the
+// ceiling (D-F63); one more is refused, and a fault in a table's last row,
+// row 254, is located there.
+static void test_total_rows_at_ceiling(void) {
+    enum {
+        LAYER_ROWS = NOAH_PROFILE_RGB_V1_MAX_TABLE_GROUP_ROWS,
+        PD_ROWS    = NOAH_PROFILE_RGB_V1_MAX_TABLE_GROUP_ROWS,
+        KEY_ROWS   = NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS - LAYER_ROWS - PD_ROWS,
+        SIZE       = NOAH_PROFILE_RGB_V1_FIXED_PAYLOAD_SIZE + 9u + 5u + 5u * LAYER_ROWS + 5u * NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES + 5u * PD_ROWS + 3u * NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS + 5u * KEY_ROWS,
+    };
+    static uint8_t               payload[SIZE + 5u];
+    size_t                       offset = NOAH_PROFILE_RGB_V1_HEADER_SIZE;
+    size_t                       last_layer_row;
+    noah_profile_rgb_v1_limits_t limits = noah_profile_rgb_v1_default_limits();
+    noah_profile_rgb_v1_view_t   view;
+    noah_profile_rgb_v1_error_t  error;
+
+    memset(payload, 0, sizeof(payload));
+    payload[0]  = NOAH_PROFILE_RGB_V1_FORMAT_VERSION;
+    payload[2]  = NOAH_PROFILE_RGB_V1_STAGE_LAYER | NOAH_PROFILE_RGB_V1_STAGE_POINTING_MODE | NOAH_PROFILE_RGB_V1_STAGE_KEY_BEHAVIOR;
+    payload[4]  = 1u;
+    payload[5]  = 1u;
+    payload[6]  = LAYER_ROWS;
+    payload[7]  = NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES;
+    payload[8]  = PD_ROWS;
+    payload[10] = NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS;
+    payload[11] = KEY_ROWS;
+    payload[12] = NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT;
+    payload[13] = NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE;
+    offset += 9u; // one empty group
+    offset += 5u; // layer zero's colour
+    for (uint16_t row = 0u; row < LAYER_ROWS; row++, offset += 5u) {
+        payload[offset] = row % 2u == 0u ? 0u : NOAH_PROFILE_RGB_V1_SELECTOR_ALL;
+    }
+    last_layer_row = offset - 5u;
+    offset += 4u; // auto-mouse fade
+    for (uint8_t slot = 0u; slot < NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES; slot++, offset += 5u) {
+        payload[offset] = slot;
+    }
+    for (uint16_t row = 0u; row < PD_ROWS; row++, offset += 5u) {
+        payload[offset] = (uint8_t)(row % 33u == 32u ? NOAH_PROFILE_RGB_V1_SELECTOR_ALL : row % 33u);
+    }
+    offset += 4u;                                                   // combo feedback
+    offset += 3u * NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS + 11u; // tap-branch colours, key feedback
+    for (uint16_t row = 0u; row < KEY_ROWS; row++, offset += 5u) {
+        payload[offset] = (uint8_t)(row % 5u == 4u ? NOAH_PROFILE_RGB_V1_SELECTOR_ALL : row % 5u);
+    }
+    assert(offset == SIZE);
+    limits.logical_layer_count = 1u;
+    expect_result(noah_profile_rgb_v1_decode(payload, SIZE, &limits, &view, &error), NOAH_PROFILE_RGB_V1_OK);
+    assert(view.layer_group_count == LAYER_ROWS && view.pd_group_count == PD_ROWS && view.key_group_count == KEY_ROWS);
+
+    payload[11] = KEY_ROWS + 1u;
+    expect_decode(payload, SIZE + 5u, &limits, NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED);
+    payload[11] = KEY_ROWS;
+
+    payload[last_layer_row + 4u] = 1u;
+    expect_result(noah_profile_rgb_v1_decode(payload, SIZE, &limits, &view, &error), NOAH_PROFILE_RGB_V1_INVALID_REFERENCE);
+    assert(error.table == NOAH_PROFILE_RGB_V1_TABLE_LAYER_GROUPS && error.row == LAYER_ROWS - 1u && error.offset == last_layer_row + 4u);
 }
 
 int main(int argc, char **argv) {
@@ -529,6 +599,7 @@ int main(int argc, char **argv) {
     test_fields_features_and_surfaces(argv[1]);
     test_canonical_empty_forms();
     test_maximum_dictionary_and_rows();
+    test_total_rows_at_ceiling();
     puts("profile RGB v1 tests passed");
     return 0;
 }

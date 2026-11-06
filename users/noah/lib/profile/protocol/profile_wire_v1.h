@@ -135,7 +135,8 @@ typedef struct {
     uint8_t  max_combos;
     uint8_t  max_keys_per_combo;
     uint8_t  max_reusable_rgb_groups;
-    uint8_t  max_rgb_stage_group_rows;
+    uint8_t  max_rgb_table_group_rows;   // group rows in one lighting table
+    uint16_t max_rgb_stage_group_rows; // group rows in all four (D-F63)
     uint8_t  physical_led_count;
     uint8_t  led_bitmap_size;
     uint8_t  custom_key_slots;

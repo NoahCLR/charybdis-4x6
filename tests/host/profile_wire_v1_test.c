@@ -25,8 +25,9 @@ static const noah_profile_wire_v1_read_service_t service = {
             .max_populated_behavior_steps = 640u,
             .max_combos                   = 128u,
             .max_keys_per_combo           = 16u,
-            .max_reusable_rgb_groups      = 16u,
-            .max_rgb_stage_group_rows     = 32u,
+            .max_reusable_rgb_groups      = 128u,
+            .max_rgb_table_group_rows       = 255u,
+            .max_rgb_stage_group_rows     = 640u,
             .physical_led_count           = 58u,
             .led_bitmap_size              = 8u,
             .custom_key_slots             = 128u,
@@ -146,6 +147,8 @@ static void test_capability_pages(void) {
     assert_success(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x42u, 1u);
     // Layout 3: every byte-wide ceiling, in order, then zero.
     assert(frame[7] == 16u && frame[8] == 16u && frame[9] == 128u && frame[10] == 5u && frame[11] == 128u);
+    // Lighting: 128 LED sets and 255 group rows in one table (D-F63).
+    assert(frame[12] == 16u && frame[13] == 128u && frame[14] == 255u);
     assert(frame[18] == 128u && frame[19] == 3u && frame[20] == 32u && frame[21] == 32u && frame[22] == 60u);
     for (uint8_t index = 23u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) assert(frame[index] == 0u);
 
@@ -160,7 +163,9 @@ static void test_capability_pages(void) {
     assert(frame[13] == 0x00u && frame[14] == 0xFCu && frame[15] == 0x01u && frame[16] == 0x00u);
     assert(frame[17] == 0x00u && frame[18] == 0xFCu && frame[19] == 0x01u && frame[20] == 0x00u);
     assert(frame[21] == 0x70u && frame[22] == 0x11u && frame[23] == 0x01u && frame[24] == 0x00u);
-    for (uint8_t index = 25u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) assert(frame[index] == 0u);
+    // 640 lighting group rows in all (D-F63).
+    assert(frame[25] == 0x80u && frame[26] == 0x02u);
+    for (uint8_t index = 27u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) assert(frame[index] == 0u);
 
     request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x46u, 3u);
     assert(noah_profile_wire_v1_handle_get(&service, frame, sizeof(frame)));

@@ -142,6 +142,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 "$BIN_KEY_ACTIVE_PROFILE" "$ROOT/tests/fixtures/rgb_domain_v1.fixture"
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+    -DRGB_ACTIVE_PROFILE_CONFIG_TEST_BACKEND \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DNOAH_RUNTIME_DIAG_TEST_BACKEND \
     -DRGB_MATRIX_ENABLE \

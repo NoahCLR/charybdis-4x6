@@ -36,10 +36,12 @@ fi
 # cache mirrors the 36 KiB VIA region alone: 106,496 bytes fewer. D-F31 removes
 # VIA, so it mirrors only QMK's 4 KiB eeconfig region: 32,768 bytes fewer.
 # D-F32 adds the working copy, one slot payload of RAM (130,048 bytes), and
-# its edit, sync and save state: one reviewed 130 KiB increment. All are
-# policy, not capacity. See
+# its edit, sync and save state: one reviewed 130 KiB increment. D-F63 keeps
+# each lighting group row's selector for a publication (656 bytes) and sizes
+# the compiled lighting's cache to the authored tables (256 bytes fewer): 400
+# bytes, as measured on both halves. All are policy, not capacity. See
 # docs/spec/resource-policy.md for what each policy is and how to report it.
-STATIC_RAM_POLICY=$((57344 + 3072 + 4096 + 124928 + 20480 - 106496 - 32768 + 133120))
+STATIC_RAM_POLICY=$((57344 + 3072 + 4096 + 124928 + 20480 - 106496 - 32768 + 133120 + 400))
 
 "$PYTHON" "$ROOT/tools/check_firmware_memory_budget.py" \
     --elf "$ELF" \

@@ -306,6 +306,8 @@ static void test_capability_hook(void) {
     assert(frame[WIRE_PAYLOAD + 12u] == 0u);
 #endif
     assert(frame[WIRE_PAYLOAD + 13u] == NOAH_PROFILE_WIRE_V1_MAX_NAME_BYTES && frame[WIRE_PAYLOAD + 14u] == 32u && frame[WIRE_PAYLOAD + 15u] == MATRIX_ROWS * MATRIX_COLS);
+    // Lighting: LED sets and the group rows of one table (D-F63).
+    assert(frame[WIRE_PAYLOAD + 6u] == 128u && frame[WIRE_PAYLOAD + 7u] == 255u);
 
     // ...and the wider ones, 32-bit capacities, on page 2.
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x33u, 2u);
@@ -316,6 +318,9 @@ static void test_capability_hook(void) {
     assert(read_u32(&frame[WIRE_PAYLOAD + 6u]) == NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX);
     assert(read_u32(&frame[WIRE_PAYLOAD + 10u]) == NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX);
     assert(read_u32(&frame[WIRE_PAYLOAD + 14u]) == 34903u);
+    // The group rows of all four lighting tables (D-F63).
+    assert(read_u16(&frame[WIRE_PAYLOAD + 18u]) == 640u);
+    for (uint8_t index = WIRE_PAYLOAD + 20u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) assert(frame[index] == 0u);
 }
 
 #ifndef NOAH_LIVE_PROFILE_OWNER_ENABLE

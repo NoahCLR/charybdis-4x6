@@ -16,6 +16,10 @@
 #include "users/noah/lib/rgb/core/rgb_helpers.h"
 #include "users/noah/lib/rgb/stages/rgb_layer_stage.h"
 #include "ws2812.h"
+#ifdef RGB_ACTIVE_PROFILE_CONFIG_TEST_BACKEND
+#    include "users/noah/lib/profile/schema/profile_validator_v1.h"
+#    include "users/noah/lib/rgb/core/rgb_active_profile_config.h"
+#endif
 
 #ifndef RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE
 #    define RGB_LAYER_RENDER_TEST_AUTOMOUSE_END_OVERRIDE 0
@@ -218,6 +222,9 @@ const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
 static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.semantic = KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING, .color = HSV(11, 12, 13), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(17, 18, 19), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(20, 21, 22), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(5, 6)}, );
 EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(key_behavior_feedback_led_groups_data);
 #endif
+
+// Room for the compiled encoding of the largest variant's lighting tables.
+EXPORT_RGB_COMPILED_CACHE(0u, 7u, 2u, 1u, 4u);
 const pointing_mode_def_t pointing_modes[POINTING_MODE_COUNT] = {
     [POINTING_MODE_INDEX_DRAGSCROLL] = {.mode_flag = POINTING_MODE_DRAGSCROLL}, [POINTING_MODE_INDEX_VOLUME] = {.mode_flag = POINTING_MODE_VOLUME}, [POINTING_MODE_INDEX_BRIGHTNESS] = {.mode_flag = POINTING_MODE_BRIGHTNESS}, [POINTING_MODE_INDEX_ZOOM] = {.mode_flag = POINTING_MODE_ZOOM}, [POINTING_MODE_INDEX_ARROW] = {.mode_flag = POINTING_MODE_ARROW}, [POINTING_MODE_INDEX_PINCH] = {.mode_flag = POINTING_MODE_PINCH},
 };
@@ -769,7 +776,9 @@ static bool test_render_normal_num(uint8_t led_min, uint8_t led_max) {
     test_map_num_preview_leds();
     layer_state  = (layer_state_t)1u << LAYER_NUM;
     bool painted = render_output_range(led_min, led_max);
-    CHECK(rgb_runtime_layer_stage_test_group_scan_count() == layer_led_group_count);
+    // Only the rows that paint are read (D-F63): Num's three and the two
+    // all-layers rows, never Nav's two.
+    CHECK(rgb_runtime_layer_stage_test_group_scan_count() == 5u);
     return painted;
 }
 
@@ -778,7 +787,9 @@ static bool test_render_preview_num(uint8_t led_min, uint8_t led_max) {
     test_map_num_preview_leds();
     fake_preview_layer = LAYER_NUM;
     bool painted       = render_output_range(led_min, led_max);
-    CHECK(rgb_runtime_layer_stage_test_group_scan_count() == 2u * layer_led_group_count);
+    // The base stack reads the two all-layers rows; the preview of Num reads
+    // them again with Num's three. Nav's rows are never read.
+    CHECK(rgb_runtime_layer_stage_test_group_scan_count() == 7u);
     return painted;
 }
 
@@ -2501,6 +2512,158 @@ static void test_workload_render_contract(void) {
 }
 #endif
 
+#ifdef RGB_ACTIVE_PROFILE_CONFIG_TEST_BACKEND
+// D-F63: a profile at the ceilings, 128 LED sets and 640 group rows (255 layer,
+// 255 pointing, 130 key feedback), costs a frame profile reads only for the
+// accents that light. Each row's selector is read once per publication.
+enum {
+    CEILING_GROUPS     = NOAH_PROFILE_RGB_V1_MAX_GROUPS,
+    CEILING_LAYER_ROWS = NOAH_PROFILE_RGB_V1_MAX_TABLE_GROUP_ROWS,
+    CEILING_PD_ROWS    = NOAH_PROFILE_RGB_V1_MAX_TABLE_GROUP_ROWS,
+    CEILING_KEY_ROWS   = NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS - CEILING_LAYER_ROWS - CEILING_PD_ROWS,
+    CEILING_SIZE       = NOAH_PROFILE_RGB_V1_FIXED_PAYLOAD_SIZE + 9u * CEILING_GROUPS + 5u * LAYER_COUNT + 5u * CEILING_LAYER_ROWS + 5u * NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES + 5u * CEILING_PD_ROWS + 3u * NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS + 5u * CEILING_KEY_ROWS,
+};
+
+static void ceiling_rows(uint8_t *payload, size_t *offset, uint16_t rows, uint8_t selector) {
+    for (uint16_t row = 0u; row < rows; row++, *offset += 5u) {
+        payload[*offset]      = selector;
+        payload[*offset + 1u] = 1u;
+        payload[*offset + 2u] = 2u;
+        payload[*offset + 3u] = 3u;
+        payload[*offset + 4u] = (uint8_t)(row % CEILING_GROUPS);
+    }
+}
+
+static void ceiling_payload(uint8_t *payload, uint8_t layer_selector, uint8_t pd_selector, uint8_t key_selector) {
+    size_t   offset = NOAH_PROFILE_RGB_V1_HEADER_SIZE;
+    uint16_t mask   = NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL; // this build compiles every stage
+
+    memset(payload, 0, CEILING_SIZE);
+    payload[0]  = NOAH_PROFILE_RGB_V1_FORMAT_VERSION;
+    payload[2]  = (uint8_t)mask;
+    payload[3]  = (uint8_t)(mask >> 8);
+    payload[4]  = CEILING_GROUPS;
+    payload[5]  = LAYER_COUNT;
+    payload[6]  = CEILING_LAYER_ROWS;
+    payload[7]  = NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES;
+    payload[8]  = CEILING_PD_ROWS;
+    payload[10] = NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS;
+    payload[11] = CEILING_KEY_ROWS;
+    payload[12] = NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT;
+    payload[13] = NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE;
+    for (uint16_t group = 0u; group < CEILING_GROUPS; group++, offset += 9u) {
+        payload[offset]      = (uint8_t)group;
+        payload[offset + 1u] = (uint8_t)group; // LEDs 0..6: distinct, ascending
+    }
+    for (uint8_t layer = 0u; layer < LAYER_COUNT; layer++, offset += 5u) {
+        payload[offset]      = layer;
+        payload[offset + 3u] = 10u;
+    }
+    ceiling_rows(payload, &offset, CEILING_LAYER_ROWS, layer_selector);
+    offset += 4u; // auto-mouse fade
+    for (uint8_t slot = 0u; slot < NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES; slot++, offset += 5u) {
+        payload[offset]      = slot;
+        payload[offset + 3u] = 20u;
+    }
+    ceiling_rows(payload, &offset, CEILING_PD_ROWS, pd_selector);
+    offset += 4u;                                     // combo feedback
+    offset += 3u * NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS; // tap-branch colours
+    payload[offset + 5u] = 30u;                       // hold colour
+    offset += NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE;
+    ceiling_rows(payload, &offset, CEILING_KEY_ROWS, key_selector);
+    CHECK(offset == CEILING_SIZE);
+}
+
+static void ceiling_publish(noah_active_profile_rgb_runtime_t *runtime, noah_active_profile_snapshot_t *snapshot, const uint8_t *payload, uint32_t publication, noah_active_profile_identity_t *previous) {
+    noah_profile_rgb_v1_limits_t limits = noah_profile_rgb_v1_default_limits();
+    noah_profile_rgb_v1_error_t  error;
+
+    limits.logical_layer_count = LAYER_COUNT;
+    CHECK(noah_profile_rgb_v1_decode(payload, CEILING_SIZE, &limits, &snapshot->profile.rgb, &error) == NOAH_PROFILE_RGB_V1_OK);
+    snapshot->identity            = (noah_active_profile_identity_t){.generation = publication, .payload_crc32 = publication, .payload_digest = publication, .kind = NOAH_ACTIVE_PROFILE_KIND_VALIDATED_PROFILE};
+    snapshot->profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
+    noah_active_profile_rgb_runtime_invalidate(runtime, publication, *previous, snapshot->identity, snapshot);
+    *previous = snapshot->identity;
+}
+
+static void test_ceiling_profile_reads_only_lit_accents(void) {
+    static uint8_t                         unlit[CEILING_SIZE];
+    static uint8_t                         lit[CEILING_SIZE];
+    static uint8_t                         named[CEILING_SIZE];
+    noah_active_profile_snapshot_t         named_snapshot = {0};
+    uint16_t                               shown_key_rows = 0u;
+    noah_active_profile_rgb_runtime_t      runtime;
+    noah_active_profile_snapshot_t         unlit_snapshot = {0};
+    noah_active_profile_snapshot_t         lit_snapshot   = {0};
+    noah_active_profile_identity_t         previous       = {0};
+    rgb_active_profile_config_test_reads_t reads;
+
+    // Unlit: rows for layer 15 (off), slot 31 (not running) and long holds
+    // (none shown).
+    ceiling_payload(unlit, 15u, 31u, KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE);
+    // Lit: every row names all layers, slots or semantics.
+    ceiling_payload(lit, NOAH_PROFILE_RGB_V1_SELECTOR_ALL, NOAH_PROFILE_RGB_V1_SELECTOR_ALL, NOAH_PROFILE_RGB_V1_SELECTOR_ALL);
+
+    test_reset();
+    noah_active_profile_rgb_runtime_init(&runtime);
+    CHECK(noah_active_profile_rgb_runtime_install(&runtime));
+    ceiling_publish(&runtime, &unlit_snapshot, unlit, 1u, &previous);
+    fake_pd_active_mode = POINTING_MODE_VOLUME;
+    test_local_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_HOLD_PENDING);
+
+    rgb_active_profile_config_test_reset_reads();
+    render_output();
+    reads = rgb_active_profile_config_test_reads();
+    CHECK(reads.selector_reads == NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS);
+    CHECK(reads.layer_rows == 0u && reads.pd_rows == 0u && reads.combo_rows == 0u && reads.key_rows == 0u);
+
+    // The next frame of the same publication reads nothing at all.
+    rgb_active_profile_config_test_reset_reads();
+    render_output();
+    reads = rgb_active_profile_config_test_reads();
+    CHECK(reads.selector_reads == 0u && reads.layer_rows == 0u && reads.pd_rows == 0u && reads.key_rows == 0u);
+
+    // A new publication reads its selectors once, then each lit row once: the
+    // layer stack in one pass, the running slot's rows, and the all-semantics
+    // key rows in their pass alone.
+    ceiling_publish(&runtime, &lit_snapshot, lit, 2u, &previous);
+    rgb_active_profile_config_test_reset_reads();
+    render_output();
+    reads = rgb_active_profile_config_test_reads();
+    CHECK(reads.selector_reads == NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS);
+    CHECK(reads.layer_rows == CEILING_LAYER_ROWS && reads.pd_rows == CEILING_PD_ROWS && reads.key_rows == CEILING_KEY_ROWS && reads.combo_rows == 0u);
+
+    rgb_active_profile_config_test_reset_reads();
+    render_output();
+    reads = rgb_active_profile_config_test_reads();
+    CHECK(reads.selector_reads == 0u);
+    CHECK(reads.layer_rows == CEILING_LAYER_ROWS && reads.pd_rows == CEILING_PD_ROWS && reads.key_rows == CEILING_KEY_ROWS);
+
+    // Key rows naming one semantic each, and every fifth all of them: with a
+    // hold shown, only the hold rows and the all-semantics rows are read, each
+    // once, though the two passes walk every row.
+    memcpy(named, lit, sizeof(named));
+    for (uint16_t row = 0u; row < CEILING_KEY_ROWS; row++) {
+        uint8_t selector = row % 5u == 4u ? NOAH_PROFILE_RGB_V1_SELECTOR_ALL : (uint8_t)(row % 5u);
+
+        named[CEILING_SIZE - 5u * (CEILING_KEY_ROWS - row)] = selector;
+        if (selector == KEY_FEEDBACK_GROUP_HOLD_ACTIVE || selector == NOAH_PROFILE_RGB_V1_SELECTOR_ALL) {
+            shown_key_rows++;
+        }
+    }
+    CHECK(shown_key_rows != 0u && shown_key_rows < CEILING_KEY_ROWS);
+    ceiling_publish(&runtime, &named_snapshot, named, 3u, &previous);
+    rgb_active_profile_config_test_reset_reads();
+    render_output();
+    reads = rgb_active_profile_config_test_reads();
+    CHECK(reads.selector_reads == NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS);
+    CHECK(reads.key_rows == shown_key_rows);
+
+    noah_active_profile_rgb_runtime_uninstall(&runtime);
+    rgb_active_profile_config_invalidate_group_selectors();
+}
+#endif
+
 int main(int argc, char **argv) {
 #if RGB_LAYER_RENDER_TEST_IDLE_TIMEOUT
     (void)argc;
@@ -2608,6 +2771,9 @@ int main(int argc, char **argv) {
     test_render_order_base_then_preview_then_pointing_mode_then_feedback();
 #endif
     test_runtime_boot_indicator_overrides_scene();
+#ifdef RGB_ACTIVE_PROFILE_CONFIG_TEST_BACKEND
+    test_ceiling_profile_reads_only_lit_accents();
+#endif
 #if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_LEFT_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
     test_multi_tap_pending_feedback_overrides_preview_and_pointing_mode();
     test_hold_pending_feedback_overrides_preview_and_pointing_mode();

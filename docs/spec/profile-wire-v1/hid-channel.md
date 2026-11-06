@@ -98,8 +98,8 @@ Page 1, every ceiling that fits a byte:
 | 3 | tap depth: branches per behaviour | 5, or the build's `KEY_BEHAVIOR_MAX_TAP_COUNT` |
 | 4 | maximum combos | 128 |
 | 5 | maximum inputs per combo | 16 |
-| 6 | maximum reusable lighting groups | 16 |
-| 7 | maximum lighting stage-group rows | 32 |
+| 6 | maximum reusable lighting groups | 128 |
+| 7 | maximum lighting group rows in one stage table (D-F63) | 255 |
 | 8 | physical LEDs | 58 with RGB Matrix, otherwise 0 |
 | 9 | LED bitmap bytes | 8 |
 | 10 | custom keys | 128 |
@@ -119,7 +119,8 @@ Page 2, the wider ceilings; every byte count is 32 bits:
 | 6–9 | maximum profile payload | 130,048 |
 | 10–13 | slot payload capacity | 130,048 |
 | 14–17 | macro domain capacity in bytes | 34,903 |
-| 18–24 | zero | |
+| 18–19 | maximum lighting group rows in all four stage tables (D-F63) | 640 |
+| 20–24 | zero | |
 
 The values come from one header, `users/noah/lib/compat/qmk_profile_capabilities.h`,
 which the Raw HID channel and the contract probe (`tests/host/run_contract_probe.sh`)

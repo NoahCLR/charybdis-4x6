@@ -3,6 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "profile_rgb_v1.h"
+#include "../storage/profile_storage_layout.h"
 
 #include <stdbool.h>
 #include <string.h>
@@ -12,6 +13,11 @@ _Static_assert(sizeof(noah_profile_rgb_v1_view_t) <= NOAH_PROFILE_RGB_V1_EMBEDDE
 _Static_assert(sizeof(noah_profile_rgb_v1_validation_t) <= NOAH_PROFILE_RGB_V1_EMBEDDED_VALIDATION_BUDGET, "RGB incremental validation state exceeded its 32-bit representation policy");
 #endif
 
+
+// The ceilings capability page 1 and 2 report are the ones validation holds
+// (D-F63); a table's row count is a header byte.
+_Static_assert(NOAH_PROFILE_WIRE_V1_MAX_REUSABLE_RGB_GROUPS == NOAH_PROFILE_RGB_V1_MAX_GROUPS && NOAH_PROFILE_WIRE_V1_MAX_RGB_STAGE_GROUP_ROWS == NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS && NOAH_PROFILE_WIRE_V1_MAX_RGB_TABLE_GROUP_ROWS == NOAH_PROFILE_RGB_V1_MAX_TABLE_GROUP_ROWS, "reported lighting ceilings must be the validated ones");
+_Static_assert(NOAH_PROFILE_RGB_V1_MAX_TABLE_GROUP_ROWS <= UINT8_MAX && NOAH_PROFILE_RGB_V1_MAX_GROUPS <= UINT8_MAX, "lighting table counts and group ids are header bytes");
 
 _Static_assert((unsigned)NOAH_PROFILE_RGB_V1_HEADER_SIZE <= (unsigned)NOAH_PROFILE_RGB_V1_VALIDATION_READ_MAX, "RGB header exceeded the incremental validation read budget");
 _Static_assert((unsigned)NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE <= (unsigned)NOAH_PROFILE_RGB_V1_VALIDATION_READ_MAX, "RGB record exceeded the incremental validation read budget");
