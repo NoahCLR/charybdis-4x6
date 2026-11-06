@@ -21,8 +21,10 @@ enum {
     TEST_BEHAVIOR_LENGTH      = 4u + TEST_ROW_COUNT * (2u + 16u + 18u * TEST_STEPS_PER_ROW),
     TEST_PROFILE_LENGTH       = TEST_BEHAVIOR_LENGTH + NOAH_PROFILE_BLOB_V1_HEADER_SIZE + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE,
     MAX_VALIDATION_STEPS      = MAX_BEHAVIOR_DOMAIN_STEPS + TEST_PROFILE_LENGTH / 20u + 64u,
-    MAX_RGB_DOMAIN_STEPS          = 58u,
-    TEST_MAXIMUM_RGB_PAYLOAD_SIZE = 344u,
+    // 128 groups and one table's 255 rows (D-F63): a step per record and five
+    // for the domain's framing.
+    MAX_RGB_DOMAIN_STEPS          = 393u,
+    TEST_MAXIMUM_RGB_PAYLOAD_SIZE = 2467u,
 };
 
 typedef struct {
@@ -133,17 +135,17 @@ static void run_maximum_rgb_profile(void) {
     rgb_payload[2]  = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
     rgb_payload[4]  = NOAH_PROFILE_RGB_V1_MAX_GROUPS;
     rgb_payload[5]  = 1u;
-    rgb_payload[6]  = NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS;
+    rgb_payload[6]  = NOAH_PROFILE_RGB_V1_MAX_TABLE_GROUP_ROWS;
     rgb_payload[12] = NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT;
     rgb_payload[13] = NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE;
     offset          = NOAH_PROFILE_RGB_V1_HEADER_SIZE;
-    for (uint8_t group = 0u; group < NOAH_PROFILE_RGB_V1_MAX_GROUPS; group++) {
-        rgb_payload[offset]      = group;
-        rgb_payload[offset + 1u] = group;
+    for (uint16_t group = 0u; group < NOAH_PROFILE_RGB_V1_MAX_GROUPS; group++) {
+        rgb_payload[offset]      = (uint8_t)group;
+        rgb_payload[offset + 1u] = (uint8_t)group;
         offset += 9u;
     }
     offset += 5u;
-    for (uint8_t row = 0u; row < NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS; row++) {
+    for (uint16_t row = 0u; row < NOAH_PROFILE_RGB_V1_MAX_TABLE_GROUP_ROWS; row++) {
         rgb_payload[offset]      = NOAH_PROFILE_RGB_V1_SELECTOR_ALL;
         rgb_payload[offset + 4u] = 0u;
         offset += 5u;
@@ -207,7 +209,7 @@ static void run_maximum_rgb_profile(void) {
     }
     assert(result == NOAH_PROFILE_VALIDATOR_V1_VALID);
     assert(validator.profile.rgb.group_count == NOAH_PROFILE_RGB_V1_MAX_GROUPS);
-    assert(validator.profile.rgb.layer_group_count == NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS);
+    assert(validator.profile.rgb.layer_group_count == NOAH_PROFILE_RGB_V1_MAX_TABLE_GROUP_ROWS);
 
     const phase_budget_t decode = budgets[NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_DECODE];
     assert(decode.steps == MAX_RGB_DOMAIN_STEPS);

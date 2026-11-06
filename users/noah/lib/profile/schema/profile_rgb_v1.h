@@ -16,10 +16,13 @@ enum {
     NOAH_PROFILE_RGB_V1_HEADER_SIZE           = 16u,
     NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT    = 58u,
     NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE       = 8u,
-    NOAH_PROFILE_RGB_V1_MAX_GROUPS            = 16u,
+    // D-F63: 128 LED sets; 640 group rows in all, at most 255 in one table
+    // (its header count is a byte).
+    NOAH_PROFILE_RGB_V1_MAX_GROUPS            = 128u,
     NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS    = 16u,
     NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES    = NOAH_PROFILE_PD_COUNT,
-    NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS  = 32u,
+    NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS  = 640u,
+    NOAH_PROFILE_RGB_V1_MAX_TABLE_GROUP_ROWS  = 255u,
     // Taps past the first: the shared tap depth minus one (D-F14).
     NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS = NOAH_PROFILE_TAP_DEPTH - 1u,
     // The domain's own offsets are 16 bits (its format is unchanged by schema

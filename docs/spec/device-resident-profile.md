@@ -428,7 +428,7 @@ Every ceiling holds at once (D-F14, [`0014`](../adr/0014-bigger-profiles.md)):
 | Macros / macro bank | 128 / 34,903 bytes |
 | Custom keys | 128 |
 | Names | 32 bytes of UTF-8 each |
-| Reusable lighting groups / stage-group rows | 16 / 32 |
+| Reusable lighting groups / group rows in one table / in all (D-F63) | 128 / 255 / 640 |
 | Physical LEDs / LED bitmap | 58 / 8 bytes |
 | Pointing slots | 32 |
 | Key-behaviour and lighting domains | 65,535 bytes each (16-bit internal offsets) |
@@ -436,11 +436,11 @@ Every ceiling holds at once (D-F14, [`0014`](../adr/0014-bigger-profiles.md)):
 
 `tests/fixtures/maximum_profile_v4.fixture`, written by
 `tests/host/make_maximum_profile.py` from the byte specs, holds every table
-at its ceiling and every name at 32 bytes, in 75,825 bytes:
+at its ceiling and every name at 32 bytes, in 79,873 bytes:
 
 | Domain | Bytes |
 | --- | ---: |
-| Lighting `0x10` | 591 |
+| Lighting `0x10` | 4,639 |
 | Key behaviours `0x20` | 13,828 |
 | Combos `0x30` | 9,736 |
 | Settings `0x40` | 10,693 |

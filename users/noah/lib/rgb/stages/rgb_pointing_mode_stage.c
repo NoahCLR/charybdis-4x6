@@ -168,15 +168,15 @@ bool rgb_runtime_pointing_mode_stage_render_active_profile_frame(rgb_runtime_fra
 bool rgb_runtime_pointing_mode_stage_render_active_profile_beneath_frame(rgb_runtime_frame_t *frame, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t beneath_layer, uint8_t led_min, uint8_t led_max) {
     // Mirrored identity and owner keys are rendered together, so they come from
     // one published generation rather than two independent reads.
-    uint8_t                       owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
-    bool                          has_owner_keys = false;
-    pointing_mode_snapshot_t      snapshot;
-    bool                          painted = false;
-    pointing_mode_id_t            active_mode;
-    pointing_mode_color_t         active_config;
-    rgb_t                         active_rgb;
-    rgb_active_profile_pd_group_t group_config;
-    uint8_t                       group_count;
+    uint8_t                              owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    bool                                 has_owner_keys = false;
+    pointing_mode_snapshot_t             snapshot;
+    bool                                 painted = false;
+    pointing_mode_id_t                   active_mode;
+    pointing_mode_color_t                active_config;
+    rgb_t                                active_rgb;
+    rgb_active_profile_pd_group_t        group_config;
+    rgb_active_profile_group_selectors_t selectors;
 
     if (!frame) {
         return false;
@@ -196,8 +196,15 @@ bool rgb_runtime_pointing_mode_stage_render_active_profile_beneath_frame(rgb_run
 
     painted |= rgb_runtime_pointing_mode_stage_paint_locality(frame, active_rgb, active_config.locality, snapshot, owner_bitmap, has_owner_keys, led_min, led_max);
 
-    group_count = rgb_active_profile_config_pd_group_count(profile_frame);
-    for (uint8_t group = 0u; group < group_count; group++) {
+    if (!rgb_active_profile_config_group_selectors(profile_frame, &selectors)) {
+        rgb_runtime_pointing_mode_stage_clear_frame(frame, led_min, led_max);
+        return false;
+    }
+    for (uint8_t group = 0u; group < selectors.pd_count; group++) {
+        // Only the running slot's rows and the all-slots rows are read (D-F63).
+        if (selectors.pd[group] != NOAH_PROFILE_RGB_V1_SELECTOR_ALL && selectors.pd[group] != active_mode) {
+            continue;
+        }
         if (!rgb_active_profile_config_pd_group_at(profile_frame, group, &group_config)) {
             rgb_runtime_pointing_mode_stage_clear_frame(frame, led_min, led_max);
             return false;

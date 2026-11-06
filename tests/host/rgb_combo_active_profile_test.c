@@ -27,6 +27,9 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = {
 const combo_feedback_led_group_t *const combo_feedback_led_groups      = combo_feedback_led_groups_data;
 const uint8_t                           combo_feedback_led_group_count = (uint8_t)ARRAY_SIZE(combo_feedback_led_groups_data);
 
+// Room for the compiled encoding of this test's lighting tables.
+EXPORT_RGB_COMPILED_CACHE(0u, 0u, 0u, ARRAY_SIZE(combo_feedback_led_groups_data), 0u);
+
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
     exit(1);

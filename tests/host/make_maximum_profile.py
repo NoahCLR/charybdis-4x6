@@ -2,7 +2,8 @@
 """Write the maximum profile fixture (D-F14), or check it is current.
 
 Every table at its simultaneous maximum in one schema 4.3 blob: RGB v4 with
-sixteen groups, sixteen layer colours and 32 group rows; 128 behaviour rows of
+128 groups, sixteen layer colours and 640 group rows, 255 in one table
+(D-F63); 128 behaviour rows of
 five full steps (640 steps); 128 combos of sixteen inputs; settings v11 with
 a shortcut on every custom key, most of them six keys with layers, and
 every one of its 273 names at 32 bytes of UTF-8; and 32 pointing slots (v4), each named with 32
@@ -74,8 +75,11 @@ def rgb() -> bytes:
     key_feedback = compiled[offset:offset + 11]
     assert t == DEPTH - 1 and l == LAYERS and p == 32
 
-    groups = 16
-    out = bytearray([4, 0, 0x1F, 0x00, groups, LAYERS, 12, 32, 12, 0, DEPTH - 1, 8, 58, 8, 0, 0])
+    # D-F63: 128 LED sets; 640 group rows, 255 in each of the layer and
+    # pointing tables, the rest in key feedback.
+    groups, layer_rows, pd_rows, combo_rows = 128, 255, 255, 0
+    key_rows = 640 - layer_rows - pd_rows - combo_rows
+    out = bytearray([4, 0, 0x1F, 0x00, groups, LAYERS, layer_rows, 32, pd_rows, combo_rows, DEPTH - 1, key_rows, 58, 8, 0, 0])
     # Distinct bitmaps over LEDs 0..57, already in ascending byte order.
     for i in range(groups):
         bitmap = bytearray(8)
@@ -84,20 +88,22 @@ def rgb() -> bytes:
         out += bytes([i]) + bitmap
     for layer in range(LAYERS):
         out += bytes([layer, (layer * 16) & 0xFF, 255, 200, layer & 1])
-    for i in range(12):
-        out += bytes([[7, 8, 15, 0xFF][i % 4], 10 * i, 255, 200, i])
+    # Row group ids reach 0 and 127; selectors reach layers 7, 8 and 15,
+    # slots 0 and 31, every semantic and 0xff.
+    for i in range(layer_rows):
+        out += bytes([[7, 8, 15, 0xFF][i % 4], (10 * i) & 0xFF, 255, 200, i % groups])
     out += fade
     for slot in range(32):
         out += bytes([slot, 8 * slot, 200, 150, slot % 5])
-    for i in range(12):
-        out += bytes([[0, 31, 0xFF][i % 3], 20 * i, 255, 200, 15 - i])
+    for i in range(pd_rows):
+        out += bytes([[0, 31, 0xFF][i % 3], (20 * i) & 0xFF, 255, 200, (groups - 1 - i) % groups])
     out += combo_feedback
     for i in range(DEPTH - 1):
         out += bytes([40 * i, 255, 200])
     out += key_feedback
-    for i in range(8):
-        out += bytes([[0, 1, 2, 3, 0xFF][i % 5], 30 * i, 255, 200, i + 4])
-    assert len(out) == 35 + 9 * 16 + 5 * 16 + 5 * 12 + 5 * 32 + 5 * 12 + 3 * (DEPTH - 1) + 5 * 8
+    for i in range(key_rows):
+        out += bytes([[0, 1, 2, 3, 0xFF][i % 5], (30 * i) & 0xFF, 255, 200, (i + 4) % groups])
+    assert len(out) == 35 + 9 * groups + 5 * LAYERS + 5 * layer_rows + 5 * 32 + 5 * pd_rows + 4 * combo_rows + 3 * (DEPTH - 1) + 5 * key_rows == 4639
     return bytes(out)
 
 

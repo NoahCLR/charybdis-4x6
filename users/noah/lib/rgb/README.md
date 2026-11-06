@@ -45,8 +45,10 @@ what they draw is [rgb-domain-v1.md](../../../../docs/spec/rgb-domain-v1.md#draw
 The scratch frames are static and LED-frame-sized (one in `rgb_runtime.c`,
 three in the fade stage); a new stage reuses the shared one. The layer stage
 also keeps, for one publication, each layer's colour, mode and solid flag and
-the mapped-only key map, so a chunk reads only its layer groups' records;
-`rgb_runtime_layer_stage_invalidate_maps` drops both.
+the mapped-only key map, so a chunk reads only its layer groups' records.
+`rgb_active_profile_config.c` keeps every layer, pointing and key-feedback
+row's selector for one publication, so a stage reads only the rows that paint
+(D-F63); `rgb_runtime_layer_stage_invalidate_maps` drops all three.
 
 A new stage needs its compile flag, a stage bit and its records in
 `profile/schema/profile_rgb_v1`, its accessors here, its call in

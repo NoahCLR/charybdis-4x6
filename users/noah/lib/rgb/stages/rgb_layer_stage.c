@@ -148,6 +148,7 @@ void rgb_runtime_layer_stage_post_init(void) {
 void rgb_runtime_layer_stage_invalidate_maps(void) {
     layer_key_led_map_dirty   = true;
     layer_profile_cache.valid = false;
+    rgb_active_profile_config_invalidate_group_selectors();
 }
 
 static bool rgb_runtime_layer_stage_has_solid_color(const rgb_active_profile_layer_profile_t *profile, uint8_t layer) {
@@ -218,6 +219,21 @@ bool rgb_runtime_frame_fill(rgb_runtime_frame_t *frame, rgb_t color, uint8_t led
     return true;
 }
 
+// Whether a row with this selector paints any layer of the selection: an
+// all-layers row when some layer in first..end-1 is selected, otherwise its
+// own layer when that is.
+static bool rgb_runtime_layer_stage_row_selected(layer_state_t state, uint8_t selected_layer, uint8_t first, uint8_t end, uint8_t selector) {
+    if (selector == RGB_LAYER_GROUP_ALL) {
+        for (uint8_t layer = first; layer < end; layer++) {
+            if (rgb_runtime_layer_stage_selection_contains(state, selected_layer, layer)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    return selector >= first && selector < end && rgb_runtime_layer_stage_selection_contains(state, selected_layer, selector);
+}
+
 // Layers first..end-1 only, each with its own rows; a split render lets a
 // linked pointing mode paint between them.
 static bool rgb_runtime_layer_stage_render_selection(rgb_runtime_frame_t *frame, layer_state_t state, uint8_t selected_layer, uint8_t first, uint8_t end, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
@@ -239,13 +255,21 @@ static bool rgb_runtime_layer_stage_render_selection(rgb_runtime_frame_t *frame,
         painted |= rgb_runtime_frame_paint_layer(frame, profile, layer, led_min, led_max);
     }
 
-    uint8_t group_count = rgb_active_profile_config_layer_group_count(profile_frame);
-    for (uint8_t group = 0; group < group_count; group++) {
+    rgb_active_profile_group_selectors_t selectors;
+    if (!rgb_active_profile_config_group_selectors(profile_frame, &selectors)) {
+        rgb_runtime_frame_clear(frame, led_min, led_max);
+        return false;
+    }
+    for (uint8_t group = 0; group < selectors.layer_count; group++) {
+        rgb_active_profile_layer_group_t group_config;
+
+        // Only a row this selection paints is read (D-F63).
+        if (!rgb_runtime_layer_stage_row_selected(state, selected_layer, first, end, selectors.layer[group])) {
+            continue;
+        }
 #    ifdef RGB_LAYER_STAGE_TEST_BACKEND
         layer_group_scan_count++;
 #    endif
-        rgb_active_profile_layer_group_t group_config;
-
         if (!rgb_active_profile_config_layer_group_at(profile_frame, group, &group_config)) {
             rgb_runtime_frame_clear(frame, led_min, led_max);
             return false;

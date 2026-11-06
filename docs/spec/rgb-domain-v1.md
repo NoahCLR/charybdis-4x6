@@ -31,20 +31,21 @@ Held by: `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`, `tes
 | 0 | 1 | version, `4` |
 | 1 | 1 | reserved, zero |
 | 2 | 2 | stage-enable mask, below |
-| 4 | 1 | reusable group count `G`, `0..16` |
+| 4 | 1 | reusable group count `G`, `0..128` |
 | 5 | 1 | layer-colour count `L`, `0..16` |
-| 6 | 1 | layer group-row count `LG` |
+| 6 | 1 | layer group-row count `LG`, `0..255` |
 | 7 | 1 | pointing-colour count `P`, `0..32` |
-| 8 | 1 | pointing group-row count `PG` |
-| 9 | 1 | combo group-row count `CG` |
+| 8 | 1 | pointing group-row count `PG`, `0..255` |
+| 9 | 1 | combo group-row count `CG`, `0..255` |
 | 10 | 1 | tap-branch colour count `T`, `0..4` |
-| 11 | 1 | key-feedback group-row count `KG` |
+| 11 | 1 | key-feedback group-row count `KG`, `0..255` |
 | 12 | 1 | physical LEDs, exactly `58` |
 | 13 | 1 | LED bitmap bytes, exactly `8` |
 | 14 | 2 | reserved, zero |
 
-`LG + PG + CG + KG` is at most 32. The tap-branch colour count's ceiling is
-the shared tap depth less one.
+`LG + PG + CG + KG` is at most 640 (D-F63,
+[ADR](../adr/0063-more-led-sets-and-accents.md)). The tap-branch colour
+count's ceiling is the shared tap depth less one.
 
 | Stage bit | Stage |
 | ---: | --- |
@@ -60,7 +61,7 @@ nothing from it. A bit may be set only for a stage the build compiles. A
 build with RGB Matrix compiles the layer stage and, by its options, the
 others; its compiled defaults set every compiled stage's bit.
 
-Held by: `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`, `test_headers_lengths_and_dictionary`, `test_fields_features_and_surfaces`), `tests/fixtures/rgb_domain_v4.json`.
+Held by: `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`, `test_headers_lengths_and_dictionary`, `test_fields_features_and_surfaces`, `test_total_rows_at_ceiling`), `tests/fixtures/rgb_domain_v4.json`.
 
 ## Sections
 
@@ -81,7 +82,7 @@ Records follow the header with no padding, in this order:
 | key-feedback group rows | 5 | `semantic`, `h s v`, `group` |
 
 The payload is exactly `35 + 9G + 5L + 5LG + 5P + 5PG + 4CG + 3T + 5KG`
-bytes; the counts' ceilings make the largest 591 bytes. Shorter is
+bytes; the counts' ceilings make the largest 4,639 bytes. Shorter is
 `TRUNCATED`, longer `TRAILING_BYTES`, both refusing the whole domain.
 
 Key feedback:
@@ -168,7 +169,7 @@ header's checks in the order listed, then each section's records in order:
 | `RESERVED_BITS` | header bytes 1, 14 or 15, or stage bits 5–15, nonzero |
 | `UNSUPPORTED_STAGE` | a stage bit for a stage the build does not compile |
 | `INCOMPATIBLE_GEOMETRY` | header byte 12 not `58` or byte 13 not `8` |
-| `CAPACITY_EXCEEDED` | at header byte 4: a count over its ceiling, or more than 32 group rows |
+| `CAPACITY_EXCEEDED` | at header byte 4: a count over its ceiling, or more than 640 group rows |
 | `TRUNCATED`, `TRAILING_BYTES` | a payload shorter or longer than its counts describe |
 | `RESERVED_BITS` | LED bits 58–63 set in a group |
 | `NONCANONICAL_ORDER` | a group or layer id not its row index, bitmaps or slots out of order |
@@ -279,21 +280,29 @@ Held by: `tests/host/run_rgb_layer_render_tests.sh` (`rgb_layer_render_test.c`, 
 ## Compiled lighting and the running view
 
 `profile_rgb_compiled_v1.c` is the one encoder of the authored lighting
-tables; the compiled defaults and the lighting fallback use its bytes. A
-profile without this domain draws the compiled lighting. The renderer reads
-records through a validated view of the active profile, one record at a time;
-it never rebuilds tables from the authored sources. A frame that began before
+tables; the compiled defaults and the lighting fallback use its bytes, kept
+in a buffer the keymap sizes to its own tables. The compiled lighting holds at
+most 16 saved groups and 32 group rows (D-F63). A profile without this domain
+draws the compiled lighting. The renderer reads records through a validated
+view of the active profile, one record at a time; it never rebuilds tables
+from the authored sources. Each publication's layer, pointing and
+key-feedback row selectors are read once and kept, a byte per row, and a
+stage reads a row and its group only when its selector matches: a layer on in
+the selection, the running slot, a semantic shown (D-F63). Combo rows have no
+selector and are read whenever a combo partition paints. A frame that began before
 a new generation or working copy activated is refused as stale and draws
 nothing from the old view. A build without RGB Matrix has no lighting domain.
 
-Held by: `tests/host/run_active_profile_rgb_runtime_tests.sh` (`active_profile_rgb_runtime_test.c`), `tests/host/run_rgb_layer_render_tests.sh` (`rgb_pd_active_profile_test.c`, `rgb_key_active_profile_test.c`, `rgb_combo_active_profile_test.c`, `test_compiled_and_live_*_rendering`), `tests/host/run_rgb_validation_tests.sh` (`rgb_validation_test.c`).
+Held by: `tests/host/run_active_profile_rgb_runtime_tests.sh` (`active_profile_rgb_runtime_test.c`), `tests/host/run_rgb_layer_render_tests.sh` (`rgb_layer_render_test.c`, `test_ceiling_profile_reads_only_lit_accents`; `rgb_pd_active_profile_test.c`, `rgb_key_active_profile_test.c`, `rgb_combo_active_profile_test.c`, `test_compiled_and_live_*_rendering`), `tests/host/run_rgb_validation_tests.sh` (`rgb_validation_test.c`).
 
 ## Compatibility
 
 The firmware reads only version 4 (D-F10,
 [ADR](../adr/0010-firmware-accepts-only-current-formats.md)); version 3 and
-earlier are `INVALID_VERSION` and are not translated. The 32 pointing-colour
+earlier are `INVALID_VERSION` and are not translated. D-F63 raised the group
+and row ceilings within version 4, so a profile within the earlier ceilings is
+unchanged and valid. The 32 pointing-colour
 rows are D-F09's ([ADR](../adr/0009-thirty-two-pointing-slots-stored-sparsely.md));
 the sixteen layer colours D-F14's ([ADR](../adr/0014-bigger-profiles.md)).
 
-Held by: `tests/host/run_profile_rgb_v4_tests.sh` (`profile_rgb_v4_test.c`), `tests/fixtures/rgb_domain_v4.json` (`version-3`, `version-2`).
+Held by: `tests/host/run_profile_rgb_v4_tests.sh` (`profile_rgb_v4_test.c`), `tests/fixtures/rgb_domain_v4.json` (`groups-128`, `groups-129`, `rows-255-in-one-table`, `rows-640-in-all`, `rows-641-in-all`, `version-3`, `version-2`).

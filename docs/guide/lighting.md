@@ -100,6 +100,11 @@ paints as itself. Rows paint in order, so a later row wins an LED they share.
 In key feedback, rows for any kind of feedback paint first, so rows for one
 kind paint over them.
 
+A profile holds up to 128 different LED sets and 640 rows in all, at most 255
+for any one of layers, pointing modes, combo feedback and key feedback. Rows
+that light the same LEDs share one set. A row that is not showing costs the
+keyboard nothing to draw.
+
 ## Brightness and the lighting keys
 
 No colour can be brighter than the keyboard's limit, 200 of 255, which keeps

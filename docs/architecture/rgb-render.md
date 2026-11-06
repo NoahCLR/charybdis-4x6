@@ -64,6 +64,11 @@ active profile's lighting domain, or the compiled view
   only once the frame has passed the check above. An epoch is never reused
   while the runtime lives, so colours read across a publication are never
   shown.
+- `rgb_active_profile_config_group_selectors` keeps every layer, pointing and
+  key-feedback group row's selector for one publication, keyed the same way
+  (D-F63). A stage compares a row's selector there and reads the row and its
+  group only when it paints, so an accent that is not lit costs no read; the
+  combo rows have no selector and are read whenever a combo partition paints.
 - The key runtime reads the tap-commit policy through the same view
   (`key_feedback_tap_commit_mode` in `rgb_active_profile_config.c`), and a stale
   or busy read is off.

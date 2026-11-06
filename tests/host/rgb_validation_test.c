@@ -41,6 +41,9 @@ const combo_feedback_led_group_t *const        combo_feedback_led_groups        
 const uint8_t                                  combo_feedback_led_group_count        = (uint8_t)ARRAY_SIZE(combo_feedback_groups);
 const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups      = key_behavior_feedback_groups;
 const uint8_t                                  key_behavior_feedback_led_group_count = (uint8_t)ARRAY_SIZE(key_behavior_feedback_groups);
+
+// Room for the compiled encoding of this test's lighting tables.
+EXPORT_RGB_COMPILED_CACHE(0u, ARRAY_SIZE(layer_groups), ARRAY_SIZE(pointing_mode_groups), ARRAY_SIZE(combo_feedback_groups), ARRAY_SIZE(key_behavior_feedback_groups));
 const automouse_fade_end_config_t              automouse_fade_end_config             = {
     .mode      = (automouse_fade_end_mode_t)0xFFu,
     .end_color = HSV(3, 3, 3),

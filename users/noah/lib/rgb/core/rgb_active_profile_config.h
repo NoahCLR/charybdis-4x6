@@ -62,3 +62,33 @@ bool                             rgb_active_profile_config_key_stage_enabled(con
 bool                             rgb_active_profile_config_key_feedback(const noah_active_profile_rgb_frame_t *frame, rgb_active_profile_key_feedback_t *config);
 uint8_t                          rgb_active_profile_config_key_group_count(const noah_active_profile_rgb_frame_t *frame);
 bool                             rgb_active_profile_config_key_group_at(const noah_active_profile_rgb_frame_t *frame, uint8_t index, rgb_active_profile_key_group_t *group);
+
+// Each layer, pointing and key-feedback group row's selector, read once per
+// lighting publication (D-F63). A stage compares a row's selector here and
+// reads the row and its group only when it matches, so an accent that is not
+// lit costs no profile read. Rows keep their table order. Combo rows have no
+// selector and are not here.
+typedef struct {
+    const uint8_t *layer;
+    const uint8_t *pd;
+    const uint8_t *key;
+    uint8_t        layer_count;
+    uint8_t        pd_count;
+    uint8_t        key_count;
+} rgb_active_profile_group_selectors_t;
+
+bool rgb_active_profile_config_group_selectors(const noah_active_profile_rgb_frame_t *frame, rgb_active_profile_group_selectors_t *selectors);
+void rgb_active_profile_config_invalidate_group_selectors(void);
+
+#ifdef RGB_ACTIVE_PROFILE_CONFIG_TEST_BACKEND
+typedef struct {
+    uint32_t selector_reads;
+    uint32_t layer_rows;
+    uint32_t pd_rows;
+    uint32_t combo_rows;
+    uint32_t key_rows;
+} rgb_active_profile_config_test_reads_t;
+
+void                                   rgb_active_profile_config_test_reset_reads(void);
+rgb_active_profile_config_test_reads_t rgb_active_profile_config_test_reads(void);
+#endif

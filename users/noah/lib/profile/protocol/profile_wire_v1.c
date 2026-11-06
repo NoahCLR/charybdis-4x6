@@ -72,7 +72,7 @@ static void encode_capabilities_page_one(uint8_t *payload, const noah_profile_wi
     payload[4]  = capabilities->max_combos;
     payload[5]  = capabilities->max_keys_per_combo;
     payload[6]  = capabilities->max_reusable_rgb_groups;
-    payload[7]  = capabilities->max_rgb_stage_group_rows;
+    payload[7]  = capabilities->max_rgb_table_group_rows;
     payload[8]  = capabilities->physical_led_count;
     payload[9]  = capabilities->led_bitmap_size;
     payload[10] = capabilities->custom_key_slots;
@@ -90,7 +90,8 @@ static void encode_capabilities_page_two(uint8_t *payload, const noah_profile_wi
     write_u32(&payload[6], capabilities->max_profile_payload);
     write_u32(&payload[10], capabilities->profile_slot_payload);
     write_u32(&payload[14], capabilities->macro_bytes);
-    // Bytes 18..24 remain canonical zero padding.
+    write_u16(&payload[18], capabilities->max_rgb_stage_group_rows);
+    // Bytes 20..24 remain canonical zero padding.
 }
 
 static void encode_status_page_zero(uint8_t *payload, const noah_profile_wire_v1_device_status_t *status) {
