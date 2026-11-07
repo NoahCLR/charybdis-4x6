@@ -7,6 +7,7 @@
 #include "host_runtime_reset_fixture.h"
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/owned_keycode.h"
+#include "users/noah/lib/key/runtime/api.h"
 #include "users/noah/lib/pointing/modes/pointing_mode_handler_common.h"
 #include "users/noah/lib/pointing/modes/pointing_mode_configured.h"
 #include "users/noah/lib/pointing/modes/pointing_mode_handlers.h"
@@ -153,7 +154,8 @@ static void test_reset_stubs(void) {
 
 HOST_RUNTIME_FIXTURE_DEFINE_BASIC_QMK_STUBS(runtime_fixture)
 
-bool noah_key_runtime_settle_pending_fallback_hold(void) {
+bool noah_key_runtime_settle_pending_fallback_hold(keypos_t emitting_key_pos) {
+    (void)emitting_key_pos;
     fallback_hold_activation_count++;
     fallback_hold_active = true;
     return true;
@@ -193,7 +195,7 @@ void noah_emit_literal_tap_with_masked_keyboard_mods(uint16_t keycode, uint8_t m
     keyboard_mod_state_t filtered = saved;
 
     if (settle_pending_fallback_holds) {
-        noah_key_runtime_settle_pending_fallback_hold();
+        noah_key_runtime_settle_pending_fallback_hold(NOAH_KEY_RUNTIME_NO_KEY);
         saved = (keyboard_mod_state_t){
             .real           = fake_mods,
             .weak           = fake_weak_mods,
@@ -215,7 +217,7 @@ void noah_emit_literal_tap_with_masked_keyboard_mods(uint16_t keycode, uint8_t m
 
 void noah_emit_literal_tap(uint16_t keycode, noah_emit_policy_t policy) {
     if (policy.settle_pending_fallback_holds) {
-        noah_key_runtime_settle_pending_fallback_hold();
+        noah_key_runtime_settle_pending_fallback_hold(NOAH_KEY_RUNTIME_NO_KEY);
     }
 
     if (policy.preserve_keyboard_mod_state) {

@@ -5,11 +5,12 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "delayed_action.h"
+#include "api.h"
 #include "../../action/action_dispatch.h"
 #include "../../state/modifiers/keyboard_mod_policy.h"
 
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
-    dispatch_delayed_action_at((keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, action, mods);
+    dispatch_delayed_action_at(NOAH_KEY_RUNTIME_NO_KEY, action, mods);
 }
 
 void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods) {

@@ -480,7 +480,9 @@ void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
 }
 
 void noah_emit_action_tap_at(keypos_t key_pos, uint16_t action, noah_emit_policy_t policy) {
-    (void)policy;
+    if (policy.settle_pending_fallback_holds) {
+        noah_key_runtime_settle_pending_fallback_hold(key_pos);
+    }
     action_dispatch_at(key_pos, action);
 }
 
@@ -622,10 +624,14 @@ uint8_t key_behavior_validate_all(void) {
 }
 
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
-    dispatch_delayed_action_at((keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, action, mods);
+    dispatch_delayed_action_at(NOAH_KEY_RUNTIME_NO_KEY, action, mods);
 }
 
 void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods) {
+    // As delayed_action.c's emit does, the tap settles pending fallback holds,
+    // all but its own key's, as it goes out. Its modifiers are not replayed
+    // here.
+    noah_key_runtime_settle_pending_fallback_hold(key_pos);
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
         .kind = KEY_RUNTIME_EFFECT_DELAYED_ACTION,
         .data.delayed_action =
