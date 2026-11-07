@@ -19,6 +19,7 @@
 #include <stdint.h>
 
 #include "feedback_kind.h"
+#include "types.h"
 #include "slot/keypos_codec.h"
 #include "slot/origin_registry.h"
 
@@ -232,7 +233,7 @@ static inline void key_feedback_broad_owner_map_clear(uint8_t *map) {
 
 static inline keypos_t key_feedback_broad_owner_map_get(const uint8_t *map, key_feedback_broad_owner_slot_t slot) {
     if (!(map && slot < KEY_FEEDBACK_BROAD_OWNER_COUNT)) {
-        return (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS};
+        return NOAH_KEY_RUNTIME_NO_KEY;
     }
 
     return key_runtime_keypos_unpack((key_runtime_packed_keypos_t)map[slot]);

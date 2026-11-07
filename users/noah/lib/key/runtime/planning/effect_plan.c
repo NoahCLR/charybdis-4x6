@@ -198,13 +198,8 @@ void key_runtime_core_effect_plan_push_tap_commit_feedback_pulse(key_runtime_cor
     }
 }
 
-static void key_runtime_core_effect_plan_push_delayed_action_with_flags(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, uint16_t action, delayed_action_mods_t mods, uint8_t repeat_count, uint8_t flags) {
+void key_runtime_core_effect_plan_push_delayed_action(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, uint16_t action, delayed_action_mods_t mods, uint8_t repeat_count) {
     if (!(plan && action != KC_NO && repeat_count != 0u)) {
-        return;
-    }
-
-    repeat_count &= KEY_RUNTIME_DELAYED_ACTION_REPEAT_COUNT_MASK;
-    if (repeat_count == 0u) {
         return;
     }
 
@@ -215,23 +210,9 @@ static void key_runtime_core_effect_plan_push_delayed_action_with_flags(key_runt
                                                         .action         = action,
                                                         .packed_key_pos = key_runtime_keypos_pack(key_pos),
                                                         .mods           = mods,
-                                                        .repeat_count   = (uint8_t)(repeat_count | flags),
+                                                        .repeat_count   = repeat_count,
                                                     },
                                             });
-}
-
-void key_runtime_core_effect_plan_push_delayed_action(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, uint16_t action, delayed_action_mods_t mods, uint8_t repeat_count) {
-    key_runtime_core_effect_plan_push_delayed_action_with_flags(plan, key_pos, action, mods, repeat_count, 0u);
-}
-
-void key_runtime_core_effect_plan_push_deferred_delayed_action(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, uint16_t action, delayed_action_mods_t mods, uint8_t repeat_count, bool tap_commit_feedback) {
-    uint8_t flags = KEY_RUNTIME_DELAYED_ACTION_FLAG_DEFER_UNTIL_RELEASE;
-
-    if (tap_commit_feedback) {
-        flags |= KEY_RUNTIME_DELAYED_ACTION_FLAG_TAP_COMMIT_FEEDBACK;
-    }
-
-    key_runtime_core_effect_plan_push_delayed_action_with_flags(plan, key_pos, action, mods, repeat_count, flags);
 }
 
 void key_runtime_core_effect_plan_append_release_plan(key_runtime_core_effect_plan_t *plan, const key_runtime_core_release_effect_plan_t *release_plan) {

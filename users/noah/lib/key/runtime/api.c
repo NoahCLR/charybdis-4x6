@@ -17,11 +17,11 @@
 // (projecting one may preempt another key's pointing mode); each is then
 // announced, traced and projected in key order. No plan is held: this runs
 // beneath the projection of an output, on the reviewed stack paths.
-bool noah_key_runtime_settle_pending_fallback_hold(void) {
+bool noah_key_runtime_settle_pending_fallback_hold(keypos_t emitting_key_pos) {
     uint32_t due[KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT];
     uint8_t  projected = 0u;
 
-    if (!key_runtime_core_pending_fallback_holds(due)) {
+    if (!key_runtime_core_pending_fallback_holds(due, emitting_key_pos)) {
         return false;
     }
     split_runtime_sync_notify_key_feedback_dirty();

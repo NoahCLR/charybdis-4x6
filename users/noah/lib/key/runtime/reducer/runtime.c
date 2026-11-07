@@ -257,9 +257,9 @@ static uint16_t key_runtime_core_elapsed(uint16_t start, uint16_t end) {
 }
 
 // A series counts taps up to the deepest authored branch. A press inside the
-// same quick run past that branch takes no tap count: the run becomes typing
-// (D-F33), its taps so far are sent as the first tap once each, and this press
-// and every further one in the run are single taps of their own, until the
+// same quick run past that branch takes no tap count: the run is past its depth
+// (D-F64), its taps so far are sent as the standard key's tap once each, and
+// this press and every further one in the run are the standard key, until the
 // multi-tap window lapses. So a run's taps are never lost and never fire a
 // branch the run went past.
 static uint8_t key_runtime_core_tap_series_next_tap_count(const tap_series_t *series) {
@@ -271,17 +271,19 @@ static bool key_runtime_core_tap_series_in_run(const key_runtime_core_state_t *s
 }
 
 static bool key_runtime_core_tap_series_can_accept_press(const key_runtime_core_state_t *state, const tap_series_t *series, uint16_t keycode, uint16_t now) {
-    return key_runtime_core_tap_series_in_run(state, series, keycode, now) && !series->typing && series->tap_count < series->authored_tap_depth;
+    return key_runtime_core_tap_series_in_run(state, series, keycode, now) && !series->past_depth && series->tap_count < series->authored_tap_depth;
 }
 
 static bool key_runtime_core_tap_series_overshoots(const key_runtime_core_state_t *state, const tap_series_t *series, uint16_t keycode, uint16_t now) {
     return key_runtime_core_tap_series_in_run(state, series, keycode, now) && !key_runtime_core_tap_series_can_accept_press(state, series, keycode, now);
 }
 
-// A press that overshot its run sends the taps counted so far as the first
-// tap, once each, rather than the branch they reached.
-static void key_runtime_core_tap_series_type_first_tap(tap_series_t *series) {
-    series->tap_repeat_count             = 0u;
+// A press that overshot its run sends the taps counted so far as the
+// standard key's tap, `standard_tap`, once each, rather than the branch they
+// reached.
+static void key_runtime_core_tap_series_type_standard_key(tap_series_t *series, uint16_t standard_tap) {
+    series->tap_action                   = standard_tap;
+    series->tap_repeat_count             = series->tap_action == KC_NO ? 0u : series->tap_count;
     series->tap_branch_has_authored_tap  = false;
     series->tap_branch_has_authored_step = false;
 }
@@ -290,7 +292,7 @@ static void key_runtime_core_tap_series_type_first_tap(tap_series_t *series) {
 // The series is written only here, plus its flush and clear (planning/
 // tap_series_flush.c, key_runtime_core_tap_series_clear()), the scan's
 // resolve (key_runtime_core_tap_series_resolve() in planning/tap_series.h) and
-// typing its first tap (key_runtime_core_tap_series_type_first_tap()). A
+// sending the standard key's taps (key_runtime_core_tap_series_type_standard_key()). A
 // press joins it; the release decision for a key's first tap starts it, and
 // for a later tap preserves or ends it; a hold's release ends its pending
 // hold. What it carries of a press is filled from that press's token in one
@@ -306,14 +308,13 @@ static void key_runtime_core_tap_series_fill_from_token(key_runtime_core_state_t
     series->active                       = true;
     series->keycode                      = token->resolved_keycode;
     series->tap_count                    = interaction->selection.tap_count ? interaction->selection.tap_count : key_runtime_core_tap_series_next_tap_count(series);
-    series->single_action                = series->single_action == KC_NO ? interaction->binding.tap_action : series->single_action;
     series->tap_action                   = interaction->binding.tap_action;
     series->tap_repeat_count             = interaction->binding.tap_repeat_count;
     series->tap_branch_has_authored_step = key_behavior_step_present(interaction->selection.step);
     series->tap_branch_has_authored_tap  = interaction->selection.step.tap.present;
     series->has_more_taps                = interaction->binding.has_more_taps;
     series->authored_tap_depth           = interaction->binding.authored_tap_depth;
-    series->typing                       = token->typing;
+    series->past_depth                   = token->past_depth;
     series->hold                         = interaction->binding.hold;
     series->long_hold                    = interaction->binding.long_hold;
     series->tap_hold_term_ms             = interaction->binding.tap_hold_term;
@@ -338,9 +339,9 @@ static void key_runtime_core_tap_series_join(key_runtime_core_state_t *state, ta
 
 // A first tap the release decision buffers starts the series, under the
 // modifiers the release was planned with: a pointing mode's mask has already
-// taken out what the mode holds for itself. The tap a typing press leaves
-// waits as a typing series too (`typing`), so the next press in the run is a
-// single tap of its own as well.
+// taken out what the mode holds for itself. The tap a press past the depth
+// leaves waits as a series past the depth too (`past_depth`), so the next press
+// in the run is the standard key as well.
 static void key_runtime_core_tap_series_start(key_runtime_core_state_t *state, keypos_t key_pos, const press_token_t *token, keyboard_mod_state_t mods) {
     tap_series_t *series = key_runtime_core_tap_series_state(state, key_pos);
 
@@ -591,7 +592,7 @@ static void key_runtime_core_press_token_begin(key_runtime_core_state_t *state, 
     bool                           handled                     = false;
     bool                           tap_outcome_available       = false;
     bool                           pointing_mode_was_locked_on_press = false;
-    bool                           typing                      = false;
+    bool                           past_depth                  = false;
     key_runtime_slot_phase_t       slot_phase                  = KEY_RUNTIME_SLOT_PHASE_IDLE;
 
     if (!state) {
@@ -628,7 +629,7 @@ static void key_runtime_core_press_token_begin(key_runtime_core_state_t *state, 
     if (key_runtime_core_tap_series_can_accept_press(state, series, event->keycode, now)) {
         tap_count = key_runtime_core_tap_series_next_tap_count(series);
     } else {
-        typing = key_runtime_core_tap_series_overshoots(state, series, event->keycode, now);
+        past_depth = key_runtime_core_tap_series_overshoots(state, series, event->keycode, now);
     }
 
     handled_key_lookup_row_tap_count_into(event->keycode, tap_count, !event->bypass_row, &resolution);
@@ -639,7 +640,7 @@ static void key_runtime_core_press_token_begin(key_runtime_core_state_t *state, 
 
     if (handled) {
         ctx = handled_key_resolution_ctx_make(event->key_pos, key_runtime_core_resolution_layers(state));
-        handled_key_materialize_into(&resolution, &ctx, &materialized);
+        handled_key_materialize_press_into(&resolution, &ctx, past_depth, &materialized);
         key_runtime_slot_interaction_from_materialized_into(&materialized, &interaction);
         hold_term_ms                = handled_key_resolution_tap_hold_term(resolution);
         long_hold_term_ms           = handled_key_resolution_long_hold_term(resolution);
@@ -678,7 +679,7 @@ static void key_runtime_core_press_token_begin(key_runtime_core_state_t *state, 
         .handled_key                 = handled,
         .tap_outcome_available       = tap_outcome_available,
         .pointing_mode_was_locked_on_press = pointing_mode_was_locked_on_press,
-        .typing                      = typing,
+        .past_depth                  = past_depth,
         .interaction                 = interaction,
         .slot_phase                  = slot_phase,
     };
@@ -1102,17 +1103,19 @@ bool key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_po
     series_key_pos = key_runtime_core_tap_series_resolve_key_pos(state, series);
 
     if (series && series->active && !key_runtime_core_tap_series_can_accept_press(state, series, keycode, token->pressed_at)) {
-        if (token->typing) {
-            key_runtime_core_tap_series_type_first_tap(series);
+        if (token->past_depth) {
+            key_runtime_core_tap_series_type_standard_key(series, token->interaction.binding.tap_action);
         }
+        // The run goes out now, in press order, ahead of anything this press
+        // does itself, its hold included (D-F64). Its taps never settle this
+        // press's own fallback hold (noah_key_runtime_settle_pending_fallback_hold()).
         if (key_runtime_core_tap_series_take_flush(series, &action, &repeat_count, &mods)) {
-            bool tap_commit_feedback = key_runtime_core_tap_series_has_authored_tap_branch(series) && key_runtime_core_tap_commit_feedback_allowed(action, series->tap_count);
-
-            key_runtime_core_effect_plan_push_deferred_delayed_action(plan, series_key_pos, action, mods, repeat_count, tap_commit_feedback);
-            key_runtime_core_tap_series_clear(state, series);
-        } else {
-            key_runtime_core_tap_series_clear(state, series);
+            key_runtime_core_effect_plan_push_delayed_action(plan, series_key_pos, action, mods, repeat_count);
+            if (key_runtime_core_tap_series_has_authored_tap_branch(series)) {
+                key_runtime_core_effect_plan_push_tap_commit_feedback_pulse(plan, series_key_pos, action, series->tap_count);
+            }
         }
+        key_runtime_core_tap_series_clear(state, series);
     }
 
     if (key_runtime_core_press_token_should_unlock_pd_lock_on_press(token)) {

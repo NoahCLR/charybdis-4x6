@@ -21,7 +21,7 @@ static uint16_t key_runtime_core_scan_keypos_index(keypos_t key_pos) {
 }
 
 static keypos_t key_runtime_core_scan_invalid_keypos(void) {
-    return (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS};
+    return NOAH_KEY_RUNTIME_NO_KEY;
 }
 
 static keypos_t key_runtime_core_scan_keypos_from_index(uint16_t index) {
@@ -413,6 +413,12 @@ void key_runtime_core_plan_pending_multi_tap_scan_for_key(key_runtime_core_state
             return;
         }
         case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_HOLD_THRESHOLD:
+            // A branch that sets nothing is the standard key pressed once per
+            // tap with the last held: the taps before the hold go out first
+            // (D-F64). A branch that sets something takes its hold alone.
+            if (key_runtime_core_tap_series_is_empty_branch(series) && series->tap_repeat_count > 1u) {
+                key_runtime_core_effect_plan_push_delayed_action(plan, key_pos, series->tap_action, mods, (uint8_t)(series->tap_repeat_count - 1u));
+            }
             key_runtime_core_tap_series_clear(state, series);
             key_runtime_core_plan_threshold_hold_effects(state, token, resolution.hold, resolution.semantics, resolution.completes_hold, false, plan);
             return;
@@ -537,7 +543,8 @@ void key_runtime_core_plan_missed_scans_for_token(key_runtime_core_state_t *stat
 }
 
 // Not inlined: the reviewed stack paths name it beneath an output.
-__attribute__((noinline)) bool key_runtime_core_pending_fallback_holds(uint32_t due[KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT]) {
+// The press at `except_key_pos` is never due: its own key's output is going out.
+__attribute__((noinline)) bool key_runtime_core_pending_fallback_holds(uint32_t due[KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT], keypos_t except_key_pos) {
     key_runtime_core_state_t *state = key_runtime_core_state();
     bool                      any   = false;
 
@@ -549,7 +556,7 @@ __attribute__((noinline)) bool key_runtime_core_pending_fallback_holds(uint32_t 
     }
 
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY; index++) {
-        if (key_runtime_core_fallback_hold_due(state, &state->press_tokens[index])) {
+        if (key_runtime_core_scan_keypos_index(except_key_pos) != index && key_runtime_core_fallback_hold_due(state, &state->press_tokens[index])) {
             due[index / 32u] |= UINT32_C(1) << (index % 32u);
             any = true;
         }
