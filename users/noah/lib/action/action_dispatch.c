@@ -18,7 +18,7 @@ static void noah_emit_run(uint16_t keycode, noah_emit_tap_fn_t emit, noah_emit_p
     keyboard_mod_state_t saved_mod_state = {0};
 
     if (policy.settle_pending_fallback_holds) {
-        noah_key_runtime_settle_pending_fallback_hold();
+        noah_key_runtime_settle_pending_fallback_hold(NOAH_KEY_RUNTIME_NO_KEY);
     }
 
     if (policy.preserve_keyboard_mod_state) {
@@ -36,7 +36,7 @@ static void noah_emit_run_at(keypos_t key_pos, uint16_t keycode, noah_emit_tap_a
     keyboard_mod_state_t saved_mod_state = {0};
 
     if (policy.settle_pending_fallback_holds) {
-        noah_key_runtime_settle_pending_fallback_hold();
+        noah_key_runtime_settle_pending_fallback_hold(key_pos);
     }
 
     if (policy.preserve_keyboard_mod_state) {
@@ -64,7 +64,7 @@ void noah_emit_synthetic_qmk_tap(uint16_t keycode, noah_emit_policy_t policy) {
 
 void noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(uint16_t keycode, uint8_t masked_mods, bool settle_pending_fallback_holds) {
     if (settle_pending_fallback_holds) {
-        noah_key_runtime_settle_pending_fallback_hold();
+        noah_key_runtime_settle_pending_fallback_hold(NOAH_KEY_RUNTIME_NO_KEY);
     }
 
     keyboard_mod_state_t saved_mod_state = keyboard_mod_policy_begin_masked_emit(masked_mods);
@@ -79,7 +79,7 @@ void noah_emit_literal_tap(uint16_t keycode, noah_emit_policy_t policy) {
 
 void noah_emit_literal_tap_with_masked_keyboard_mods(uint16_t keycode, uint8_t masked_mods, bool settle_pending_fallback_holds) {
     if (settle_pending_fallback_holds) {
-        noah_key_runtime_settle_pending_fallback_hold();
+        noah_key_runtime_settle_pending_fallback_hold(NOAH_KEY_RUNTIME_NO_KEY);
     }
     keyboard_mod_state_t saved = keyboard_mod_policy_begin_masked_emit(masked_mods);
     owned_keycode_tap_literal(keycode);
@@ -96,7 +96,7 @@ static uint8_t noah_emit_host_mods(keyboard_mod_state_t state) {
 // modifiers changes what the host sees, the button waits for that report and
 // the modifiers come back only once the button is up.
 void noah_emit_owned_click(uint16_t keycode, uint8_t masked_mods, bool exact) {
-    noah_key_runtime_settle_pending_fallback_hold();
+    noah_key_runtime_settle_pending_fallback_hold(NOAH_KEY_RUNTIME_NO_KEY);
 
     uint8_t              host_mods = noah_emit_host_mods(keyboard_mod_policy_current_state());
     keyboard_mod_state_t saved     = exact ? keyboard_mod_policy_begin_preserve_all() : keyboard_mod_policy_begin_masked_emit(masked_mods);

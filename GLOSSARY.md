@@ -247,6 +247,12 @@ _Avoid_: level, stage, longer hold, second hold
 Everything a behaviour does on one tap count: its tap, hold and long hold.
 _Avoid_: tap step, step, row, tap-count entry
 
+**Standard key**:
+What a key does with no behaviour: its own tap and hold. A behaviour's
+empty tiers and every press past its deepest tap count are the standard key
+(D-F64); a single tap set to Transparent is its tap.
+_Avoid_: built-in behaviour, default key, fallback key
+
 **Hold style**:
 How a hold sends its action: held until release, tapped at the threshold,
 tapped on release, or repeated while held.

@@ -1,3 +1,7 @@
+---
+status: superseded by D-F64
+---
+
 # A run of taps past the deepest tap count types the first tap
 
 Cited as D-F33.

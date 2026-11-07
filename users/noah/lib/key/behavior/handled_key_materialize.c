@@ -78,6 +78,37 @@ void handled_key_materialize_into(const handled_key_resolution_t *resolution, co
     handled_key_materialized_refresh_contract(out);
 }
 
+// A branch that sets nothing, inside the depth, held at its Nth press, is the
+// standard key pressed N times with the last held: the standard key, with a
+// threshold hold so the series sends its taps first, and the tap of this
+// tap count, the standard tap N times.
+static void handled_key_materialize_empty_branch(const handled_key_resolution_t *resolution, const handled_key_resolution_ctx_t *ctx, handled_key_materialized_t *out) {
+    handled_key_resolution_t standard;
+
+    handled_key_resolution_standard_key_into(resolution, true, &standard);
+    handled_key_materialize_into(&standard, ctx, out);
+    out->authored = *resolution;
+    handled_key_materialize_tap(resolution, ctx, out);
+    handled_key_materialized_refresh_contract(out);
+}
+
+void handled_key_materialize_press_into(const handled_key_resolution_t *resolution, const handled_key_resolution_ctx_t *ctx, bool past_depth, handled_key_materialized_t *out) {
+    handled_key_resolution_t standard;
+
+    if (!(resolution && ctx && out)) {
+        return;
+    }
+
+    if (past_depth) {
+        handled_key_resolution_standard_key_into(resolution, false, &standard);
+        handled_key_materialize_into(&standard, ctx, out);
+    } else if (handled_key_resolution_is_empty_branch(resolution)) {
+        handled_key_materialize_empty_branch(resolution, ctx, out);
+    } else {
+        handled_key_materialize_into(resolution, ctx, out);
+    }
+}
+
 handled_key_materialized_t handled_key_materialize(handled_key_resolution_t resolution, handled_key_resolution_ctx_t ctx) {
     handled_key_materialized_t materialized;
 

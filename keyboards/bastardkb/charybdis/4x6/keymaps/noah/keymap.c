@@ -376,22 +376,22 @@
 // ─── Key Behavior Tables ────────────────────────────────────────────────────
 //
 // key_behaviors[] is the single authored behavior table for keys handled by
-// the custom state machine. One row describes one physical key.
+// the custom state machine. Each entry is one keycode's behaviour.
 //
-// tap_counts[0] = tap index 0 (single press)
-// tap_counts[1] = tap index 1 (double press)
-// tap_counts[2] = tap index 2 (triple press)
-// tap_counts[3] = tap index 3 (quadruple press)
-// tap_counts[4] = tap index 4 (quintuple press)
+// tap_counts[0] = the single tap
+// tap_counts[1] = the double tap
+// tap_counts[2] = the triple tap
+// tap_counts[3] = the quadruple tap
+// tap_counts[4] = the quintuple tap
 //
 // timing defaults currently set in config.h:
 //   - TAPPING_TERM = 200 ms
 //     the hold time of every dual-role key (LT()/MT()/OSM()/TT()/OSL()), with
-//     or without a row here, when .tap_hold_term is omitted; the runtime
+//     or without a behaviour here, when .tap_hold_term is omitted; the runtime
 //     decides all of them (D-F27), and the live profile's dual-role setting
 //     replaces it once live
 //   - CUSTOM_TAP_HOLD_TERM = 150 ms
-//     default first hold threshold for every other key_behavior row
+//     default first hold threshold for every other behaviour
 //   - CUSTOM_LONGER_HOLD_TERM = 400 ms
 //     default long hold threshold
 //   - CUSTOM_MULTI_TAP_TERM = 150 ms
@@ -400,16 +400,16 @@
 //     current runtime limit for tap_counts[] entries
 //
 // per-key timing overrides:
-//   - .tap_hold_term overrides the first hold threshold for that row
+//   - .tap_hold_term overrides the first hold threshold for that behaviour
 //   - .longer_hold_term overrides the long hold threshold
 //   - .multi_tap_term overrides the max gap between taps
 //   - omit them (or leave them 0) to use the defaults above
-//   - for LT()/MT()/OSM()/TT()/OSL() rows, omitted .tap_hold_term falls back
-//     to TAPPING_TERM (or the live dual-role setting);
-//     all other rows fall back to CUSTOM_TAP_HOLD_TERM
+//   - for LT()/MT()/OSM()/TT()/OSL() behaviours, omitted .tap_hold_term falls
+//     back to TAPPING_TERM (or the live dual-role setting);
+//     all others fall back to CUSTOM_TAP_HOLD_TERM
 //
 // per-key policy flags, omit them (or leave them false) for ordinary keys:
-//   - .keeps_auto_mouse_anchored counts the row's keycode as a mouse record, so
+//   - .keeps_auto_mouse_anchored counts the behaviour's keycode as a mouse record, so
 //     pressing it keeps the pointer layer up instead of letting auto mouse
 //     reset on it. Only keys that drive the mouse through authored actions need
 //     it: mouse keycodes and pointing-mode keys already anchor on their own.
@@ -425,27 +425,35 @@
 //   - terminal tap branches wait that same window rather than firing on the
 //     release, so every authored depth shows its branch color for the same
 //     length of time before its action lands
-//   - a quick run of taps past the deepest branch is typing: no branch fires,
-//     and every press in the run sends the first tap once (D-F33). A held press
-//     in it takes tap_counts[0]'s hold
-//   - if a non-base branch omits .tap, a quick tap repeats the first tap, once
-//     per press; the branch color still shows, but tap-commit feedback is
-//     skipped because no .tap was authored on that branch
+//   - whatever a branch leaves out is the standard key, what the keycode does
+//     with no behaviour (D-F64); nothing from one tap count reaches another.
+//     A .tap of KC_TRNS on tap_counts[0] makes the key below the standard tap
+//   - a quick run of taps past the deepest branch is the standard key: no
+//     branch fires and every press in the run, the first included, taps it; a
+//     held press in it holds the standard key, after the taps before it
+//   - if a non-base branch omits .tap, a quick tap sends the standard tap once
+//     per press, never tap_counts[0]'s; the branch color still shows, but
+//     tap-commit feedback is skipped because no .tap was authored on that branch
+//   - a non-base branch that sets nothing, held, sends the standard tap for
+//     each press before it, then holds the standard key
 //
-// within one tap index:
+// within one tap count:
 //   - .tap is the tap tier
 //   - .hold is the normal hold tier
 //   - .long_hold is the long-hold tier
-// omit .tap to keep the key's normal tap behavior for that tap index
-// if .tap is set but hold/long_hold are omitted, keys that already have a
-// default held path keep using it. Stacked pointing-mode rows are contained: if
-// a first-tap override can branch into another pointing mode on a later hold,
-// the first pointing mode waits until the hold threshold instead of activating
-// immediately. Other keycodes keep the tap override and send it on release
+// omit .tap to keep the standard key's tap for that tap count
+// if .tap is set but hold/long_hold are omitted on tap_counts[0], keys with a
+// hold of their own keep it (a plain key or modifier itself, LT()/MT() their
+// layer or modifiers, a pointing-mode key its mode, a custom key its shortcut).
+// Stacked pointing-mode behaviours are contained: if a first-tap override can
+// branch into another pointing mode on a later hold, the first pointing mode
+// waits until the hold threshold instead of activating immediately. Keys with
+// no hold of their own (macros, custom keys without a shortcut), and every
+// later tap count, send the .tap on release
 // .hold and .long_hold are independent: define either one by itself, or use
 // both together for a two-stage hold
 //
-// RGB feedback follows authored tiers on the current tap index:
+// RGB feedback follows authored tiers on the current tap count:
 //   - every tap past the base one shows that branch's authored color for as long
 //     as nothing more specific applies; another tap just renames it. Single taps
 //     stay quiet. Any action state replaces it: a pending hold tier, the tap a

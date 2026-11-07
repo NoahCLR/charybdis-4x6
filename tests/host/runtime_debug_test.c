@@ -65,6 +65,12 @@ static uint16_t                  delayed_action_count;
 static uint16_t                  delayed_action_log[KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY + KEY_RUNTIME_DEFERRED_RELEASE_DRAIN_BATCH_CAPACITY];
 static delayed_action_mods_t     delayed_action_mods_log[KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY + KEY_RUNTIME_DEFERRED_RELEASE_DRAIN_BATCH_CAPACITY];
 static uint16_t                  projection_order_count;
+// Everything sent, delayed or emitted, in the order it went out, and whether
+// the sending key held something down at that moment.
+static uint16_t                  output_count;
+static uint16_t                  output_log[16];
+static bool                      output_under_hold_log[16];
+static keypos_t                  output_key_pos;
 static uint16_t                  projection_order_log[KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY * 2u];
 static uint16_t                  feedback_pulse_count;
 static keypos_t                  feedback_pulse_key_pos_log[KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY];
@@ -234,7 +240,8 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
     };
     uint8_t layer         = UINT8_MAX;
     bool    has_more_taps = false;
-    // Branch count for this fake row; a quick run past it types the first tap.
+    // Branch count for this fake behaviour; a quick run past it is the
+    // standard key (D-F64).
     uint8_t authored_tap_depth = 1u;
 
     if (keycode == TEST_PENDING_MULTI_TAP_KEY) {
@@ -369,6 +376,21 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
         step = (key_behavior_step_t){
             .hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_ACTION),
         };
+    } else if (keycode == KC_ESCAPE) {
+        // Noah's Esc behaviour: the Single tap sets only a long hold, Opt+Cmd+Esc
+        // at its threshold, and the Double tap types ~.
+        flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+        authored_tap_depth = 2u;
+        if (tap_count == 1u) {
+            step = (key_behavior_step_t){
+                .long_hold = TAP_AT_HOLD_THRESHOLD(LALT(LGUI(KC_ESCAPE))),
+            };
+            has_more_taps = true;
+        } else {
+            step = (key_behavior_step_t){
+                .tap = TAP_SENDS(KC_TILD),
+            };
+        }
     } else if (keycode == TEST_TRANSPARENT_HOLD_KEY) {
         step = (key_behavior_step_t){
             .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_TRNS),
@@ -402,6 +424,7 @@ static void test_reset_stubs(void) {
     last_delayed_mods                 = (delayed_action_mods_t){0};
     delayed_action_count              = 0;
     projection_order_count            = 0;
+    output_count                      = 0;
     feedback_pulse_count              = 0;
     delayed_action_enqueue_hook_armed = false;
     delayed_action_reenter_drain      = false;
@@ -546,7 +569,7 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
     if (keycode == KC_LEFT_GUI || keycode == KC_LEFT_CTRL) {
         return count < 3u;
     }
-    if (keycode == KC_RIGHT_GUI) {
+    if (keycode == KC_RIGHT_GUI || keycode == KC_ESCAPE) {
         return count < 2u;
     }
 
@@ -738,19 +761,45 @@ void action_dispatch(uint16_t action) {
     (void)action;
 }
 
-void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
-    last_emitted_action = action;
-    (void)policy;
+static bool test_key_holds_anything(keypos_t key_pos) {
+    held_action_debug_snapshot_t snapshot;
+
+    held_action_debug_snapshot(&snapshot);
+    for (uint16_t index = 0; index < HELD_ACTION_BINDING_CAPACITY; index++) {
+        if ((snapshot.actions[index].active && test_keypos_equal(snapshot.actions[index].key_pos, key_pos)) || (snapshot.modifiers[index].active && test_keypos_equal(snapshot.modifiers[index].key_pos, key_pos))) {
+            return true;
+        }
+    }
+    return false;
 }
 
+static void test_log_output(uint16_t action) {
+    if (output_count < ARRAY_SIZE(output_log)) {
+        output_log[output_count]            = action;
+        output_under_hold_log[output_count] = test_key_holds_anything(output_key_pos);
+    }
+    output_count++;
+}
+
+// As action_dispatch.c's emit does: an output that settles fallback holds
+// settles every pending one but its own key's.
 void noah_emit_action_tap_at(keypos_t key_pos, uint16_t action, noah_emit_policy_t policy) {
-    (void)key_pos;
-    noah_emit_action_tap(action, policy);
+    if (policy.settle_pending_fallback_holds) {
+        noah_key_runtime_settle_pending_fallback_hold(key_pos);
+    }
+    output_key_pos      = key_pos;
+    last_emitted_action = action;
+    test_log_output(action);
+}
+
+void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
+    noah_emit_action_tap_at(NOAH_KEY_RUNTIME_NO_KEY, action, policy);
 }
 
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     last_delayed_action = action;
     last_delayed_mods   = mods;
+    test_log_output(action);
     if (delayed_action_count < ARRAY_SIZE(delayed_action_log)) {
         delayed_action_log[delayed_action_count]      = action;
         delayed_action_mods_log[delayed_action_count] = mods;
@@ -768,8 +817,11 @@ void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     }
 }
 
+// As delayed_action.c's emit does, the tap settles pending fallback holds,
+// all but its own key's, as it goes out. Its modifiers are not replayed here.
 void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods) {
-    (void)key_pos;
+    noah_key_runtime_settle_pending_fallback_hold(key_pos);
+    output_key_pos = key_pos;
     dispatch_delayed_action(action, mods);
 }
 
@@ -1586,7 +1638,6 @@ static void test_key_runtime_core_direct_active_release_helper_seeds_pending_mul
     CHECK(series->keycode == TEST_PENDING_MULTI_TAP_KEY);
     CHECK(series->tap_count == 1u);
     CHECK(!series->pending_hold);
-    CHECK(series->single_action == TEST_ACTION);
     CHECK(series->tap_action == TEST_ACTION);
     CHECK(series->tap_repeat_count == 1u);
     CHECK(series->tap_hold_term_ms == 120u);
@@ -1822,7 +1873,7 @@ static void test_lone_modifier_tap_sends_its_tap_when_the_window_closes(void) {
 }
 
 // An empty tap count inside the behaviour's depth repeats the modifier's tap
-// once per press, as any plain key's does (D-F33).
+// once per press, as any plain key's does (D-F64).
 static void test_empty_modifier_tap_count_inside_the_depth_repeats_its_tap(void) {
     keypos_t key_pos = test_keypos(6, 5);
 
@@ -1875,6 +1926,164 @@ static void test_held_modifier_holds_itself_until_release_and_sends_no_tap(void)
     held_action_debug_snapshot(&snapshot);
     CHECK(test_find_held_modifier_binding(&snapshot, key_pos, KC_LEFT_GUI) == NULL);
     CHECK(delayed_action_count == 0u);
+}
+
+// Quick runs of taps (D-F64). These tap `taps` times quickly, then may hold
+// one more press, scanning every 5 ms, and read what went out in order.
+static void test_tap_quickly(uint16_t keycode, keypos_t key_pos, uint8_t taps) {
+    for (uint8_t tap = 0u; tap < taps; tap++) {
+        CHECK(!test_process_record(keycode, key_pos, true));
+        fake_time = (uint16_t)(fake_time + 10u);
+        CHECK(!test_process_record(keycode, key_pos, false));
+        fake_time = (uint16_t)(fake_time + 20u);
+    }
+}
+
+static bool test_held_at(keypos_t key_pos, uint16_t action) {
+    held_action_debug_snapshot_t snapshot;
+
+    held_action_debug_snapshot(&snapshot);
+    return test_find_held_action_binding(&snapshot, key_pos, action) != NULL || test_find_held_modifier_binding(&snapshot, key_pos, action) != NULL;
+}
+
+typedef struct {
+    uint16_t sent_at_press;  // outputs once the press was processed
+    uint16_t sent_when_held; // outputs when `held` went down, UINT16_MAX if never
+    uint16_t held_after_ms;  // how long the press had been down then
+} test_held_press_t;
+
+// Presses `keycode` and holds it `hold_ms`.
+static test_held_press_t test_hold_press(uint16_t keycode, keypos_t key_pos, uint16_t held, uint16_t hold_ms) {
+    test_held_press_t result = {.sent_when_held = UINT16_MAX, .held_after_ms = UINT16_MAX};
+
+    CHECK(!test_process_record(keycode, key_pos, true));
+    result.sent_at_press = output_count;
+    if (test_held_at(key_pos, held)) {
+        result.sent_when_held = output_count;
+        result.held_after_ms  = 0u;
+    }
+    for (uint16_t elapsed = 5u; elapsed <= hold_ms; elapsed = (uint16_t)(elapsed + 5u)) {
+        fake_time = (uint16_t)(fake_time + 5u);
+        noah_key_runtime_scan();
+        if (result.sent_when_held == UINT16_MAX && test_held_at(key_pos, held)) {
+            result.sent_when_held = output_count;
+            result.held_after_ms  = elapsed;
+        }
+    }
+    return result;
+}
+
+static void test_release_and_settle(uint16_t keycode, keypos_t key_pos) {
+    CHECK(!test_process_record(keycode, key_pos, false));
+    for (uint16_t elapsed = 0u; elapsed <= CUSTOM_MULTI_TAP_TERM + 10u; elapsed = (uint16_t)(elapsed + 5u)) {
+        fake_time = (uint16_t)(fake_time + 5u);
+        noah_key_runtime_scan();
+    }
+}
+
+// Exactly `count` outputs, every one `action`, none under a hold of the key.
+static void test_sent_only(uint16_t action, uint16_t count) {
+    CHECK(output_count == count);
+    for (uint16_t index = 0u; index < count; index++) {
+        CHECK(output_log[index] == action);
+        CHECK(!output_under_hold_log[index]);
+    }
+}
+
+// Noah's Esc behaviour, depth 2. Three quick taps and a held fourth are the standard
+// key four times: Esc, Esc, Esc at the fourth press, then Esc held from the
+// tap / hold threshold until release. The Single tap's long hold never fires.
+static void test_hold_past_the_depth_is_the_standard_key(void) {
+    keypos_t          key_pos = test_keypos(6, 3);
+    test_held_press_t held;
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    test_tap_quickly(KC_ESCAPE, key_pos, 3u);
+    held = test_hold_press(KC_ESCAPE, key_pos, KC_ESCAPE, CUSTOM_LONGER_HOLD_TERM + 30u);
+    CHECK(held.sent_at_press == 3u);
+    CHECK(held.sent_when_held == 3u);
+    CHECK(held.held_after_ms >= CUSTOM_TAP_HOLD_TERM);
+    test_release_and_settle(KC_ESCAPE, key_pos);
+    CHECK(!test_held_at(key_pos, KC_ESCAPE));
+    test_sent_only(KC_ESCAPE, 3u);
+}
+
+// Inside the depth the Single tap still does what it sets: held, its long
+// hold sends Opt+Cmd+Esc at the threshold.
+static void test_hold_of_the_single_tap_takes_its_long_hold(void) {
+    keypos_t key_pos = test_keypos(6, 3);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    (void)test_hold_press(KC_ESCAPE, key_pos, KC_ESCAPE, CUSTOM_LONGER_HOLD_TERM + 30u);
+    CHECK(!test_held_at(key_pos, KC_ESCAPE));
+    test_release_and_settle(KC_ESCAPE, key_pos);
+    CHECK(output_count == 1u);
+    CHECK(output_log[0] == LALT(LGUI(KC_ESCAPE)));
+}
+
+// Left GUI, depth 3, its Single tap empty. Four quick taps send GUI four
+// times and nothing is held: a tap typed at the fourth press leaves that
+// press alone.
+static void test_quick_taps_past_the_depth_type_the_standard_tap(void) {
+    keypos_t key_pos = test_keypos(6, 3);
+
+    for (uint8_t taps = 4u; taps <= 5u; taps++) {
+        test_reset_stubs();
+        noah_runtime_reset_for_test();
+        test_tap_quickly(KC_LEFT_GUI, key_pos, taps);
+        test_release_and_settle(KC_LEFT_GUI, key_pos);
+        CHECK(!test_held_at(key_pos, KC_LEFT_GUI));
+        test_sent_only(KC_LEFT_GUI, taps);
+    }
+}
+
+// Three taps and a held fourth: GUI three times at the fourth press, then
+// GUI held from the tap / hold threshold, never from the press. Released
+// before the threshold, the fourth is a fourth tap.
+static void test_hold_past_the_depth_holds_after_the_typed_taps(void) {
+    keypos_t          key_pos = test_keypos(6, 3);
+    test_held_press_t held;
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    test_tap_quickly(KC_LEFT_GUI, key_pos, 3u);
+    held = test_hold_press(KC_LEFT_GUI, key_pos, KC_LEFT_GUI, CUSTOM_TAP_HOLD_TERM + 50u);
+    CHECK(held.sent_at_press == 3u);
+    CHECK(held.sent_when_held == 3u);
+    CHECK(held.held_after_ms >= CUSTOM_TAP_HOLD_TERM);
+    CHECK(!test_held_at(key_pos, KC_LEFT_ALT));
+    test_release_and_settle(KC_LEFT_GUI, key_pos);
+    CHECK(!test_held_at(key_pos, KC_LEFT_GUI));
+    test_sent_only(KC_LEFT_GUI, 3u);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    test_tap_quickly(KC_LEFT_GUI, key_pos, 3u);
+    held = test_hold_press(KC_LEFT_GUI, key_pos, KC_LEFT_GUI, CUSTOM_TAP_HOLD_TERM - 20u);
+    CHECK(held.sent_when_held == UINT16_MAX);
+    test_release_and_settle(KC_LEFT_GUI, key_pos);
+    test_sent_only(KC_LEFT_GUI, 4u);
+}
+
+// Left Control, depth 3, Single and Double taps empty. Held at its second
+// press, the empty Double tap is the standard key pressed twice with the last
+// held: Control once, then Control held from the threshold.
+static void test_hold_of_an_empty_branch_is_the_standard_key(void) {
+    keypos_t          key_pos = test_keypos(6, 3);
+    test_held_press_t held;
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    test_tap_quickly(KC_LEFT_CTRL, key_pos, 1u);
+    held = test_hold_press(KC_LEFT_CTRL, key_pos, KC_LEFT_CTRL, CUSTOM_TAP_HOLD_TERM + 50u);
+    CHECK(held.sent_at_press == 0u);
+    CHECK(held.sent_when_held == 1u);
+    CHECK(held.held_after_ms >= CUSTOM_TAP_HOLD_TERM);
+    test_release_and_settle(KC_LEFT_CTRL, key_pos);
+    CHECK(!test_held_at(key_pos, KC_LEFT_CTRL));
+    test_sent_only(KC_LEFT_CTRL, 1u);
 }
 
 static void test_inherited_terminal_modifier_tap_waits_the_window_without_commit_feedback(void) {
@@ -2462,7 +2671,6 @@ static void test_key_runtime_core_pending_multi_tap_scan_resolution_flushes_expi
     CHECK(series != NULL);
     CHECK(series->active);
     CHECK(series->tap_count == 1u);
-    CHECK(series->single_action == TEST_ACTION);
     CHECK(series->tap_term_ms == 180u);
 
     fake_time = (uint16_t)(fake_time + 181u);
@@ -2526,7 +2734,6 @@ static void test_key_runtime_transition_flush_multi_tap_chunks_without_dropping_
             .active           = true,
             .keycode          = TEST_PENDING_MULTI_TAP_KEY,
             .tap_count        = 1u,
-            .single_action    = TEST_ACTION,
             .tap_action       = TEST_ACTION,
             .tap_repeat_count = 1u,
             .saved_mod_state  = {0},
@@ -3729,6 +3936,11 @@ int main(void) {
 #endif
 
     test_key_runtime_activity_snapshot_uses_authoritative_counts();
+    test_hold_past_the_depth_is_the_standard_key();
+    test_hold_of_the_single_tap_takes_its_long_hold();
+    test_quick_taps_past_the_depth_type_the_standard_tap();
+    test_hold_past_the_depth_holds_after_the_typed_taps();
+    test_hold_of_an_empty_branch_is_the_standard_key();
 
     puts("runtime_debug host tests passed");
     return 0;

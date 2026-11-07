@@ -337,7 +337,7 @@ static inline __attribute__((always_inline)) void key_runtime_core_resolve_pendi
     uint16_t                       elapsed;
     uint8_t                        series_tap_count;
     bool                           preserve_chain;
-    bool                           terminal_tap_only_feedback_window;
+    bool                           deepest_branch_keeps_window;
     bool                           tap_branch_feedback_on_release;
     bool                           authored_branch;
     bool                           authored_tap_branch;
@@ -351,10 +351,11 @@ static inline __attribute__((always_inline)) void key_runtime_core_resolve_pendi
     // A terminal branch has nothing deeper to wait for, so without this it would
     // dispatch on the release and its color would last only as long as the press.
     // Preserving the chain gives every authored depth the same multi-tap window,
-    // hold tiers included. The preserving release clears the hold bindings, so
-    // nothing stays armed.
-    terminal_tap_only_feedback_window = !token->interaction.binding.has_more_taps && tap_action != KC_NO && !key_runtime_release_tap_keeps_own_layer(&token->interaction, tap_action);
-    preserve_chain                    = preserve_chain_available && elapsed < token->interaction.binding.tap_hold_term && (token->interaction.binding.has_more_taps || terminal_tap_only_feedback_window);
+    // hold tiers included, and keeps a quick press past the deepest tap count in
+    // the run (D-F64), even after a branch whose tap sends nothing. The
+    // preserving release clears the hold bindings, so nothing stays armed.
+    deepest_branch_keeps_window       = !token->interaction.binding.has_more_taps && !key_runtime_release_tap_keeps_own_layer(&token->interaction, tap_action);
+    preserve_chain                    = preserve_chain_available && elapsed < token->interaction.binding.tap_hold_term && (token->interaction.binding.has_more_taps || deepest_branch_keeps_window);
     tap_branch_feedback_on_release    = series_tap_count > 1u && token->slot_phase != KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING;
 
     if (token->interaction.contract.hold.release_action != KC_NO ? elapsed >= token->interaction.binding.tap_hold_term : !token->interaction.binding.hold.present && token->interaction.contract.long_hold.release_action != KC_NO && elapsed >= token->interaction.binding.long_hold_term) {

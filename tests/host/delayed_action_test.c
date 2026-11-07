@@ -126,7 +126,8 @@ void clear_oneshot_locked_mods(void) {
 
 void send_keyboard_report(void) {}
 
-bool noah_key_runtime_settle_pending_fallback_hold(void) {
+bool noah_key_runtime_settle_pending_fallback_hold(keypos_t emitting_key_pos) {
+    (void)emitting_key_pos;
     fallback_hold_activation_count++;
     fake_mods |= fallback_hold_settle_real_mods;
     fake_weak_mods |= fallback_hold_settle_weak_mods;

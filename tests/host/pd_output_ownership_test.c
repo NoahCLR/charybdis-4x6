@@ -31,7 +31,7 @@ void tap_code16(uint16_t key) {
 }
 void wait_ms(uint16_t delay) {}
 void pointer_layer_policy_note_action(uint16_t key, bool pressed) {}
-bool noah_key_runtime_settle_pending_fallback_hold(void) { return false; }
+bool noah_key_runtime_settle_pending_fallback_hold(keypos_t emitting_key_pos) { (void)emitting_key_pos; return false; }
 void noah_action_tap(uint16_t key) { assert(false); }
 void noah_action_tap_at(keypos_t pos, uint16_t key) { assert(false); }
 bool noah_profile_macro_start(uint16_t key) { return false; }

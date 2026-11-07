@@ -451,9 +451,10 @@ static void test_row_without_steps_is_no_row(void) {
     CHECK(toggle.tap_hold_term == 120u && toggle.multi_tap_term == 180u);
 }
 
-// An empty tap at a later count repeats the first tap the row sets, once per
-// press; a row without one repeats the key's own tap (D-F33).
-static void test_empty_later_tap_repeats_the_first_tap(void) {
+// An empty Tap at a later count is the standard key's, once per press, never
+// the Single tap the behaviour sets (D-F64): a user keycode taps nothing, Delete
+// taps Delete.
+static void test_empty_later_tap_is_the_standard_tap(void) {
     keypos_t                   key_pos = test_keypos(1, 1);
     handled_key_materialized_t materialized;
 
@@ -462,11 +463,11 @@ static void test_empty_later_tap_repeats_the_first_tap(void) {
     layer_state = 1u;
 
     materialized = test_materialize(handled_key_lookup_tap_count(TEST_REPEAT_KEY, 2u), key_pos);
-    CHECK(materialized.tap_action == KC_C);
-    CHECK(materialized.tap_repeat_count == 2u);
+    CHECK(materialized.tap_action == KC_NO);
+    CHECK(materialized.tap_repeat_count == 0u);
     materialized = test_materialize(handled_key_lookup_tap_count(TEST_REPEAT_KEY, 3u), key_pos);
-    CHECK(materialized.tap_action == KC_C);
-    CHECK(materialized.tap_repeat_count == 3u);
+    CHECK(materialized.tap_action == KC_NO);
+    CHECK(materialized.tap_repeat_count == 0u);
     materialized = test_materialize(handled_key_lookup_tap_count(KC_DELETE, 2u), key_pos);
     CHECK(materialized.tap_action == KC_DELETE);
     CHECK(materialized.tap_repeat_count == 2u);
@@ -932,9 +933,10 @@ static void test_live_profile_behavior_replaces_compiled_rows_atomically(void) {
 
 // The whole table at the shared depth, through the live runtime's row index:
 // the first, middle and last rows, every step of each, and a missing key.
-// A live row with holds only past its first tap count repeats its first tap,
-// read from the row's steps as the compiled table is (D-F33).
-static void test_live_profile_row_empty_later_tap_repeats_its_first_tap(void) {
+// A live behaviour with holds only past its first tap count sends the
+// standard tap at those counts, never its Single tap, as the compiled table
+// does (D-F64).
+static void test_live_profile_row_empty_later_tap_is_the_standard_tap(void) {
     uint8_t                               payload[128];
     size_t                                written;
     noah_profile_codec_v1_error_t         codec_error;
@@ -976,7 +978,7 @@ static void test_live_profile_row_empty_later_tap_repeats_its_first_tap(void) {
     test_set_keymap_key(0, test_keypos(1, 1), KC_DELETE);
     layer_state = 1u;
     materialized = test_materialize(handled_key_lookup_tap_count(KC_DELETE, 2u), test_keypos(1, 1));
-    CHECK(materialized.tap_action == KC_Z && materialized.tap_repeat_count == 2u);
+    CHECK(materialized.tap_action == KC_DELETE && materialized.tap_repeat_count == 2u);
     noah_active_profile_key_behavior_runtime_uninstall(&runtime);
 }
 
@@ -1114,7 +1116,7 @@ int main(void) {
     test_tap_toggle_layer_holds_and_locks_on_its_toggle_tap();
     test_tap_toggle_layer_defers_to_an_authored_row_and_the_layer_count();
     test_row_without_steps_is_no_row();
-    test_empty_later_tap_repeats_the_first_tap();
+    test_empty_later_tap_is_the_standard_tap();
     test_plain_pointing_mode_key_is_handled_without_authored_behavior();
     test_handled_resolution_searches_authored_rows_once();
     test_pointing_mode_lock_stays_out_of_handled_key_runtime();
@@ -1137,7 +1139,7 @@ int main(void) {
     test_transparent_long_hold_uses_lower_explicit_long_hold_action();
     test_momentary_layer_query_matches_hold_materialization();
     test_live_profile_behavior_replaces_compiled_rows_atomically();
-    test_live_profile_row_empty_later_tap_repeats_its_first_tap();
+    test_live_profile_row_empty_later_tap_is_the_standard_tap();
     test_live_profile_full_table_through_the_row_index();
 
     puts("key_behavior_lookup host tests passed");
