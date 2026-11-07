@@ -192,19 +192,24 @@ static const layer_ownership_binding_snapshot_t *test_find_layer_binding(const l
     return NULL;
 }
 
-static const held_action_binding_snapshot_t *test_find_held_action_binding(const held_action_debug_snapshot_t *snapshot, keypos_t key_pos, uint16_t action) {
-    if (!snapshot) {
-        return NULL;
-    }
-
+static const held_action_binding_snapshot_t *test_find_binding(const held_action_binding_snapshot_t *bindings, keypos_t key_pos, uint16_t action) {
     for (uint16_t index = 0; index < HELD_ACTION_BINDING_CAPACITY; index++) {
-        const held_action_binding_snapshot_t *binding = &snapshot->actions[index];
+        const held_action_binding_snapshot_t *binding = &bindings[index];
         if (binding->active && binding->action == action && test_keypos_equal(binding->key_pos, key_pos)) {
             return binding;
         }
     }
 
     return NULL;
+}
+
+static const held_action_binding_snapshot_t *test_find_held_action_binding(const held_action_debug_snapshot_t *snapshot, keypos_t key_pos, uint16_t action) {
+    return snapshot ? test_find_binding(snapshot->actions, key_pos, action) : NULL;
+}
+
+// Held pure modifiers have their own table.
+static const held_action_binding_snapshot_t *test_find_held_modifier_binding(const held_action_debug_snapshot_t *snapshot, keypos_t key_pos, uint16_t modifier) {
+    return snapshot ? test_find_binding(snapshot->modifiers, key_pos, modifier) : NULL;
 }
 
 static const held_repeat_binding_snapshot_t *test_find_held_repeat_binding(const held_repeat_debug_snapshot_t *snapshot, keypos_t key_pos, uint16_t action) {
@@ -270,6 +275,18 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
             step = (key_behavior_step_t){
                 .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT),
             };
+            has_more_taps = true;
+        } else {
+            step = (key_behavior_step_t){
+                .tap = TAP_SENDS(OSM(MOD_LSFT)),
+            };
+        }
+    } else if (keycode == KC_LEFT_CTRL) {
+        // A bare modifier whose single and double taps are empty.
+        flags |= HANDLED_KEY_FLAG_MULTI_TAP;
+        authored_tap_depth = 3u;
+        if (tap_count < 3u) {
+            step          = key_behavior_step_none();
             has_more_taps = true;
         } else {
             step = (key_behavior_step_t){
@@ -526,7 +543,7 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
     if (keycode == TEST_PENDING_MULTI_TAP_KEY || keycode == TEST_FINAL_TAP_ONLY_KEY) {
         return count < 2u;
     }
-    if (keycode == KC_LEFT_GUI) {
+    if (keycode == KC_LEFT_GUI || keycode == KC_LEFT_CTRL) {
         return count < 3u;
     }
     if (keycode == KC_RIGHT_GUI) {
@@ -1780,6 +1797,84 @@ static void test_inherited_non_base_modifier_tap_flush_has_no_commit_feedback(vo
     key_feedback_tap_branch_map(tap_branch_map);
     CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_NONE);
     CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 0u);
+}
+
+// A bare modifier is a plain key: its behaviour's empty single tap sends the
+// modifier's own tap, once the multi tap window closes.
+static void test_lone_modifier_tap_sends_its_tap_when_the_window_closes(void) {
+    keypos_t key_pos = test_keypos(6, 4);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    CHECK(!test_process_record(KC_LEFT_GUI, key_pos, true));
+    fake_time = (uint16_t)(fake_time + 10u);
+    CHECK(!test_process_record(KC_LEFT_GUI, key_pos, false));
+    noah_key_runtime_scan();
+    CHECK(delayed_action_count == 0u);
+
+    fake_time = (uint16_t)(fake_time + CUSTOM_MULTI_TAP_TERM + 1u);
+    noah_key_runtime_scan();
+
+    CHECK(!key_runtime_core_has_pending_multi_tap_at(key_pos));
+    CHECK(delayed_action_count == 1u);
+    CHECK(delayed_action_log[0] == KC_LEFT_GUI);
+}
+
+// An empty tap count inside the behaviour's depth repeats the modifier's tap
+// once per press, as any plain key's does (D-F33).
+static void test_empty_modifier_tap_count_inside_the_depth_repeats_its_tap(void) {
+    keypos_t key_pos = test_keypos(6, 5);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    CHECK(!test_process_record(KC_LEFT_CTRL, key_pos, true));
+    fake_time = (uint16_t)(fake_time + 10u);
+    CHECK(!test_process_record(KC_LEFT_CTRL, key_pos, false));
+    fake_time = (uint16_t)(fake_time + 20u);
+    CHECK(!test_process_record(KC_LEFT_CTRL, key_pos, true));
+    fake_time = (uint16_t)(fake_time + 10u);
+    CHECK(!test_process_record(KC_LEFT_CTRL, key_pos, false));
+    CHECK(delayed_action_count == 0u);
+
+    fake_time = (uint16_t)(fake_time + CUSTOM_MULTI_TAP_TERM + 1u);
+    noah_key_runtime_scan();
+
+    CHECK(!key_runtime_core_has_pending_multi_tap_at(key_pos));
+    CHECK(delayed_action_count == 2u);
+    CHECK(delayed_action_log[0] == KC_LEFT_CTRL);
+    CHECK(delayed_action_log[1] == KC_LEFT_CTRL);
+}
+
+// Held, the modifier holds itself from the tap / hold threshold until
+// release (its fallback hold), and its release sends no tap.
+static void test_held_modifier_holds_itself_until_release_and_sends_no_tap(void) {
+    held_action_debug_snapshot_t snapshot;
+    keypos_t                     key_pos = test_keypos(6, 6);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    CHECK(!test_process_record(KC_LEFT_GUI, key_pos, true));
+    fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM - 1u);
+    noah_key_runtime_scan();
+    held_action_debug_snapshot(&snapshot);
+    CHECK(test_find_held_modifier_binding(&snapshot, key_pos, KC_LEFT_GUI) == NULL);
+
+    fake_time = (uint16_t)(fake_time + 2u);
+    noah_key_runtime_scan();
+    held_action_debug_snapshot(&snapshot);
+    CHECK(test_find_held_modifier_binding(&snapshot, key_pos, KC_LEFT_GUI) != NULL);
+
+    fake_time = (uint16_t)(fake_time + 100u);
+    CHECK(!test_process_record(KC_LEFT_GUI, key_pos, false));
+    fake_time = (uint16_t)(fake_time + CUSTOM_MULTI_TAP_TERM + 1u);
+    noah_key_runtime_scan();
+
+    held_action_debug_snapshot(&snapshot);
+    CHECK(test_find_held_modifier_binding(&snapshot, key_pos, KC_LEFT_GUI) == NULL);
+    CHECK(delayed_action_count == 0u);
 }
 
 static void test_inherited_terminal_modifier_tap_waits_the_window_without_commit_feedback(void) {
@@ -3583,6 +3678,9 @@ int main(void) {
     test_base_tap_multi_tap_flush_stays_quiet();
     test_inherited_non_base_modifier_tap_flush_has_no_commit_feedback();
     test_inherited_terminal_modifier_tap_waits_the_window_without_commit_feedback();
+    test_lone_modifier_tap_sends_its_tap_when_the_window_closes();
+    test_empty_modifier_tap_count_inside_the_depth_repeats_its_tap();
+    test_held_modifier_holds_itself_until_release_and_sends_no_tap();
     test_split_term_branch_names_its_tap_at_the_accept_window();
     test_long_hold_only_branch_keeps_branch_color_until_long_hold();
     test_key_feedback_maps_name_the_branch_through_a_pending_hold();

@@ -11,3 +11,15 @@ on rows whose later counts hold or repeat, and sent one Escape for three.
 Like cycling, an overshooting run never fires the branch it went past. There
 is no setting; a first tap that toggles a lock toggles once per press.
 Contract: [What keys can do](../guide/keys.md#tap-counts).
+
+Amended (Noah, 2026-11-07): a bare modifier key (Left or Right Control,
+Shift, Alt or GUI) is no exception. Its behaviour's empty single tap sends the
+modifier's own tap once the multi tap window closes, and each empty tap count
+inside its depth repeats it, as any plain key's does. It had sent nothing at
+an empty tap count whenever its behaviour went past the single tap, a rule
+left from when a pending modifier tap was held under the next key pressed
+inside the window; that went long before, and the rule only swallowed the
+tap, while some programs act on a lone modifier tap, or on two tapped
+together. Held, the modifier still holds itself from the tap / hold threshold
+until release, and a key pressed inside the window settles its pending tap as
+any other key's (D-F56).

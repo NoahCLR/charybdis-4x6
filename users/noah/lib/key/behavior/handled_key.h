@@ -70,7 +70,6 @@ typedef struct {
     handled_key_hold_semantics_t long_hold;
     pointing_mode_mask_t         quick_tap_pointing_mode_lock;
     bool                         suppress_tap_on_layer_interrupt;
-    bool                         buffered_base_tap_dispatches_tap;
     bool                         quick_release_of_immediate_hold_dispatches_tap;
     bool                         fallback_hold_suppresses_nonquick_release;
     bool                         nonquick_release_dispatches_tap;

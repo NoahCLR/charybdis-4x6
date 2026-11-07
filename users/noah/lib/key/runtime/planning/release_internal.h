@@ -26,7 +26,6 @@ typedef struct {
     bool                                  momentary_layer_tap_interrupted;
     bool                                  quick_tap;
     bool                                  quick_immediate_hold;
-    bool                                  buffered_base_tap;
     pointing_mode_mask_t                  lock_tap_mode;
     key_runtime_release_decision_t        decision;
 } key_runtime_core_active_release_resolution_t;

@@ -89,7 +89,8 @@ static void test_layout_and_reset_contract(void) {
     // Layer locks and one-shot layers moved from intents to two masks (D-F26),
     // so the intent table shrank from 16 entries to 4: 192 bytes fewer, 8 more
     // for the masks and their alignment, 184 bytes.
-    CHECK(sizeof(key_runtime_core_state_t) == 20920u);
+    // A press token is 172 bytes, and this harness has 64 of them.
+    CHECK(sizeof(key_runtime_core_state_t) == 20664u);
     CHECK(test_state.pending_release_count == 0u);
     CHECK(test_state.pending_release_head_index == KEY_RUNTIME_CORE_PENDING_RELEASE_INDEX_NONE);
     CHECK(test_state.pending_release_tail_index == KEY_RUNTIME_CORE_PENDING_RELEASE_INDEX_NONE);
