@@ -258,7 +258,6 @@ bool key_runtime_core_resolve_active_release(keypos_t key_pos, key_runtime_core_
         .momentary_layer_tap_interrupted = token->momentary_layer_tap_interrupted,
         .quick_tap                       = key_runtime_release_query_quick_tap(&query),
         .quick_immediate_hold            = key_runtime_release_query_quick_immediate_hold(&query),
-        .buffered_base_tap               = key_runtime_release_query_buffered_base_tap(&query),
         .lock_tap_mode                   = key_runtime_release_query_lock_tap_mode(&query),
         .decision                        = key_runtime_release_decide(&query),
     };

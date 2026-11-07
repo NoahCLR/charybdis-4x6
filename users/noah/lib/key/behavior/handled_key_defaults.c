@@ -53,22 +53,6 @@ bool handled_key_resolution_step_present(const handled_key_resolution_t *resolut
     return resolution && key_behavior_step_present(resolution->step);
 }
 
-static bool handled_key_resolution_uses_buffered_modifier_single_step(const handled_key_resolution_t *resolution) {
-    noah_action_desc_t desc;
-
-    if (!resolution) {
-        return false;
-    }
-
-    desc = noah_action_describe(resolution->keycode);
-
-    if (handled_key_resolution_step_present(resolution) || (resolution->flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0u) {
-        return false;
-    }
-
-    return (resolution->flags & HANDLED_KEY_FLAG_MULTI_TAP) != 0u && noah_action_desc_is_pure_modifier_literal(desc);
-}
-
 bool handled_key_resolution_uses_fallback_hold_behavior(const handled_key_resolution_t *resolution) {
     if (!resolution || resolution->tap_count != 1) {
         return false;
@@ -129,10 +113,6 @@ static uint16_t handled_key_single_tap_action(const handled_key_resolution_t *re
 
     if (resolution->step.tap.present) {
         return resolution->step.tap.action;
-    }
-
-    if (handled_key_resolution_uses_buffered_modifier_single_step(resolution)) {
-        return KC_NO;
     }
 
     return handled_key_default_tap_action(resolution);
@@ -217,8 +197,8 @@ uint16_t handled_key_tap_action_behavior(const handled_key_resolution_t *resolut
         return resolution->step.tap.action;
     }
 
-    // An empty tap at a later count repeats the first tap: the one the row sets
-    // there, or the key's own (D-F33).
+    // An empty tap at a later count repeats the first tap: the one the
+    // behaviour sets there, or the key's own (D-F33).
     if (resolution->first_tap.present) {
         return resolution->first_tap.action;
     }

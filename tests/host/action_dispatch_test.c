@@ -329,7 +329,6 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_uses_held_lifecycle_for_press_and_hold(layer_lock));
     CHECK(!noah_action_desc_is_runtime_handled_keycode(layer_lock));
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(layer_lock));
-    CHECK(!noah_action_desc_is_pure_modifier_literal(layer_lock));
     CHECK(!noah_action_desc_source_sets_momentary_layer_flag(layer_lock));
     CHECK(!noah_action_desc_source_sets_layer_tap_flag(layer_lock));
     CHECK(!noah_action_desc_supports_fallback_hold(layer_lock));
@@ -354,7 +353,6 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_source_layer_uses_desc_layer(momentary));
     CHECK(noah_action_desc_source_layer(momentary) == 3);
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(momentary));
-    CHECK(!noah_action_desc_is_pure_modifier_literal(momentary));
     CHECK(!noah_action_desc_supports_fallback_hold(momentary));
     CHECK(noah_action_desc_default_tap_action(momentary) == KC_NO);
 
@@ -373,7 +371,6 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_source_sets_layer_tap_flag(layer_tap));
     CHECK(!noah_action_desc_is_runtime_handled_keycode(layer_tap));
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(layer_tap));
-    CHECK(!noah_action_desc_is_pure_modifier_literal(layer_tap));
     CHECK(!noah_action_desc_supports_fallback_hold(layer_tap));
     CHECK(!noah_action_desc_source_layer_uses_desc_layer(layer_tap));
     CHECK(noah_action_desc_source_layer(layer_tap) == UINT8_MAX);
@@ -389,7 +386,6 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_supported_as_authored_action(raw_layer, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
     CHECK(!noah_action_desc_uses_authored_layer_tap_contract(raw_layer));
     CHECK(noah_action_desc_default_tap_uses_action_keycode(raw_layer));
-    CHECK(!noah_action_desc_is_pure_modifier_literal(raw_layer));
     CHECK(!noah_action_desc_source_sets_momentary_layer_flag(raw_layer));
     CHECK(!noah_action_desc_source_sets_layer_tap_flag(raw_layer));
     CHECK(noah_action_desc_supports_fallback_hold(raw_layer));
@@ -487,7 +483,6 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_supported_as_authored_action(qmk_behavior, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
     CHECK(noah_action_desc_uses_held_lifecycle_for_press_and_hold(qmk_behavior));
     CHECK(noah_action_desc_default_tap_uses_action_keycode(qmk_behavior));
-    CHECK(!noah_action_desc_is_pure_modifier_literal(qmk_behavior));
     CHECK(!noah_action_desc_source_sets_momentary_layer_flag(qmk_behavior));
     CHECK(!noah_action_desc_source_sets_layer_tap_flag(qmk_behavior));
     CHECK(!noah_action_desc_supports_fallback_hold(qmk_behavior));
@@ -504,7 +499,6 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_is_runtime_handled_keycode(pd_key));
     CHECK(noah_action_desc_uses_held_lifecycle_for_press_and_hold(pd_key));
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(pd_key));
-    CHECK(!noah_action_desc_is_pure_modifier_literal(pd_key));
     CHECK(!noah_action_desc_source_sets_momentary_layer_flag(pd_key));
     CHECK(!noah_action_desc_source_sets_layer_tap_flag(pd_key));
     CHECK(!noah_action_desc_supports_fallback_hold(pd_key));
@@ -517,7 +511,6 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_is_runtime_handled_keycode(pd_lock));
     CHECK(!noah_action_desc_uses_held_lifecycle_for_press_and_hold(pd_lock));
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(pd_lock));
-    CHECK(!noah_action_desc_is_pure_modifier_literal(pd_lock));
     CHECK(!noah_action_desc_source_sets_momentary_layer_flag(pd_lock));
     CHECK(!noah_action_desc_source_sets_layer_tap_flag(pd_lock));
     CHECK(!noah_action_desc_supports_fallback_hold(pd_lock));
@@ -532,7 +525,6 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_consumes_direct_press(macro_action));
     CHECK(!noah_action_desc_uses_held_lifecycle_for_press_and_hold(macro_action));
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(macro_action));
-    CHECK(!noah_action_desc_is_pure_modifier_literal(macro_action));
     CHECK(!noah_action_desc_source_sets_momentary_layer_flag(macro_action));
     CHECK(!noah_action_desc_source_sets_layer_tap_flag(macro_action));
     CHECK(!noah_action_desc_supports_fallback_hold(macro_action));
@@ -549,7 +541,6 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_describe(CUSTOM_KEY_63).kind == NOAH_ACTION_KIND_CUSTOM_KEY && noah_action_describe(PD_MODE_0).kind != NOAH_ACTION_KIND_CUSTOM_KEY);
     CHECK(noah_action_desc_uses_held_lifecycle_for_press_and_hold(custom));
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(custom));
-    CHECK(!noah_action_desc_is_pure_modifier_literal(custom));
     CHECK(!noah_action_desc_source_sets_momentary_layer_flag(custom));
     CHECK(!noah_action_desc_source_sets_layer_tap_flag(custom));
     CHECK(!noah_action_desc_supports_fallback_hold(custom));
@@ -568,7 +559,6 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_uses_held_lifecycle_for_press_and_hold(literal));
     CHECK(!noah_action_desc_is_runtime_handled_keycode(literal));
     CHECK(noah_action_desc_default_tap_uses_action_keycode(literal));
-    CHECK(!noah_action_desc_is_pure_modifier_literal(literal));
     CHECK(!noah_action_desc_source_sets_momentary_layer_flag(literal));
     CHECK(!noah_action_desc_source_sets_layer_tap_flag(literal));
     CHECK(noah_action_desc_supports_fallback_hold(literal));
@@ -577,7 +567,6 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_default_tap_action(literal) == KC_C);
 
     literal = noah_action_describe(KC_LEFT_SHIFT);
-    CHECK(noah_action_desc_is_pure_modifier_literal(literal));
     CHECK(noah_action_desc_default_tap_action(literal) == KC_LEFT_SHIFT);
 }
 

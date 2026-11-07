@@ -43,22 +43,6 @@ static bool noah_action_desc_has_policy_flag(noah_action_desc_t desc, noah_actio
     return def && (def->policy_flags & (uint16_t)flag) != 0;
 }
 
-static bool noah_action_keycode_is_pure_modifier_literal(uint16_t action) {
-    switch (action) {
-        case KC_LEFT_CTRL:
-        case KC_LEFT_SHIFT:
-        case KC_LEFT_ALT:
-        case KC_LEFT_GUI:
-        case KC_RIGHT_CTRL:
-        case KC_RIGHT_SHIFT:
-        case KC_RIGHT_ALT:
-        case KC_RIGHT_GUI:
-            return true;
-        default:
-            return false;
-    }
-}
-
 // The firmware always links the live lookup
 // (active_profile_settings_runtime.c), which falls back to the keymap's
 // shortcuts before a profile is live. This default, no shortcuts, only serves
@@ -139,10 +123,6 @@ bool noah_action_desc_default_tap_uses_layer_tap_keycode(noah_action_desc_t desc
 
 bool noah_action_desc_default_tap_uses_action_keycode(noah_action_desc_t desc) {
     return noah_action_desc_has_policy_flag(desc, NOAH_ACTION_POLICY_DEFAULT_TAP_USES_ACTION_KEYCODE) || noah_action_desc_is_custom_key_with_shortcut(desc);
-}
-
-bool noah_action_desc_is_pure_modifier_literal(noah_action_desc_t desc) {
-    return desc.kind == NOAH_ACTION_KIND_LITERAL && noah_action_keycode_is_pure_modifier_literal(desc.action);
 }
 
 bool noah_action_desc_source_sets_momentary_layer_flag(noah_action_desc_t desc) {

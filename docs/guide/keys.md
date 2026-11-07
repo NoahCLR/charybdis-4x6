@@ -33,10 +33,12 @@ or long hold sends its action in one of four **hold styles**:
   rate you set, 1 to 100 times a second, until you let go.
 
 A tier you leave empty does what the key does on its own. An empty tap sends
-the key's own keycode. On the single tap, an empty hold holds the key: an
-`LT()` key holds its layer, an `MT()` key its modifiers, a pointing key its
-mode and a custom key its shortcut. A macro has no hold of its own, and from
-the double tap on an empty hold is no hold at all.
+the key's own keycode, a modifier's too: a lone tap of a Left GUI whose
+behaviour sets only a double and a triple tap sends Left GUI. On the single
+tap, an empty hold holds the key: an `LT()` key holds its layer, an `MT()` key
+its modifiers, a pointing key its mode and a custom key its shortcut. A macro
+has no hold of its own, and from the double tap on an empty hold is no hold at
+all.
 
 ### Hold and long hold that both send on release
 

@@ -720,6 +720,51 @@ static void test_press_on_other_handled_position_keeps_foreign_pending_multi_tap
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(1, 3)) == TEST_HOLD_KEY_TWO);
 }
 
+// A bare modifier's pending tap is a plain key's: a key without a behaviour
+// pressed inside the multi tap window types it first (D-F56), and the
+// modifier is never held under that key.
+static void test_key_without_a_behaviour_types_a_pending_modifier_tap_first(void) {
+    static const key_runtime_scenario_multi_tap_entry_t entries[] = {
+        {.tap_count = 2, .step = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT)}},
+        {.tap_count = 3, .step = {.tap = TAP_SENDS(OSM(MOD_LSFT))}},
+    };
+    static const key_runtime_scenario_step_t modifier_tap[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(KC_LEFT_GUI, 1, 1),
+        KEY_RUNTIME_SCENARIO_ADVANCE(10),
+        KEY_RUNTIME_SCENARIO_RELEASE(KC_LEFT_GUI, 1, 1),
+        KEY_RUNTIME_SCENARIO_ADVANCE(30),
+    };
+    static const key_runtime_scenario_step_t other_press[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(KC_A, 2, 2),
+    };
+    static const key_runtime_scenario_step_t other_release_and_timeout[] = {
+        KEY_RUNTIME_SCENARIO_ADVANCE(10),
+        KEY_RUNTIME_SCENARIO_RELEASE(KC_A, 2, 2),
+        KEY_RUNTIME_SCENARIO_ADVANCE(400),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+
+    key_runtime_scenario_reset();
+    key_runtime_scenario_add_pending_multi_tap_chain(KC_LEFT_GUI, key_behavior_step_none(), entries, ARRAY_SIZE(entries));
+    key_runtime_scenario_run(modifier_tap, ARRAY_SIZE(modifier_tap));
+
+    CHECK(key_runtime_scenario_effect_count() == 0);
+    CHECK(key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(1, 1)));
+
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(other_press, ARRAY_SIZE(other_press));
+
+    CHECK(key_runtime_scenario_effect_count() == 1);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+    CHECK(key_runtime_scenario_effect_at(0)->data.delayed_action.action == KC_LEFT_GUI);
+    CHECK(!key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(1, 1)));
+
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(other_release_and_timeout, ARRAY_SIZE(other_release_and_timeout));
+
+    CHECK(key_runtime_scenario_effect_count() == 0);
+}
+
 // Another key's press settles a down key's repeated tap when its hold is an
 // output of its own, typing it first (D-F27). A hold that changes other keys,
 // here a modifier or a custom key whose shortcut turns a layer on or is
@@ -1338,6 +1383,7 @@ int main(void) {
     test_threshold_hold_registers_and_releases_owned_state();
     test_replaced_press_token_still_releases_owned_state();
     test_press_on_other_handled_position_keeps_foreign_pending_multi_tap_until_timeout();
+    test_key_without_a_behaviour_types_a_pending_modifier_tap_first();
     test_other_press_settles_active_same_key_multi_tap_chain();
     test_independent_pending_multi_tap_chains_can_coexist_and_flush_independently();
     test_interrupt_other_press_activates_fallback_hold();
