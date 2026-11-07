@@ -9,6 +9,7 @@
 #include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
+#include "users/noah/lib/key/runtime/api.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
@@ -450,7 +451,10 @@ void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
 }
 
 void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods) {
-    (void)key_pos;
+    // As delayed_action.c's emit does, the tap settles pending fallback holds,
+    // all but its own key's, as it goes out. Its modifiers are not replayed
+    // here.
+    noah_key_runtime_settle_pending_fallback_hold(key_pos);
     dispatch_delayed_action(action, mods);
 }
 

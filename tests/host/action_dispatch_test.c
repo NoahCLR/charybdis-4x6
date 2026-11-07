@@ -164,7 +164,8 @@ void wait_ms(uint16_t ms) {
     test_trace('W');
 }
 
-bool noah_key_runtime_settle_pending_fallback_hold(void) {
+bool noah_key_runtime_settle_pending_fallback_hold(keypos_t emitting_key_pos) {
+    (void)emitting_key_pos;
     fallback_hold_activation_count++;
     fallback_hold_active = true;
     fake_mods |= fallback_hold_settle_real_mods;
@@ -524,11 +525,13 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_supported_as_authored_action(macro_action, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
     CHECK(noah_action_desc_consumes_direct_press(macro_action));
     CHECK(!noah_action_desc_uses_held_lifecycle_for_press_and_hold(macro_action));
-    CHECK(!noah_action_desc_default_tap_uses_action_keycode(macro_action));
+    // A macro key's own tap is the macro, so a behaviour's empty tap plays it
+    // (D-F64).
+    CHECK(noah_action_desc_default_tap_uses_action_keycode(macro_action));
     CHECK(!noah_action_desc_source_sets_momentary_layer_flag(macro_action));
     CHECK(!noah_action_desc_source_sets_layer_tap_flag(macro_action));
     CHECK(!noah_action_desc_supports_fallback_hold(macro_action));
-    CHECK(noah_action_desc_default_tap_action(macro_action) == KC_NO);
+    CHECK(noah_action_desc_default_tap_action(macro_action) == MACRO_0);
 
     // A custom key is a row's own keycode, a combo output and, sending only
     // its shortcut, a step (D-F26).

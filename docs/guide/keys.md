@@ -32,13 +32,34 @@ or long hold sends its action in one of four **hold styles**:
 - **repeated while held**: sent at the threshold, then again and again at the
   rate you set, 1 to 100 times a second, until you let go.
 
-A tier you leave empty does what the key does on its own. An empty tap sends
-the key's own keycode, a modifier's too: a lone tap of a Left GUI whose
-behaviour sets only a double and a triple tap sends Left GUI. On the single
-tap, an empty hold holds the key: an `LT()` key holds its layer, an `MT()` key
-its modifiers, a pointing key its mode and a custom key its shortcut. A macro
-has no hold of its own, and from the double tap on an empty hold is no hold at
-all.
+Whatever a behaviour leaves empty is the **standard key**: what the key does
+with no behaviour at all.
+
+- A plain key or a modifier taps itself and holds itself from the tap / hold
+  threshold. A lone tap of a Left GUI whose behaviour sets only a double and a
+  triple tap sends Left GUI.
+- `LT()` and `MT()` tap their key and hold their layer or modifiers; `OSM()`
+  arms its one-shot.
+- `MO()`, `LM()` and a pointing key hold from the press and tap nothing.
+- A custom key does its shortcut; with no shortcut it does nothing.
+- A macro plays.
+- A single tap set to Transparent sends the key below, and the key below is
+  then the standard key's tap too, wherever a tap is empty.
+
+The standard key keeps the behaviour's own tap / hold threshold.
+
+On the single tap, a tier you leave empty under a tap you set is still the
+key's own hold: a plain key or a modifier holds itself, `LT()` and `MT()` hold
+their layer or modifiers, a pointing key its mode and a custom key its
+shortcut. Only a key with no hold of its own, a macro or a custom key without
+a shortcut, sends the tap you set when you let go, however long you held it.
+
+On a later tap count, a tier you leave empty follows the tiers you set: with
+a tap set, an empty hold and long hold send that tap when you let go, however
+long you held it.
+
+On any tap count, with a hold set an empty long hold carries the hold on, and
+with only a long hold set, letting go before its threshold sends the tap.
 
 ### Hold and long hold that both send on release
 
@@ -58,13 +79,28 @@ hold.
   sent, to see whether another tap follows. That holds at every depth, the
   deepest included.
 - A hold does not wait: crossing a hold threshold enters the branch at once.
-- A branch with no tap of its own repeats the first tap once per press, so an
-  empty double tap sends it twice and an empty triple tap three times.
-- **Tapping past the deepest branch is typing.** If you keep tapping within
-  the window after the deepest branch you set, no branch fires: every press
-  in the run sends the first tap once. A Backspace whose double tap types V
-  sends Backspace for one tap, V for two and three Backspaces for three. A
-  press you hold during such a run takes the first branch's hold.
+- A branch does only what it sets. Nothing in one tap count turns up at
+  another.
+- A branch with no tap of its own sends the standard key's tap once per
+  press: an empty double tap sends it twice, an empty triple tap three times,
+  never the single tap you set. A pointing key whose single tap is
+  Transparent types the key below; one whose single tap is set otherwise
+  types nothing there.
+- A branch you leave wholly empty is the standard key pressed that many
+  times. Held at its second press, an empty double tap on Left Control sends
+  Control once, then holds Control from the tap / hold threshold.
+- **Tapping past the deepest branch is typing the standard key.** If you keep
+  tapping within the window after the deepest branch you set, no branch
+  fires: every press in the run, the first included, is the standard key. A
+  Backspace whose single tap types X and double tap types V sends X for one
+  tap, V for two and three Backspaces for three; a Dragscroll whose single tap
+  is Transparent types the key below once per press. A press you hold during
+  such a run holds the standard key, after the run's taps before it have gone
+  out in the order you pressed them: three taps and a held fourth on an Escape
+  whose single tap long-holds Option+Command+Escape send three Escapes, then
+  hold Escape.
+- A behaviour that sets only the single tap doesn't count taps: every press is
+  a single tap.
 
 ## Dual-role keys
 

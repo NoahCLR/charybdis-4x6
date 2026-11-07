@@ -136,7 +136,7 @@
         },
         {
           "name": "handled press planning",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_process_plan_handled_key_press", "key_runtime_core_effect_plan_push_delayed_action_with_flags", "key_runtime_core_effect_plan_push"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_process_plan_handled_key_press", "key_runtime_core_effect_plan_push_delayed_action", "key_runtime_core_effect_plan_push"]
         },
         {
           "name": "handled press projection with fallback settlement",

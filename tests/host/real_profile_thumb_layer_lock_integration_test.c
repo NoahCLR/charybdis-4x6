@@ -20,9 +20,11 @@
 #include "users/noah/lib/pointing/modes/pointing_mode_configured.h"
 #include "users/noah/lib/profile/runtime/active_profile_pd_runtime.h"
 #include "users/noah/lib/key/runtime/projection/projection.h"
+#include "users/noah/lib/key/runtime/api.h"
 #include "users/noah/lib/key/runtime/reducer/runtime.h"
 #include "users/noah/lib/key/runtime/reducer/state_query.h"
 #include "users/noah/lib/key/runtime/trace/core_trace.h"
+#include "users/noah/lib/state/modifiers/keyboard_mod_policy.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
 #include "users/noah/lib/state/diagnostics/runtime_debug.h"
@@ -1059,28 +1061,18 @@ void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     (void)mods;
 }
 
+// As delayed_action.c does: the tap's own modifiers are replayed around it,
+// and its emit settles pending fallback holds first, all but its own key's.
 void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods) {
-    dispatch_delayed_action(action, mods);
+    keyboard_mod_state_t saved = keyboard_mod_policy_begin_action_replay(mods);
 
-    if (!IS_QK_ONE_SHOT_MOD(action)) {
-        return;
+    if (IS_QK_ONE_SHOT_MOD(action)) {
+        noah_emit_action_tap_at(key_pos, action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
+    } else {
+        noah_key_runtime_settle_pending_fallback_hold(key_pos);
     }
-
-    keyboard_mod_state_t saved = keyboard_mod_state_suspend();
-
-    keyboard_mod_state_apply(mods);
-    noah_emit_action_tap_at(key_pos, action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
-
-    keyboard_mod_state_t emitted = {
-        .real           = fake_mods,
-        .weak           = fake_weak_mods,
-        .oneshot        = fake_oneshot_mods,
-        .oneshot_locked = fake_oneshot_locked_mods,
-    };
-
-    saved.oneshot |= emitted.oneshot;
-    saved.oneshot_locked |= emitted.oneshot_locked;
-    keyboard_mod_state_apply(saved);
+    dispatch_delayed_action(action, mods);
+    keyboard_mod_policy_end_action_replay(action, saved);
 }
 
 void held_action_register(keypos_t key_pos, uint16_t action) {
@@ -1503,6 +1495,292 @@ static void test_right_thumb_triple_tap_long_hold_registers_next_track_hold(void
     test_assert_thumb_runtime_quiescent(key_pos);
 }
 
+// Noah's behaviours run quickly (D-F64): `taps` quick taps, then, with `hold_ms`,
+// one more press held that long, scanning every 5 ms, then released and left
+// until the run settles. What went out, and when the key held something.
+typedef struct {
+    uint16_t sent_at_last_press; // delayed taps once the last press was processed
+    uint16_t held;               // what the last press held, KC_NO for nothing
+    uint16_t held_after_ms;      // how long it had been down then
+    uint16_t sent_when_held;     // delayed taps by then
+} test_noah_run_t;
+
+static test_noah_run_t test_noah_run(keypos_t key_pos, uint8_t taps, uint16_t hold_ms) {
+    test_noah_run_t run = {.held = KC_NO, .held_after_ms = UINT16_MAX, .sent_when_held = UINT16_MAX};
+
+    for (uint8_t tap = 0u; tap < taps; tap++) {
+        test_press_resolved(key_pos);
+        key_runtime_integration_advance(&fake_time, 10u);
+        test_release_resolved(key_pos);
+        key_runtime_integration_advance(&fake_time, 30u);
+        key_runtime_integration_scan();
+    }
+    if (hold_ms) {
+        test_press_resolved(key_pos);
+        run.sent_at_last_press = test_delayed_action_count;
+        for (uint16_t elapsed = 0u; elapsed <= hold_ms; elapsed = (uint16_t)(elapsed + 5u)) {
+            uint16_t held = noah_runtime_debug_slot_held_action_keycode(key_pos);
+
+            if (run.held == KC_NO && held != KC_NO) {
+                run.held           = held;
+                run.held_after_ms  = elapsed;
+                run.sent_when_held = test_delayed_action_count;
+            }
+            key_runtime_integration_advance(&fake_time, 5u);
+            key_runtime_integration_scan();
+        }
+        test_release_resolved(key_pos);
+    }
+    for (uint16_t elapsed = 0u; elapsed <= CUSTOM_MULTI_TAP_TERM + 20u; elapsed = (uint16_t)(elapsed + 5u)) {
+        key_runtime_integration_advance(&fake_time, 5u);
+        key_runtime_integration_scan();
+    }
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
+    CHECK(!noah_runtime_debug_slot_has_pending_multi_tap(key_pos));
+    return run;
+}
+
+static keypos_t test_noah_row_on_layer(uint8_t layer, uint16_t keycode) {
+    keypos_t key_pos = test_find_keypos_on_layer(layer, keycode);
+
+    CHECK(test_keypos_valid(key_pos));
+    test_reset_state();
+    layer_state = noah_layer_state_set_user(test_layer_mask(LAYER_BASE) | test_layer_mask(layer));
+    return key_pos;
+}
+
+static void test_delayed_taps_are(uint16_t action, uint16_t count) {
+    CHECK(test_delayed_action_count == count);
+    for (uint16_t index = 0u; index < count && index < ARRAY_SIZE(test_delayed_actions); index++) {
+        CHECK(test_delayed_actions[index] == action);
+    }
+}
+
+// Escape: Single tap Long hold Opt+Cmd+Esc, Double tap ~. Three quick taps
+// and a held fourth are the standard key: Esc three times at the fourth
+// press, then Esc held until release, and no Opt+Cmd+Esc.
+static void test_noah_escape_held_past_the_depth_holds_escape(void) {
+    keypos_t        key_pos = test_noah_row_on_layer(LAYER_BASE, KC_ESC);
+    test_noah_run_t run     = test_noah_run(key_pos, 3u, CUSTOM_LONGER_HOLD_TERM + 30u);
+
+    CHECK(run.sent_at_last_press == 3u);
+    CHECK(run.held == KC_ESC && run.sent_when_held == 3u && run.held_after_ms >= CUSTOM_TAP_HOLD_TERM);
+    test_delayed_taps_are(KC_ESC, 3u);
+    CHECK(test_tap_code16_count == 0u);
+}
+
+// The Single tap held does what it sets: Opt+Cmd+Esc at the Long hold
+// threshold.
+static void test_noah_escape_single_tap_held_takes_its_long_hold(void) {
+    keypos_t key_pos = test_noah_row_on_layer(LAYER_BASE, KC_ESC);
+
+    (void)test_noah_run(key_pos, 0u, CUSTOM_LONGER_HOLD_TERM + 30u);
+    CHECK(test_delayed_action_count == 0u);
+    CHECK(test_tap_code16_count == 1u && test_last_tap_code16 == LAG(KC_ESC));
+}
+
+// Left Command: Single tap empty, Double tap Hold Left Option, Triple tap
+// One-shot Shift. Past the depth every press is Command.
+static void test_noah_left_command_past_the_depth_is_command(void) {
+    keypos_t        key_pos = test_noah_row_on_layer(LAYER_BASE, KC_LEFT_GUI);
+    test_noah_run_t run;
+
+    (void)test_noah_run(key_pos, 4u, 0u);
+    test_delayed_taps_are(KC_LEFT_GUI, 4u);
+
+    key_pos = test_noah_row_on_layer(LAYER_BASE, KC_LEFT_GUI);
+    run     = test_noah_run(key_pos, 3u, CUSTOM_TAP_HOLD_TERM + 50u);
+    CHECK(run.sent_at_last_press == 3u);
+    CHECK(run.held == KC_LEFT_GUI && run.sent_when_held == 3u && run.held_after_ms >= CUSTOM_TAP_HOLD_TERM);
+    test_delayed_taps_are(KC_LEFT_GUI, 3u);
+
+    key_pos = test_noah_row_on_layer(LAYER_BASE, KC_LEFT_GUI);
+    run     = test_noah_run(key_pos, 3u, CUSTOM_TAP_HOLD_TERM - 30u);
+    CHECK(run.held == KC_NO);
+    test_delayed_taps_are(KC_LEFT_GUI, 4u);
+}
+
+// Right Alt: Single tap the arrow-mode lock, Double tap Hold Zoom. The Double
+// tap's empty Tap is the standard key's, Right Alt, once per press; past the
+// depth every press is Right Alt too. The lock never toggles.
+static void test_noah_right_alt_double_tap_taps_right_alt(void) {
+    keypos_t key_pos = test_noah_row_on_layer(LAYER_BASE, KC_RIGHT_ALT);
+
+    (void)test_noah_run(key_pos, 2u, 0u);
+    test_delayed_taps_are(KC_RIGHT_ALT, 2u);
+    CHECK(pointing_mode_local_locked_snapshot() == 0);
+
+    key_pos = test_noah_row_on_layer(LAYER_BASE, KC_RIGHT_ALT);
+    (void)test_noah_run(key_pos, 4u, 0u);
+    test_delayed_taps_are(KC_RIGHT_ALT, 4u);
+    CHECK(pointing_mode_local_locked_snapshot() == 0);
+}
+
+// The thumbs are custom keys without a shortcut: the standard key does
+// nothing. Past the depth, tapped or held, they send nothing and lock no
+// layer.
+static void test_noah_thumbs_past_the_depth_do_nothing(void) {
+    static const struct {
+        uint16_t keycode;
+        uint8_t  depth;
+    } thumbs[] = {{CUSTOM_KEY_1, 5u}, {CUSTOM_KEY_0, 4u}};
+
+    for (uint8_t index = 0u; index < ARRAY_SIZE(thumbs); index++) {
+        for (uint8_t held = 0u; held <= 1u; held++) {
+            keypos_t        key_pos = test_noah_row_on_layer(LAYER_BASE, thumbs[index].keycode);
+            test_noah_run_t run     = test_noah_run(key_pos, (uint8_t)(thumbs[index].depth + (held ? 0u : 1u)), held ? CUSTOM_LONGER_HOLD_TERM + 30u : 0u);
+
+            CHECK(run.held == KC_NO);
+            CHECK(test_delayed_action_count == 0u);
+            CHECK(test_tap_code16_count == 0u);
+            for (uint8_t layer = 1u; layer < LAYER_COUNT; layer++) {
+                CHECK(!test_layer_locked(layer));
+                CHECK(!test_layer_active(layer));
+            }
+        }
+    }
+}
+
+// Dragscroll, Pinch and Volume set their Single tap to Transparent, which
+// makes the key underneath their standard tap (D-F64): they type and hold
+// exactly as before the standard key. Quick runs type the key underneath once
+// per press, wherever a tap is empty; held, each runs its pointing mode; a
+// Dragscroll Double tap held locks Dragscroll.
+static void test_noah_transparent_pointing_keys_type_the_key_below(void) {
+    static const struct {
+        uint16_t             keycode;
+        uint8_t              layer;
+        pointing_mode_mask_t mode;
+        bool                 double_tap_types; // the Double tap's tap is empty
+    } keys[] = {
+        {PD_MODE_0, LAYER_NAV, POINTING_MODE_DRAGSCROLL, true},
+        {PD_MODE_5, LAYER_POINTER, 0, false},
+        {PD_MODE_1, LAYER_POINTER, 0, false},
+    };
+
+    for (uint8_t index = 0u; index < ARRAY_SIZE(keys); index++) {
+        keypos_t key_pos = test_noah_row_on_layer(keys[index].layer, keys[index].keycode);
+        uint16_t below;
+
+        // A single tap types the key underneath's tap.
+        (void)test_noah_run(key_pos, 1u, 0u);
+        CHECK(test_delayed_action_count == 1u);
+        below = test_delayed_actions[0];
+        CHECK(below != KC_NO && below != KC_TRNS && below == (test_keycode_at(LAYER_BASE, key_pos) & 0xffu));
+
+        for (uint8_t taps = 2u; taps <= 4u; taps++) {
+            if (taps == 2u && !keys[index].double_tap_types) {
+                continue;
+            }
+            key_pos = test_noah_row_on_layer(keys[index].layer, keys[index].keycode);
+            (void)test_noah_run(key_pos, taps, 0u);
+            test_delayed_taps_are(below, taps);
+        }
+
+        // Held alone, or held past the depth after two taps: the pointing
+        // mode runs while held, and the taps before it type the key below.
+        for (uint8_t taps = 0u; taps <= 2u; taps += 2u) {
+            pointing_mode_mask_t active_while_held;
+
+            key_pos = test_noah_row_on_layer(keys[index].layer, keys[index].keycode);
+            for (uint8_t tap = 0u; tap < taps; tap++) {
+                test_press_resolved(key_pos);
+                key_runtime_integration_advance(&fake_time, 10u);
+                test_release_resolved(key_pos);
+                key_runtime_integration_advance(&fake_time, 30u);
+                key_runtime_integration_scan();
+            }
+            test_press_resolved(key_pos);
+            for (uint16_t elapsed = 0u; elapsed < CUSTOM_LONGER_HOLD_TERM + 30u; elapsed = (uint16_t)(elapsed + 5u)) {
+                key_runtime_integration_advance(&fake_time, 5u);
+                key_runtime_integration_scan();
+            }
+            active_while_held = pointing_mode_local_active_snapshot();
+            test_release_resolved(key_pos);
+            key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 20u);
+            key_runtime_integration_scan();
+            CHECK(active_while_held != 0);
+            CHECK(keys[index].mode == 0 || active_while_held == keys[index].mode);
+            CHECK(pointing_mode_local_active_snapshot() == 0);
+            test_delayed_taps_are(below, taps);
+        }
+    }
+
+    {
+        keypos_t key_pos = test_noah_row_on_layer(LAYER_NAV, PD_MODE_0);
+
+        test_press_resolved(key_pos);
+        key_runtime_integration_advance(&fake_time, 10u);
+        test_release_resolved(key_pos);
+        key_runtime_integration_advance(&fake_time, 30u);
+        test_press_resolved(key_pos);
+        key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 20u);
+        key_runtime_integration_scan();
+        test_release_resolved(key_pos);
+        key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 20u);
+        key_runtime_integration_scan();
+        CHECK(pointing_mode_local_locked_snapshot() == POINTING_MODE_DRAGSCROLL);
+        CHECK(test_delayed_action_count == 0u);
+    }
+}
+
+// A held modifier a delayed tap settles stays held. Escape tapped, then Left
+// Command pressed inside Escape's multi tap window and held: Escape goes out,
+// and Command, settled as Escape's tap goes out, is still in the report
+// while held and after its threshold.
+static void test_noah_modifier_settled_by_a_delayed_tap_stays_held(void) {
+    keypos_t esc_pos = test_noah_row_on_layer(LAYER_BASE, KC_ESC);
+    keypos_t gui_pos = test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_GUI);
+
+    test_press_resolved(esc_pos);
+    key_runtime_integration_advance(&fake_time, 10u);
+    test_release_resolved(esc_pos);
+    key_runtime_integration_advance(&fake_time, 60u);
+    test_press_resolved(gui_pos);
+    for (uint16_t elapsed = 0u; elapsed <= CUSTOM_TAP_HOLD_TERM + 50u; elapsed = (uint16_t)(elapsed + 5u)) {
+        key_runtime_integration_advance(&fake_time, 5u);
+        key_runtime_integration_scan();
+    }
+    CHECK(test_delayed_action_count >= 1u && test_delayed_actions[0] == KC_ESC);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(gui_pos) == KC_LEFT_GUI);
+    CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) != 0u);
+    test_release_resolved(gui_pos);
+    key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 20u);
+    key_runtime_integration_scan();
+    CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) == 0u);
+}
+
+// Left Command held, and before its threshold Escape tapped three times: the
+// first Escape press settles Command's hold, and the third sends the first two
+// Escapes under it, their own modifiers replayed and restored around them.
+// Command stays in the report throughout.
+static void test_noah_modifier_settled_by_a_run_stays_held(void) {
+    keypos_t esc_pos = test_noah_row_on_layer(LAYER_BASE, KC_ESC);
+    keypos_t gui_pos = test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_GUI);
+
+    test_press_resolved(gui_pos);
+    key_runtime_integration_advance(&fake_time, 5u);
+    for (uint8_t tap = 0u; tap < 3u; tap++) {
+        test_press_resolved(esc_pos);
+        CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) != 0u);
+        key_runtime_integration_advance(&fake_time, 10u);
+        test_release_resolved(esc_pos);
+        key_runtime_integration_advance(&fake_time, 20u);
+        key_runtime_integration_scan();
+    }
+    for (uint16_t elapsed = 0u; elapsed <= CUSTOM_TAP_HOLD_TERM + 50u; elapsed = (uint16_t)(elapsed + 5u)) {
+        key_runtime_integration_advance(&fake_time, 5u);
+        key_runtime_integration_scan();
+    }
+    CHECK(test_delayed_action_count >= 2u && test_delayed_actions[0] == KC_ESC);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(gui_pos) == KC_LEFT_GUI);
+    CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) != 0u);
+    test_release_resolved(gui_pos);
+    key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 20u);
+    key_runtime_integration_scan();
+    CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) == 0u);
+}
+
 static void test_right_thumb_quadruple_tap_dispatches_previous_track(void) {
     keypos_t key_pos      = test_right_thumb_pos();
     uint16_t base_keycode = test_keycode_at(LAYER_BASE, key_pos);
@@ -1590,9 +1868,10 @@ static void test_pointer_pinch_double_tap_salvos_queue_zoom_chord_cleanly(void) 
 }
 
 // A third quick tap goes past the Double tap, the deepest tap count these
-// pointer keys set, so the run types (D-F33): the first tap, the key
-// underneath, three times, and never the Double tap's action.
-static void test_pointer_terminal_third_quick_tap_types_the_first_tap(uint16_t keycode, uint16_t double_tap_action) {
+// pointer keys set, so the run is the standard key three times (D-F64). Their
+// Single tap is Transparent, which makes the key underneath their standard
+// tap: it goes out three times, never the Double tap's action.
+static void test_pointer_terminal_third_quick_tap_types_the_key_below_three_times(uint16_t keycode, uint16_t double_tap_action) {
     keypos_t key_pos;
 
     key_pos = test_find_keypos_on_layer(LAYER_POINTER, keycode);
@@ -1627,11 +1906,11 @@ static void test_pointer_terminal_third_quick_tap_types_the_first_tap(uint16_t k
 }
 
 static void test_pointer_pinch_third_quick_tap_types_the_key_underneath(void) {
-    test_pointer_terminal_third_quick_tap_types_the_first_tap(PD_MODE_5, MACRO_6);
+    test_pointer_terminal_third_quick_tap_types_the_key_below_three_times(PD_MODE_5, MACRO_6);
 }
 
 static void test_pointer_volume_third_quick_tap_types_the_key_underneath(void) {
-    test_pointer_terminal_third_quick_tap_types_the_first_tap(PD_MODE_1, KC_MUTE);
+    test_pointer_terminal_third_quick_tap_types_the_key_below_three_times(PD_MODE_1, KC_MUTE);
 }
 
 // Drag Window is a custom key, so find it the way its own tap tier
@@ -1983,8 +2262,8 @@ static void test_direct_dragscroll_repeated_quick_taps_stay_quiescent(uint8_t la
         key_runtime_integration_scan();
         test_assert_direct_dragscroll_quiescent(dragscroll_pos, expected_reset_count);
 
-        // The run counts to the Double tap, the deepest tap count the row
-        // sets; past it every press is a single tap of its own (D-F33).
+        // The run counts to the Double tap, the deepest tap count the
+        // behaviour sets; past it every press is the standard key (D-F64).
         CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1u);
         CHECK(noah_runtime_debug_slot_pending_multi_tap_count(dragscroll_pos) == (iteration == 1u ? 2u : 1u));
 
@@ -1994,7 +2273,8 @@ static void test_direct_dragscroll_repeated_quick_taps_stay_quiescent(uint8_t la
     key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
     key_runtime_integration_scan();
     CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
-    // Each of the eight taps types the key underneath, once.
+    // Each of the eight taps types the key underneath, once: the Single tap
+    // is Transparent, so the key underneath is the standard tap (D-F64).
     CHECK(test_delayed_action_count == 8u);
     for (uint8_t index = 1u; index < ARRAY_SIZE(test_delayed_actions); index++) {
         CHECK(test_delayed_actions[index] == test_delayed_actions[0]);
@@ -4017,6 +4297,14 @@ int main(void) {
     test_pointer_pinch_double_tap_salvos_queue_zoom_chord_cleanly();
     test_pointer_pinch_third_quick_tap_types_the_key_underneath();
     test_pointer_volume_third_quick_tap_types_the_key_underneath();
+    test_noah_escape_held_past_the_depth_holds_escape();
+    test_noah_escape_single_tap_held_takes_its_long_hold();
+    test_noah_left_command_past_the_depth_is_command();
+    test_noah_right_alt_double_tap_taps_right_alt();
+    test_noah_thumbs_past_the_depth_do_nothing();
+    test_noah_transparent_pointing_keys_type_the_key_below();
+    test_noah_modifier_settled_by_a_delayed_tap_stays_held();
+    test_noah_modifier_settled_by_a_run_stays_held();
     test_pointer_drag_window_tap_falls_through_to_the_base_layer_key();
     test_click_spam_combo_output_keeps_the_pointer_layer_anchored();
     test_click_spam_combo_uses_authored_combo_owner();

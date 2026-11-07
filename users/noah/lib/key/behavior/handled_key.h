@@ -24,8 +24,9 @@ typedef struct {
     pointing_mode_mask_t pointing_mode;
     bool                has_more_taps;
     uint8_t             authored_tap_depth;
-    // The first tap count's tap: what an empty tap at a later count repeats.
-    tap_behavior_t      first_tap;
+    // The behaviour's single tap is Transparent: the standard key's tap is the
+    // key below (D-F64).
+    bool                single_tap_transparent;
     uint16_t            flags;
 } handled_key_resolution_t;
 
@@ -146,6 +147,11 @@ handled_key_resolution_ctx_t   handled_key_resolution_ctx_live(keypos_t key_pos)
 __attribute__((noinline)) bool handled_key_resolution_materializes_momentary_layer(const handled_key_resolution_t *resolution, const handled_key_resolution_ctx_t *ctx);
 void                           handled_key_materialize_into(const handled_key_resolution_t *resolution, const handled_key_resolution_ctx_t *ctx, handled_key_materialized_t *out);
 handled_key_materialized_t     handled_key_materialize(handled_key_resolution_t resolution, handled_key_resolution_ctx_t ctx);
+// What a press does (D-F64): past the deepest tap count of a quick run it is
+// the standard key; at a later tap count whose branch sets nothing, the
+// standard tap once per press and, held, the standard key's hold; otherwise
+// what its branch sets.
+void                           handled_key_materialize_press_into(const handled_key_resolution_t *resolution, const handled_key_resolution_ctx_t *ctx, bool past_depth, handled_key_materialized_t *out);
 bool                           handled_key_resolution_is_handled(handled_key_resolution_t resolution);
 bool                           handled_key_resolution_has_multi_tap(handled_key_resolution_t resolution);
 bool                           handled_key_resolution_is_momentary_layer(handled_key_resolution_t resolution);
