@@ -339,38 +339,38 @@ void macro_payload_preflight_begin(macro_payload_preflight_t *preflight) {
 
 // A key the keyboard report carries in one of its six key slots: a keyboard
 // key, as the report filters above project it. A modifier has the report's
-// modifier byte, and system and consumer keys their own reports (D-F65).
+// modifier byte, and system, consumer and mouse keys their own reports
+// (D-F65). Wider than the Unicode entry check's "ordinary key", which is any
+// non-modifier.
 static bool macro_payload_takes_report_slot(uint8_t keycode) {
     return IS_BASIC_KEYCODE(keycode);
 }
 
-// The report slots the macro's holds fill, with those keys added that it does
-// not already hold.
-static uint8_t macro_payload_report_slots(const macro_payload_hold_balance_t *balance, const uint8_t *keys, uint8_t count) {
+// A key held twice, or named twice in one chord, fills one slot.
+static uint8_t macro_payload_report_slots_filled(const macro_payload_hold_balance_t *balance, const uint8_t *keys, uint8_t count) {
     uint8_t slots = 0u;
     for (uint8_t i = 0u; i < balance->count; i++)
         if (macro_payload_takes_report_slot(balance->keycodes[i])) slots++;
     for (uint8_t i = 0u; i < count; i++) {
-        bool counted = !macro_payload_takes_report_slot(keys[i]) || macro_payload_hold_balance_find(balance, keys[i]) >= 0;
-        for (uint8_t j = 0u; j < i && !counted; j++)
-            counted = keys[j] == keys[i];
-        if (!counted) slots++;
+        bool no_new_slot = !macro_payload_takes_report_slot(keys[i]) || macro_payload_hold_balance_find(balance, keys[i]) >= 0;
+        for (uint8_t j = 0u; j < i && !no_new_slot; j++)
+            no_new_slot = keys[j] == keys[i];
+        if (!no_new_slot) slots++;
     }
     return slots;
 }
 
-// The report slots a step fills while it plays, with what the macro holds.
-static uint8_t macro_payload_step_report_slots(const macro_payload_hold_balance_t *balance, const macro_payload_ir_step_t *step) {
+static uint8_t macro_payload_step_report_slots_filled(const macro_payload_hold_balance_t *balance, const macro_payload_ir_step_t *step) {
     uint8_t key = (uint8_t)step->value;
     switch (step->opcode) {
         case MACRO_PAYLOAD_IR_OP_TAP_LIST:
-            return macro_payload_report_slots(balance, step->bytes, step->length);
+            return macro_payload_report_slots_filled(balance, step->bytes, step->length);
         case MACRO_PAYLOAD_IR_OP_KEY_DOWN:
-            return macro_payload_report_slots(balance, &key, 1u);
+            return macro_payload_report_slots_filled(balance, &key, 1u);
         // A character is typed as a key, so it needs a slot the holds leave free.
         case MACRO_PAYLOAD_IR_OP_TEXT:
         case MACRO_PAYLOAD_IR_OP_UNICODE:
-            return (uint8_t)(macro_payload_report_slots(balance, NULL, 0u) + 1u);
+            return (uint8_t)(macro_payload_report_slots_filled(balance, NULL, 0u) + 1u);
         default:
             return 0u;
     }
@@ -410,7 +410,7 @@ bool macro_payload_preflight_window(macro_payload_preflight_t *preflight, const 
         }
         // The report has six key slots whatever the build, and a key past
         // them would push another out (D-F65).
-        if (macro_payload_step_report_slots(balance, &step) > KEYBOARD_REPORT_KEYS) {
+        if (macro_payload_step_report_slots_filled(balance, &step) > KEYBOARD_REPORT_KEYS) {
             return false;
         }
         if (step.opcode == MACRO_PAYLOAD_IR_OP_KEY_DOWN && !macro_payload_hold_balance_note_down(balance, (uint8_t)step.value)) {

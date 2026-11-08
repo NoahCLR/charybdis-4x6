@@ -10,6 +10,7 @@ noah_host_require_tool rg
 noah_host_export_qmk_cpath "$ROOT"
 BUILD_DIR="$(mktemp -d)"
 BIN="$BUILD_DIR/macro_payload_engine_test"
+PLAIN_BIN="$BUILD_DIR/macro_payload_engine_plain_test"
 SANITIZED_BIN="$BUILD_DIR/macro_payload_engine_sanitized_test"
 
 cleanup() {
@@ -35,6 +36,23 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -o "$BIN"
 
 "$BIN"
+
+# The shipped build has no NKRO; the six-slot limit holds there too (D-F65).
+cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+    -DTAP_CODE_DELAY=0u \
+    -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -I"$QMK_ROOT/platforms" \
+    -I"$QMK_ROOT/quantum/send_string" \
+    -I"$ROOT" \
+    -I"$ROOT/users/noah" \
+    -I"$ROOT/tests/host/include" \
+    "$ROOT/tests/host/macro_payload_engine_test.c" \
+    "$ROOT/users/noah/lib/macro/macro_payload_run.c" \
+    "$ROOT/users/noah/lib/macro/host_layout.c" \
+    "$ROOT/users/noah/lib/macro/host_layout_tables.c" \
+    -o "$PLAIN_BIN"
+
+"$PLAIN_BIN"
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -fsanitize=address,undefined \

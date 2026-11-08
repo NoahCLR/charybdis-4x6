@@ -71,7 +71,7 @@ The six are the keyboard report's key slots, whatever the build: no NKRO
 (D-F65, [ADR](../../adr/0065-a-macro-holds-at-most-six-keys-besides-modifiers.md)).
 They count the presses still held, a chord's keys and the key that types a
 character, together, and count a key held twice once. Modifiers
-(`0xe0`–`0xe7`) and system and consumer keys don't count. So a chord holds at
+(`0xe0`–`0xe7`) and system, consumer and mouse keys don't count. So a chord holds at
 most six keyboard keys besides its modifiers, fewer while presses are held,
 and text needs a slot the held keys leave free. Applying a profile never
 checks this.
