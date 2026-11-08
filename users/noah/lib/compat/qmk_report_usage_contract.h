@@ -1,5 +1,5 @@
 // QMK's basic-keycode ranges for the usages a custom key's shortcut may hold,
-// and the 6-key report that holds its keys (D-F26). custom_key_shortcut.h
+// and the 6-key report that holds its keys (D-F26) and a macro's (D-F65). custom_key_shortcut.h
 // states them as numbers, so the settings validator and the keymap's
 // compile-time checks need no QMK header; this holds those numbers to the
 // selected QMK's.
@@ -16,5 +16,8 @@ _Static_assert(QK_MOUSE_CURSOR_UP == 0xcd && QK_MOUSE_WHEEL_RIGHT == 0xdc && QK_
 // A held shortcut's keyboard keys all sit in the 6-key report at once, so the
 // record holds no more than it has slots (no NKRO).
 _Static_assert(NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT <= KEYBOARD_REPORT_KEYS, "a shortcut holds no more keys than QMK's 6-key report");
+// A macro holds at most KEYBOARD_REPORT_KEYS keys besides its modifiers, and
+// D-F65 and the macro domain spec say six.
+_Static_assert(KEYBOARD_REPORT_KEYS == 6, "a macro holds at most six keys besides modifiers (D-F65)");
 _Static_assert(NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_SYSTEM(KC_SYSTEM_SLEEP) && NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_CONSUMER(KC_MEDIA_PLAY_PAUSE) && !NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_KEY(QK_MOUSE_ACCELERATION_2),
                "the shortcut key classes follow QMK's ranges");

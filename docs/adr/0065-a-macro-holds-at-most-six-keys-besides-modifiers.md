@@ -5,10 +5,12 @@ Cited as D-F65.
 The keyboard report has six key slots, and this build has no NKRO. A macro
 may therefore never have more than six keyboard keys down at once. That
 counts its presses still held, a chord's keys and a character it types, all
-together, and counts a key held twice once. Its modifiers have the report's
-modifier byte, and system, consumer and mouse keys have their own reports, so
-none of them count. A character is typed as a key, so text, and a character
-the host layout types, needs a slot the held keys leave free. Preflight checks
+together; a key a chord names that is already held, or names twice, counts
+once. Its modifiers have the report's modifier byte, and system, consumer and
+mouse keys have their own reports, so none of them count. A character is
+typed as a key, so text, and a character the host layout types, needs a slot
+the held keys leave free, even when its key is one of them: the rule stays one
+a client can check without knowing each layout's keys. Preflight checks
 this over every window before any output (D-F59), and a macro that breaks it
 plays nothing. A stored macro is never refused when a profile is applied,
 so a macro saved before this rule still loads and simply doesn't play.

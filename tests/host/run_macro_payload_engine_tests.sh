@@ -19,58 +19,32 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-# TAP_CODE_DELAY is QMK's default, which the firmware keeps, so timing checks
-# match the keyboard rather than the stub's slower fallback.
-cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
-    -DNKRO_ENABLE -DTAP_CODE_DELAY=0u \
-    -DQMK_KEYBOARD_H='"qmk_stub.h"' \
-    -I"$QMK_ROOT/platforms" \
-    -I"$QMK_ROOT/quantum/send_string" \
-    -I"$ROOT" \
-    -I"$ROOT/users/noah" \
-    -I"$ROOT/tests/host/include" \
-    "$ROOT/tests/host/macro_payload_engine_test.c" \
-    "$ROOT/users/noah/lib/macro/macro_payload_run.c" \
-    "$ROOT/users/noah/lib/macro/host_layout.c" \
-    "$ROOT/users/noah/lib/macro/host_layout_tables.c" \
-    -o "$BIN"
+# Builds the engine test with the given flags into the named binary and runs
+# it. TAP_CODE_DELAY is QMK's default, which the firmware keeps, so timing
+# checks match the keyboard rather than the stub's slower fallback.
+build_and_run() {
+    out="$1"
+    shift
+    cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+        "$@" -DTAP_CODE_DELAY=0u \
+        -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+        -I"$QMK_ROOT/platforms" \
+        -I"$QMK_ROOT/quantum/send_string" \
+        -I"$ROOT" \
+        -I"$ROOT/users/noah" \
+        -I"$ROOT/tests/host/include" \
+        "$ROOT/tests/host/macro_payload_engine_test.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_run.c" \
+        "$ROOT/users/noah/lib/macro/host_layout.c" \
+        "$ROOT/users/noah/lib/macro/host_layout_tables.c" \
+        -o "$out"
+    "$out"
+}
 
-"$BIN"
-
+build_and_run "$BIN" -DNKRO_ENABLE
 # The shipped build has no NKRO; the six-slot limit holds there too (D-F65).
-cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
-    -DTAP_CODE_DELAY=0u \
-    -DQMK_KEYBOARD_H='"qmk_stub.h"' \
-    -I"$QMK_ROOT/platforms" \
-    -I"$QMK_ROOT/quantum/send_string" \
-    -I"$ROOT" \
-    -I"$ROOT/users/noah" \
-    -I"$ROOT/tests/host/include" \
-    "$ROOT/tests/host/macro_payload_engine_test.c" \
-    "$ROOT/users/noah/lib/macro/macro_payload_run.c" \
-    "$ROOT/users/noah/lib/macro/host_layout.c" \
-    "$ROOT/users/noah/lib/macro/host_layout_tables.c" \
-    -o "$PLAIN_BIN"
-
-"$PLAIN_BIN"
-
-cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
-    -fsanitize=address,undefined \
-    -fno-omit-frame-pointer \
-    -DNKRO_ENABLE -DTAP_CODE_DELAY=0u \
-    -DQMK_KEYBOARD_H='"qmk_stub.h"' \
-    -I"$QMK_ROOT/platforms" \
-    -I"$QMK_ROOT/quantum/send_string" \
-    -I"$ROOT" \
-    -I"$ROOT/users/noah" \
-    -I"$ROOT/tests/host/include" \
-    "$ROOT/tests/host/macro_payload_engine_test.c" \
-    "$ROOT/users/noah/lib/macro/macro_payload_run.c" \
-    "$ROOT/users/noah/lib/macro/host_layout.c" \
-    "$ROOT/users/noah/lib/macro/host_layout_tables.c" \
-    -o "$SANITIZED_BIN"
-
-"$SANITIZED_BIN"
+build_and_run "$PLAIN_BIN"
+build_and_run "$SANITIZED_BIN" -fsanitize=address,undefined -fno-omit-frame-pointer -DNKRO_ENABLE
 
 if rg -n '\b(wait_ms|send_char|send_char_with_delay|owned_keycode_tap)[[:space:]]*\(' \
     "$ROOT/users/noah/lib/macro/macro_payload_run.c"; then
