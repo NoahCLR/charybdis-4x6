@@ -478,6 +478,66 @@ static void test_untypeable_text_is_refused_before_output(void) {
     CHECK(start_on_host(&held_entry, LAYOUT_WINDOWS_GERMAN, NOAH_HOST_WINDOWS, NOAH_HOST_UNICODE_ENABLED) == MACRO_PAYLOAD_START_INVALID);
 }
 
+// The 6-key report has six key slots whatever the build, so a macro holds at
+// most six keys at once besides its modifiers (D-F65).
+static macro_payload_start_result_t start_and_drain(const macro_payload_ir_t *ir) {
+    macro_payload_start_result_t result = start_on_host(ir, 0u, NOAH_HOST_AUTO, 0u);
+    if (result == MACRO_PAYLOAD_START_STARTED) {
+        test_unicode_drain();
+        CHECK(callback_result == MACRO_PAYLOAD_FINISH_SUCCESS);
+    }
+    return result;
+}
+
+static void test_a_chord_holds_at_most_six_keys_besides_modifiers(void) {
+    const macro_payload_ir_t seven = {.length = 9u, .bytes = {MACRO_PAYLOAD_IR_OP_TAP_LIST, 7u, KC_E, KC_Y, KC_K, KC_SEMICOLON, KC_P, KC_0, KC_U}};
+    CHECK(start_and_drain(&seven) == MACRO_PAYLOAD_START_INVALID);
+    CHECK(test_op_count == 0u);
+    const macro_payload_ir_t six_and_mods = {.length = 12u, .bytes = {MACRO_PAYLOAD_IR_OP_TAP_LIST, 10u, KC_LEFT_GUI, KC_LEFT_ALT, KC_LEFT_CTRL, KC_LEFT_SHIFT, KC_E, KC_Y, KC_K, KC_SEMICOLON, KC_P, KC_0}};
+    CHECK(start_and_drain(&six_and_mods) == MACRO_PAYLOAD_START_STARTED);
+}
+
+static void test_held_keys_and_a_chord_share_the_six(void) {
+#define HOLD_A_B_THEN(...) {MACRO_PAYLOAD_IR_OP_KEY_DOWN, KC_A, MACRO_PAYLOAD_IR_OP_KEY_DOWN, KC_B, __VA_ARGS__, MACRO_PAYLOAD_IR_OP_KEY_UP, KC_B, MACRO_PAYLOAD_IR_OP_KEY_UP, KC_A}
+    const macro_payload_ir_t five = {.length = 15u, .bytes = HOLD_A_B_THEN(MACRO_PAYLOAD_IR_OP_TAP_LIST, 5u, KC_C, KC_D, KC_E, KC_F, KC_G)};
+    CHECK(start_and_drain(&five) == MACRO_PAYLOAD_START_INVALID);
+    CHECK(test_op_count == 0u);
+    const macro_payload_ir_t four = {.length = 14u, .bytes = HOLD_A_B_THEN(MACRO_PAYLOAD_IR_OP_TAP_LIST, 4u, KC_C, KC_D, KC_E, KC_F)};
+    CHECK(start_and_drain(&four) == MACRO_PAYLOAD_START_STARTED);
+    // A key already held takes no second slot.
+    const macro_payload_ir_t again = {.length = 15u, .bytes = HOLD_A_B_THEN(MACRO_PAYLOAD_IR_OP_TAP_LIST, 5u, KC_A, KC_C, KC_D, KC_E, KC_F)};
+    CHECK(start_and_drain(&again) == MACRO_PAYLOAD_START_STARTED);
+#undef HOLD_A_B_THEN
+    uint8_t presses[28];
+    for (uint8_t i = 0u; i < 7u; i++) {
+        presses[2u * i] = MACRO_PAYLOAD_IR_OP_KEY_DOWN;
+        presses[2u * i + 1u] = (uint8_t)(KC_A + i);
+        presses[14u + 2u * i] = MACRO_PAYLOAD_IR_OP_KEY_UP;
+        presses[14u + 2u * i + 1u] = (uint8_t)(KC_A + 6u - i);
+    }
+    macro_payload_ir_t seven = {.length = 28u};
+    memcpy(seven.bytes, presses, sizeof(presses));
+    CHECK(start_and_drain(&seven) == MACRO_PAYLOAD_START_INVALID);
+    CHECK(test_op_count == 0u);
+}
+
+static void test_media_and_system_keys_take_no_report_slot(void) {
+    const macro_payload_ir_t chord = {.length = 10u, .bytes = {MACRO_PAYLOAD_IR_OP_TAP_LIST, 8u, KC_A, KC_B, KC_C, KC_D, KC_E, KC_F, KC_AUDIO_VOL_UP, KC_SYSTEM_SLEEP}};
+    CHECK(start_and_drain(&chord) == MACRO_PAYLOAD_START_STARTED);
+}
+
+// Text types each character as a key, so it needs a slot the holds leave free.
+static void test_text_needs_a_report_slot_the_holds_leave_free(void) {
+    macro_payload_ir_t ir = {0};
+    for (uint8_t held = 5u; held <= 6u; held++) {
+        ir.length = 0u;
+        for (uint8_t i = 0u; i < held; i++) {ir.bytes[ir.length++] = MACRO_PAYLOAD_IR_OP_KEY_DOWN; ir.bytes[ir.length++] = (uint8_t)(KC_A + i);}
+        ir.bytes[ir.length++] = MACRO_PAYLOAD_IR_OP_TEXT; ir.bytes[ir.length++] = 1u; ir.bytes[ir.length++] = 'z';
+        for (uint8_t i = held; i-- > 0u;) {ir.bytes[ir.length++] = MACRO_PAYLOAD_IR_OP_KEY_UP; ir.bytes[ir.length++] = (uint8_t)(KC_A + i);}
+        CHECK(start_and_drain(&ir) == (held == 5u ? MACRO_PAYLOAD_START_STARTED : MACRO_PAYLOAD_START_INVALID));
+    }
+}
+
 static void test_unicode_restores_current_modifiers_after_neutral_commit(void) {
     test_reset(); unicode_mode = 1u;
     live_mods = MOD_BIT(KC_LEFT_ALT) | MOD_BIT(KC_LEFT_SHIFT);
@@ -589,6 +649,10 @@ int main(void) {
     test_ascii_text_uses_keys_in_every_unicode_mode();
     test_text_types_through_the_host_layout();
     test_untypeable_text_is_refused_before_output();
+    test_a_chord_holds_at_most_six_keys_besides_modifiers();
+    test_held_keys_and_a_chord_share_the_six();
+    test_media_and_system_keys_take_no_report_slot();
+    test_text_needs_a_report_slot_the_holds_leave_free();
     memset(external_keys, 0, sizeof(external_keys));
     memset(report_keys, 0, sizeof(report_keys));
     memset(managed_count, 0, sizeof(managed_count));
@@ -614,7 +678,9 @@ void send_keyboard_report(void) {
     report_keyboard_t report = {0};
     report_nkro_t nkro = {0};
     uint8_t index = 0u;
-    for (uint16_t key = 1u; key < KC_LEFT_CTRL; key++) if (managed_count[key] || (external_keys[key / 8u] & (1u << (key % 8u)))) {
+    // QMK's keyboard report carries keyboard keys; system and consumer keys
+    // go to reports of their own.
+    for (uint16_t key = KC_A; key <= KC_EXSEL; key++) if (managed_count[key] || (external_keys[key / 8u] & (1u << (key % 8u)))) {
         if (index < sizeof(report.keys)) report.keys[index++] = (uint8_t)key;
         nkro.bits[key / 8u] |= (uint8_t)(1u << (key % 8u));
     }
