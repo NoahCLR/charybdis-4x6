@@ -8,7 +8,7 @@ BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
 for variant in normal features sanitized; do
     flags=""
-    if [ "$variant" != normal ]; then flags="-DMAGIC_ENABLE -DNKRO_ENABLE -DAUTOCORRECT_ENABLE -DENABLE_RGB_MATRIX_BREATHING -DENABLE_RGB_MATRIX_CYCLE_ALL"; fi
+    if [ "$variant" != normal ]; then flags="-DMAGIC_ENABLE -DNKRO_ENABLE -DENABLE_RGB_MATRIX_BREATHING -DENABLE_RGB_MATRIX_CYCLE_ALL"; fi
     if [ "$variant" = sanitized ]; then flags="$flags -fsanitize=address,undefined -fno-omit-frame-pointer"; fi
     cc -std=c11 -Wall -Wextra -Werror $flags -DNOAH_PORTABLE_PROFILE_ENABLE -DQMK_KEYBOARD_H='"keycode_config.h"' \
         -I"$ROOT/tests/host/include/portable_editor" -I"$ROOT/tests/host/include" -I"$ROOT" \

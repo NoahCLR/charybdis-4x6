@@ -45,9 +45,9 @@ static uint16_t supported_options(void) {
 #    ifndef NO_ACTION_ONESHOT
     result |= 1u << 10;
 #    endif
-#    ifdef AUTOCORRECT_ENABLE
+    // The firmware's own engine corrects from the profile's list (D-F69);
+    // QMK's AUTOCORRECT_ENABLE has no part in it.
     result |= 1u << 12;
-#    endif
     return result;
 }
 

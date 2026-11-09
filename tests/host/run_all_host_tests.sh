@@ -115,6 +115,7 @@ sh run_macro_program_size_tests.sh
 sh run_macro_payload_engine_tests.sh
 sh run_macro_output_ownership_tests.sh
 sh run_host_layout_tests.sh
+sh run_autocorrect_tests.sh
 sh run_key_runtime_release_matrix_tests.sh
 sh run_key_runtime_integration_harness_tests.sh
 sh run_key_runtime_scenario_tests.sh

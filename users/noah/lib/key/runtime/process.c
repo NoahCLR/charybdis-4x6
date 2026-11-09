@@ -329,7 +329,7 @@ bool is_tap_record_user(keyrecord_t *record, bool native_tap, bool default_tap) 
 }
 
 bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
-    if (!noah_record_admission_macro_admit(record, macro_payload_engine_protected(), noah_synthetic_record_active())) return false;
+    if (!noah_record_admission_macro_admit(record, macro_payload_engine_ignores_presses(), noah_synthetic_record_active())) return false;
     if (noah_synthetic_record_active()) {
         return true;
     }

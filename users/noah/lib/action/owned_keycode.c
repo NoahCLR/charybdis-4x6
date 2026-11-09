@@ -7,6 +7,7 @@
 #include "../pointing/policy/pointer_layer_policy.h"
 #include "../compat/qmk_mod_contract.h"
 #include "../state/ownership/keyboard_mod_ownership.h"
+#include "../macro/typing_stage.h"
 
 #define OWNED_KEYCODE_USAGE_CAPACITY ((uint16_t)QK_MOUSE_ACCELERATION_2 + 1u)
 
@@ -87,8 +88,12 @@ static void owned_keycode_note_underflow(void) {
     }
 }
 
+// A build or host test without the typing stage (typing_stage.h).
+__attribute__((weak)) void noah_typing_stage_note_click(void) {}
+
 // Precondition: the usage's managed count is below UINT8_MAX.
 static void owned_keycode_acquire_basic(uint8_t basic) {
+    if (IS_MOUSEKEY_BUTTON(basic)) noah_typing_stage_note_click();
     if (owned_keycode_state.managed_refcounts[basic]++ == 0u) {
         owned_keycode_state.managed_usage_count++;
         if (owned_keycode_state.physical_refcounts[basic] == 0u) {
@@ -359,6 +364,7 @@ void owned_keycode_track_physical_event(uint16_t keycode, keyrecord_t *record) {
     }
     physical = &owned_keycode_state.physical_refcounts[components.basic];
     if (record->event.pressed) {
+        if (IS_MOUSEKEY_BUTTON(components.basic)) noah_typing_stage_note_click();
         if (*physical == UINT8_MAX) {
             owned_keycode_note_saturation();
             return;

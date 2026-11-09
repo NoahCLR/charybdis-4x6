@@ -71,6 +71,12 @@ def word_characters() -> dict[str, str]:
             fail(f"folding {char!r} twice changes it again")
         if ord(char) > 0xFFFF:
             fail(f"{char!r} does not fit the 16-bit word table")
+    # A small letter's capital is the one character that folds to it; the
+    # case rule of docs/spec/autocorrect-v1.md depends on there being one.
+    capitals: dict[str, str] = {}
+    for char, fold in table.items():
+        if fold != char and capitals.setdefault(fold, char) != char:
+            fail(f"{fold!r} has two capitals, {capitals[fold]!r} and {char!r}")
     return dict(sorted(table.items()))
 
 

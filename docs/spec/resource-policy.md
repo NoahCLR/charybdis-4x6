@@ -124,6 +124,7 @@ engineering regression policies, not SRAM limits:
 | Split authority | 128 | `NOAH_PROFILE_SPLIT_AUTHORITY_STATE_BUDGET_32BIT` |
 | Key-behaviour domain handle / its validation | 128 / 128 | `key_behavior_domain_v1.c`, `NOAH_KEY_BEHAVIOR_DOMAIN_V1_EMBEDDED_VALIDATION_BUDGET` |
 | Autocorrect list handle / its validation (D-F68) | 24 / 64 | `NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_LIST_BUDGET`, `NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_VALIDATION_BUDGET` |
+| Autocorrect: the word, the keys shown and live, and the queue of 64 changes (D-F69) | 304 | `NOAH_AUTOCORRECT_EMBEDDED_STATE_BUDGET` |
 | Lighting domain view / its validation | 40 / 72 | `NOAH_PROFILE_RGB_V1_EMBEDDED_VIEW_BUDGET`, `NOAH_PROFILE_RGB_V1_EMBEDDED_VALIDATION_BUDGET` |
 | Lighting row selectors, one byte per group row (D-F63) | 656 | `rgb_active_profile_config.c` |
 | Lighting render snapshot | 96 | `rgb_runtime.c` |

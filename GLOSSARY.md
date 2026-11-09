@@ -280,8 +280,8 @@ _Avoid_: combo term, combo timeout
 
 **Switch key**:
 A key that turns combos (`CM_ON`, `CM_OFF`, `CM_TOGG`), behaviours
-(`BH_ON`, `BH_OFF`, `BH_TOGG`) or auto-mouse (`AM_ON`, `AM_OFF`, `AM_TOGG`)
-on, off or the other way for the whole keyboard until it restarts, never
+(`BH_ON`, `BH_OFF`, `BH_TOGG`), auto-mouse (`AM_ON`, `AM_OFF`, `AM_TOGG`) or
+autocorrect (`AC_ON`, `AC_OFF`, `AC_TOGG`) on, off or the other way for the whole keyboard until it restarts, never
 saved; the stored switch stays as it is.
 _Avoid_: toggle key, combo toggle, behaviour key
 
@@ -324,6 +324,35 @@ _Avoid_: replacement, fix, target, output
 A misspelling an entry corrects, stored case-folded; it belongs to exactly one
 correction.
 _Avoid_: trigger, pattern, source, input, misspelling (as a second term)
+
+**Word**:
+What autocorrect follows as it is typed: letters and digits, with apostrophes
+between them. Apostrophes before and after it stay on screen and are not part
+of what a typo matches.
+_Avoid_: token, string (for this)
+
+**Word end**:
+The character that finishes a word: anything that is not a letter, a digit or
+an apostrophe, and Enter or Tab. A typo is corrected only here.
+_Avoid_: delimiter, boundary, trigger key
+
+**Undo a correction**:
+Backspace pressed right after a correction that a printing character ended:
+the ending character goes and the word comes back as typed.
+_Avoid_: revert (for this), rollback
+
+**Fresh start**:
+Autocorrect forgetting the word because the cursor may have moved: the next
+character starts a new word.
+
+**Suspended**:
+Autocorrect correcting nothing until the next word end, because it no longer
+knows where the word on screen starts.
+
+**Typing stage**:
+The step between live key ownership and the keyboard report where autocorrect
+reads what is typed and holds keys back while a correction is typed.
+_Avoid_: filter, interceptor, deferral layer
 
 **Where it matches**:
 What part of a word a typo has to be: the whole word, the start of a word,

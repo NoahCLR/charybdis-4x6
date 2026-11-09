@@ -367,3 +367,4 @@ __attribute__((weak)) uint8_t layer_switch_get_layer(keypos_t key) {
 // The integration harness controls macro playback without its output engine.
 bool key_runtime_test_macro_protected;
 bool macro_payload_engine_protected(void) {return key_runtime_test_macro_protected;}
+bool macro_payload_engine_ignores_presses(void) {return key_runtime_test_macro_protected;}

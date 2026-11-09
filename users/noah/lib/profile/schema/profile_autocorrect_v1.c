@@ -52,6 +52,16 @@ bool noah_profile_autocorrect_v1_fold(uint32_t character, uint32_t *folded) {
     return false;
 }
 
+bool noah_profile_autocorrect_v1_capital(uint32_t character, uint32_t *capital) {
+    for (uint16_t index = 0u; index < noah_profile_autocorrect_v1_word_count; index++) {
+        if (noah_profile_autocorrect_v1_words[index][1] == character && noah_profile_autocorrect_v1_words[index][0] != character) {
+            if (capital) *capital = noah_profile_autocorrect_v1_words[index][0];
+            return true;
+        }
+    }
+    return false;
+}
+
 static uint16_t read_u16(const uint8_t *bytes) {
     return (uint16_t)(bytes[0] | (uint16_t)bytes[1] << 8u);
 }

@@ -113,6 +113,9 @@ typedef struct {
 // other character. A typo holds folded characters only, so a typed word is
 // folded with this before it is looked up.
 bool noah_profile_autocorrect_v1_fold(uint32_t character, uint32_t *folded);
+// A small letter's capital: the one word character that folds to it. False
+// for a capital, a digit and a letter without one.
+bool noah_profile_autocorrect_v1_capital(uint32_t character, uint32_t *capital);
 
 // ── Validation ──────────────────────────────────────────────────────────────
 

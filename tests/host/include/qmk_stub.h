@@ -310,6 +310,13 @@ void     pointing_device_set_cpi(uint16_t cpi);
 report_mouse_t pointing_device_get_report(void);
 void           pointing_device_set_report(report_mouse_t mouse_report);
 
+// The one keymap option the runtime reads: the stored autocorrect switch. A
+// keyboard header that models all of QMK's options defines the macro first.
+#ifndef NOAH_HOST_KEYMAP_CONFIG
+typedef struct { bool autocorrect_enable; } keymap_config_t;
+extern keymap_config_t keymap_config;
+#endif
+
 #ifndef QMK_REPORT_KEYS_FILTER
 #define QMK_REPORT_KEYS_FILTER 1
 #define KEYBOARD_REPORT_KEYS 6

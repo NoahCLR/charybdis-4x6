@@ -163,6 +163,39 @@ without one, when preflight found a character that needs Unicode entry.
 Pointing, consumer and system reports are outside it. Played interruptibly, a
 usage another owner holds gains no fresh edge from the macro.
 
+## Corrections
+
+D-F69. Autocorrect (`lib/autocorrect/`) is the **typing stage**
+(`macro/typing_stage.h`): the report filters hand it every outgoing report
+before the macro's own projection.
+
+- **Reading.** `noah_typing_stage_keys` gets the live usages with the playing
+  macro's leases taken out, and the report a lease change sends from inside
+  the ledger is not read at all. It turns each difference from the report
+  before into a change (a usage up or down, the modifiers), reads key-downs
+  through the host layout and follows the word
+  ([autocorrect](../spec/autocorrect-v1.md)).
+- **Holding back.** A key that ends a word waits at the head of the stage's
+  queue while the scan looks the word up (`noah_autocorrect_scan`, after the
+  engine's scan). While anything waits, the stage answers the report with the
+  usages and modifiers the computer has been shown so far, and
+  `keyboard_report_mods_override_user` uses its modifiers.
+- **Typing.** `macro_slot_provider_start_correction` writes an erase step and
+  the characters into the shared window and starts the engine with source
+  `MACRO_PAYLOAD_SOURCE_CORRECTION`: uninterruptible output, 5 ms a key, but
+  `macro_payload_engine_ignores_presses` stays false, so the press guard
+  drops nothing. A slot start meanwhile is busy.
+- **Letting out.** When playback ends the stage shows its queue one change a
+  step, 2 ms apart, reading each as typing. A macro trigger that arrived
+  meanwhile (`noah_typing_stage_defer_macro`, from
+  `noah_profile_macro_try_play`) starts when its turn comes, and the queue
+  waits until it has played.
+- **Clicks.** The ledger tells the stage when a mouse button goes down
+  (`noah_typing_stage_note_click`), which starts the next word fresh.
+
+With autocorrect off in the profile or an empty list
+`noah_typing_stage_active` is false and none of this runs.
+
 ## The report
 
 Every key a macro sends is an `owned_keycode` lease (`owned_keycode.c`): QMK
@@ -187,6 +220,8 @@ steps and never reaches `macro/`. Its path is
 - Where bytes come from, and slot metadata: `profile_macro_provider.c`; the
   shared window: `macro_slot_provider.c`, inside the macro RAM policy of
   [resource-policy.md](../spec/resource-policy.md).
+- What autocorrect reads, corrects and holds back: `lib/autocorrect/`, with
+  [autocorrect](../spec/autocorrect-v1.md) and its fixture.
 - Layouts: the fixture and its generator
   ([host-layouts-v1.md](../spec/host-layouts-v1.md#changing-the-data)), never
   `host_layout_tables.c` by hand.
@@ -202,6 +237,8 @@ steps and never reaches `macro/`. Its path is
 - Leases, uninterruptible playback and report filters: `run_macro_output_ownership_tests.sh`,
   `run_qmk_report_filter_tests.sh`, `run_owned_keycode_tests.sh`.
 - Host layouts against their sources: `run_host_layout_tests.sh`.
+- Corrections, the queue and the undo, through the ledger, the report hooks
+  and the engine: `run_autocorrect_tests.sh`.
 - Starting from actions: `run_action_lifecycle_tests.sh`,
   `run_action_dispatch_tests.sh`; from pointing outputs:
   `run_pointing_mode_handlers_tests.sh`; the press guard:

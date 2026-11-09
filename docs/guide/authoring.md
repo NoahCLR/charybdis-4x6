@@ -97,8 +97,9 @@ they need Unicode entry ([Macros](macros.md#uninterruptible-playback)).
 
 ### The autocorrect list
 
-`autocorrect.txt` lists the typos the keyboard corrects, one a line, in the
-form QMK's autocorrect lists use:
+`autocorrect.txt` lists the typos the keyboard corrects
+([Autocorrect](autocorrect.md)), one a line, in the form QMK's autocorrect
+lists use:
 
 ```
 :teh: -> the        # the whole word

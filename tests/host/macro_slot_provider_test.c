@@ -68,6 +68,10 @@ bool macro_payload_preflight_end(const macro_payload_preflight_t *preflight) {
     return preflight != NULL;
 }
 
+bool macro_payload_engine_idle(void) {
+    return !engine_active;
+}
+
 bool macro_payload_engine_cancel(void) {
     cancel_calls++;
     return engine_active;
@@ -79,8 +83,8 @@ macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir
     }
     CHECK(ir != NULL);
     CHECK(text_output == MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED);
-    CHECK(interval == 7u);
-    CHECK(source == MACRO_PAYLOAD_SOURCE_SLOT);
+    CHECK(interval == (source == MACRO_PAYLOAD_SOURCE_CORRECTION ? 5u : 7u));
+    CHECK(source == MACRO_PAYLOAD_SOURCE_SLOT || source == MACRO_PAYLOAD_SOURCE_CORRECTION);
     CHECK(slot == 0u);
     captured_finish  = finish;
     captured_context = context;
@@ -94,7 +98,7 @@ macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir
 macro_payload_start_result_t macro_payload_start_windows(const macro_payload_ir_t *ir, const macro_payload_preflight_t *preflight, macro_payload_load_window_fn load_next, void *load_context, macro_payload_text_output_t text_output, uint8_t interval, macro_payload_source_t source, uint8_t slot, macro_payload_finish_fn finish, void *context) {
     (void)load_context;
     CHECK(preflight != NULL);
-    CHECK(load_next != NULL);
+    CHECK((load_next != NULL) == (source == MACRO_PAYLOAD_SOURCE_SLOT));
     captured_load_next = load_next;
     return macro_payload_start_ir(ir, text_output, interval, source, slot, finish, context);
 }
@@ -278,6 +282,55 @@ static void test_storage_change_cancels_any_active_stored_macro(void) {
     test_finish_active();
 }
 
+static uint8_t                       correction_finishes;
+static macro_payload_finish_result_t correction_result;
+
+static void test_correction_finished(macro_payload_finish_result_t result, void *context) {
+    (void)context;
+    correction_finishes++;
+    correction_result = result;
+}
+
+// A correction plays from the shared window while no macro holds it, and a
+// macro finds the window busy until the correction ends.
+static void test_a_correction_borrows_the_shared_window(void) {
+    static const uint16_t       characters[] = {'h', 0x00E9u, 'e', 'y'};
+    static const uint8_t        program[]    = {MACRO_PAYLOAD_IR_OP_ERASE, 2u, MACRO_PAYLOAD_IR_OP_TEXT, 1u, 'h', MACRO_PAYLOAD_IR_OP_UNICODE, 0xE9u, 0u, 0u, MACRO_PAYLOAD_IR_OP_TEXT, 2u, 'e', 'y'};
+    const macro_slot_provider_t provider     = {.slot_count = 1u, .load_ir = test_load_ir};
+    macro_slot_metadata_t       metadata[1]  = {0};
+
+    test_reset();
+    correction_finishes = 0u;
+    // Nothing to erase or type is nothing to play.
+    CHECK(macro_slot_provider_start_correction(0u, characters, 0u, 5u, test_correction_finished) == MACRO_PAYLOAD_START_INVALID);
+    CHECK(macro_slot_provider_start_correction(2u, characters, 4u, 5u, NULL) == MACRO_PAYLOAD_START_INVALID);
+
+    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_STARTED);
+    CHECK(macro_slot_provider_start_correction(2u, characters, 4u, 5u, test_correction_finished) == MACRO_PAYLOAD_START_BUSY);
+    CHECK(captured_ir->bytes[0] == MACRO_PAYLOAD_IR_OP_TEXT);
+    test_finish_active();
+
+    CHECK(macro_slot_provider_start_correction(2u, characters, 4u, 5u, test_correction_finished) == MACRO_PAYLOAD_START_STARTED);
+    CHECK(captured_ir->protection == 1u && !captured_ir->more && captured_ir->length == sizeof(program));
+    for (uint8_t index = 0u; index < sizeof(program); index++)
+        CHECK(captured_ir->bytes[index] == program[index]);
+    load_call_count = 0u;
+    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_BUSY);
+    CHECK(load_call_count == 0u && captured_ir->bytes[0] == MACRO_PAYLOAD_IR_OP_ERASE);
+    test_finish_active();
+    CHECK(correction_finishes == 1u && correction_result == MACRO_PAYLOAD_FINISH_SUCCESS);
+
+    // A character the layout cannot type is refused by preflight: nothing
+    // starts and the window is free again.
+    preflight_window_calls = 0u;
+    preflight_fail_window  = 0u;
+    CHECK(macro_slot_provider_start_correction(2u, characters, 4u, 5u, test_correction_finished) == MACRO_PAYLOAD_START_INVALID);
+    preflight_fail_window = UINT8_MAX;
+    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_STARTED);
+    test_finish_active();
+    CHECK(correction_finishes == 1u);
+}
+
 int main(void) {
     test_active_invalidation_and_busy_start_preserve_shared_ir();
     test_engine_busy_start_keeps_valid_metadata_without_pinning();
@@ -286,6 +339,7 @@ int main(void) {
     test_long_macro_checks_every_window_then_plays_from_the_first();
     test_rejected_later_window_types_nothing();
     test_storage_change_cancels_any_active_stored_macro();
+    test_a_correction_borrows_the_shared_window();
     puts("macro_slot_provider host tests passed");
     return 0;
 }

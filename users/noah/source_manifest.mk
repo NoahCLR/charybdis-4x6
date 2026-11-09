@@ -104,6 +104,8 @@ NOAH_COMMON_SOURCES := \
     lib/key/ownership/held_repeat.c \
     lib/action/action_dispatch.c \
     lib/action/owned_keycode.c \
+    lib/autocorrect/autocorrect.c \
+    lib/autocorrect/autocorrect_switch.c \
     lib/macro/macro_input_guard.c \
     lib/macro/macro_slot_provider.c \
     lib/macro/macro_payload.c \

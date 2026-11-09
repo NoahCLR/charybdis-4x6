@@ -1,5 +1,7 @@
 #include "macro_slot_provider.h"
 
+#include "macro_payload_internal.h"
+
 // One window of the active macro, and where the next one starts. A macro
 // longer than one window refills it from storage while it plays.
 static macro_payload_ir_t            macro_slot_active_ir;
@@ -8,6 +10,8 @@ static macro_slot_provider_t         macro_slot_active_provider;
 static uint8_t                       macro_slot_active_slot;
 static macro_slot_metadata_t        *macro_slot_active_metadata;
 static bool                          macro_slot_active_stale;
+// A correction borrows the window while no macro holds it.
+static macro_payload_finish_fn       macro_slot_correction_finish;
 
 static bool macro_slot_provider_slot_in_range(const macro_slot_provider_t *provider, uint8_t slot) {
     return provider && slot < provider->slot_count;
@@ -86,7 +90,7 @@ macro_payload_start_result_t macro_slot_provider_start(const macro_slot_provider
     if (!metadata || !macro_slot_provider_slot_in_range(provider, slot) || !provider->load_ir) {
         return MACRO_PAYLOAD_START_INVALID;
     }
-    if (macro_slot_active_metadata) {
+    if (macro_slot_active_metadata || macro_slot_correction_finish) {
         // The engine rejects before reading the IR while active. Route through
         // that path so its existing busy diagnostics remain authoritative.
         return macro_payload_start_ir(NULL, text_output, interval, source, slot, NULL, NULL);
@@ -112,6 +116,69 @@ macro_payload_start_result_t macro_slot_provider_start(const macro_slot_provider
     // A successfully decoded slot remains structurally valid. Playback
     // preflight also depends on volatile host detection and current settings;
     // rejecting it must not poison the decoder cache until the bytes change.
+    return result;
+}
+
+static void macro_slot_provider_correction_finished(macro_payload_finish_result_t result, void *context) {
+    macro_payload_finish_fn finish = macro_slot_correction_finish;
+
+    (void)context;
+    macro_slot_active_ir.length  = 0u;
+    macro_slot_correction_finish = NULL;
+    if (finish) finish(result, NULL);
+}
+
+// Erase, then the characters: ASCII in text steps, anything else a scalar.
+static bool macro_slot_provider_write_correction(macro_payload_ir_t *ir, uint8_t erase, const uint16_t *characters, uint8_t count) {
+    uint8_t *run = NULL;
+
+    if (erase) {
+        ir->bytes[ir->length++] = MACRO_PAYLOAD_IR_OP_ERASE;
+        ir->bytes[ir->length++] = erase;
+    }
+    for (uint8_t index = 0u; index < count; index++) {
+        if (characters[index] >= 0x80u) {
+            run = NULL;
+            if (!macro_payload_ir_append_unicode(ir, characters[index])) return false;
+            continue;
+        }
+        if (!macro_payload_text_byte_is_supported((uint8_t)characters[index])) return false;
+        if (!run) {
+            if (ir->length + 2u > sizeof(ir->bytes)) return false;
+            ir->bytes[ir->length++] = MACRO_PAYLOAD_IR_OP_TEXT;
+            run                     = &ir->bytes[ir->length++];
+            *run                    = 0u;
+        }
+        if (ir->length + 1u > sizeof(ir->bytes)) return false;
+        ir->bytes[ir->length++] = (uint8_t)characters[index];
+        (*run)++;
+    }
+    return ir->length != 0u;
+}
+
+macro_payload_start_result_t macro_slot_provider_start_correction(uint8_t erase, const uint16_t *characters, uint8_t count, uint8_t interval, macro_payload_finish_fn finish) {
+    macro_payload_start_result_t result;
+    macro_payload_preflight_t    preflight;
+
+    if (!finish || (count && !characters)) return MACRO_PAYLOAD_START_INVALID;
+    if (macro_slot_active_metadata || macro_slot_correction_finish || !macro_payload_engine_idle()) return MACRO_PAYLOAD_START_BUSY;
+
+    macro_slot_active_ir.length     = 0u;
+    macro_slot_active_ir.protection = 1u;
+    macro_slot_active_ir.more       = false;
+    macro_payload_preflight_begin(&preflight);
+    // A correction never falls back to Unicode entry: every character must
+    // be one the layout types.
+    if (!macro_slot_provider_write_correction(&macro_slot_active_ir, erase, characters, count) || !macro_payload_preflight_window(&preflight, &macro_slot_active_ir) || preflight.needs_unicode) {
+        macro_slot_active_ir.length = 0u;
+        return MACRO_PAYLOAD_START_INVALID;
+    }
+    macro_slot_correction_finish = finish;
+    result                       = macro_payload_start_windows(&macro_slot_active_ir, &preflight, NULL, NULL, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, interval, MACRO_PAYLOAD_SOURCE_CORRECTION, 0u, macro_slot_provider_correction_finished, NULL);
+    if (result != MACRO_PAYLOAD_START_STARTED) {
+        macro_slot_active_ir.length  = 0u;
+        macro_slot_correction_finish = NULL;
+    }
     return result;
 }
 

@@ -37,6 +37,7 @@ else reads it, projects it, mirrors it or adapts QMK to it.
 | Applied held actions and repeats | `lib/key/ownership/` | projection, housekeeping |
 | Applied layers and modifiers | `lib/state/ownership/`, `lib/state/modifiers/` | QMK's layer state and reports |
 | Macro playback | `lib/macro/` ([macro playback](macro-playback.md)) | action lifecycle, input guard |
+| The word being typed, the keys held back while a correction is typed, and the autocorrect override | `lib/autocorrect/` ([corrections](macro-playback.md#corrections)) | the report filters in `lib/macro/`; the switch keys `AC_*` in `lib/action/` and the runtime page in `lib/compat/` (D-F66, D-F69) |
 | Pointing mode state and handlers | `lib/pointing/runtime/`, `lib/pointing/modes/` ([pointer report](pointer-report.md)) | key runtime bridge, lighting, split sync |
 | Auto-mouse on/off: the override beside the stored setting, and what reaches QMK | `lib/pointing/policy/auto_mouse_switch.c` | the switch keys `AM_*` in `lib/action/`, the settings push and runtime page in `lib/compat/` (D-F66) |
 | What QMK and the fork promise | `lib/compat/` ([its README](../../users/noah/lib/compat/README.md)) | everything that touches QMK |

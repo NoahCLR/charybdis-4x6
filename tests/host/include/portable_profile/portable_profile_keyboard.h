@@ -1,6 +1,7 @@
 #pragma once
 // QMK_KEYBOARD_H for the portable-profile readback test: the QMK and
 // Charybdis surface qmk_portable_profile.c reads, as host declarations.
+#define NOAH_HOST_KEYMAP_CONFIG
 #include "qmk_stub.h"
 #define CHARYBDIS_AUTO_SNIPING_LAYER 3
 #define CHARYBDIS_DRAGSCROLL_DPI 100

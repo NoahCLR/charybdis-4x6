@@ -1,0 +1,4183 @@
+{
+  "description": "Autocorrect behaviour version 1: what the computer ends with when the keyboard corrects a list while keys are typed. Rules: docs/spec/autocorrect-v1.md; each case names the rule it holds. A case has a list (entries as in autocorrect_domain_v1.json), a host layout (a slug of host_layouts_v1.json), the host's Caps Lock at its start, and events. Events: {type: text} presses the keys that show those characters on that layout under that Caps Lock, one after another ('\\n' is Enter, '\\t' Tab); {fast: text} the same with no pause, so later keys arrive while a correction is typed; {key, mods} taps a named key; {stroke} taps a layout stroke; {tap} taps a key by its QMK name with whatever modifiers are held; {press} and {release} hold a modifier; {click}; {hold, ms, repeats} holds a key that long while the computer repeats it; {macro: text, fast} presses a macro key that types the text; {mash, count} taps a key that many times with no pause. result is the text the computer ends with; resultEndsWith holds only its end where the rest depends on timing. screen, when present, is the same input as the characters the computer would show with autocorrect off ('\\b' is Backspace): a client's text matcher run over it with the case's list, layout and Caps Lock must produce result. A case with keyboardOnly has no screen form and says why. The case folding and capitals are wordCharacters in autocorrect_domain_v1.json: a small letter's capital is the one character that folds to it. Test evidence, never a migration source.",
+  "spec": "docs/spec/autocorrect-v1.md",
+  "version": 1,
+  "cases": [
+    {
+      "name": "word-end-space",
+      "rule": 2,
+      "description": "A listed typo is corrected when Space ends the word.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "teh "
+        }
+      ],
+      "screen": "teh ",
+      "result": "the "
+    },
+    {
+      "name": "differing-suffix",
+      "rule": 2,
+      "description": "becuase becomes because: four characters erased, four typed.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "becuase "
+        }
+      ],
+      "screen": "becuase ",
+      "strokes": {
+        "erased": 4,
+        "typed": 4
+      },
+      "result": "because "
+    },
+    {
+      "name": "word-end-enter",
+      "rule": 2,
+      "description": "Enter ends the word; the correction comes first, then Enter.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "teh\n"
+        }
+      ],
+      "screen": "teh\n",
+      "result": "the\n"
+    },
+    {
+      "name": "word-end-punctuation",
+      "rule": 2,
+      "description": "Punctuation and a hyphen end a word.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "teh, hte-teh."
+        }
+      ],
+      "screen": "teh, hte-teh.",
+      "result": "the, the-the."
+    },
+    {
+      "name": "inside-a-longer-word",
+      "rule": 2,
+      "description": "A whole-word typo inside a longer word is never touched.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "tehran ateh "
+        }
+      ],
+      "screen": "tehran ateh ",
+      "result": "tehran ateh "
+    },
+    {
+      "name": "unfinished-word",
+      "rule": 2,
+      "description": "A typo in a word still being typed is left alone.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "teh"
+        }
+      ],
+      "screen": "teh",
+      "result": "teh"
+    },
+    {
+      "name": "apostrophe-after",
+      "rule": 2,
+      "description": "An apostrophe after the word stays on screen and is not part of the typo.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "teh' "
+        }
+      ],
+      "screen": "teh' ",
+      "result": "the' "
+    },
+    {
+      "name": "apostrophes-around",
+      "rule": 2,
+      "description": "Apostrophes before and after the word stay.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "'teh' "
+        }
+      ],
+      "screen": "'teh' ",
+      "result": "'the' "
+    },
+    {
+      "name": "apostrophe-inside",
+      "rule": 2,
+      "description": "An apostrophe between letters is part of the word.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "dosen't "
+        }
+      ],
+      "screen": "dosen't ",
+      "result": "doesn't "
+    },
+    {
+      "name": "digits-are-word-characters",
+      "rule": 2,
+      "description": "Digits belong to the word, so teh2 is not teh.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "teh2 "
+        }
+      ],
+      "screen": "teh2 ",
+      "result": "teh2 "
+    },
+    {
+      "name": "shift-space",
+      "rule": 1,
+      "description": "Shift+Space types a space, so it ends the word.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "teh"
+        },
+        {
+          "stroke": "S(KC_SPC)"
+        }
+      ],
+      "screen": "teh ",
+      "result": "the "
+    },
+    {
+      "name": "shift-enter",
+      "rule": 1,
+      "description": "Shift+Enter is typing too.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "teh"
+        },
+        {
+          "key": "Enter",
+          "mods": [
+            "Shift"
+          ]
+        }
+      ],
+      "screen": "teh\n",
+      "result": "the\n"
+    },
+    {
+      "name": "two-typos-one-correction",
+      "rule": 3,
+      "description": "Two typos of one correction both become it.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "hte teh "
+        }
+      ],
+      "screen": "hte teh ",
+      "result": "the the "
+    },
+    {
+      "name": "anywhere-in-a-word",
+      "rule": 3,
+      "description": "A typo that matches anywhere replaces only the matched part.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "sometihng tihngs "
+        }
+      ],
+      "screen": "sometihng tihngs ",
+      "result": "something things "
+    },
+    {
+      "name": "end-of-a-word",
+      "rule": 3,
+      "description": "A typo that matches the end of a word, and not its start.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "statemnet mnetal "
+        }
+      ],
+      "screen": "statemnet mnetal ",
+      "result": "statement mnetal "
+    },
+    {
+      "name": "start-of-a-word",
+      "rule": 3,
+      "description": "A typo that matches the start of a word, and not its end.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "recieved unrecieve "
+        }
+      ],
+      "screen": "recieved unrecieve ",
+      "result": "received unrecieve "
+    },
+    {
+      "name": "longest-typo-wins",
+      "rule": 3,
+      "description": "Of two part-of-word typos that match, the longer wins.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "think",
+          "typos": [
+            {
+              "typo": "tihngk",
+              "match": "anywhere"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "tihngk "
+        }
+      ],
+      "screen": "tihngk ",
+      "result": "think "
+    },
+    {
+      "name": "whole-word-beats-part",
+      "rule": 3,
+      "description": "A whole-word typo beats a part-of-word one that also matches.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "hey",
+          "typos": [
+            {
+              "typo": "eh",
+              "match": "end of word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "teh xeh "
+        }
+      ],
+      "screen": "teh xeh ",
+      "result": "the xhey "
+    },
+    {
+      "name": "first-in-the-list-wins-a-tie",
+      "rule": 3,
+      "description": "Of two part-of-word typos of the same length, the one first in the list (the lower typo in byte order) wins.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "x",
+          "typos": [
+            {
+              "typo": "ab",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "y",
+          "typos": [
+            {
+              "typo": "cd",
+              "match": "end of word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "abcd "
+        }
+      ],
+      "screen": "abcd ",
+      "result": "xcd "
+    },
+    {
+      "name": "first-letter-capital",
+      "rule": 4,
+      "description": "First letter capital, the rest small: the correction's first letter is capitalized.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "Teh "
+        }
+      ],
+      "screen": "Teh ",
+      "result": "The "
+    },
+    {
+      "name": "all-capitals",
+      "rule": 4,
+      "description": "Two or more letters, all capitals: the correction in capitals.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "TEH "
+        }
+      ],
+      "screen": "TEH ",
+      "result": "THE "
+    },
+    {
+      "name": "mixed-case",
+      "rule": 4,
+      "description": "Any other mix: the correction as written.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "tEh teH "
+        }
+      ],
+      "screen": "tEh teH ",
+      "result": "the the "
+    },
+    {
+      "name": "correction-keeps-its-capitals",
+      "rule": 4,
+      "description": "A correction written with capitals keeps them, whether or not the typo began with one.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "iphone Iphone "
+        }
+      ],
+      "screen": "iphone Iphone ",
+      "result": "iPhone iPhone "
+    },
+    {
+      "name": "capitals-of-a-capitalized-correction",
+      "rule": 4,
+      "description": "All capitals still wins over the correction's own capitals; nothing changes when the word already reads that way.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "IPHONE "
+        }
+      ],
+      "screen": "IPHONE ",
+      "result": "IPHONE "
+    },
+    {
+      "name": "case-of-the-matched-part",
+      "rule": 4,
+      "description": "Case is judged on the part of the word the typo matched.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "Sometihng TIHNGS Tihngs "
+        }
+      ],
+      "screen": "Sometihng TIHNGS Tihngs ",
+      "result": "Something THINGS Things "
+    },
+    {
+      "name": "caps-lock",
+      "rule": 4,
+      "description": "With Caps Lock on the word reads in capitals, and the correction is typed so it does too.",
+      "layout": "us",
+      "capsLock": true,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "TEH "
+        }
+      ],
+      "screen": "TEH ",
+      "result": "THE "
+    },
+    {
+      "name": "caps-lock-with-iphone",
+      "rule": 4,
+      "description": "Caps Lock on and Shift on the first letter: the word reads iPHONE, so the correction is typed as written, small letters through Shift.",
+      "layout": "us",
+      "capsLock": true,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "iPHONE "
+        }
+      ],
+      "screen": "iPHONE ",
+      "result": "iPhone "
+    },
+    {
+      "name": "caps-lock-on-macos",
+      "rule": 4,
+      "description": "macOS shows capitals under Caps Lock whatever Shift does; a correction in capitals is typed.",
+      "layout": "macos-abc",
+      "capsLock": true,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "TEH "
+        }
+      ],
+      "screen": "TEH ",
+      "result": "THE "
+    },
+    {
+      "name": "capital-the-layout-cannot-type",
+      "rule": 4,
+      "description": "The layout cannot type the capital form (ẞ on German Windows), so the correction is typed as written.",
+      "layout": "windows-german",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "straße",
+          "typos": [
+            {
+              "typo": "strasse",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "STRASSE "
+        }
+      ],
+      "screen": "STRASSE ",
+      "result": "straße "
+    },
+    {
+      "name": "dutch-dead-key-typed",
+      "rule": 1,
+      "description": "Dutch on macOS: the correction's é is typed as the layout does, a dead key then e.",
+      "layout": "macos-dutch",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "café",
+          "typos": [
+            {
+              "typo": "cafe",
+              "match": "whole word"
+            },
+            {
+              "typo": "cafë",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "cafe "
+        }
+      ],
+      "screen": "cafe ",
+      "result": "café "
+    },
+    {
+      "name": "dutch-dead-key-read",
+      "rule": 1,
+      "description": "Dutch on macOS: a character composed with a dead key is read as that character.",
+      "layout": "macos-dutch",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "café",
+          "typos": [
+            {
+              "typo": "cafe",
+              "match": "whole word"
+            },
+            {
+              "typo": "cafë",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "cafë "
+        }
+      ],
+      "screen": "cafë ",
+      "result": "café "
+    },
+    {
+      "name": "us-international-dead-apostrophe",
+      "rule": 1,
+      "description": "US International: the apostrophe is a dead key completed by Space. That Space is the apostrophe, not a word end.",
+      "layout": "windows-us-international",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "dosen't "
+        }
+      ],
+      "screen": "dosen't ",
+      "result": "doesn't "
+    },
+    {
+      "name": "us-international-unresolved-dead-key",
+      "rule": 6,
+      "description": "A dead key the layout composes nothing with (apostrophe, then t) leaves the word unknown: nothing is corrected until the next word end.",
+      "layout": "windows-us-international",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "stroke": "KC_QUOT"
+        },
+        {
+          "type": "teh teh "
+        }
+      ],
+      "keyboardOnly": "a dead-key sequence the layout does not resolve",
+      "result": "'teh the "
+    },
+    {
+      "name": "undo-after-space",
+      "rule": 5,
+      "description": "Backspace right after a correction removes the space and puts the word back as typed; ending it again leaves it alone.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "teh "
+        },
+        {
+          "key": "Backspace"
+        },
+        {
+          "type": " "
+        }
+      ],
+      "screen": "teh \b ",
+      "result": "teh "
+    },
+    {
+      "name": "undo-after-punctuation",
+      "rule": 5,
+      "description": "The undo works after punctuation too.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "Teh,"
+        },
+        {
+          "key": "Backspace"
+        }
+      ],
+      "screen": "Teh,\b",
+      "result": "Teh"
+    },
+    {
+      "name": "no-undo-after-enter",
+      "rule": 5,
+      "description": "After Enter there is no undo: Backspace is just Backspace.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "teh\n"
+        },
+        {
+          "key": "Backspace"
+        }
+      ],
+      "screen": "teh\n\b",
+      "result": "the"
+    },
+    {
+      "name": "undo-only-on-the-next-key",
+      "rule": 5,
+      "description": "Any key between the correction and Backspace ends the chance to undo.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "teh x"
+        },
+        {
+          "key": "Backspace"
+        },
+        {
+          "key": "Backspace"
+        },
+        {
+          "key": "Backspace"
+        }
+      ],
+      "screen": "teh x\b\b\b",
+      "result": "th"
+    },
+    {
+      "name": "undo-restores-apostrophes",
+      "rule": 5,
+      "description": "The undo puts back exactly what was typed, apostrophes included.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "teh' "
+        },
+        {
+          "key": "Backspace"
+        }
+      ],
+      "screen": "teh' \b",
+      "result": "teh'"
+    },
+    {
+      "name": "backspace-inside-a-word",
+      "rule": 6,
+      "description": "Backspace inside a word removes its last character.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "tehh"
+        },
+        {
+          "key": "Backspace"
+        },
+        {
+          "type": " "
+        }
+      ],
+      "screen": "tehh\b ",
+      "result": "the "
+    },
+    {
+      "name": "backspace-into-an-earlier-word",
+      "rule": 6,
+      "description": "Backspace with no word left deletes into text the keyboard does not know: nothing is corrected until the next word end.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "xy "
+        },
+        {
+          "key": "Backspace"
+        },
+        {
+          "key": "Backspace"
+        },
+        {
+          "type": "teh teh "
+        }
+      ],
+      "screen": "xy \b\bteh teh ",
+      "result": "xteh the "
+    },
+    {
+      "name": "cursor-key-starts-fresh",
+      "rule": 6,
+      "description": "A cursor key forgets the word; the next character starts a new one.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "teh"
+        },
+        {
+          "key": "Left"
+        },
+        {
+          "key": "Right"
+        },
+        {
+          "type": " teh "
+        }
+      ],
+      "keyboardOnly": "a cursor key",
+      "result": "teh the "
+    },
+    {
+      "name": "shortcut-starts-fresh",
+      "rule": 6,
+      "description": "A shortcut forgets the word, and the next word is corrected normally.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "te"
+        },
+        {
+          "key": "S",
+          "mods": [
+            "Ctrl"
+          ]
+        },
+        {
+          "type": "h teh "
+        }
+      ],
+      "keyboardOnly": "a shortcut",
+      "result": "teh the "
+    },
+    {
+      "name": "click-starts-fresh",
+      "rule": 6,
+      "description": "A mouse click forgets the word.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "teh"
+        },
+        {
+          "click": true
+        },
+        {
+          "type": " teh "
+        }
+      ],
+      "keyboardOnly": "a mouse click",
+      "result": "teh the "
+    },
+    {
+      "name": "macro-text-is-not-typing",
+      "rule": 6,
+      "description": "A macro's text never counts as typing, and the word around it is forgotten.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "te"
+        },
+        {
+          "macro": "h"
+        },
+        {
+          "type": " teh "
+        }
+      ],
+      "keyboardOnly": "a macro",
+      "result": "teh the "
+    },
+    {
+      "name": "held-key-suspends",
+      "rule": 6,
+      "description": "A key held until the computer repeats it types characters the keyboard does not see, so the word is left alone.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "te"
+        },
+        {
+          "hold": "h",
+          "ms": 400,
+          "repeats": 2
+        },
+        {
+          "type": " teh "
+        }
+      ],
+      "keyboardOnly": "a key held until the computer repeats it",
+      "result": "tehhh the "
+    },
+    {
+      "name": "keys-during-a-correction",
+      "rule": 7,
+      "description": "Keys pressed while a correction is typed come out afterwards, in order, and are corrected in their turn.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "fast": "teh quick hte fox "
+        }
+      ],
+      "screen": "teh quick hte fox ",
+      "result": "the quick the fox "
+    },
+    {
+      "name": "held-shift-stays-out",
+      "rule": 7,
+      "description": "A Shift held across the correction does not change it, and is still held afterwards.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "press": "Shift"
+        },
+        {
+          "tap": "KC_T"
+        },
+        {
+          "tap": "KC_E"
+        },
+        {
+          "tap": "KC_H"
+        },
+        {
+          "tap": "KC_SPC"
+        },
+        {
+          "tap": "KC_X"
+        },
+        {
+          "release": "Shift"
+        },
+        {
+          "tap": "KC_X"
+        }
+      ],
+      "keyboardOnly": "a held modifier",
+      "result": "THE Xx"
+    },
+    {
+      "name": "macro-key-during-a-correction",
+      "rule": 7,
+      "description": "A macro key pressed while a correction is typed waits its turn behind the ending key.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "fast": "teh "
+        },
+        {
+          "macro": "!!",
+          "fast": true
+        },
+        {
+          "fast": "a"
+        }
+      ],
+      "keyboardOnly": "a macro key pressed during a correction",
+      "result": "the !!a"
+    },
+    {
+      "name": "full-queue",
+      "rule": 7,
+      "description": "More key changes than the queue holds arrive while a correction is typed: the correction stops where it is and every key still comes out, in order.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "fast": "becuase "
+        },
+        {
+          "mash": "x",
+          "count": 40
+        },
+        {
+          "fast": "y"
+        }
+      ],
+      "keyboardOnly": "more keys than the queue holds",
+      "resultEndsWith": " xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxy"
+    },
+    {
+      "name": "character-the-layout-cannot-type",
+      "rule": 9,
+      "description": "The layout cannot type the correction (é on US): the entry is skipped and nothing is typed through Unicode entry.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "café",
+          "typos": [
+            {
+              "typo": "cafe",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "cafe teh "
+        }
+      ],
+      "screen": "cafe teh ",
+      "result": "cafe the "
+    },
+    {
+      "name": "switched-off",
+      "rule": 8,
+      "description": "With autocorrect off in the profile nothing is corrected.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "teh "
+        }
+      ],
+      "keyboardOnly": "the stored switch",
+      "on": false,
+      "result": "teh "
+    }
+  ]
+}

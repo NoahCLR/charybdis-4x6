@@ -217,6 +217,63 @@ static void test_text_uses_lease_backed_press_and_release_scans(void) {
     CHECK(wait_call_count == 0u);
 }
 
+// An erase step taps Backspace its count of times at the text pace.
+static void test_erase_taps_backspace_at_the_text_pace(void) {
+    macro_payload_ir_t             ir = {.length = 5u, .bytes = {MACRO_PAYLOAD_IR_OP_ERASE, 2u, MACRO_PAYLOAD_IR_OP_TEXT, 1u, 'a'}};
+    macro_payload_ir_t             empty = {.length = 2u, .bytes = {MACRO_PAYLOAD_IR_OP_ERASE, 0u}};
+    macro_payload_debug_snapshot_t snapshot;
+
+    test_reset();
+    CHECK(macro_payload_start_ir(&empty, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_DIRECT, 0u, NULL, NULL) == MACRO_PAYLOAD_START_INVALID);
+    CHECK(macro_payload_start_ir(&ir, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_DIRECT, 0u, NULL, NULL) == MACRO_PAYLOAD_START_STARTED);
+    macro_payload_engine_scan();
+    CHECK(test_op_count == 1u && test_ops[0].kind == TEST_OP_ACQUIRE && test_ops[0].keycode == KC_BACKSPACE);
+    test_scan_after(6u);
+    CHECK(test_op_count == 1u);
+    test_scan_after(1u);
+    macro_payload_engine_scan();
+    CHECK(test_op_count == 2u && test_ops[1].kind == TEST_OP_RELEASE && test_ops[1].keycode == KC_BACKSPACE);
+    test_scan_after(6u);
+    macro_payload_engine_scan();
+    CHECK(test_op_count == 2u);
+    test_scan_after(1u);
+    macro_payload_engine_scan();
+    CHECK(test_op_count == 3u && test_ops[2].kind == TEST_OP_ACQUIRE && test_ops[2].keycode == KC_BACKSPACE);
+    test_scan_after(7u);
+    macro_payload_engine_scan();
+    CHECK(test_op_count == 4u && test_ops[3].kind == TEST_OP_RELEASE && test_ops[3].keycode == KC_BACKSPACE);
+    test_scan_after(7u);
+    macro_payload_engine_scan();
+    CHECK(test_op_count == 5u && test_ops[4].kind == TEST_OP_ACQUIRE && test_ops[4].keycode == KC_A);
+    test_scan_after(7u);
+    macro_payload_engine_scan();
+    test_scan_after(7u);
+    macro_payload_engine_scan();
+    macro_payload_debug_snapshot(&snapshot);
+    CHECK(snapshot.state == MACRO_PAYLOAD_ENGINE_IDLE && snapshot.completed_count == 1u && macro_payload_engine_idle());
+}
+
+// A correction's output is isolated as a protected macro's is, but only a
+// protected macro has new presses ignored: a correction's are held back and
+// replayed by the typing stage.
+static void test_a_correction_is_isolated_without_ignoring_presses(void) {
+    const macro_payload_ir_t  ir = {.length = 3u, .protection = 1u, .bytes = {MACRO_PAYLOAD_IR_OP_TEXT, 1u, 'a'}};
+    macro_payload_preflight_t preflight;
+
+    test_reset();
+    CHECK(macro_payload_start_ir(&ir, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_DIRECT, 0, NULL, NULL) == MACRO_PAYLOAD_START_STARTED);
+    CHECK(macro_payload_engine_protected() && macro_payload_engine_ignores_presses() && !macro_payload_engine_idle());
+    CHECK(macro_payload_engine_cancel());
+    test_drain_cleanup();
+    macro_payload_preflight_begin(&preflight);
+    CHECK(macro_payload_preflight_window(&preflight, &ir));
+    CHECK(macro_payload_start_windows(&ir, &preflight, NULL, NULL, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 5u, MACRO_PAYLOAD_SOURCE_CORRECTION, 0u, NULL, NULL) == MACRO_PAYLOAD_START_STARTED);
+    CHECK(macro_payload_engine_protected() && !macro_payload_engine_ignores_presses());
+    CHECK(macro_payload_engine_cancel());
+    test_drain_cleanup();
+    CHECK(macro_payload_engine_idle());
+}
+
 static void test_busy_start_is_rejected_without_restarting_active_ir(void) {
     macro_payload_ir_t             active = {.length = 3u, .bytes = {MACRO_PAYLOAD_IR_OP_DELAY, 100u, 0u}};
     macro_payload_ir_t             other  = {.length = 3u, .bytes = {MACRO_PAYLOAD_IR_OP_DELAY, 1u, 0u}};
@@ -580,6 +637,8 @@ static void test_protected_unicode_cancellation_never_replays_existing_keys(void
 }
 
 int main(void) {
+    test_erase_taps_backspace_at_the_text_pace();
+    test_a_correction_is_isolated_without_ignoring_presses();
     test_protected_output_isolates_existing_keys_and_modifiers();
     test_protected_unicode_cancellation_never_replays_existing_keys();
     test_protection_is_latched_and_released();

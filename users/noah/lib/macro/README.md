@@ -20,7 +20,12 @@ the bank and its steps are the
 - `macro_payload_run.c`: preflight, the engine, Unicode entry and the report
   filters BK's report hooks call.
 - `macro_input_guard.c`: the press guard for uninterruptible playback.
-- `host_layout.c`: layout lookup over the generated `host_layout_tables.c`.
+- `host_layout.c`: layout lookup over the generated `host_layout_tables.c`,
+  both ways: the strokes for a character, and what a stroke types.
+- `typing_stage.h`: the stage autocorrect implements
+  (`../autocorrect/`), called from the report filters, the macro trigger and
+  the ledger. Each caller defines a weak default that does nothing, so a host
+  test links without the stage.
 
 ## The IR
 
@@ -34,6 +39,7 @@ opcode then its operands:
 | 3 press, 4 release | one basic keycode |
 | 5 chord | a count (1–16), then the keycodes |
 | 6 Unicode | one scalar, three bytes little-endian |
+| 7 erase | a count: Backspace that many times at the text pace. A correction plays it (D-F69); the bank encoder refuses it, so no stored macro holds it |
 
 `protection` and `more` ride beside the bytes, outside the steps. A window
 ends on a whole step; `macro_payload_stream_cursor_t` carries the bank offset
@@ -64,6 +70,7 @@ reads the first two to find the safe boundary.
 ## Host-test seams
 
 `macro_payload_host_setting`, `macro_payload_host_os` and
-`macro_payload_unicode_caps_lock` are weak, so a test fixes the host. A
+`macro_payload_unicode_caps_lock` are weak, so a test fixes the host; the
+`noah_typing_stage_*` defaults are weak so a build has the stage or not. A
 direct start (`macro_payload_start_ir` with an IR, source `DIRECT`) plays only
 in host tests; firmware calls it only for the busy answer.

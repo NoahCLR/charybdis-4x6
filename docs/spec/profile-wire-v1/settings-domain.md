@@ -321,7 +321,7 @@ community module's effect and `CUSTOM_` for the keyboard's or keymap's own.
 | 9 | swap right Control and GUI | `MAGIC_ENABLE` |
 | 10 | one-shot keys | unless `NO_ACTION_ONESHOT` |
 | 11 | swap Escape and Caps Lock | `MAGIC_ENABLE` |
-| 12 | autocorrect | `AUTOCORRECT_ENABLE` |
+| 12 | autocorrect ([autocorrect](../autocorrect-v1.md#on-and-off)) | always: the firmware's own engine (D-F69) |
 
 Effect ids are the running build's; they are not remapped between builds.
 
