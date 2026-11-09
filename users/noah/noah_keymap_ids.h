@@ -195,7 +195,8 @@ _Static_assert((QK_MACRO_0 + MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "Macro slot 
 // BH_ON, BH_OFF and BH_TOGG, and AM_ON, AM_OFF and AM_TOGG, are switch keys:
 // they set the behaviours and auto-mouse overrides as CM_ON, CM_OFF and
 // CM_TOGG set QMK's combo flag, until the keyboard restarts, never saved
-// (D-F66).
+// (D-F66). QMK's AC_ON, AC_OFF and AC_TOGG are switch keys too, for the
+// autocorrect override.
 
 #define NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE (SAFE_RANGE + 0x00)
 #define NOAH_KEYCODE_PD_HOLD_BASE (SAFE_RANGE + 0x40)

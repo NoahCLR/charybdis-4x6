@@ -327,6 +327,17 @@ bool auto_mouse_switch_override(void) {
     return auto_mouse_override;
 }
 
+// The autocorrect keys' switch.
+static bool autocorrect_override = true;
+
+void autocorrect_switch_set_override(bool allowed) {
+    autocorrect_override = allowed;
+}
+
+bool autocorrect_switch_override(void) {
+    return autocorrect_override;
+}
+
 void pointer_layer_policy_settle_record(void) {}
 
 void pointer_layer_policy_take_back_qmk_toggle(uint16_t keycode, const keyrecord_t *record) {

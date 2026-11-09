@@ -50,10 +50,25 @@ goes to 2.1 (D-F28); the profile's format is unchanged and its schema stays
 digest changes too, and a profile saved under the previous digest is
 refused (D-F10).
 
+Autocorrect gets the same two switches (D-F69). Its stored switch is key
+option 12; QMK's `AC_ON`, `AC_OFF` and `AC_TOGG`, switch keys like the
+others and kept at QMK's values, set a runtime autocorrect override beside
+it: allowed at boot, never saved, cleared by a replug. QMK does nothing with
+these keycodes, since its own autocorrect is not built, so they need no fork
+hook. The engine reads the stored switch and the override each time it
+looks, so no push of the settings can undo the override and `AC_ON` never
+turns on what the profile has off. Switched off, the engine still follows
+words, so switching back on finds the next one; a correction being typed
+finishes. GET `0x22` page 0 was full, so the override reads back as byte 0
+of a new page 1, where later overrides go too. It is a capability within
+the same, unreleased Profile Wire 2.1; the keycodes are QMK's and outside
+the action-ABI digest's stream, which does not change for them.
+
 With behaviours off a key is the standard key, and a behaviours key's
 standard key is its switch, so `BH_ON` and `BH_TOGG` always turn behaviours
 back on. Switching off decides no press again: a behaviour already holding
 something keeps it until its key is let go. Contracts:
 [`participation-policy.md`](../spec/participation-policy.md),
 [`pd-mode-domain-v1.md`](../spec/pd-mode-domain-v1.md#keycodes),
-[`live-edits.md`](../spec/profile-wire-v1/live-edits.md#toggles-and-the-settings-qmk-holds).
+[`live-edits.md`](../spec/profile-wire-v1/live-edits.md#toggles-and-the-settings-qmk-holds),
+[`autocorrect-v1.md`](../spec/autocorrect-v1.md#on-and-off).

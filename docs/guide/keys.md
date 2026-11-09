@@ -213,9 +213,10 @@ one for all combos, can make combos send their action's plain action instead.
 The combo keys, `CM_ON`, `CM_OFF` and `CM_TOGG`, turn combos on and off
 until the keyboard is unplugged; they are never saved. `BH_ON`, `BH_OFF` and
 `BH_TOGG` do the same for behaviours
-([switch keys](#where-behaviours-and-combos-run)), and `AM_ON`, `AM_OFF`
+([switch keys](#where-behaviours-and-combos-run)), `AM_ON`, `AM_OFF`
 and `AM_TOGG` for auto-mouse
-([the pointer layer](pointing.md#the-pointer-layer-and-sniping)).
+([the pointer layer](pointing.md#the-pointer-layer-and-sniping)), and
+`AC_ON`, `AC_OFF` and `AC_TOGG` for [autocorrect](autocorrect.md).
 
 ## Custom keys
 
@@ -289,4 +290,8 @@ behaviours off a key does what it does without one, so `BH_ON` or `BH_TOGG`
 turns them back on even when it has a behaviour of its own. No switch key
 changes the switches set in Ark; unplugging puts back what is set there.
 `AM_ON`, `AM_OFF` and `AM_TOGG` are switch keys for auto-mouse
-([the pointer layer](pointing.md#the-pointer-layer-and-sniping)).
+([the pointer layer](pointing.md#the-pointer-layer-and-sniping)), and
+`AC_ON`, `AC_OFF` and `AC_TOGG` for autocorrect
+([Autocorrect](autocorrect.md#turning-it-off)): the keyboard cannot see a
+password field or a terminal, so `AC_OFF` or `AC_TOGG` on a key is how you
+keep autocorrect out of one.

@@ -17,6 +17,7 @@
 #include "../compat/qmk_oneshot_contract.h"
 #include "../key/behavior/participation.h"
 #include "../pointing/policy/auto_mouse_switch.h"
+#include "../autocorrect/autocorrect_switch.h"
 #include "../profile/runtime/active_profile_settings_runtime.h"
 #include "../state/ownership/layer_ownership.h"
 
@@ -151,9 +152,9 @@ static void noah_action_press_pointing_mode_lock(noah_action_desc_t desc, keypos
     noah_action_toggle_pointing_mode_lock(desc, key_pos);
 }
 
-// A switch key turns combos (QMK's flag), behaviours or auto-mouse (the
-// firmware's overrides) on, off or the other way, at its tap or press; no
-// stored master changes (D-F66).
+// A switch key turns combos (QMK's flag), behaviours, auto-mouse or
+// autocorrect (the firmware's overrides) on, off or the other way, at its tap
+// or press; no stored master changes (D-F66).
 static void noah_action_switch_key(noah_action_desc_t desc, keypos_t key_pos) {
     (void)key_pos;
     switch (desc.action) {
@@ -183,6 +184,15 @@ static void noah_action_switch_key(noah_action_desc_t desc, keypos_t key_pos) {
             break;
         case AM_TOGG:
             auto_mouse_switch_set_override(!auto_mouse_switch_override());
+            break;
+        case QK_AUTOCORRECT_ON:
+            autocorrect_switch_set_override(true);
+            break;
+        case QK_AUTOCORRECT_OFF:
+            autocorrect_switch_set_override(false);
+            break;
+        case QK_AUTOCORRECT_TOGGLE:
+            autocorrect_switch_set_override(!autocorrect_switch_override());
             break;
         default:
             break;

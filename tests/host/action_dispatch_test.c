@@ -857,13 +857,14 @@ static void test_unassigned_userspace_codes_are_refused_everywhere(void) {
     CHECK(!noah_profile_action_placement_v1_supported(&stray, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT));
 }
 
-// The switch keys, QMK's combo keys and the behaviours keys, go on a key, in
-// a behaviour's tap and holds and as a combo output. A saved profile stores
+// The switch keys, QMK's combo and autocorrect keys and the firmware's
+// behaviours and auto-mouse keys, go on a key, in a behaviour's tap and holds
+// and as a combo output. A saved profile stores
 // them as QMK keycodes and is held to the same rule. The rest of the
 // behaviours keys' block is inert.
 static void test_switch_keys_go_everywhere_a_key_goes(void) {
-    const uint16_t                keys[]       = {BH_ON, BH_OFF, BH_TOGG, AM_ON, AM_OFF, AM_TOGG};
-    const uint16_t                combo_keys[] = {QK_COMBO_ON, QK_COMBO_OFF, QK_COMBO_TOGGLE, QK_COMBO_ON, QK_COMBO_OFF, QK_COMBO_TOGGLE};
+    const uint16_t                keys[]       = {BH_ON, BH_OFF, BH_TOGG, AM_ON, AM_OFF, AM_TOGG, QK_AUTOCORRECT_ON, QK_AUTOCORRECT_OFF, QK_AUTOCORRECT_TOGGLE};
+    const uint16_t                combo_keys[] = {QK_COMBO_ON, QK_COMBO_OFF, QK_COMBO_TOGGLE, QK_COMBO_ON, QK_COMBO_OFF, QK_COMBO_TOGGLE, QK_COMBO_ON, QK_COMBO_OFF, QK_COMBO_TOGGLE};
     const noah_action_placement_t placements[] = {NOAH_ACTION_PLACEMENT_KEY, NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER, NOAH_ACTION_PLACEMENT_COMBO_OUTPUT};
     const noah_profile_validator_v1_placement_t stored_placements[] = {NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_KEY, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_OTHER, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT};
 
@@ -895,7 +896,7 @@ static void test_switch_keys_go_everywhere_a_key_goes(void) {
 // itself there, the standard key's tap (D-F64): a switch key switches and a
 // pointing-mode lock locks.
 static void test_press_only_keys_tap_themselves_where_a_behaviour_leaves_the_tap_empty(void) {
-    const uint16_t keys[] = {BH_ON, BH_OFF, BH_TOGG, QK_COMBO_ON, QK_COMBO_OFF, QK_COMBO_TOGGLE, AM_ON, AM_OFF, AM_TOGG, PD_MODE_4_LOCK};
+    const uint16_t keys[] = {BH_ON, BH_OFF, BH_TOGG, QK_COMBO_ON, QK_COMBO_OFF, QK_COMBO_TOGGLE, AM_ON, AM_OFF, AM_TOGG, QK_AUTOCORRECT_ON, QK_AUTOCORRECT_OFF, QK_AUTOCORRECT_TOGGLE, PD_MODE_4_LOCK};
     for (uint8_t i = 0; i < ARRAY_SIZE(keys); i++) {
         CHECK(noah_action_desc_default_tap_action(noah_action_describe(keys[i])) == keys[i]);
     }

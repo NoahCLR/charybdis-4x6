@@ -36,6 +36,8 @@ decision through its release.
 Auto-mouse has the same two switches outside participation: its stored
 setting and a runtime override that the switch keys `AM_ON`, `AM_OFF` and `AM_TOGG` set
 (D-F66, [toggles](profile-wire-v1/live-edits.md#toggles-and-the-settings-qmk-holds)).
+So has autocorrect: its stored switch and the override `AC_ON`, `AC_OFF` and
+`AC_TOGG` set ([autocorrect](autocorrect-v1.md#on-and-off)).
 
 Switching something off keeps it: a disabled behaviour row keeps its branches,
 timing and layers, a disabled combo its inputs, output and window, and

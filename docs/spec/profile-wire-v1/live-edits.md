@@ -418,6 +418,16 @@ Bytes 4–23 are QMK's live values in the settings scalars' encodings
 profile leaves them zero. Auto-mouse runs while its stored setting (scalar 4,
 read through settings readback) and byte 24 are both on.
 
+Page 1, 1 byte: the overrides that came after page 0 was full.
+
+| Offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 1 | autocorrect override (D-F66) |
+
+Autocorrect runs while its stored switch (key option 12 of scalar 24) and
+this byte are both on ([autocorrect](../autocorrect-v1.md#on-and-off)). Any
+later page answers `UNKNOWN_PAGE`.
+
 Held by: `tests/host/run_qmk_profile_edit_channel_tests.sh` (`test_gets`).
 
 ### Edit mode, GET 0x27
@@ -533,9 +543,11 @@ A toggle is a runtime override beside its stored master, never an edit:
 combos run only while the stored master and QMK's combo flag both allow;
 behaviours only while the stored master and the firmware's behaviours
 override both allow; auto-mouse only while its stored setting and the
-firmware's auto-mouse override both allow. The switch keys set the flag
-(`CM_ON`, `CM_OFF`, `CM_TOGG`) and the overrides (`BH_ON`, `BH_OFF`,
-`BH_TOGG`; `AM_ON`, `AM_OFF`, `AM_TOGG`), D-F66. An override starts allowed
+firmware's auto-mouse override both allow; autocorrect only while its
+stored switch and the firmware's autocorrect override both allow. The switch
+keys set the flag (`CM_ON`, `CM_OFF`, `CM_TOGG`) and the overrides (`BH_ON`,
+`BH_OFF`, `BH_TOGG`; `AM_ON`, `AM_OFF`, `AM_TOGG`; `AC_ON`, `AC_OFF`,
+`AC_TOGG`), D-F66. An override starts allowed
 at boot, is never saved, and reads back through GET `0x22`. RGB on and off
 is a lighting adjustment, not a toggle.
 

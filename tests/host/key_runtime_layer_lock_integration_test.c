@@ -12,6 +12,7 @@
 #include "users/noah/lib/key/behavior/participation.h"
 #include "users/noah/lib/key/runtime/api.h"
 #include "users/noah/lib/pointing/policy/auto_mouse_switch.h"
+#include "users/noah/lib/autocorrect/autocorrect_switch.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
@@ -85,6 +86,7 @@ static void test_reset_state(void) {
     noah_runtime_reset_for_test();
     noah_participation_set_behaviors_override(true);
     auto_mouse_switch_set_override(true);
+    autocorrect_switch_set_override(true);
 }
 
 static void test_run_thumb_like_double_tap_hold_cycle_with_release_keycode(keypos_t key_pos, uint16_t release_keycode) {
@@ -901,6 +903,31 @@ static void test_plain_auto_mouse_keys_switch_the_override(void) {
     CHECK(noah_runtime_debug_active_slot_count() == 0);
 }
 
+// QMK's autocorrect keys switch the autocorrect override the same way: the
+// firmware owns them, they act at their press and never reach QMK, whose own
+// autocorrect is not built.
+static void test_plain_autocorrect_keys_switch_the_override(void) {
+    keypos_t key_pos = test_keypos(4, 0);
+
+    test_reset_state();
+
+    CHECK(autocorrect_switch_override());
+    CHECK(!test_plain_key_tap(QK_AUTOCORRECT_OFF, key_pos));
+    CHECK(!autocorrect_switch_override());
+    CHECK(!test_plain_key_tap(QK_AUTOCORRECT_OFF, key_pos));
+    CHECK(!autocorrect_switch_override());
+    CHECK(!test_plain_key_tap(QK_AUTOCORRECT_TOGGLE, key_pos));
+    CHECK(autocorrect_switch_override());
+    CHECK(!test_plain_key_tap(QK_AUTOCORRECT_TOGGLE, key_pos));
+    CHECK(!autocorrect_switch_override());
+    CHECK(!test_plain_key_tap(QK_AUTOCORRECT_ON, key_pos));
+    CHECK(autocorrect_switch_override());
+    // The other switches are untouched.
+    CHECK(noah_participation_behaviors_override() && auto_mouse_switch_override());
+    CHECK(tap_count == 0);
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+}
+
 // A behaviour step can send AM_OFF, and with behaviours off a plain AM_ON
 // still switches auto-mouse back.
 static void test_behavior_step_switches_auto_mouse_off(void) {
@@ -943,6 +970,7 @@ int main(void) {
     test_switch_key_held_for_its_behaviour_does_not_switch();
 
     test_plain_auto_mouse_keys_switch_the_override();
+    test_plain_autocorrect_keys_switch_the_override();
     test_behavior_step_switches_auto_mouse_off();
 
     puts("key_runtime layer-lock integration tests passed");
