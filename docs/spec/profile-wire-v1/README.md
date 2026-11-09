@@ -49,7 +49,7 @@ protocol-version or firmware-version read. Capability page 0
 | --- | --- | --- |
 | Profile Wire version | major `2`, minor `1` (D-F66: the behaviours and auto-mouse switch keys) | page 0 bytes 2–3 |
 | Profile schema version | major `4`, minor `4` (D-F62: pointing v4; D-F26: settings v11; D-F68: the autocorrect list) | page 0 bytes 4–5, and blob header bytes 4–5 |
-| Capability layout | `3`, three pages | page 0 bytes 0–1 |
+| Capability layout | `3`, four pages | page 0 bytes 0–1 |
 | Firmware version | `NOAH_FIRMWARE_VERSION`, never zero | page 0 bytes 17–20 |
 | Action-ABI digest | see [blob-and-digests.md](blob-and-digests.md#action-abi-digest) | page 0 bytes 13–16 |
 | Compiled-default digest | see [blob-and-digests.md](blob-and-digests.md#digests-and-checksums) | page 0 bytes 21–24 |

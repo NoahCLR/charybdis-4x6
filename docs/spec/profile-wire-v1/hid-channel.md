@@ -354,7 +354,7 @@ not route, and every value not listed, is answered unhandled (`0xFF`).
 
 | Command | Value | Operation | Builds | Specified in |
 | --- | ---: | --- | --- | --- |
-| get | `0x01` | capability pages 0–2 | all | [this file](#capability-pages--get-0x01) |
+| get | `0x01` | capability pages 0–3 | all | [this file](#capability-pages--get-0x01) |
 | get | `0x02` | profile status pages 0–1 | all | [this file](#profile-status--get-0x02) |
 | get | `0x03` | cadence recorder | diagnostic | [this file](#diagnostic-values) |
 | get | `0x04` | saved payload | all | [this file](#payload-readback--get-0x04-and-0x05) |
