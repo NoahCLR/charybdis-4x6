@@ -95,7 +95,7 @@ Held by: `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_t
 
 The firmware accepts only the formats it writes (D-F10,
 [`0010`](../adr/0010-firmware-accepts-only-current-formats.md)): Profile
-Wire 2.0, profile schema 4.3, each domain at its registry version, and store
+Wire 2.1, profile schema 4.3, each domain at its registry version, and store
 format 6 (D-F28, [`0028`](../adr/0028-new-base-32-bit-profile-lengths.md)).
 Nothing in another format is translated:
 

@@ -12,10 +12,11 @@ combo output.
 
 The keys sit in their own aligned block, `0x7ee0..0x7eef` (D-F51), with
 16 codes reserved and three used, so no other keycode moves. The rest of the
-block and `0x7ef0..0x7eff` stay inert. The block moves the end of the action
-vocabulary, so the action-ABI digest changes and a profile saved under the
-previous digest is refused (D-F10); a client tells the vocabularies apart by
-that digest.
+block and `0x7ef0..0x7eff` stay inert. They are a capability, so Profile Wire
+goes to 2.1 (D-F28); the profile's format is unchanged and its schema stays
+4.3. The block moves the end of the action vocabulary, so the action-ABI
+digest changes too, and a profile saved under the previous digest is refused
+(D-F10).
 
 Two consequences follow from the participation rules rather than from new
 ones. With behaviours off, a key takes its normal action, and a behaviours

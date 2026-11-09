@@ -229,7 +229,7 @@ int main(int argc, char **argv) {
     assert(NOAH_PROFILE_FEATURE_SAVES == (1u << 1));
     assert(NOAH_PROFILE_FEATURE_POINTING == (1u << 2));
     assert(NOAH_PROFILE_FEATURES_KNOWN == 0x07u);
-    assert(NOAH_PROFILE_WIRE_V1_PROTOCOL_MAJOR == 2u && NOAH_PROFILE_WIRE_V1_PROTOCOL_MINOR == 0u);
+    assert(NOAH_PROFILE_WIRE_V1_PROTOCOL_MAJOR == 2u && NOAH_PROFILE_WIRE_V1_PROTOCOL_MINOR == 1u);
     assert(NOAH_PROFILE_STATE_STORED_EARLIER_FORMAT == (1u << 9));
     assert(argc == 2);
     fixture_path = argv[1];

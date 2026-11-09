@@ -31,7 +31,7 @@ else reads it, projects it, mirrors it or adapts QMK to it.
 | --- | --- | --- |
 | The profile each half saves, runs and copies; the working copy | `lib/profile/` ([profile flow](profile-flow.md)) | every runtime, through the `profile/runtime/active_profile_*_runtime.c` views |
 | What an action is and how it is dispatched; literal report usages | `lib/action/` | key runtime, macros, pointing outputs |
-| A key's effective behaviour and its participation | `lib/key/behavior/` | the key runtime's planners, validation |
+| A key's effective behaviour and its participation | `lib/key/behavior/` | the key runtime's planners, validation; the behaviours keys in `lib/action/` switch its override (D-F66) |
 | Presses, tap series, leases, pending releases | `lib/key/runtime/reducer/` ([key press](key-press.md)) | planners, projection, feedback, trace |
 | Release, scan and tap-series decisions | `lib/key/runtime/planning/` | `transition.c`, which projects them |
 | Applied held actions and repeats | `lib/key/ownership/` | projection, housekeeping |

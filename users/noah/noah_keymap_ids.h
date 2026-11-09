@@ -172,7 +172,7 @@ _Static_assert((QK_MACRO_0 + MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "Macro slot 
 //   0x7e80–0x7e9f  PD_MODE_n            hold slot n's mode      (32, all used)
 //   0x7ea0–0x7ebf  PD_MODE_n_LOCK       lock slot n's mode      (32, all used)
 //   0x7ec0–0x7edf  LOCK_LAYER(n)        toggle layer n's lock   (32 reserved)
-//   0x7ee0–0x7eef  BH_ON, BH_OFF, BH_TOGG  behaviours on, off, toggle (16 reserved)
+//   0x7ee0–0x7eef  BH_ON, BH_OFF, BH_TOGG  behaviours on, off, the other way (16 reserved)
 //   0x7ef0–0x7eff  unassigned: inert, refused as a step or combo output
 //   0x7f00–0x7f7f  CUSTOM_KEY_0–127     named keys: their shortcut and behaviour
 //   0x7f80–0x7fff  CUSTOM_KEY_LAYER_TAP(n)  runtime only: what custom key
