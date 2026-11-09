@@ -2,8 +2,8 @@
 
 Each domain decodes to plain JSON values, field by field, following the specs
 in docs/spec/: RGB v4 (rgb-domain-v1.md), key behaviours v2, combos v3,
-settings v11, keymap v1 and macros v1 (profile-wire-v1/), sparse PD v3
-(pd-mode-domain-v1.md). An action is written as the native keycode it stands for, so a
+settings v11, keymap v1, macros v1 and the autocorrect list v1
+(profile-wire-v1/), sparse PD v3 (pd-mode-domain-v1.md). An action is written as the native keycode it stands for, so a
 combo naming pointing slot 5 as a semantic action and one naming it as the keycode
 0x7e85 read the same; nonzero action flags are kept beside it.
 """
@@ -14,7 +14,7 @@ LAYERS = 16
 MATRIX_KEYS = 60
 MACRO_SLOTS = 128
 
-DOMAIN_NAMES = {0x10: "rgb", 0x20: "behaviors", 0x30: "combos", 0x40: "settings", 0x50: "pointing", 0x60: "keymap", 0x70: "macros"}
+DOMAIN_NAMES = {0x10: "rgb", 0x20: "behaviors", 0x30: "combos", 0x40: "settings", 0x50: "pointing", 0x60: "keymap", 0x70: "macros", 0x80: "autocorrect"}
 
 # users/noah/noah_keymap_ids.h and QMK's keycode blocks.
 _NATIVE_BASE = {2: 0x5220, 3: 0x7EC0, 4: 0x7E80, 5: 0x7EA0, 6: 0x7700, 7: 0x7F00}
@@ -182,7 +182,22 @@ def macros(data: bytes) -> list:
     return streams
 
 
-DECODERS = {"rgb": rgb, "behaviors": behaviors, "combos": combos, "settings": settings, "pointing": pointing, "keymap": keymap, "macros": macros}
+def autocorrect(data: bytes) -> list:
+    """Each correction with its typos and where each matches, in stored order."""
+    corrections, typos, part, text_length = struct.unpack_from("<HHHH", data, 0)
+    text = 8 + 6 * corrections + 6 * typos + 2 * part
+    assert len(data) == text + text_length
+    entries = []
+    for index in range(corrections):
+        offset, length = struct.unpack_from("<HB", data, 8 + 6 * index)
+        entries.append({"correction": data[text + offset : text + offset + length].decode("utf-8"), "typos": []})
+    for index in range(typos):
+        offset, length, match, correction = struct.unpack_from("<HBBH", data, 8 + 6 * corrections + 6 * index)
+        entries[correction]["typos"].append({"typo": data[text + offset : text + offset + length].decode("utf-8"), "match": match})
+    return entries
+
+
+DECODERS = {"rgb": rgb, "behaviors": behaviors, "combos": combos, "settings": settings, "pointing": pointing, "keymap": keymap, "macros": macros, "autocorrect": autocorrect}
 
 
 def logical(domains: dict) -> dict:

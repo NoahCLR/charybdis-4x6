@@ -50,9 +50,10 @@ enum {
     NOAH_PROFILE_WIRE_V1_PROTOCOL_MAJOR = 2u,
     NOAH_PROFILE_WIRE_V1_PROTOCOL_MINOR = 1u,
     // Capability layout 3 (D-F28): page 1 the byte-wide ceilings, page 2 the
-    // wider ones, payload capacities 32 bits.
+    // wider ones, payload capacities 32 bits; page 3 the autocorrect list's
+    // ceilings (D-F68).
     NOAH_PROFILE_WIRE_V1_CAPABILITY_LAYOUT     = 3u,
-    NOAH_PROFILE_WIRE_V1_CAPABILITY_PAGES      = 3u,
+    NOAH_PROFILE_WIRE_V1_CAPABILITY_PAGES      = 4u,
     NOAH_PROFILE_WIRE_V1_STATUS_PAGES          = 2u,
 };
 
@@ -146,6 +147,14 @@ typedef struct {
     uint32_t profile_slot_payload;
     uint32_t profile_slot_size;
     uint32_t macro_bytes;
+    // The autocorrect list (D-F68): its counted ceilings, its text capacity,
+    // the whole domain at those ceilings, and the bytes one correction or
+    // typo may take.
+    uint16_t autocorrect_corrections;
+    uint16_t autocorrect_typos;
+    uint16_t autocorrect_text_bytes;
+    uint32_t autocorrect_bytes;
+    uint8_t  autocorrect_text_max;
     uint8_t  supported_domain_mask;
     uint8_t  max_name_bytes;
     uint8_t  layer_mask_bits;

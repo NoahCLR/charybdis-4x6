@@ -48,9 +48,9 @@ typedef struct {
     bool                saw_pristine_marker;
 } reuse_guard_state_t;
 
-static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
-static const uint8_t rgb_profile[]      = {'N', 'L', 'P', '1', 4u, 3u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB, 3u, 0u, 0u, 0u, 1u, 2u, 3u};
-static const uint8_t behavior_profile[] = {'N', 'L', 'P', '1', 4u, 3u, 1u, 1u, 0x20u, NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS, 2u, 0u, 0u, 0u, 4u, 5u};
+static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 4u, 4u, 0u, 1u};
+static const uint8_t rgb_profile[]      = {'N', 'L', 'P', '1', 4u, 4u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB, 3u, 0u, 0u, 0u, 1u, 2u, 3u};
+static const uint8_t behavior_profile[] = {'N', 'L', 'P', '1', 4u, 4u, 1u, 1u, 0x20u, NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS, 2u, 0u, 0u, 0u, 4u, 5u};
 
 // The flash backend refuses a read or write over the store's I/O bound; one
 // here fails the test.
@@ -896,7 +896,7 @@ static void test_boot_selection_state_machine_is_scan_bounded(void) {
 // These are storage-envelope fixtures: domain bodies are opaque to this layer.
 // The schema validator remains responsible for semantic payload validation.
 static uint16_t pd_payload(uint8_t *payload, uint8_t mask) {
-    const uint8_t header[] = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
+    const uint8_t header[] = {'N', 'L', 'P', '1', 4u, 4u, 0u, 1u};
     uint16_t length = sizeof(header);
     memcpy(payload, header, sizeof(header));
     for (uint8_t domain = 0u; domain < NOAH_PROFILE_DOMAIN_REGISTRY_COUNT; domain++) {
@@ -1027,7 +1027,9 @@ static void test_pd_store_accepts_only_32_slot_rgb_and_pd_versions(void) {
 static void test_pd_header_all_identity_bits_and_boot_paths(void) {
     for (uint8_t origin = 0u; origin < 2u; origin++) {
         for (uint8_t flags = 0u; flags < 2u; flags++) {
-            for (uint8_t mask = 0u; mask <= NOAH_PROFILE_DOMAIN_MASK_ALL; mask++) {
+            // The registry fills the mask's byte, so the counter is wider.
+            for (unsigned every_mask = 0u; every_mask <= NOAH_PROFILE_DOMAIN_MASK_ALL; every_mask++) {
+                uint8_t mask = (uint8_t)every_mask;
                 uint8_t payload[64];
                 uint16_t length = pd_payload(payload, mask);
                 noah_profile_store_t store, rebooted;
@@ -1055,6 +1057,14 @@ static void test_pd_header_all_identity_bits_and_boot_paths(void) {
                 // A reader with a different schema must refuse the current record.
                 noah_profile_store_compatibility_t incompatible = compatibility();
                 incompatible.schema_major                       = 1u;
+                noah_profile_store_init(&rebooted, io_for(&eeprom), incompatible);
+                CHECK(noah_profile_store_boot_select(&rebooted, &record) == NOAH_PROFILE_STORE_NO_SAVED_PROFILE);
+                CHECK(noah_profile_store_boot_slot_result(&rebooted, NOAH_PROFILE_SLOT_A) == NOAH_PROFILE_STORE_INCOMPATIBLE_SCHEMA);
+                // So must one a schema minor ahead of the record: the firmware
+                // that adds a domain never boots the slot the one before it
+                // saved (D-F10), and the keyboard runs its compiled defaults.
+                incompatible = compatibility();
+                incompatible.schema_minor++;
                 noah_profile_store_init(&rebooted, io_for(&eeprom), incompatible);
                 CHECK(noah_profile_store_boot_select(&rebooted, &record) == NOAH_PROFILE_STORE_NO_SAVED_PROFILE);
                 CHECK(noah_profile_store_boot_slot_result(&rebooted, NOAH_PROFILE_SLOT_A) == NOAH_PROFILE_STORE_INCOMPATIBLE_SCHEMA);
@@ -1093,10 +1103,11 @@ static void test_pd_header_rejects_bad_contracts_before_writing(void) {
     reset_eeprom(&eeprom);
     initialize_pd_store(&store);
     for (uint8_t invalid = 0u; invalid < 10u; invalid++) {
-        if (invalid == 1u || invalid == 2u) continue; // were the retired VIA binding (D-F31)
+        // 1 and 2 were the retired VIA binding (D-F31); 0 was a mask bit no
+        // domain has, and eight domains now fill the mask (D-F68).
+        if (invalid <= 2u) continue;
         candidate = valid;
         switch (invalid) {
-            case 0: candidate.domain_mask = 0x80u; break;
             case 3: candidate.origin_half = 2u; break;
             case 4: candidate.flags = 2u; break;
             case 5:
@@ -1128,10 +1139,12 @@ static void test_pd_header_rejects_bad_contracts_before_writing(void) {
     store_u16(&header[33], header_crc16(header));
     CHECK(boot_slot_result(&eeprom, pd_compatibility(), NOAH_PROFILE_SLOT_A) == NOAH_PROFILE_STORE_INVALID_HEADER);
     header[5] ^= 4;
-    // Reserved bits and mask/payload disagreement stay invalid even with a valid CRC.
+    // Mask/payload disagreement stays invalid even with a valid CRC. Every
+    // mask bit names a domain (D-F68): the last one names a list this payload
+    // lacks.
     header[0] |= 0x80u;
     store_u16(&header[33], header_crc16(header));
-    CHECK(boot_slot_result(&eeprom, pd_compatibility(), NOAH_PROFILE_SLOT_A) == NOAH_PROFILE_STORE_INVALID_HEADER);
+    CHECK(boot_slot_result(&eeprom, pd_compatibility(), NOAH_PROFILE_SLOT_A) == NOAH_PROFILE_STORE_INVALID_PAYLOAD);
     header[0] = 0x0fu; // Drops PD from the mask.
     store_u16(&header[33], header_crc16(header));
     CHECK(boot_slot_result(&eeprom, pd_compatibility(), NOAH_PROFILE_SLOT_A) == NOAH_PROFILE_STORE_INVALID_PAYLOAD);
@@ -1148,14 +1161,8 @@ static void test_pd_header_rejects_bad_contracts_before_writing(void) {
         CHECK(commit_pd(&store, payload, &candidate) == NOAH_PROFILE_STORE_INVALID_PAYLOAD);
         CHECK(noah_profile_store_boot_select(&store, &record) == NOAH_PROFILE_STORE_NO_SAVED_PROFILE);
     }
-    // Mask bits beyond the seven current domains are refused before writing.
-    reset_eeprom(&eeprom);
-    initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_NO_SAVED_PROFILE);
-    candidate = candidate_for(empty_profile, sizeof(empty_profile), 1u, 0u);
-    candidate.format_version = NOAH_PROFILE_STORE_FORMAT_VERSION;
-    candidate.domain_mask    = 128u;
-    CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_INVALID_ARGUMENT);
-    CHECK(eeprom.write_calls == 0u);
+    // The eight current domains fill the mask (D-F68): no bit lies beyond them.
+    _Static_assert(NOAH_PROFILE_DOMAIN_MASK_ALL == UINT8_MAX, "a ninth domain needs a wider mask");
 }
 
 static void test_pd_header_power_loss_keeps_complete_generation(void) {
@@ -1337,7 +1344,7 @@ static void test_payload_over_64_kib_round_trips(void) {
     uint8_t                        span[40];
     noah_profile_store_result_t    result;
 
-    memcpy(payload, (const uint8_t[]){'N', 'L', 'P', '1', 4u, 3u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB}, 10u);
+    memcpy(payload, (const uint8_t[]){'N', 'L', 'P', '1', 4u, 4u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB}, 10u);
     payload[10] = (uint8_t)(WIDE - 14u);
     payload[11] = (uint8_t)((WIDE - 14u) >> 8u);
     payload[12] = (uint8_t)((WIDE - 14u) >> 16u);

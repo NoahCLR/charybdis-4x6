@@ -15,6 +15,8 @@ NOAH_COMMON_SOURCES := \
     lib/profile/schema/profile_pd_v1.c \
     lib/profile/schema/profile_keymap_v1.c \
     lib/profile/schema/profile_macros_v1.c \
+    lib/profile/schema/profile_autocorrect_v1.c \
+    lib/profile/schema/profile_autocorrect_words_v1.c \
     lib/profile/schema/profile_reader.c \
     lib/profile/schema/key_behavior_domain_v1.c \
     lib/profile/schema/profile_rgb_v1.c \
@@ -26,6 +28,7 @@ NOAH_COMMON_SOURCES := \
     lib/profile/schema/profile_pd_compiled_v1.c \
     lib/profile/schema/profile_keymap_compiled_v1.c \
     lib/profile/schema/profile_macros_compiled_v1.c \
+    lib/profile/schema/profile_autocorrect_compiled_v1.c \
     lib/profile/runtime/profile_action_runtime_v1.c \
     lib/profile/runtime/active_profile_provider.c \
     lib/profile/runtime/profile_working_copy.c \
@@ -166,6 +169,7 @@ NOAH_AUTOMOUSE_SOURCES := \
 # a build with no half cannot carry the owner.
 NOAH_LIVE_PROFILE_OWNER_SOURCES := \
     lib/profile/runtime/profile_owner.c \
+    lib/profile/runtime/active_profile_autocorrect_runtime.c \
     lib/profile/runtime/profile_action_placement_v1.c
 
 NOAH_RGB_KEYMAP_SOURCES := \

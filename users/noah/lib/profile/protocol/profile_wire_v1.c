@@ -94,6 +94,15 @@ static void encode_capabilities_page_two(uint8_t *payload, const noah_profile_wi
     // Bytes 20..24 remain canonical zero padding.
 }
 
+static void encode_capabilities_page_three(uint8_t *payload, const noah_profile_wire_v1_capabilities_t *capabilities) {
+    write_u16(&payload[0], capabilities->autocorrect_corrections);
+    write_u16(&payload[2], capabilities->autocorrect_typos);
+    write_u16(&payload[4], capabilities->autocorrect_text_bytes);
+    write_u32(&payload[6], capabilities->autocorrect_bytes);
+    payload[10] = capabilities->autocorrect_text_max;
+    // Bytes 11..24 remain canonical zero padding.
+}
+
 static void encode_status_page_zero(uint8_t *payload, const noah_profile_wire_v1_device_status_t *status) {
     payload[0] = 1u; // response layout version
     payload[1] = NOAH_PROFILE_WIRE_V1_STATUS_PAGES;
@@ -153,8 +162,10 @@ bool noah_profile_wire_v1_handle_get(const noah_profile_wire_v1_read_service_t *
             encode_capabilities_page_zero(&frame[WIRE_PAYLOAD], &service->capabilities);
         } else if (page == 1u) {
             encode_capabilities_page_one(&frame[WIRE_PAYLOAD], &service->capabilities);
-        } else {
+        } else if (page == 2u) {
             encode_capabilities_page_two(&frame[WIRE_PAYLOAD], &service->capabilities);
+        } else {
+            encode_capabilities_page_three(&frame[WIRE_PAYLOAD], &service->capabilities);
         }
     } else if (page == 0u) {
         encode_status_page_zero(&frame[WIRE_PAYLOAD], &service->status);

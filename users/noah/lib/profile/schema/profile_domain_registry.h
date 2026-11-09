@@ -8,7 +8,8 @@
 #include <stdint.h>
 
 // X(NAME, module, id, version). A row's index is its position, numbered by
-// the enum below, and its mask bit is 1 << index.
+// the enum below, and its mask bit is 1 << index. Eight rows fill the one-byte
+// domain mask: a ninth domain needs a wider mask everywhere one travels.
 #define NOAH_PROFILE_DOMAIN_ROWS(X) \
     X(RGB,           rgb,           0x10u, 4u) \
     X(KEY_BEHAVIORS, key_behaviors, 0x20u, 2u) \
@@ -16,7 +17,8 @@
     X(SETTINGS,      settings,      0x40u, 11u) \
     X(PD,            pd,            0x50u, 4u) \
     X(KEYMAP,        keymap,        0x60u, 1u) \
-    X(MACROS,        macros,        0x70u, 1u)
+    X(MACROS,        macros,        0x70u, 1u) \
+    X(AUTOCORRECT,   autocorrect,   0x80u, 1u)
 
 enum {
 #define NOAH_DOMAIN_INDEX(NAME, module, id, version) NOAH_PROFILE_DOMAIN_INDEX_##NAME,

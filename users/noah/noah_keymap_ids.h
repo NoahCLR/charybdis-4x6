@@ -397,6 +397,10 @@ extern const char *const macro_payloads[MACRO_SLOT_COUNT];
 // writing the compiled defaults copies bytes instead of compiling macros.
 extern const uint8_t  authored_macro_bank[];
 extern const uint16_t authored_macro_bank_size;
+// The authored autocorrect list as profile domain 0x80, generated from the
+// keymap folder's autocorrect.txt: the compiled defaults' list (D-F68).
+extern const uint8_t  authored_autocorrect_list[];
+extern const uint16_t authored_autocorrect_list_size;
 extern const char        macro_names[MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE];
 extern const char        custom_key_names[CUSTOM_KEY_SLOT_COUNT][NOAH_MACRO_NAME_SIZE];
 // Each custom key's authored shortcut, as settings v11 stores it: the report

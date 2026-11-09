@@ -37,6 +37,11 @@ static const noah_profile_wire_v1_read_service_t service = {
             .profile_slot_payload         = NOAH_PROFILE_PAYLOAD_MAX,
             .profile_slot_size            = 131072u,
             .macro_bytes                  = 70000u,
+            .autocorrect_corrections      = 1024u,
+            .autocorrect_typos            = 1025u,
+            .autocorrect_text_bytes       = 20480u,
+            .autocorrect_bytes            = 70001u,
+            .autocorrect_text_max         = 32u,
             .supported_domain_mask        = 3u,
             .max_name_bytes               = 32u,
             .layer_mask_bits              = 32u,
@@ -134,7 +139,7 @@ static void test_capability_pages(void) {
     assert(noah_profile_wire_v1_handle_get(&service, frame, sizeof(frame)));
     assert_golden("capabilities-page-0-response", frame);
     assert_success(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x41u, 0u);
-    assert(frame[7] == NOAH_PROFILE_WIRE_V1_CAPABILITY_LAYOUT && frame[7] == 3u && frame[8] == 3u);
+    assert(frame[7] == NOAH_PROFILE_WIRE_V1_CAPABILITY_LAYOUT && frame[7] == 3u && frame[8] == 4u);
     assert(frame[9] == 2u && frame[10] == 0u && frame[11] == 4u);
     assert(frame[13] == 32u && frame[14] == 0u && frame[15] == 2u);
     // The feature word: split and pointing, nothing else (D-F28).
@@ -167,7 +172,17 @@ static void test_capability_pages(void) {
     assert(frame[25] == 0x80u && frame[26] == 0x02u);
     for (uint8_t index = 27u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) assert(frame[index] == 0u);
 
+    // Page 3 holds the autocorrect list's ceilings (D-F68).
     request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x46u, 3u);
+    assert_golden("capabilities-page-3-request", frame);
+    assert(noah_profile_wire_v1_handle_get(&service, frame, sizeof(frame)));
+    assert_golden("capabilities-page-3-response", frame);
+    assert_success(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x46u, 3u);
+    assert(frame[7] == 0x00u && frame[8] == 0x04u && frame[9] == 0x01u && frame[10] == 0x04u && frame[11] == 0x00u && frame[12] == 0x50u);
+    assert(frame[13] == 0x71u && frame[14] == 0x11u && frame[15] == 0x01u && frame[16] == 0x00u && frame[17] == 32u);
+    for (uint8_t index = 18u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) assert(frame[index] == 0u);
+
+    request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x47u, 4u);
     assert(noah_profile_wire_v1_handle_get(&service, frame, sizeof(frame)));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE && frame[6] == 0u);
 }

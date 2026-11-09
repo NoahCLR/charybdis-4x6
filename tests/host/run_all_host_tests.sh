@@ -69,6 +69,7 @@ sh run_pd_profile_integration_tests.sh
 sh run_qmk_portable_editor_tests.sh
 sh run_qmk_portable_profile_tests.sh
 sh run_profile_validator_v1_tests.sh
+sh run_profile_autocorrect_v1_tests.sh
 sh run_profile_keymap_macros_runtime_tests.sh
 sh run_profile_validator_work_budget_tests.sh
 sh run_active_profile_provider_tests.sh

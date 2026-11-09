@@ -207,7 +207,7 @@ static void test_golden_incremental_phases(const char *fixture_path) {
 
 static void test_identity_capacity_and_masks(const char *fixture_path) {
     uint8_t                                   full[TEST_BUFFER_SIZE];
-    uint8_t                                   empty[NOAH_PROFILE_BLOB_V1_HEADER_SIZE] = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
+    uint8_t                                   empty[NOAH_PROFILE_BLOB_V1_HEADER_SIZE] = {'N', 'L', 'P', '1', 4u, 4u, 0u, 1u};
     size_t                                    full_length                             = fixture_hex(fixture_path, "profile.full.hex", full, sizeof(full));
     noah_profile_validator_v1_compatibility_t compatible                              = compatibility();
     noah_profile_validator_v1_declaration_t   declaration                             = declaration_for(full, full_length, (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS));
@@ -222,6 +222,18 @@ static void test_identity_capacity_and_masks(const char *fixture_path) {
     declaration.action_abi_digest--;
     declaration.schema_minor = NOAH_PROFILE_SCHEMA_MINOR + 1u;
     expect_result(noah_profile_validator_v1_begin(&validator, &reader, 0u, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INCOMPATIBLE_SCHEMA);
+    // The schema before this one, 4.3, is refused as it is declared, and a
+    // 4.3 blob under a current declaration at its header (D-F10).
+    declaration.schema_minor = NOAH_PROFILE_SCHEMA_MINOR - 1u;
+    expect_result(noah_profile_validator_v1_begin(&validator, &reader, 0u, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INCOMPATIBLE_SCHEMA);
+    assert(state.calls == 0u);
+    {
+        uint8_t                                 older[NOAH_PROFILE_BLOB_V1_HEADER_SIZE] = {'N', 'L', 'P', '1', 4u, NOAH_PROFILE_SCHEMA_MINOR - 1u, 0u, 1u};
+        noah_profile_validator_v1_declaration_t older_declaration                       = declaration_for(older, sizeof(older), 0u);
+        noah_profile_validator_v1_compatibility_t any = compatibility();
+        any.required_domain_mask = 0u;
+        expect_result(validate(older, sizeof(older), &older_declaration, &any, &error), NOAH_PROFILE_VALIDATOR_V1_INCOMPATIBLE_SCHEMA);
+    }
     declaration.schema_minor = NOAH_PROFILE_SCHEMA_MINOR;
     declaration.flags        = 1u;
     expect_result(noah_profile_validator_v1_begin(&validator, &reader, 0u, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_BLOB);
@@ -288,7 +300,7 @@ static void test_blob_and_domain_rejections(const char *fixture_path) {
     assert(error.detail_code == NOAH_PROFILE_CODEC_V1_DOMAIN_ORDER && error.domain_index == 1u);
 
     memcpy(bytes, valid, length);
-    bytes[8]    = 0x80u;
+    bytes[8]    = 0x90u;
     declaration = declaration_for(bytes, length, (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS));
     expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_UNSUPPORTED_DOMAIN);
 
@@ -464,7 +476,7 @@ static size_t combo_row(uint8_t *out, uint8_t inputs, uint8_t flags, uint16_t te
     return (size_t)(p - out);
 }
 static size_t combo_profile(uint8_t *bytes, uint8_t rows, uint8_t inputs, uint16_t domain_length) {
-    const uint8_t head[] = {'N', 'L', 'P', '1', 4, 3, 1, 1, 0x30, NOAH_PROFILE_DOMAIN_VERSION_COMBOS, (uint8_t)domain_length, (uint8_t)(domain_length >> 8), 0, 0, rows, 0, 0, 0, 60, 0, 200, 0};
+    const uint8_t head[] = {'N', 'L', 'P', '1', 4, 4, 1, 1, 0x30, NOAH_PROFILE_DOMAIN_VERSION_COMBOS, (uint8_t)domain_length, (uint8_t)(domain_length >> 8), 0, 0, rows, 0, 0, 0, 60, 0, 200, 0};
     size_t        length = sizeof(head);
     memcpy(bytes, head, sizeof(head));
     for (unsigned row = 0; row < rows; row++)
@@ -571,7 +583,7 @@ static void test_combo_domain(void) {
 
 // Rows of different lengths, the default window, and retired versions.
 static void test_combo_domain_v3(void) {
-    uint8_t bytes[8 + 6 + 8 + 20 + 24] = {'N', 'L', 'P', '1', 4, 3, 1, 1, 0x30, NOAH_PROFILE_DOMAIN_VERSION_COMBOS, 52, 0, 0, 0, 2, 0, 0, 0, 60, 0, 150, 0};
+    uint8_t bytes[8 + 6 + 8 + 20 + 24] = {'N', 'L', 'P', '1', 4, 4, 1, 1, 0x30, NOAH_PROFILE_DOMAIN_VERSION_COMBOS, 52, 0, 0, 0, 2, 0, 0, 0, 60, 0, 150, 0};
     combo_row(&bytes[22], 2, 0, 0, 0xffffu, 41, 4);  // follows the default window
     combo_row(&bytes[42], 3, 6, 45, 0x0005u, 41, 6); // its own window, tap and order, layers 0 and 2
     noah_profile_validator_v1_compatibility_t compatible = compatibility();
@@ -671,7 +683,7 @@ static void test_combo_native_rule(void) {
 
 // A profile of one domain: the blob header, its 6-byte envelope, its payload.
 static size_t single_domain_profile(uint8_t *bytes, uint8_t id, uint8_t version, const uint8_t *payload, uint32_t length) {
-    const uint8_t head[] = {'N', 'L', 'P', '1', 4, 3, 1, 1, id, version, (uint8_t)length, (uint8_t)(length >> 8), (uint8_t)(length >> 16), (uint8_t)(length >> 24)};
+    const uint8_t head[] = {'N', 'L', 'P', '1', 4, 4, 1, 1, id, version, (uint8_t)length, (uint8_t)(length >> 8), (uint8_t)(length >> 16), (uint8_t)(length >> 24)};
     memcpy(bytes, head, sizeof(head));
     memcpy(&bytes[sizeof(head)], payload, length);
     return sizeof(head) + length;
@@ -825,6 +837,67 @@ static void test_macro_domain(void) {
     assert(error.byte_offset == 14u);
 }
 
+static noah_profile_validator_v1_result_t validate_autocorrect_list(const uint8_t *payload, size_t payload_length, noah_profile_validator_v1_error_t *error) {
+    uint8_t                                   bytes[14u + 64u];
+    noah_profile_validator_v1_compatibility_t compatible = single_domain_compatibility();
+    assert(payload_length <= 64u);
+    size_t                                    length      = single_domain_profile(bytes, NOAH_PROFILE_DOMAIN_V1_AUTOCORRECT, NOAH_PROFILE_AUTOCORRECT_V1_VERSION, payload, (uint32_t)payload_length);
+    noah_profile_validator_v1_declaration_t   declaration = declaration_for(bytes, length, NOAH_PROFILE_VALIDATOR_V1_DOMAIN_AUTOCORRECT);
+    return validate(bytes, length, &declaration, &compatible, error);
+}
+
+// The autocorrect list inside a profile (domain 0x80, D-F68). The list's own
+// refusals, one vector each, are run_profile_autocorrect_v1_tests.sh's; here a
+// whole-profile validation accepts a list and names a refusal's table, row
+// and reason for the client.
+static void test_autocorrect_domain(void) {
+    noah_profile_validator_v1_error_t error;
+    // teh -> the (autocorrect_domain_v1.json's "one"), then the empty list.
+    static const uint8_t one[] = {1, 0, 1, 0, 0, 0, 6, 0, 0, 0, 3, 0, 0, 0, 3, 0, 3, 0, 0, 0, 't', 'h', 'e', 't', 'e', 'h'};
+    uint8_t              list[sizeof(one)];
+
+    expect_result(validate_autocorrect_list(one, sizeof(one), &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
+    expect_result(validate_autocorrect_list(MACRO_BYTES(0, 0, 0, 0, 0, 0, 0, 0), &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
+
+    // A typo that is its own correction: the typo table, its row, the reason.
+    memcpy(list, one, sizeof(one));
+    memcpy(&list[23], "the", 3u);
+    expect_result(validate_autocorrect_list(list, sizeof(list), &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    assert(error.domain_id == NOAH_PROFILE_DOMAIN_V1_AUTOCORRECT && error.domain_index == 0u && error.table_id == NOAH_PROFILE_AUTOCORRECT_V1_TABLE_TYPOS && error.row_index == 0u && error.field_id == NOAH_PROFILE_AUTOCORRECT_V1_TYPO_IS_CORRECTION);
+    assert(error.byte_offset == 14u + 14u);
+    // A capital in a typo.
+    memcpy(list, one, sizeof(one));
+    list[23] = 'T';
+    expect_result(validate_autocorrect_list(list, sizeof(list), &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    assert(error.table_id == NOAH_PROFILE_AUTOCORRECT_V1_TABLE_TYPOS && error.field_id == NOAH_PROFILE_AUTOCORRECT_V1_NOT_FOLDED);
+    // A correction no typo names: its first typo is past the typos.
+    memcpy(list, one, sizeof(one));
+    list[12] = 1;
+    expect_result(validate_autocorrect_list(list, sizeof(list), &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    assert(error.table_id == NOAH_PROFILE_AUTOCORRECT_V1_TABLE_CORRECTIONS && error.row_index == 0u && error.field_id == NOAH_PROFILE_AUTOCORRECT_V1_INVALID_REFERENCE);
+    // A header that does not count the domain's bytes names no table or row.
+    expect_result(validate_autocorrect_list(one, sizeof(one) - 1u, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    assert(error.table_id == NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8 && error.row_index == NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16 && error.field_id == NOAH_PROFILE_AUTOCORRECT_V1_INVALID_LENGTH);
+    // The domain's version is the registry's.
+    {
+        uint8_t                                   bytes[14u + sizeof(one)];
+        noah_profile_validator_v1_compatibility_t compatible = single_domain_compatibility();
+        size_t                                    length     = single_domain_profile(bytes, NOAH_PROFILE_DOMAIN_V1_AUTOCORRECT, NOAH_PROFILE_AUTOCORRECT_V1_VERSION + 1u, one, sizeof(one));
+        noah_profile_validator_v1_declaration_t   declaration = declaration_for(bytes, length, NOAH_PROFILE_VALIDATOR_V1_DOMAIN_AUTOCORRECT);
+        expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+        assert(error.detail_code == NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION);
+    }
+    // A build that does not admit the list refuses a profile holding it.
+    {
+        uint8_t                                   bytes[14u + sizeof(one)];
+        noah_profile_validator_v1_compatibility_t compatible = single_domain_compatibility();
+        size_t                                    length     = single_domain_profile(bytes, NOAH_PROFILE_DOMAIN_V1_AUTOCORRECT, NOAH_PROFILE_AUTOCORRECT_V1_VERSION, one, sizeof(one));
+        noah_profile_validator_v1_declaration_t   declaration = declaration_for(bytes, length, NOAH_PROFILE_VALIDATOR_V1_DOMAIN_AUTOCORRECT);
+        compatible.allowed_domain_mask &= (uint8_t)~NOAH_PROFILE_VALIDATOR_V1_DOMAIN_AUTOCORRECT;
+        expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_UNSUPPORTED_DOMAIN);
+    }
+}
+
 int main(int argc, char **argv) {
     assert(argc == 2);
     test_golden_incremental_phases(argv[1]);
@@ -838,6 +911,7 @@ int main(int argc, char **argv) {
     test_combo_native_rule();
     test_keymap_domain();
     test_macro_domain();
+    test_autocorrect_domain();
     puts("profile validator v1 host tests passed");
     return 0;
 }

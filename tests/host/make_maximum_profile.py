@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Write the maximum profile fixture (D-F14), or check it is current.
 
-Every table at its simultaneous maximum in one schema 4.3 blob: RGB v4 with
+Every table at its simultaneous maximum in one schema 4.4 blob: RGB v4 with
 128 groups, sixteen layer colours and 640 group rows, 255 in one table
 (D-F63); 128 behaviour rows of
 five full steps (640 steps); 128 combos of sixteen inputs; settings v11 with
 a shortcut on every custom key, most of them six keys with layers, and
 every one of its 273 names at 32 bytes of UTF-8; and 32 pointing slots (v4), each named with 32
 bytes, with every layer starting one of them; the full 1,920-byte matrix and
-34,903-byte macro bank.
+34,903-byte macro bank; and an autocorrect list of 1,024 corrections and 1,024
+typos, every typo part of a word, in 20,480 bytes of text (34,824 bytes).
 Values reach the edges the plan names: layers 7, 8 and
 15, combo rows 31, 32, 63, 64 and 127, macros and custom keys 0, 63, 64 and
 127. It is test evidence built from the byte specs, not from firmware code.
@@ -26,6 +27,9 @@ import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools" / "autocorrect"))
+import build as autocorrect_list  # noqa: E402  (the list's one encoder)
+
 FIXTURE = ROOT / "tests/fixtures/maximum_profile_v4.fixture"
 LAYERS = 16
 DEPTH = 5
@@ -232,9 +236,15 @@ def macros() -> bytes:
     return b"a" * (34903 - 128) + b"\0" * 128
 
 
+def autocorrect() -> bytes:
+    payload = autocorrect_list.encode(autocorrect_list.maximum_entries())
+    assert len(payload) == autocorrect_list.MAX_SIZE == 34824
+    return payload
+
+
 def blob() -> tuple[bytes, list[tuple[int, int, bytes]]]:
-    domains = [(0x10, 4, rgb()), (0x20, 2, behaviors()), (0x30, 3, combos()), (0x40, 11, settings()), (0x50, 4, pointing()), (0x60, 1, keymap()), (0x70, 1, macros())]
-    out = bytearray(b"NLP1" + bytes([4, 3, len(domains), 1]))
+    domains = [(0x10, 4, rgb()), (0x20, 2, behaviors()), (0x30, 3, combos()), (0x40, 11, settings()), (0x50, 4, pointing()), (0x60, 1, keymap()), (0x70, 1, macros()), (0x80, 1, autocorrect())]
+    out = bytearray(b"NLP1" + bytes([4, 4, len(domains), 1]))
     for domain_id, version, payload in domains:
         out += bytes([domain_id, version]) + struct.pack("<I", len(payload)) + payload
     assert len(out) + ALLOWANCE <= PAYLOAD_MAX
