@@ -100,6 +100,10 @@ static bool    macro_capture_suppressed;
 // lease itself says what it holds: for that report the macro's keys cannot be
 // told from the person's.
 static bool macro_lease_changing;
+// The filters' working copies of a report's usages. They sit at the bottom of
+// the deepest reviewed stack paths, so they are static: a report is filtered
+// on the main thread only, and nothing a filter calls sends another.
+static uint8_t macro_report_keys[32], macro_report_macro_keys[32];
 
 static void macro_payload_lease_keys(const owned_keycode_lease_t *lease, uint8_t keys[32]) {
     if (lease->active && lease->has_basic && IS_BASIC_KEYCODE(lease->basic)) keys[lease->basic / 8u] |= (uint8_t)(1u << (lease->basic % 8u));
@@ -142,17 +146,17 @@ static void macro_payload_project_keys(uint8_t keys[32]) {
     // The typing stage reads the person's keys and answers with the ones the
     // host is to see; the macro's own keys join them below as they always did.
     if (noah_typing_stage_active()) {
-        uint8_t macro_keys[32] = {0};
-        uint8_t macro_mods     = macro_payload_output_mods();
+        uint8_t macro_mods = macro_payload_output_mods();
         if (macro_lease_changing) {
             // Everything counts as the macro's, so the stage reads nothing
             // from this report; the one after the change is read as usual.
-            memset(macro_keys, 0xFF, sizeof(macro_keys));
+            memset(macro_report_macro_keys, 0xFF, sizeof(macro_report_macro_keys));
             macro_mods = 0xFFu;
         } else {
-            macro_payload_output_keys(macro_keys);
+            memset(macro_report_macro_keys, 0, sizeof(macro_report_macro_keys));
+            macro_payload_output_keys(macro_report_macro_keys);
         }
-        noah_typing_stage_keys(keys, macro_keys, macro_mods);
+        noah_typing_stage_keys(keys, macro_report_macro_keys, macro_mods);
     }
     if (macro_capture_suppressed)
         for (uint8_t i = 0u; i < 32u; i++)
@@ -181,7 +185,8 @@ static bool macro_payload_filter_needed(void) {
 
 void keyboard_report_keys_filter_user(report_keyboard_t *report) {
     if (!macro_payload_filter_needed()) return;
-    uint8_t keys[32] = {0};
+    uint8_t *keys = macro_report_keys;
+    memset(keys, 0, sizeof(macro_report_keys));
     for (uint8_t i = 0u; i < sizeof(report->keys); i++)
         keys[report->keys[i] / 8u] |= (uint8_t)(1u << (report->keys[i] % 8u));
     keys[0] &= (uint8_t)~1u;
@@ -196,7 +201,8 @@ void keyboard_report_keys_filter_user(report_keyboard_t *report) {
 #ifdef NKRO_ENABLE
 void nkro_report_keys_filter_user(report_nkro_t *report) {
     if (!macro_payload_filter_needed()) return;
-    uint8_t keys[32] = {0};
+    uint8_t *keys = macro_report_keys;
+    memset(keys, 0, sizeof(macro_report_keys));
     for (uint8_t i = 0u; i < sizeof(report->bits); i++)
         keys[i] = report->bits[i];
     macro_payload_project_keys(keys);

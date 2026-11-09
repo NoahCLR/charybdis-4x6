@@ -86,14 +86,13 @@ typedef struct {
     autocorrect_choice_t choice;
     uint8_t  kept, typed;     // Of the corrected word: characters unchanged, characters typed.
     uint8_t  watched;         // The usage whose hold is timed, zero for none.
-    uint32_t watched_at, stepped_at;
+    uint32_t watched_at;
     bool     synced : 1;      // live and shown describe the reports since the stage last ran.
+    bool     resumed : 1;     // The stage has just started reading reports again.
     bool     on : 1;
     bool     allowed : 1;     // The override, as the stage last read it.
     bool     suspended : 1;   // Nothing is corrected until the next word end.
     bool     left_alone : 1;  // This word was put back by an undo.
-    bool     replaying : 1;   // Held-back keys come out one at a time, paced.
-    bool     step_due : 1;
     bool     lagging : 1;     // A change did not fit the queue and waits in the report.
     bool     head_decided : 1;   // The ending key at the head has had its lookup.
     bool     corrected : 1;      // That word was corrected.
@@ -344,12 +343,13 @@ static void autocorrect_pop(void) {
     autocorrect.count--;
 }
 
-// Shows the host the changes at the head of the queue, in order, until one
-// has to wait. While held-back keys are coming out, one key change a step.
-static void autocorrect_pump(void) {
-    bool one = autocorrect.replaying;
+// Shows the host the next change at the head of the queue, unless it has to
+// wait: one key change a scan, with the modifier changes before it, so a
+// press and its release never share a report. True when what the host is
+// shown changed.
+static __attribute__((noinline)) bool autocorrect_pump(void) {
+    bool changed = false;
 
-    autocorrect.step_due = false;
     while (autocorrect.count && autocorrect.state == AUTOCORRECT_IDLE) {
         autocorrect_edge_t edge = autocorrect.queue[autocorrect.head];
 
@@ -361,17 +361,18 @@ static void autocorrect_pump(void) {
                 autocorrect_set_bit(autocorrect.shown, edge.value, false);
                 break;
             case AUTOCORRECT_EDGE_DOWN:
-                if (!autocorrect_key_down(edge.value)) return;
+                if (!autocorrect_key_down(edge.value)) return changed;
                 autocorrect_set_bit(autocorrect.shown, edge.value, true);
                 break;
             default:
                 autocorrect.state = AUTOCORRECT_MACRO_START;
-                return;
+                return changed;
         }
         autocorrect_pop();
-        if (one && edge.kind != AUTOCORRECT_EDGE_MODS) break;
+        changed = true;
+        if (edge.kind != AUTOCORRECT_EDGE_MODS) break;
     }
-    if (!autocorrect.count && autocorrect.state == AUTOCORRECT_IDLE) autocorrect.replaying = false;
+    return changed;
 }
 
 // A change that does not fit stays in the report and is read again at the
@@ -394,7 +395,7 @@ static bool autocorrect_wanted(void) {
 }
 
 static bool autocorrect_holding(void) {
-    return autocorrect.state != AUTOCORRECT_IDLE || autocorrect.count != 0u || autocorrect.replaying;
+    return autocorrect.state != AUTOCORRECT_IDLE || autocorrect.count != 0u;
 }
 
 static bool autocorrect_settled(void) {
@@ -410,18 +411,18 @@ bool noah_typing_stage_active(void) {
     return false;
 }
 
+// The report hook only records: it reads what changed since the report
+// before, queues it and answers with what the host has been shown so far.
+// The scan reads the queue as typing and shows it, a change at a time. This
+// runs deep inside key processing, on the reviewed stack paths, so it calls
+// nothing that looks anything up.
 void noah_typing_stage_keys(uint8_t keys[32], const uint8_t macro_keys[32], uint8_t macro_mods) {
     uint8_t mods   = (uint8_t)(get_mods() | get_weak_mods() | get_oneshot_mods());
-    bool    wanted = autocorrect_wanted();
     bool    typing = false;
 
     // The person's own keys: what a macro holds is not theirs, and while it
     // holds a usage or modifier theirs stays as it last was.
     mods = (uint8_t)((mods & ~macro_mods) | (autocorrect.live_mods & macro_mods));
-    for (uint8_t index = 0u; index < 32u; index++) {
-        keys[index] = (uint8_t)((keys[index] & ~macro_keys[index]) | (autocorrect.live[index] & macro_keys[index]));
-        typing      = typing || keys[index] != 0u;
-    }
     if (!autocorrect.synced) {
         // Reports went out unread: the keyboard does not know where the word
         // on screen began. Every key now down is read as going down, which
@@ -430,42 +431,22 @@ void noah_typing_stage_keys(uint8_t keys[32], const uint8_t macro_keys[32], uint
         memset(autocorrect.shown, 0, sizeof(autocorrect.shown));
         autocorrect.live_mods = autocorrect.shown_mods = mods;
         autocorrect.synced                             = true;
-        autocorrect_forget(true);
+        autocorrect.resumed                            = true;
     }
-    if (wanted != autocorrect.on) {
-        autocorrect.on = wanted;
-        if (!wanted) autocorrect_forget(false);
-    }
-    if (autocorrect_switch_override() != autocorrect.allowed) {
-        // Switched by key in the middle of a word, that word is left alone.
-        autocorrect.allowed = !autocorrect.allowed;
-        if (autocorrect.length) autocorrect_forget(true);
-        autocorrect.undo_armed = false;
-    }
-    // A macro's text is never typing: whatever it types, the next word
-    // starts fresh.
-    if (autocorrect.state == AUTOCORRECT_IDLE && !macro_payload_engine_idle()) autocorrect_forget(false);
-
     autocorrect.lagging = false;
-    for (uint8_t index = 0u; index < 32u && !autocorrect.lagging; index++) {
-        uint8_t released = (uint8_t)(autocorrect.live[index] & ~keys[index]);
-        for (uint8_t bit = 0u; released && bit < 8u; bit++) {
-            if (!(released & (1u << bit))) continue;
-            if (!autocorrect_queue_change(AUTOCORRECT_EDGE_UP, (uint8_t)(index * 8u + bit))) break;
-            autocorrect.live[index] &= (uint8_t)~(1u << bit);
+    for (uint8_t index = 0u; index < 32u; index++) {
+        keys[index] = (uint8_t)((keys[index] & ~macro_keys[index]) | (autocorrect.live[index] & macro_keys[index]));
+        typing      = typing || keys[index] != 0u;
+        for (uint8_t released = (uint8_t)(autocorrect.live[index] & ~keys[index]), bit = 0u; released && bit < 8u && !autocorrect.lagging; bit++) {
+            if ((released & (1u << bit)) && autocorrect_queue_change(AUTOCORRECT_EDGE_UP, (uint8_t)(index * 8u + bit))) autocorrect.live[index] &= (uint8_t)~(1u << bit);
         }
     }
     if (!autocorrect.lagging && mods != autocorrect.live_mods && autocorrect_queue_change(AUTOCORRECT_EDGE_MODS, mods)) autocorrect.live_mods = mods;
     for (uint8_t index = 0u; index < 32u && !autocorrect.lagging; index++) {
-        uint8_t pressed = (uint8_t)(keys[index] & ~autocorrect.live[index]);
-        for (uint8_t bit = 0u; pressed && bit < 8u; bit++) {
-            if (!(pressed & (1u << bit))) continue;
-            if (!autocorrect_queue_change(AUTOCORRECT_EDGE_DOWN, (uint8_t)(index * 8u + bit))) break;
-            autocorrect.live[index] |= (uint8_t)(1u << bit);
+        for (uint8_t pressed = (uint8_t)(keys[index] & ~autocorrect.live[index]), bit = 0u; pressed && bit < 8u && !autocorrect.lagging; bit++) {
+            if ((pressed & (1u << bit)) && autocorrect_queue_change(AUTOCORRECT_EDGE_DOWN, (uint8_t)(index * 8u + bit))) autocorrect.live[index] |= (uint8_t)(1u << bit);
         }
     }
-
-    if (autocorrect.state == AUTOCORRECT_IDLE && (!autocorrect.replaying || autocorrect.step_due)) autocorrect_pump();
     memcpy(keys, autocorrect.shown, sizeof(autocorrect.shown));
     // QMK spends a one-shot modifier on the report that carries a key; while
     // the stage supplies the modifiers it spends it here, where the key was
@@ -489,11 +470,9 @@ void noah_typing_stage_note_click(void) {
 
 // ── Corrections ─────────────────────────────────────────────────────────────
 
-// Held-back keys come out again, the first of them at once.
+// Held-back keys come out again, from the next pass of the scan.
 static void autocorrect_release(void) {
-    autocorrect.state     = AUTOCORRECT_IDLE;
-    autocorrect.replaying = true;
-    autocorrect.step_due  = true;
+    autocorrect.state = AUTOCORRECT_IDLE;
 }
 
 static void autocorrect_playback_finished(macro_payload_finish_result_t result, void *context) {
@@ -613,7 +592,7 @@ static bool autocorrect_correction_text(const autocorrect_choice_t *choice, uint
     return form != AUTOCORRECT_FORM_AS_WRITTEN && autocorrect_plan(choice, AUTOCORRECT_FORM_AS_WRITTEN, correction, count, text, length, kept);
 }
 
-static void autocorrect_start_correction(void) {
+static __attribute__((noinline)) void autocorrect_start_correction(void) {
     uint16_t text[AUTOCORRECT_TEXT_MAX];
     uint8_t  length = 0u, kept = 0u;
 
@@ -644,8 +623,10 @@ static void autocorrect_consider(uint16_t correction, uint8_t start, uint8_t len
 
 // Looks the finished word up: the whole word first, then the part-of-word
 // typos a bounded number a scan. The longest typo wins, and of equal ones the
-// first in the list; a whole-word typo beats them all.
-static void autocorrect_lookup(void) {
+// first in the list; a whole-word typo beats them all. Its workspace, like
+// the other steps' below, stays out of the scan's own frame, which every
+// path through the matrix scan stands on.
+static __attribute__((noinline)) void autocorrect_lookup(void) {
     const noah_profile_autocorrect_v1_list_t *list = noah_active_profile_autocorrect_list();
     noah_profile_autocorrect_v1_typo_t        typo;
     uint16_t                                  folded[NOAH_AUTOCORRECT_WORD_MAX], part[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX];
@@ -713,7 +694,7 @@ static void autocorrect_lookup(void) {
 // correction typed go, and the word comes back as it was typed. The
 // Backspace itself never reaches the host. When this host cannot type the
 // word back, it is an ordinary Backspace.
-static void autocorrect_start_undo(void) {
+static __attribute__((noinline)) void autocorrect_start_undo(void) {
     const macro_payload_typing_host_t host      = macro_payload_typing_host();
     bool                              caps_lock = macro_payload_unicode_caps_lock();
     uint16_t                          text[NOAH_AUTOCORRECT_WORD_MAX];
@@ -755,10 +736,35 @@ static void autocorrect_watch_hold(uint32_t now) {
     }
 }
 
+// What the switches say now, read from the scan so a change takes effect
+// between two keys and never in the middle of one.
+static void autocorrect_read_switches(void) {
+    bool wanted = autocorrect_wanted();
+
+    if (autocorrect.resumed) {
+        autocorrect.resumed = false;
+        autocorrect_forget(true);
+    }
+    if (wanted != autocorrect.on) {
+        autocorrect.on = wanted;
+        if (!wanted) autocorrect_forget(false);
+    }
+    if (autocorrect_switch_override() != autocorrect.allowed) {
+        // Switched by key in the middle of a word, that word is left alone.
+        autocorrect.allowed = !autocorrect.allowed;
+        if (autocorrect.length) autocorrect_forget(true);
+        autocorrect.undo_armed = false;
+    }
+    // A macro's text is never typing: whatever it types, the next word
+    // starts fresh.
+    if (autocorrect.state == AUTOCORRECT_IDLE && !macro_payload_engine_idle()) autocorrect_forget(false);
+}
+
 void noah_autocorrect_scan(void) {
-    uint32_t now;
+    bool changed = false;
 
     if (!autocorrect.synced) return;
+    autocorrect_read_switches();
     switch (autocorrect.state) {
         case AUTOCORRECT_LOOKUP:
             autocorrect_lookup();
@@ -775,17 +781,11 @@ void noah_autocorrect_scan(void) {
         default:
             break;
     }
-    if (autocorrect.state != AUTOCORRECT_IDLE || !(autocorrect.watched || autocorrect.replaying || autocorrect.lagging)) return;
-    now = timer_read32();
-    if (autocorrect.watched) autocorrect_watch_hold(now);
-    // Held-back keys come out paced, and every scan once the queue is over
-    // half full or a change is waiting for room in it, so it empties faster
-    // than keys can be pressed.
-    if (autocorrect.lagging || (autocorrect.replaying && (autocorrect.step_due || autocorrect.count > NOAH_AUTOCORRECT_QUEUE_SIZE / 2u || now - autocorrect.stepped_at >= NOAH_AUTOCORRECT_REPLAY_MS))) {
-        autocorrect.step_due   = true;
-        autocorrect.stepped_at = now;
-        send_keyboard_report();
-    }
+    if (autocorrect.state != AUTOCORRECT_IDLE) return;
+    if (autocorrect.watched) autocorrect_watch_hold(timer_read32());
+    changed = autocorrect_pump();
+    // A change waiting for room in the queue is read again from the report.
+    if (changed || autocorrect.lagging) send_keyboard_report();
 }
 
 void noah_autocorrect_init(void) {

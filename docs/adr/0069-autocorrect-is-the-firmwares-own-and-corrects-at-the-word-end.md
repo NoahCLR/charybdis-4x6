@@ -47,6 +47,16 @@ behaviour's tap decided on release, a combo, a custom key's shortcut. It
 reads each change of the outgoing report as a key or modifier going down or
 up.
 
+The hook itself only records. It runs at the bottom of the deepest reviewed
+stack paths, inside key processing, so it compares the report with the one
+before, queues what changed and answers with what the computer has been
+shown so far; it looks nothing up. The scan reads the queue as typing and
+shows it, one key change a scan. So with autocorrect on, a key reaches the
+computer at the scan after it was pressed, and a press and its release never
+share a report. The filters' working copies of the report became static for
+the same reason, which keeps those paths inside their budget without a
+larger stack.
+
 Holding the ending key back at the same place keeps the key runtime out of
 it. Presses keep being processed live, with their real timing, so tap and
 hold decisions, layers and locks are not disturbed; only what the computer is
@@ -56,8 +66,7 @@ have replayed presses with compressed timing through QMK's tapping and the
 key runtime's reducer, and changed what a held key decides.
 
 The lookup and every start (a correction, an undo, a queued macro) run from
-the matrix scan in bounded steps, never from the report hook, which is
-reached from deep inside key processing (D-F54's rule for callbacks).
+the matrix scan too, in bounded steps (D-F54's rule for callbacks).
 
 ## Typing a correction: an amendment to D-F17
 
@@ -77,8 +86,8 @@ than finding the engine busy. The engine gained one step for this source,
 only; no stored macro holds it.
 
 The pace is fixed here because the build defines no `TAP_CODE_DELAY`: 5 ms
-held and 5 ms after each key of a correction, and 2 ms between held-back
-changes as they come out.
+held and 5 ms after each key of a correction. Held-back changes come out one
+key change a scan.
 
 ## The queue is bounded and never costs a key
 
@@ -91,7 +100,7 @@ reordering anything:
   cancelled where it stands, so the queue can empty; the word is left partly
   corrected, which is the one thing given up;
 - a change that does not fit is not consumed: it stays in the report and is
-  read again at the next scan, while the queue empties one change a scan.
+  read again at the next scan, while the queue empties a key change a scan.
 
 The alternative, dropping presses as D-F17 does, loses typing; a larger queue
 only moves the limit.

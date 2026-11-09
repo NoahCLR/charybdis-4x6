@@ -25,8 +25,6 @@ enum {
     NOAH_AUTOCORRECT_STROKES_MAX = 48u,
     // A correction's keys are each held this long and followed by as long a gap.
     NOAH_AUTOCORRECT_PACE_MS = 5u,
-    // Held-back keys come out this far apart.
-    NOAH_AUTOCORRECT_REPLAY_MS = 2u,
     // A key held this long is taken to repeat on the host.
     NOAH_AUTOCORRECT_HOLD_MS = 200u,
     // Part-of-word typos compared in one scan.

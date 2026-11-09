@@ -169,24 +169,26 @@ D-F69. Autocorrect (`lib/autocorrect/`) is the **typing stage**
 (`macro/typing_stage.h`): the report filters hand it every outgoing report
 before the macro's own projection.
 
-- **Reading.** `noah_typing_stage_keys` gets the live usages with the playing
-  macro's leases taken out, and the report a lease change sends from inside
-  the ledger is not read at all. It turns each difference from the report
-  before into a change (a usage up or down, the modifiers), reads key-downs
-  through the host layout and follows the word
-  ([autocorrect](../spec/autocorrect-v1.md)).
-- **Holding back.** A key that ends a word waits at the head of the stage's
-  queue while the scan looks the word up (`noah_autocorrect_scan`, after the
-  engine's scan). While anything waits, the stage answers the report with the
-  usages and modifiers the computer has been shown so far, and
-  `keyboard_report_mods_override_user` uses its modifiers.
+- **Recording.** `noah_typing_stage_keys` gets the live usages with the
+  playing macro's leases taken out, and the report a lease change sends from
+  inside the ledger is not read at all. It queues each difference from the
+  report before (a usage up or down, the modifiers) and answers with the
+  usages the computer has been shown so far;
+  `keyboard_report_mods_override_user` uses the stage's modifiers while
+  anything is queued. The hook looks nothing up: it is at the bottom of the
+  deepest reviewed stack paths.
+- **Reading and holding back.** `noah_autocorrect_scan`, after the engine's
+  scan, shows the queue one key change a pass, reading each key-down through
+  the host layout and following the word
+  ([autocorrect](../spec/autocorrect-v1.md)). A key that ends a word waits at
+  the head of the queue while the scan looks the word up.
 - **Typing.** `macro_slot_provider_start_correction` writes an erase step and
   the characters into the shared window and starts the engine with source
   `MACRO_PAYLOAD_SOURCE_CORRECTION`: uninterruptible output, 5 ms a key, but
   `macro_payload_engine_ignores_presses` stays false, so the press guard
   drops nothing. A slot start meanwhile is busy.
-- **Letting out.** When playback ends the stage shows its queue one change a
-  step, 2 ms apart, reading each as typing. A macro trigger that arrived
+- **Letting out.** When playback ends the scan goes on showing the queue,
+  reading each key as typing. A macro trigger that arrived
   meanwhile (`noah_typing_stage_defer_macro`, from
   `noah_profile_macro_try_play`) starts when its turn comes, and the queue
   waits until it has played.

@@ -148,11 +148,17 @@ inside its physical stack:
 The split slave thread's stack is QMK's serial-protocol thread, not core 1's.
 `tools/check_firmware_stack_budget.py` reads the linked disassembly for each
 function's frame and its direct calls, and walks the paths a manifest names:
-`tools/firmware_stack_budget.json` (key runtime, pointing, macros, storage
-reads) and `tools/firmware_stack_budget_live_profile_owner.json` (the
+`tools/firmware_stack_budget.json` (key runtime, pointing, macros,
+autocorrect, storage reads) and `tools/firmware_stack_budget_live_profile_owner.json` (the
 live-profile owner, Profile Wire, the split protocol, saving). Every adjacency
 on a path that is not a direct call must be a declared indirect edge; a path
 whose adjacency the linker no longer makes fails the gate.
+
+The keyboard-report filters end the deepest of these paths, so they keep
+nothing large on the stack: their working copies of a report's usages are
+static, and the typing stage only queues what changed there. Autocorrect's
+lookup and its starts each keep their workspace in a frame of their own
+below the matrix scan (D-F69).
 
 A PASS covers the named paths only. It is not a global or interrupt-stack
 maximum and not a measured high-water: the sums start at `main` and leave out

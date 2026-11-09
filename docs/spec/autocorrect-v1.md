@@ -21,9 +21,12 @@ Held by: `tests/host/run_autocorrect_tests.sh` (`autocorrect_test.c`, every case
 
 ## What counts as typing
 
-The keyboard reads the keyboard reports it sends: each key going down, with
-the modifiers the computer sees with it, whatever sent it (a plain key, a
-behaviour's tap, a combo, a custom key). From the chosen host layout
+The keyboard reads the keyboard reports it is about to send: each key going
+down, with the modifiers the computer sees with it, whatever sent it (a plain
+key, a behaviour's tap, a combo, a custom key). While autocorrect runs, every
+key and modifier change is queued as it happens and shown to the computer
+from the matrix scan, one key change a scan, so a key reaches the computer at
+the scan after it was pressed. From the chosen host layout
 (settings scalar 27) it works out the character that stroke shows:
 
 - A key with Shift, AltGr or both types what the layout says. On a macOS
@@ -183,9 +186,9 @@ it, and are back afterwards. A key that was down when the correction began
 is up for the computer from then on and is not pressed again.
 
 Unlike a macro's, the presses that arrive meanwhile are not ignored. Every
-key and modifier change since the ending key waits in a queue of 64 changes,
-the ending key first, and comes out afterwards in the order it happened, 2 ms
-apart, and every scan while the queue is over half full. What comes out is
+key and modifier change since the ending key waits in the queue, which holds
+64 changes, the ending key first, and comes out afterwards in the order it
+happened, one key change a scan. What comes out is
 read as typing in its turn, so a typo typed while a correction plays is
 corrected when its own word end comes out. A macro key pressed meanwhile
 waits in the same queue and starts when its turn comes; the keys behind it
@@ -198,10 +201,10 @@ The queue is never allowed to cost a key:
 - If the queue fills while a correction is typed, the correction stops where
   it is, the word is left as far as it got, and the queue empties. A change
   that does not fit stays in the keyboard's report and is taken up at the
-  next scan, late and in order, never dropped.
+  next scan, late, never dropped.
 
-The lookup itself runs from the scan, never from the report: the whole word
-at once, then 32 part-of-word typos a scan. The ending key waits for it, at
+The lookup runs from the scan too: the whole word at once, then 32
+part-of-word typos a scan. The ending key waits for it, at
 most 33 scans for a full list and one for a list without part-of-word typos.
 
 Held by: `tests/host/run_autocorrect_tests.sh` (rule 7 cases; `test_no_correction_starts_behind_a_long_queue`, `test_a_full_queue_loses_no_key`, `test_a_correction_keeps_its_pace`, `test_a_one_shot_modifier_is_spent_once`), `tests/host/run_macro_payload_engine_tests.sh` (`test_erase_taps_backspace_at_the_text_pace`, `test_a_correction_is_isolated_without_ignoring_presses`).

@@ -589,7 +589,7 @@ static void test_a_one_shot_modifier_is_spent_once(void) {
 static void burst_behind_a_correction(unsigned trailing) {
     type("teh", false);
     key(KC_SPACE, true);
-    scan(1u);
+    scan(3u);
     key(KC_SPACE, false);
     // No scans from here: every change waits behind the correction.
     for (unsigned i = 0; i < 4u; i++)
