@@ -491,6 +491,13 @@ int uprintf(const char *fmt, ...) {
     return 0;
 }
 
+// QMK's combo flag, which the switch keys set (D-F66); this harness has no
+// combo engine of its own.
+static bool test_combos_switched_on = true;
+void combo_enable(void) { test_combos_switched_on = true; }
+void combo_disable(void) { test_combos_switched_on = false; }
+bool is_combo_enabled(void) { return test_combos_switched_on; }
+
 uint16_t timer_read(void) {
     return fake_time;
 }
