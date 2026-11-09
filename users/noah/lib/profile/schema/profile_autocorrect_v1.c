@@ -25,6 +25,13 @@ enum {
 
 _Static_assert((unsigned)NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_ROW_SIZE == (unsigned)NOAH_PROFILE_AUTOCORRECT_V1_TYPO_ROW_SIZE, "correction and typo rows share one size");
 _Static_assert(NOAH_PROFILE_AUTOCORRECT_V1_MAX_TEXT_BYTES <= UINT16_MAX && NOAH_PROFILE_AUTOCORRECT_V1_MAX_SIZE <= UINT16_MAX, "text offsets are 16 bits");
+#if UINTPTR_MAX == UINT32_MAX
+// Regression policies for the 32-bit target, not SRAM limits: the validation
+// state stays well inside the whole-profile validator's domain union, and
+// the list handle is its range and counts.
+_Static_assert(sizeof(noah_profile_autocorrect_v1_validation_t) <= NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_VALIDATION_BUDGET, "autocorrect validation state exceeded its firmware regression policy");
+_Static_assert(sizeof(noah_profile_autocorrect_v1_list_t) <= NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_LIST_BUDGET, "autocorrect list handle exceeded its firmware regression policy");
+#endif
 _Static_assert((unsigned)NOAH_PROFILE_AUTOCORRECT_V1_TYPO_ROW_SIZE <= (unsigned)NOAH_PROFILE_AUTOCORRECT_V1_STEP_READ_MAX && (unsigned)NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX <= 2u * NOAH_PROFILE_AUTOCORRECT_V1_STEP_READ_MAX, "a row is one read and a text at most two");
 
 bool noah_profile_autocorrect_v1_fold(uint32_t character, uint32_t *folded) {
@@ -316,21 +323,6 @@ noah_profile_autocorrect_v1_validation_step_t noah_profile_autocorrect_v1_valida
     if (state->part != state->part_typos) return reject(error, NOAH_PROFILE_AUTOCORRECT_V1_PART_INDEX, part_index_offset(state->corrections, state->typos) + (size_t)NOAH_PROFILE_AUTOCORRECT_V1_PART_ROW_SIZE * state->part, NOAH_PROFILE_AUTOCORRECT_V1_TABLE_PART_INDEX, state->part);
     if (state->text_offset != state->text_bytes) return reject(error, NOAH_PROFILE_AUTOCORRECT_V1_INVALID_LENGTH, text_area(state) + state->text_offset, NO_TABLE, NOAH_PROFILE_AUTOCORRECT_V1_LOCATION_NONE);
     return NOAH_PROFILE_AUTOCORRECT_V1_COMPLETE;
-}
-
-noah_profile_autocorrect_v1_result_t noah_profile_autocorrect_v1_validate(const uint8_t *bytes, size_t length, noah_profile_autocorrect_v1_error_t *error) {
-    noah_profile_autocorrect_v1_error_t      detail = {.code = NOAH_PROFILE_AUTOCORRECT_V1_INVALID_ARGUMENT, .table = NO_TABLE, .row = NOAH_PROFILE_AUTOCORRECT_V1_LOCATION_NONE};
-    noah_profile_autocorrect_v1_validation_t state  = {0};
-    if (bytes) {
-        noah_profile_reader_t                         reader = noah_profile_reader_from_memory(bytes, length);
-        noah_profile_autocorrect_v1_validation_step_t step;
-        do {
-            step = noah_profile_autocorrect_v1_validation_step(&state, &reader, 0u, length, &detail);
-        } while (step == NOAH_PROFILE_AUTOCORRECT_V1_VALIDATING);
-        if (step == NOAH_PROFILE_AUTOCORRECT_V1_COMPLETE) detail = (noah_profile_autocorrect_v1_error_t){.code = NOAH_PROFILE_AUTOCORRECT_V1_OK, .table = NO_TABLE, .row = NOAH_PROFILE_AUTOCORRECT_V1_LOCATION_NONE};
-    }
-    if (error) *error = detail;
-    return detail.code;
 }
 
 // ── Lookups ─────────────────────────────────────────────────────────────────

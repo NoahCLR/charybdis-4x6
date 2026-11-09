@@ -114,8 +114,6 @@ static size_t check_vectors(const char *path) {
             fprintf(stderr, "%s: expected %s at table %d row %d, got %s at table %u row %u (offset %zu)\n", vector.name, vector.code, vector.table, vector.row, code_names[result], (unsigned)error.table, (unsigned)error.row, error.offset);
             exit(1);
         }
-        // The one-call form agrees.
-        CHECK(noah_profile_autocorrect_v1_validate(vector.bytes, vector.length, NULL) == result);
         seen[result] = true;
         if (strcmp(vector.name, "small") == 0) small = vector;
         count++;
@@ -228,7 +226,8 @@ static void test_empty_list(void) {
     noah_profile_reader_t              reader = noah_profile_reader_from_memory(empty, sizeof(empty));
     noah_profile_autocorrect_v1_list_t list;
     noah_profile_autocorrect_v1_typo_t typo;
-    CHECK(noah_profile_autocorrect_v1_validate(empty, sizeof(empty), NULL) == NOAH_PROFILE_AUTOCORRECT_V1_OK);
+    noah_profile_autocorrect_v1_error_t error;
+    CHECK(validate_bounded(empty, sizeof(empty), &error) == NOAH_PROFILE_AUTOCORRECT_V1_OK);
     CHECK(noah_profile_autocorrect_v1_open(&list, &reader, 0u, sizeof(empty)));
     CHECK(!find(&list, "teh", &typo) && !noah_profile_autocorrect_v1_part_at(&list, 0u, &typo, NULL));
 }
@@ -273,7 +272,6 @@ static void test_arguments(void) {
     noah_profile_autocorrect_v1_error_t      error;
     noah_profile_autocorrect_v1_validation_t state  = {0};
     noah_profile_reader_t                    reader = noah_profile_reader_from_memory(small.bytes, small.length);
-    CHECK(noah_profile_autocorrect_v1_validate(NULL, 8u, &error) == NOAH_PROFILE_AUTOCORRECT_V1_INVALID_ARGUMENT);
     CHECK(noah_profile_autocorrect_v1_validation_step(NULL, &reader, 0u, small.length, &error) == NOAH_PROFILE_AUTOCORRECT_V1_REJECTED && error.code == NOAH_PROFILE_AUTOCORRECT_V1_INVALID_ARGUMENT);
     CHECK(noah_profile_autocorrect_v1_validation_step(&state, NULL, 0u, small.length, &error) == NOAH_PROFILE_AUTOCORRECT_V1_REJECTED);
     // A reader that ends before the payload does is a read error, not a pass.

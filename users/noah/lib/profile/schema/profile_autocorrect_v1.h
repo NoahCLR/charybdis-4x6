@@ -46,6 +46,9 @@ enum {
     NOAH_PROFILE_AUTOCORRECT_V1_STEP_READ_MAX   = 20u,
     NOAH_PROFILE_AUTOCORRECT_V1_APOSTROPHE      = 0x27u,
     NOAH_PROFILE_AUTOCORRECT_V1_LOCATION_NONE   = 0xFFFFu,
+    // Regression policies for the 32-bit target's state, not SRAM limits.
+    NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_VALIDATION_BUDGET = 64u,
+    NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_LIST_BUDGET       = 24u,
 };
 
 // Where a typo matches a word.
@@ -140,8 +143,6 @@ typedef enum {
 // steps than the header's counts allow, whatever the bytes say. `base` is the
 // payload's offset in the reader, `length` its length.
 noah_profile_autocorrect_v1_validation_step_t noah_profile_autocorrect_v1_validation_step(noah_profile_autocorrect_v1_validation_t *state, const noah_profile_reader_t *reader, size_t base, size_t length, noah_profile_autocorrect_v1_error_t *error);
-// A whole payload in memory.
-noah_profile_autocorrect_v1_result_t noah_profile_autocorrect_v1_validate(const uint8_t *bytes, size_t length, noah_profile_autocorrect_v1_error_t *error);
 
 // ── Lookups ─────────────────────────────────────────────────────────────────
 
