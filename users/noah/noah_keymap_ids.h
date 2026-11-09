@@ -192,9 +192,9 @@ _Static_assert((QK_MACRO_0 + MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "Macro slot 
 // for explicit tap, hold, long-hold or multi-tap behavior on top of that
 // default.
 // LOCK_LAYER(n) toggles a layer lock from actions authored in key_behaviors[].
-// BH_ON, BH_OFF and BH_TOGG switch the behaviours override as QMK's CM_ON,
-// CM_OFF and CM_TOGG switch its combo flag: until the keyboard restarts, never
-// saved (D-F66).
+// BH_ON, BH_OFF and BH_TOGG are switch keys: they set the behaviours override
+// as CM_ON, CM_OFF and CM_TOGG set QMK's combo flag, until the keyboard
+// restarts, never saved (D-F66).
 
 #define NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE (SAFE_RANGE + 0x00)
 #define NOAH_KEYCODE_PD_HOLD_BASE (SAFE_RANGE + 0x40)

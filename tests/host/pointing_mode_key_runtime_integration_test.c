@@ -5809,6 +5809,35 @@ static void test_qmk_keys_holding_from_the_press_hold_no_keys_back(void) {
     }
 }
 
+void combo_enable(void);
+bool is_combo_enabled(void);
+// QMK leaves the combo keys to the firmware (COMBO_KEYCODES_DOWNSTREAM): a
+// pressed CM_OFF, CM_ON or CM_TOGG switches QMK's combo flag once, and so does
+// one a behaviour taps, which QMK's pre-process never sees (D-F66).
+static void test_qmk_combo_keys_switch_combos_wherever_they_are_sent(void) {
+    const struct { uint16_t key; bool on; } pressed[] = {{QK_COMBO_OFF, false}, {QK_COMBO_OFF, false}, {QK_COMBO_TOGGLE, true}, {QK_COMBO_TOGGLE, false}, {QK_COMBO_ON, true}};
+    test_reset_state(); fake_time = 48000;
+    CHECK(is_combo_enabled());
+    for (unsigned i = 0; i < ARRAY_SIZE(pressed); i++) {
+        gesture_test_code = pressed[i].key;
+        gesture_at(3,0,true); gesture_advance(30); gesture_at(3,0,false); gesture_advance(300);
+        CHECK(is_combo_enabled() == pressed[i].on);
+    }
+
+    test_reset_state(); fake_time = 49000;
+    gesture_test_code = gesture_tap_only_row = KC_F13;
+    const uint16_t tapped[] = {QK_COMBO_OFF, QK_COMBO_TOGGLE, QK_COMBO_TOGGLE, QK_COMBO_ON};
+    const bool     after[]  = {false, true, false, true};
+    for (unsigned i = 0; i < ARRAY_SIZE(tapped); i++) {
+        gesture_tap_only_action = tapped[i];
+        gesture_at(3,0,true); gesture_advance(30); gesture_at(3,0,false); gesture_advance(300);
+        CHECK(is_combo_enabled() == after[i]);
+    }
+    gesture_assert_admission_quiescent();
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+    combo_enable();
+}
+
 // MO(), TT() and OSL() turn their layer on at the press. A key pressed while
 // one is down lands on that layer and cancels its quick tap, even a tap its
 // row authors (D-F02, D-F27); tapped alone
@@ -6069,6 +6098,7 @@ int main(int argc, char **argv) {
         test_qmk_keys_wait_for_mode_and_modifier_holds();
         test_qmk_combo_output_outlasts_the_dual_role_term();
         test_qmk_keys_holding_from_the_press_hold_no_keys_back();
+    test_qmk_combo_keys_switch_combos_wherever_they_are_sent();
         test_qmk_interrupted_momentary_layer_row_sends_no_tap();
         test_qmk_modifier_shortcut_release_applies_to_the_next_key();
         test_qmk_combo_modifier_release_waits_for_undecided_key();

@@ -511,11 +511,12 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_consumes_direct_press(pd_lock));
     CHECK(!noah_action_desc_is_runtime_handled_keycode(pd_lock));
     CHECK(!noah_action_desc_uses_held_lifecycle_for_press_and_hold(pd_lock));
-    CHECK(!noah_action_desc_default_tap_uses_action_keycode(pd_lock));
+    // Where its behaviour leaves the tap empty, a lock taps itself (D-F64).
+    CHECK(noah_action_desc_default_tap_uses_action_keycode(pd_lock));
     CHECK(!noah_action_desc_source_sets_momentary_layer_flag(pd_lock));
     CHECK(!noah_action_desc_source_sets_layer_tap_flag(pd_lock));
     CHECK(!noah_action_desc_supports_fallback_hold(pd_lock));
-    CHECK(noah_action_desc_default_tap_action(pd_lock) == KC_NO);
+    CHECK(noah_action_desc_default_tap_action(pd_lock) == pd_lock.action);
 
     CHECK(macro_action.kind == NOAH_ACTION_KIND_MACRO);
     CHECK(noah_action_desc_is_press_only(macro_action));
@@ -856,10 +857,11 @@ static void test_unassigned_userspace_codes_are_refused_everywhere(void) {
     CHECK(!noah_profile_action_placement_v1_supported(&stray, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT));
 }
 
-// The behaviour keys go wherever QMK's combo keys go: on a key, in every
-// behaviour step and as a combo output. A saved profile stores them as QMK
-// keycodes and is held to the same rule. The rest of their block is inert.
-static void test_behaviors_keys_go_where_the_combo_keys_go(void) {
+// The switch keys, QMK's combo keys and the behaviours keys, go on a key, in
+// a behaviour's tap and holds and as a combo output. A saved profile stores
+// them as QMK keycodes and is held to the same rule. The rest of the
+// behaviours keys' block is inert.
+static void test_switch_keys_go_everywhere_a_key_goes(void) {
     const uint16_t                keys[]       = {BH_ON, BH_OFF, BH_TOGG};
     const uint16_t                combo_keys[] = {QK_COMBO_ON, QK_COMBO_OFF, QK_COMBO_TOGGLE};
     const noah_action_placement_t placements[] = {NOAH_ACTION_PLACEMENT_KEY, NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER, NOAH_ACTION_PLACEMENT_COMBO_OUTPUT};
@@ -869,7 +871,8 @@ static void test_behaviors_keys_go_where_the_combo_keys_go(void) {
         const noah_profile_action_v1_t stored       = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = keys[i]};
         const noah_profile_action_v1_t stored_combo = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = combo_keys[i]};
 
-        CHECK(noah_action_describe(keys[i]).kind == NOAH_ACTION_KIND_BEHAVIORS_SWITCH);
+        CHECK(noah_action_describe(keys[i]).kind == NOAH_ACTION_KIND_SWITCH_KEY);
+        CHECK(noah_action_describe(combo_keys[i]).kind == NOAH_ACTION_KIND_SWITCH_KEY);
         for (uint8_t p = 0; p < ARRAY_SIZE(placements); p++) {
             CHECK(noah_action_supported_at(keys[i], placements[p]));
             CHECK(noah_action_supported_at(keys[i], placements[p]) == noah_action_supported_at(combo_keys[i], placements[p]));
@@ -885,6 +888,16 @@ static void test_behaviors_keys_go_where_the_combo_keys_go(void) {
         CHECK(noah_action_describe(inert[i]).kind == NOAH_ACTION_KIND_UNASSIGNED_USER);
         for (uint8_t p = 0; p < ARRAY_SIZE(placements); p++)
             CHECK(!noah_action_supported_at(inert[i], placements[p]));
+    }
+}
+
+// A key that acts at its press and whose behaviour leaves a tap empty taps
+// itself there, the standard key's tap (D-F64): a switch key switches and a
+// pointing-mode lock locks.
+static void test_press_only_keys_tap_themselves_where_a_behaviour_leaves_the_tap_empty(void) {
+    const uint16_t keys[] = {BH_ON, BH_OFF, BH_TOGG, QK_COMBO_ON, QK_COMBO_OFF, QK_COMBO_TOGGLE, PD_MODE_4_LOCK};
+    for (uint8_t i = 0; i < ARRAY_SIZE(keys); i++) {
+        CHECK(noah_action_desc_default_tap_action(noah_action_describe(keys[i])) == keys[i]);
     }
 }
 
@@ -977,7 +990,8 @@ int main(void) {
     test_action_placement_rules();
     test_saved_profile_placement_matches_the_rules();
     test_unassigned_userspace_codes_are_refused_everywhere();
-    test_behaviors_keys_go_where_the_combo_keys_go();
+    test_switch_keys_go_everywhere_a_key_goes();
+    test_press_only_keys_tap_themselves_where_a_behaviour_leaves_the_tap_empty();
     test_last_layer_actions();
     test_macro_bank_ends_at_127();
     test_custom_key_block_holds_128();

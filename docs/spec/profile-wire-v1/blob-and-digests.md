@@ -165,7 +165,7 @@ output. A combo holds its output while it is held.
 | `LM()` | yes | no | no | no | yes |
 | `LT()` | yes | no | no | no | no |
 | `TG()`, `TO()`, `LOCK_LAYER()` | yes | yes | yes | yes | yes |
-| `BH_ON`, `BH_OFF`, `BH_TOGG`, as QMK's `CM_ON`, `CM_OFF`, `CM_TOGG` | yes | yes | yes | yes | yes |
+| The switch keys: `CM_ON`, `CM_OFF`, `CM_TOGG`, `BH_ON`, `BH_OFF`, `BH_TOGG` (D-F66) | yes | yes | yes | yes | yes |
 | `DF()`, `PDF()`, and any layer keycode naming a layer at or above the layer count | no | no | no | no | no |
 | Any other keycode in QMK's user range `0x7e40..0x7fff`: the inert `0x7e40..0x7e7f` block, layer locks past the layer count, `0x7ee3..0x7eff`, and `0x7f80..0x7fff`, which only the runtime sends (`CUSTOM_KEY_LAYER_TAP(n)`, D-F26) | no | no | no | no | no |
 

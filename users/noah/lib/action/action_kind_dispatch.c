@@ -13,6 +13,7 @@
 
 #include "owned_keycode.h"
 #include "synthetic_record.h"
+#include "../compat/qmk_combo_switch_contract.h"
 #include "../compat/qmk_oneshot_contract.h"
 #include "../key/behavior/participation.h"
 #include "../profile/runtime/active_profile_settings_runtime.h"
@@ -149,10 +150,21 @@ static void noah_action_press_pointing_mode_lock(noah_action_desc_t desc, keypos
     noah_action_toggle_pointing_mode_lock(desc, key_pos);
 }
 
-// BH_ON, BH_OFF and BH_TOGG switch the behaviours override as QMK's combo
-// keys switch its combo flag (D-F66); the stored master stays as it is.
-static void noah_action_switch_behaviors(noah_action_desc_t desc) {
+// A switch key turns combos (QMK's flag) or behaviours (the firmware's
+// override) on, off or the other way, at its tap or press; neither stored
+// master changes (D-F66).
+static void noah_action_switch_key(noah_action_desc_t desc, keypos_t key_pos) {
+    (void)key_pos;
     switch (desc.action) {
+        case QK_COMBO_ON:
+            noah_qmk_contract_switch_combos(true);
+            break;
+        case QK_COMBO_OFF:
+            noah_qmk_contract_switch_combos(false);
+            break;
+        case QK_COMBO_TOGGLE:
+            noah_qmk_contract_switch_combos(!noah_qmk_contract_combos_switched_on());
+            break;
         case BH_ON:
             noah_participation_set_behaviors_override(true);
             break;
@@ -165,16 +177,6 @@ static void noah_action_switch_behaviors(noah_action_desc_t desc) {
         default:
             break;
     }
-}
-
-static void noah_action_tap_behaviors_switch(noah_action_desc_t desc, keypos_t key_pos) {
-    (void)key_pos;
-    noah_action_switch_behaviors(desc);
-}
-
-static void noah_action_press_behaviors_switch(noah_action_desc_t desc, keypos_t key_pos) {
-    (void)key_pos;
-    noah_action_switch_behaviors(desc);
 }
 
 static void noah_action_press_owned_momentary_layer(noah_action_desc_t desc, keypos_t key_pos) {

@@ -101,8 +101,8 @@ static bool behavior_definition(uint16_t keycode, uint8_t layer) {
 
 // Behaviours on/off is two switches (D-F32): the stored master in the
 // profile's settings, and a runtime override in RAM, never saved, cleared by
-// a replug. Behaviours run only when both allow. BH_ON, BH_OFF and BH_TOGG
-// flip the override (D-F66).
+// a replug. Behaviours run only when both allow. The switch keys BH_ON,
+// BH_OFF and BH_TOGG set the override (D-F66).
 static bool behaviors_override = true;
 
 void noah_participation_set_behaviors_override(bool allowed) {
@@ -118,7 +118,8 @@ bool noah_participation_behaviors_allowed(void) {
 }
 
 // Combos likewise: the stored master here, and QMK's own combo flag as the
-// override (QK_COMBO_TOGGLE and friends), which QMK checks itself.
+// override, which QMK checks itself and the switch keys CM_ON, CM_OFF and
+// CM_TOGG set (D-F66).
 bool noah_participation_combos_allowed(void) {
     return noah_setting(NOAH_SETTING_COMBOS_ENABLED, 1u) != 0u;
 }

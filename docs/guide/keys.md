@@ -210,10 +210,10 @@ key, including tap counts: a combo sending Left GUI joins Left GUI's tap
 count. Its hold time starts when the combo sends. A switch on each combo, and
 one for all combos, can make combos send their action's plain action instead.
 
-QMK's combo keys, `CM_ON`, `CM_OFF` and `CM_TOGG`, turn combos on and off
+The combo keys, `CM_ON`, `CM_OFF` and `CM_TOGG`, turn combos on and off
 until the keyboard is unplugged; they are never saved. `BH_ON`, `BH_OFF` and
 `BH_TOGG` do the same for behaviours
-([where behaviours and combos run](#where-behaviours-and-combos-run)).
+([switch keys](#where-behaviours-and-combos-run)).
 
 ## Custom keys
 
@@ -274,12 +274,15 @@ layer**, the one the key came from after falling through transparent keys.
 These switches are set from Ark; the compiled defaults allow everything
 everywhere.
 
-Keys switch both for the whole keyboard until it is unplugged, and never save
-anything. QMK's combo keys `CM_ON`, `CM_OFF` and `CM_TOGG` turn combos on, off
-or the other way; `BH_ON`, `BH_OFF` and `BH_TOGG` do the same for behaviours.
-They go wherever a key can go: on a key, in a behaviour, or as a combo's
-output. They act when pressed. A behaviour already holding something when
-behaviours go off keeps holding it until you let go of its key. With
-behaviours off, a key does what it does without one, and `BH_ON` or `BH_TOGG`
-turns them back on even when it has a behaviour of its own. Neither key
-changes the switch set in Ark; unplugging puts back what is set there.
+The **switch keys** turn both on and off for the whole keyboard until it is
+unplugged, and never save anything: `CM_ON`, `CM_OFF` and `CM_TOGG` turn
+combos on, off or the other way, and `BH_ON`, `BH_OFF` and `BH_TOGG` do the
+same for behaviours. They go wherever a key can go: on a key, in a
+behaviour's tap or hold, or as a combo's output, and they act when pressed.
+A switch key with a behaviour of its own does what the behaviour decides:
+held for its hold, it holds that and switches nothing; where the behaviour
+leaves the tap empty, a tap switches. A behaviour already holding something
+when behaviours go off keeps holding it until you let go of its key. With
+behaviours off a key does what it does without one, so `BH_ON` or `BH_TOGG`
+turns them back on even when it has a behaviour of its own. No switch key
+changes the switches set in Ark; unplugging puts back what is set there.

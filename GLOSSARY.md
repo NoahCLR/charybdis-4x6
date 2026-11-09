@@ -278,6 +278,12 @@ _Avoid_: chord (for this), key combination
 How close together a combo's keys must be pressed.
 _Avoid_: combo term, combo timeout
 
+**Switch key**:
+A key that turns combos (`CM_ON`, `CM_OFF`, `CM_TOGG`) or behaviours
+(`BH_ON`, `BH_OFF`, `BH_TOGG`) on, off or the other way for the whole
+keyboard until it restarts, never saved; the stored switch stays as it is.
+_Avoid_: toggle key, combo toggle, behaviour key
+
 **Participation**:
 Whether a press uses its behaviour and whether it can join a combo, allowed
 only when the whole keyboard, the source layer, the definition and the

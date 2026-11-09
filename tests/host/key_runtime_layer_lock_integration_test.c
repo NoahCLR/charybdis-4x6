@@ -242,7 +242,17 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
         };
     }
 
-    // BH_ON has a row of its own, which runs only while behaviours are on.
+    // BH_TOGG's behaviour sets only a hold, so its tap is its own.
+    if (keycode == BH_TOGG) {
+        return (key_behavior_view_t){
+            .keycode       = keycode,
+            .handled       = true,
+            .tap_hold_term = 150,
+            .single        = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(TEST_NUM_LAYER))},
+        };
+    }
+
+    // BH_ON's behaviour, which runs only while behaviours are on, taps B.
     if (keycode == BH_ON) {
         return (key_behavior_view_t){
             .keycode       = keycode,
@@ -724,10 +734,10 @@ static void test_owned_mod_tap_consumes_oneshot(void) {
     CHECK(noah_runtime_debug_active_slot_count() == 0);
 }
 
-// The behaviour keys switch the runtime override the way QMK's combo keys
-// switch its combo flag: BH_OFF stops behaviours, BH_TOGG flips them, and
-// BH_ON allows them. A key without a row acts at its press, and QMK never
-// sees it.
+// The behaviours keys switch the runtime override the way the combo keys
+// switch QMK's combo flag: BH_OFF stops behaviours, BH_TOGG flips them, and
+// BH_ON allows them. QMK never sees them. BH_TOGG, whose behaviour sets only
+// a hold, switches at its tap.
 static void test_plain_behaviors_keys_switch_the_override(void) {
     keypos_t key_pos = test_keypos(4, 0);
 
@@ -747,9 +757,9 @@ static void test_plain_behaviors_keys_switch_the_override(void) {
     CHECK(noah_runtime_debug_active_slot_count() == 0);
 }
 
-// With behaviours off a key takes its normal action, and a behaviour key's
-// normal action is its switch: BH_ON turns behaviours back on even though
-// its own row says otherwise, and from then on its row runs instead.
+// With behaviours off a key is the standard key, and a behaviours key's
+// standard key is its switch: BH_ON turns behaviours back on even though its
+// own behaviour taps B, and from then on its behaviour runs instead.
 static void test_behaviors_off_keeps_the_way_back(void) {
     keypos_t toggle_pos = test_keypos(3, 0);
     keypos_t on_pos     = test_keypos(4, 1);
@@ -788,10 +798,10 @@ static void test_behaviors_off_keeps_the_way_back(void) {
     CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
 }
 
-// A behaviour step can send BH_OFF. A behaviour already holding something
+// A behaviour's tap can send BH_OFF. A behaviour already holding something
 // when behaviours go off keeps it until its key is let go, and then lets go
 // of it.
-static void test_behavior_step_switches_behaviors_off_and_a_held_one_still_releases(void) {
+static void test_behavior_tap_switches_behaviors_off_and_a_held_one_still_releases(void) {
     keypos_t step_pos = test_keypos(3, 2);
     keypos_t hold_pos = test_keypos(3, 0);
 
@@ -831,6 +841,32 @@ static void test_behavior_step_switches_behaviors_off_and_a_held_one_still_relea
     CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
 }
 
+// The firmware decides a switch key's press before it switches: BH_TOGG held
+// past its hold threshold holds its behaviour's layer and switches nothing.
+static void test_switch_key_held_for_its_behaviour_does_not_switch(void) {
+    keypos_t key_pos = test_keypos(4, 2);
+
+    test_reset_state();
+    const key_runtime_integration_step_t hold[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(BH_TOGG, key_pos.row, key_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(200),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+    key_runtime_integration_run(&fake_time, hold, ARRAY_SIZE(hold));
+    CHECK(test_layer_active(TEST_NUM_LAYER));
+    CHECK(noah_participation_behaviors_override());
+
+    const key_runtime_integration_step_t release[] = {
+        KEY_RUNTIME_INTEGRATION_RELEASE(BH_TOGG, key_pos.row, key_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(200),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+    key_runtime_integration_run(&fake_time, release, ARRAY_SIZE(release));
+    CHECK(!test_layer_active(TEST_NUM_LAYER));
+    CHECK(noah_participation_behaviors_override());
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+}
+
 int main(void) {
     test_owned_mod_tap_consumes_oneshot();
     test_double_tap_hold_toggles_num_layer_lock_off_on_second_cycle();
@@ -844,7 +880,8 @@ int main(void) {
 
     test_plain_behaviors_keys_switch_the_override();
     test_behaviors_off_keeps_the_way_back();
-    test_behavior_step_switches_behaviors_off_and_a_held_one_still_releases();
+    test_behavior_tap_switches_behaviors_off_and_a_held_one_still_releases();
+    test_switch_key_held_for_its_behaviour_does_not_switch();
 
     puts("key_runtime layer-lock integration tests passed");
     return 0;
