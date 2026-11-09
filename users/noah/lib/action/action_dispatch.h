@@ -51,6 +51,10 @@ static inline uint8_t noah_action_keycode_layer_lock_layer(uint16_t action) {
     return noah_action_keycode_is_layer_toggle(action) ? (uint8_t)QK_TOGGLE_LAYER_GET_LAYER(action) : (uint8_t)(action - LAYER_LOCK_BASE);
 }
 
+static inline bool noah_action_keycode_is_behaviors_switch(uint16_t action) {
+    return action == BH_ON || action == BH_OFF || action == BH_TOGG;
+}
+
 static inline bool noah_action_keycode_is_momentary(uint16_t action) {
     return IS_QK_MOMENTARY(action) && QK_MOMENTARY_GET_LAYER(action) < LAYER_COUNT;
 }

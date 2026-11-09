@@ -856,6 +856,38 @@ static void test_unassigned_userspace_codes_are_refused_everywhere(void) {
     CHECK(!noah_profile_action_placement_v1_supported(&stray, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT));
 }
 
+// The behaviour keys go wherever QMK's combo keys go: on a key, in every
+// behaviour step and as a combo output. A saved profile stores them as QMK
+// keycodes and is held to the same rule. The rest of their block is inert.
+static void test_behaviors_keys_go_where_the_combo_keys_go(void) {
+    const uint16_t                keys[]       = {BH_ON, BH_OFF, BH_TOGG};
+    const uint16_t                combo_keys[] = {QK_COMBO_ON, QK_COMBO_OFF, QK_COMBO_TOGGLE};
+    const noah_action_placement_t placements[] = {NOAH_ACTION_PLACEMENT_KEY, NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER, NOAH_ACTION_PLACEMENT_COMBO_OUTPUT};
+    const noah_profile_validator_v1_placement_t stored_placements[] = {NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_KEY, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_OTHER, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT};
+
+    for (uint8_t i = 0; i < ARRAY_SIZE(keys); i++) {
+        const noah_profile_action_v1_t stored       = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = keys[i]};
+        const noah_profile_action_v1_t stored_combo = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = combo_keys[i]};
+
+        CHECK(noah_action_describe(keys[i]).kind == NOAH_ACTION_KIND_BEHAVIORS_SWITCH);
+        for (uint8_t p = 0; p < ARRAY_SIZE(placements); p++) {
+            CHECK(noah_action_supported_at(keys[i], placements[p]));
+            CHECK(noah_action_supported_at(keys[i], placements[p]) == noah_action_supported_at(combo_keys[i], placements[p]));
+        }
+        for (uint8_t p = 0; p < ARRAY_SIZE(stored_placements); p++) {
+            CHECK(noah_profile_action_placement_v1_supported(&stored, stored_placements[p]));
+            CHECK(noah_profile_action_placement_v1_supported(&stored, stored_placements[p]) == noah_profile_action_placement_v1_supported(&stored_combo, stored_placements[p]));
+        }
+    }
+
+    const uint16_t inert[] = {BH_TOGG + 1, NOAH_KEYCODE_BEHAVIORS_SWITCH_BASE + NOAH_KEYCODE_BEHAVIORS_SWITCH_RESERVED - 1};
+    for (uint8_t i = 0; i < ARRAY_SIZE(inert); i++) {
+        CHECK(noah_action_describe(inert[i]).kind == NOAH_ACTION_KIND_UNASSIGNED_USER);
+        for (uint8_t p = 0; p < ARRAY_SIZE(placements); p++)
+            CHECK(!noah_action_supported_at(inert[i], placements[p]));
+    }
+}
+
 // The keyboard's check of a saved profile asks the same rules of a Profile
 // Wire action, placement for placement.
 static void test_saved_profile_placement_matches_the_rules(void) {
@@ -945,6 +977,7 @@ int main(void) {
     test_action_placement_rules();
     test_saved_profile_placement_matches_the_rules();
     test_unassigned_userspace_codes_are_refused_everywhere();
+    test_behaviors_keys_go_where_the_combo_keys_go();
     test_last_layer_actions();
     test_macro_bank_ends_at_127();
     test_custom_key_block_holds_128();

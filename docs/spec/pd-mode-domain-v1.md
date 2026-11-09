@@ -41,7 +41,8 @@ keycode runs its slot's mode, which comes from the active profile (D-F50,
 | `0x7e80..0x7e9f` | `PD_MODE_n`, hold slot `n`'s mode | 32, the whole block |
 | `0x7ea0..0x7ebf` | `PD_MODE_n_LOCK`, lock slot `n`'s mode | 32, the whole block |
 | `0x7ec0..0x7edf` | `LOCK_LAYER(n)`, toggle layer `n`'s lock | 16 (`0x7ec0..0x7ecf`) |
-| `0x7ee0..0x7eff` | unassigned: inert | — |
+| `0x7ee0..0x7eef` | `BH_ON`, `BH_OFF`, `BH_TOGG`: behaviours on, off, toggle (D-F66) | 3 (`0x7ee0..0x7ee2`) |
+| `0x7ef0..0x7eff` | unassigned: inert | — |
 | `0x7f00..0x7f7f` | `CUSTOM_KEY_0..127` | 128 |
 | `0x7f80..0x7fff` | `CUSTOM_KEY_LAYER_TAP(n)`, the runtime's own: what custom key `n`'s tap does to its layers (D-F26); inert on a key, never stored | — |
 | `0x7700..0x777f` | `QK_MACRO_0..127`, QMK's macro block | 128 |

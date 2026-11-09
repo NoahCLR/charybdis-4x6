@@ -101,8 +101,8 @@ static bool behavior_definition(uint16_t keycode, uint8_t layer) {
 
 // Behaviours on/off is two switches (D-F32): the stored master in the
 // profile's settings, and a runtime override in RAM, never saved, cleared by
-// a replug. Behaviours run only when both allow. No key flips the override,
-// so it stays on.
+// a replug. Behaviours run only when both allow. BH_ON, BH_OFF and BH_TOGG
+// flip the override (D-F66).
 static bool behaviors_override = true;
 
 void noah_participation_set_behaviors_override(bool allowed) {

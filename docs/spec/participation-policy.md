@@ -24,6 +24,13 @@ cannot overrule a higher one. Behaviour and combo participation are
 independent. Each override is a runtime toggle beside its stored master,
 starts allowed at boot and is never saved
 ([toggles](profile-wire-v1/live-edits.md#toggles-and-the-settings-qmk-holds)).
+QMK's `CM_ON`, `CM_OFF` and `CM_TOGG` switch the combos override; `BH_ON`,
+`BH_OFF` and `BH_TOGG` switch the behaviours override the same way, when
+pressed (D-F66, [ADR](../adr/0066-keys-switch-behaviours-as-combo-keys-switch-combos.md)).
+A behaviours key with no row of its own, or one whose press takes its normal
+action, switches; so `BH_ON` and `BH_TOGG` always work while behaviours are
+off. Switching behaviours off settles no press already decided: a press keeps
+its decision through its release.
 
 Switching something off keeps it: a disabled behaviour row keeps its branches,
 timing and layers, a disabled combo its inputs, output and window, and
@@ -32,7 +39,7 @@ switching it on again restores them unchanged.
 The compiled defaults allow everything: both masters on, every layer bit set,
 every definition enabled on every bank layer, every placement bit clear.
 
-Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_defaults_allow_everything`, `test_master_and_definition`, `test_overrides_beside_the_masters`, `test_placement`).
+Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_defaults_allow_everything`, `test_master_and_definition`, `test_overrides_beside_the_masters`, `test_placement`), `tests/host/run_key_runtime_layer_lock_integration_tests.sh` (`key_runtime_layer_lock_integration_test.c`, `test_plain_behaviors_keys_switch_the_override`, `test_behaviors_off_keeps_the_way_back`, `test_behavior_step_switches_behaviors_off_and_a_held_one_still_releases`).
 
 ## Source layer and placement
 

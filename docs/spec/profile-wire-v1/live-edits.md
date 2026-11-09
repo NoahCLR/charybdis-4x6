@@ -529,7 +529,8 @@ reports the stored values.
 A toggle is a runtime override beside its stored master, never an edit:
 combos run only while the stored master and QMK's combo flag (flipped by
 QMK's combo keys) both allow; behaviours only while the stored master and
-the firmware's behaviours override both allow. An override starts allowed
+the firmware's behaviours override (flipped by `BH_ON`, `BH_OFF` and
+`BH_TOGG`, D-F66) both allow. An override starts allowed
 at boot, is never saved, and reads back through GET `0x22`. RGB on and off
 is a lighting adjustment, not a toggle.
 
