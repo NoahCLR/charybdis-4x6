@@ -162,13 +162,29 @@ Held by: `tests/host/run_macro_payload_engine_tests.sh` (`macro_payload_engine_t
 ## C tables
 
 `build.py --write` generates `users/noah/lib/macro/host_layout_tables.c` from
-the fixture: per layout, an array of `host_layout_char_t` (a 32-bit code point
-and two strokes, 8 bytes) sorted by code point, then the `host_layouts[]`
-catalogue (id, flags, count, characters) and `host_layout_table_count`.
-`host_layout.h` and `host_layout.c` give `host_layout_get(id)`, which answers
-`NULL` for an id not in the tables, and `host_layout_lookup()`, a binary
-search that answers the strokes for a code point or false. The host test fails
-if the tables pass 40 KiB, a regression tripwire, not a resource budget.
+the fixture. Every character a layout types is in the Basic Multilingual
+Plane, so the tables hold 16-bit code points. Per layout:
+
+- `chars`: an array of `host_layout_char_t` (a code point and two strokes, 6
+  bytes) sorted by code point, from the fixture's `chars`. Typing uses it.
+- `keys`: for each of the 50 keys the layouts are read for, what it types
+  plain, with Shift, with AltGr and with both: a code point, zero for nothing,
+  or `HOST_LAYOUT_DEAD_KEY` (`0xFFFF`). From the fixture's `keys`.
+- `deads` and `composes`: each dead-key stroke with the strokes it composes
+  with and the character each makes, the dead key then Space included. From
+  the fixture's `dead`.
+
+Then the `host_layouts[]` catalogue, `host_layout_table_count` and
+`host_layout_table_bytes`. `host_layout.h` and `host_layout.c` give
+`host_layout_get(id)`, which answers `NULL` for an id not in the tables;
+`host_layout_lookup()`, a binary search that answers the strokes for a code
+point or false; `host_layout_stroke_types()`, which answers what a stroke
+types by itself (a character, a dead key or nothing); and
+`host_layout_compose()`, what a dead key then a stroke types.
+[Autocorrect](autocorrect-v1.md#what-counts-as-typing) reads typing through
+the last two. The generator and the host test fail if the tables together
+pass 40 KiB (39,716 bytes today), a regression tripwire, not a resource
+budget.
 
 Held by: `tests/host/run_host_layout_tests.sh` (`build.py --check`, `host_layout_test.c`).
 

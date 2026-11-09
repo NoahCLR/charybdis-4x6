@@ -41,14 +41,19 @@ static void check_types(uint8_t layout_id, uint32_t codepoint, uint16_t first, u
 
 static void test_catalogue_is_complete_and_well_formed(void) {
     CHECK(host_layout_table_count == LAYOUT_COUNT && NOAH_HOST_LAYOUT_LIMIT == LAYOUT_COUNT);
-    CHECK(sizeof(host_layout_char_t) == 8u);
+    CHECK(sizeof(host_layout_char_t) == 6u && sizeof(host_layout_dead_t) == 6u && sizeof(host_layout_compose_t) == 4u);
     CHECK(host_layout_get(LAYOUT_COUNT) == NULL && host_layout_get(0xFFu) == NULL);
-    unsigned entries = 0u;
+    unsigned table_bytes = 0u;
     for (uint8_t id = 0u; id < LAYOUT_COUNT; id++) {
         const host_layout_t *layout = host_layout_get(id);
         CHECK(layout && layout->id == id && layout->count > 0u);
         CHECK(!!(layout->flags & HOST_LAYOUT_FLAG_MACOS) == (id >= 1u && id <= 6u));
-        entries += layout->count;
+        table_bytes += layout->count * sizeof(host_layout_char_t) + HOST_LAYOUT_KEY_SLOTS * sizeof(layout->keys[0]) + layout->dead_count * sizeof(host_layout_dead_t);
+        for (uint16_t i = 0u; i < layout->dead_count; i++) {
+            CHECK(i == 0u || layout->deads[i - 1u].stroke < layout->deads[i].stroke);
+            CHECK(i == 0u || layout->deads[i - 1u].first + layout->deads[i - 1u].count == layout->deads[i].first);
+            table_bytes += layout->deads[i].count * sizeof(host_layout_compose_t);
+        }
         for (uint16_t i = 0u; i < layout->count; i++) {
             const host_layout_char_t *entry = &layout->chars[i];
             CHECK(i == 0u || layout->chars[i - 1u].codepoint < entry->codepoint);
@@ -72,10 +77,58 @@ static void test_catalogue_is_complete_and_well_formed(void) {
         for (const char *c = "0123456789abcdefu"; *c; c++) CHECK(host_layout_lookup(layout, (uint8_t)*c, strokes) && strokes[1] == 0u);
         CHECK(!host_layout_lookup(layout, 0x7Fu, strokes) && !host_layout_lookup(layout, 0x0Du, strokes));
     }
-    // Flash cost of the first set: a regression tripwire, not a budget.
-    CHECK(entries * sizeof(host_layout_char_t) <= 40u * 1024u);
+    // Flash cost of every table: a regression tripwire, not a budget.
+    CHECK(table_bytes == host_layout_table_bytes && table_bytes <= 40u * 1024u);
     CHECK(host_layout_get(MACOS_UNICODE_HEX_INPUT)->flags == (HOST_LAYOUT_FLAG_UNICODE_HEX_INPUT | HOST_LAYOUT_FLAG_MACOS));
     CHECK(!host_layout_lookup(NULL, 'a', (uint16_t[2]){0}));
+}
+
+// Every character's canonical strokes read back as that character, so what a
+// macro types the keyboard recognizes when the same keys are typed.
+static void test_strokes_read_back_as_their_characters(void) {
+    for (uint8_t id = 0u; id < LAYOUT_COUNT; id++) {
+        const host_layout_t *layout = host_layout_get(id);
+        for (uint16_t i = 0u; i < layout->count; i++) {
+            const host_layout_char_t *entry    = &layout->chars[i];
+            uint16_t                  codepoint = 0u;
+            if (entry->codepoint == '\t' || entry->codepoint == '\n') {
+                CHECK(host_layout_stroke_types(layout, entry->strokes[0], &codepoint) == HOST_LAYOUT_TYPES_NOTHING);
+            } else if (entry->strokes[1]) {
+                CHECK(host_layout_stroke_types(layout, entry->strokes[0], &codepoint) == HOST_LAYOUT_TYPES_DEAD_KEY);
+                CHECK(host_layout_compose(layout, entry->strokes[0], entry->strokes[1], &codepoint) && codepoint == entry->codepoint);
+            } else {
+                CHECK(host_layout_stroke_types(layout, entry->strokes[0], &codepoint) == HOST_LAYOUT_TYPES_CHARACTER && codepoint == entry->codepoint);
+            }
+        }
+    }
+}
+
+static void test_keys_and_dead_keys_are_recognized(void) {
+    const host_layout_t *us = host_layout_get(HOST_LAYOUT_US), *intl = host_layout_get(WINDOWS_US_INTERNATIONAL), *dutch = host_layout_get(MACOS_DUTCH);
+    uint16_t             codepoint = 0u;
+    // Shift+Space is a space; a key the layouts do not read types nothing.
+    CHECK(host_layout_stroke_types(us, SHIFT | KC_SPACE, &codepoint) == HOST_LAYOUT_TYPES_CHARACTER && codepoint == ' ');
+    CHECK(host_layout_stroke_types(us, SHIFT | KC_T, &codepoint) == HOST_LAYOUT_TYPES_CHARACTER && codepoint == 'T');
+    CHECK(host_layout_stroke_types(us, ALTGR | KC_T, &codepoint) == HOST_LAYOUT_TYPES_NOTHING);
+    CHECK(host_layout_stroke_types(us, KC_LEFT, &codepoint) == HOST_LAYOUT_TYPES_NOTHING);
+    CHECK(host_layout_stroke_types(us, KC_ENTER, &codepoint) == HOST_LAYOUT_TYPES_NOTHING);
+    CHECK(host_layout_stroke_types(us, 0x0400u | KC_T, &codepoint) == HOST_LAYOUT_TYPES_NOTHING);
+    CHECK(host_layout_stroke_types(NULL, KC_T, &codepoint) == HOST_LAYOUT_TYPES_NOTHING);
+    CHECK(!host_layout_compose(us, KC_QUOTE, KC_E, &codepoint));
+    // US International: the apostrophe key is dead; then Space is an
+    // apostrophe, then e is é, and it composes nothing with t.
+    CHECK(host_layout_stroke_types(intl, KC_QUOTE, &codepoint) == HOST_LAYOUT_TYPES_DEAD_KEY);
+    CHECK(host_layout_compose(intl, KC_QUOTE, KC_SPACE, &codepoint) && codepoint == '\'');
+    CHECK(host_layout_compose(intl, KC_QUOTE, KC_E, &codepoint) && codepoint == 0x00E9u);
+    CHECK(host_layout_compose(intl, KC_QUOTE, SHIFT | KC_E, &codepoint) && codepoint == 0x00C9u);
+    CHECK(!host_layout_compose(intl, KC_QUOTE, KC_T, &codepoint));
+    CHECK(!host_layout_compose(intl, KC_E, KC_E, &codepoint));
+    // A composed character with a stroke of its own is recognized both ways.
+    CHECK(host_layout_stroke_types(intl, ALTGR | KC_E, &codepoint) == HOST_LAYOUT_TYPES_CHARACTER && codepoint == 0x00E9u);
+    // Dutch on macOS: Option+e is the dead acute.
+    CHECK(host_layout_stroke_types(dutch, ALTGR | KC_E, &codepoint) == HOST_LAYOUT_TYPES_DEAD_KEY);
+    CHECK(host_layout_compose(dutch, ALTGR | KC_E, KC_E, &codepoint) && codepoint == 0x00E9u);
+    CHECK(host_layout_stroke_types(dutch, KC_NONUS_BACKSLASH, &codepoint) == HOST_LAYOUT_TYPES_CHARACTER && codepoint == 0x00A7u);
 }
 
 static void test_us_matches_qmk_send_string(void) {
@@ -141,6 +194,8 @@ static void test_layouts_type_their_own_characters(void) {
 
 int main(void) {
     test_catalogue_is_complete_and_well_formed();
+    test_strokes_read_back_as_their_characters();
+    test_keys_and_dead_keys_are_recognized();
     test_us_matches_qmk_send_string();
     test_windows_ascii_matches_qmk_send_string();
     test_layouts_type_their_own_characters();
