@@ -69,7 +69,7 @@ Held by: `tests/host/run_profile_wire_v1_tests.sh` (`profile_wire_v1_test.c`, th
 
 ## Capability pages — GET `0x01`
 
-A client reads these before anything else. Three byte pages, `0..2`; page 3
+A client reads these before anything else. Four byte pages, `0..3`; page 4
 and above answer status `2`.
 
 Page 0, the identity (see [README.md](README.md#version-identity)):
@@ -77,9 +77,9 @@ Page 0, the identity (see [README.md](README.md#version-identity)):
 | Byte | Field |
 | ---: | --- |
 | 0 | capability layout, `3` |
-| 1 | capability page count, `3` |
+| 1 | capability page count, `4` |
 | 2–3 | Profile Wire major `2`, minor `1` |
-| 4–5 | schema major `4`, minor `3` |
+| 4–5 | schema major `4`, minor `4` |
 | 6 | report size, `32` |
 | 7 | candidate chunk capacity: `20` when feature bit 1 is set, otherwise `0` |
 | 8 | profile status page count, `2` |
@@ -121,6 +121,18 @@ Page 2, the wider ceilings; every byte count is 32 bits:
 | 14–17 | macro domain capacity in bytes | 34,903 |
 | 18–19 | maximum lighting group rows in all four stage tables (D-F63) | 640 |
 | 20–24 | zero | |
+
+Page 3, the [autocorrect list](autocorrect-domain.md#ceilings)'s ceilings
+(D-F68):
+
+| Byte | Field | This firmware |
+| ---: | --- | --- |
+| 0–1 | maximum corrections | 1,024 |
+| 2–3 | maximum typos | 1,024 |
+| 4–5 | text capacity in bytes, corrections and typos together | 20,480 |
+| 6–9 | autocorrect domain capacity in bytes | 34,824 |
+| 10 | maximum bytes in one correction or typo | 32 |
+| 11–24 | zero | |
 
 The values come from one header, `users/noah/lib/compat/qmk_profile_capabilities.h`,
 which the Raw HID channel and the contract probe (`tests/host/run_contract_probe.sh`)

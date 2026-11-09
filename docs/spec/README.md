@@ -13,7 +13,7 @@ make:
 | --- | --- | --- |
 | HID channel | [profile-wire-v1/](profile-wire-v1/README.md) | Profile Wire: the Raw HID reports, every value id, results, candidate transfer and live edits |
 | Blob | [profile-wire-v1/blob-and-digests.md](profile-wire-v1/blob-and-digests.md) | The canonical profile blob, the domain registry, action encoding, digests |
-| Domains | [key behaviours](profile-wire-v1/key-behavior-domain.md), [combos](profile-wire-v1/combo-domain.md), [settings](profile-wire-v1/settings-domain.md), [keymap](profile-wire-v1/keymap-domain.md), [macros](profile-wire-v1/macro-domain.md) | Each domain's payload and readback |
+| Domains | [key behaviours](profile-wire-v1/key-behavior-domain.md), [combos](profile-wire-v1/combo-domain.md), [settings](profile-wire-v1/settings-domain.md), [keymap](profile-wire-v1/keymap-domain.md), [macros](profile-wire-v1/macro-domain.md), [autocorrect list](profile-wire-v1/autocorrect-domain.md) | Each domain's payload and readback |
 | | [pd-mode-domain-v1.md](pd-mode-domain-v1.md) | The pointing domain and how pointing modes run |
 | | [rgb-domain-v1.md](rgb-domain-v1.md) | The lighting domain and how it is drawn |
 | | [participation-policy.md](participation-policy.md) | When a press uses its behaviour or joins a combo |

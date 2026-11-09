@@ -44,7 +44,7 @@ _Avoid_: app (in specs), editor, host (for the program)
 **Profile**:
 Everything the keyboard can be told to do without a reflash, kept as one
 versioned whole: keymap, behaviours, combos, macros, custom keys, pointing
-modes, lighting, settings and the keyboard's name.
+modes, lighting, settings, the autocorrect list and the keyboard's name.
 _Avoid_: config, configuration, setup, layout, keymap (for the whole)
 
 **Domain**:
@@ -304,6 +304,31 @@ _Avoid_: action (for this), event, token
 A macro playing with held typing keys suspended and new presses ignored, so
 nothing the person does mixes into what it types.
 _Avoid_: protected playback, input protection
+
+## Autocorrect
+
+**Autocorrect list**:
+The typos the keyboard corrects and what each becomes, kept in the profile as
+its own domain.
+_Avoid_: dictionary, autocorrect table, trie, word list
+
+**Entry**:
+One correction with every typo that becomes it.
+_Avoid_: rule, pair, row (for this), mapping
+
+**Correction**:
+The right word of an entry, stored once, as it is to be typed.
+_Avoid_: replacement, fix, target, output
+
+**Typo**:
+A misspelling an entry corrects, stored case-folded; it belongs to exactly one
+correction.
+_Avoid_: trigger, pattern, source, input, misspelling (as a second term)
+
+**Where it matches**:
+What part of a word a typo has to be: the whole word, the start of a word,
+the end of a word, or anywhere in a word.
+_Avoid_: boundary, anchor, mode, match type
 
 ## Pointing
 

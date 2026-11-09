@@ -18,8 +18,8 @@ Eight bytes, then the domains:
 | ---: | ---: | --- |
 | 0 | 4 | ASCII magic `NLP1` |
 | 4 | 1 | schema major, `4` |
-| 5 | 1 | schema minor, `2` |
-| 6 | 1 | domain count, `0..7` |
+| 5 | 1 | schema minor, `4` |
+| 6 | 1 | domain count, `0..8` |
 | 7 | 1 | flags: exactly `0x01` (bit 0 canonical encoding; bits 1–7 reserved) |
 
 The blob carries no length of its own. The carrier supplies it as a 32-bit
@@ -27,14 +27,14 @@ field: a candidate's BEGIN, a profile slot's record header, payload readback's
 metadata page. A blob is `8..130,048` bytes: the upper bound is one 128 KiB
 profile slot less the first kilobyte its header and commit marker take
 (D-F29, [`0029`](../../adr/0029-profile-slots-in-their-own-flash-region.md)).
-The empty profile is the eight bytes `4e 4c 50 31 04 00 00 01`.
+The empty profile is the eight bytes `4e 4c 50 31 04 04 00 01`.
 
 A header is refused, in this order: shorter than 8 bytes `TRUNCATED`; longer
 than 130,048 `CAPACITY_EXCEEDED`; wrong magic `INVALID_MAGIC`; any other
 schema `INCOMPATIBLE_SCHEMA` (no earlier schema is read, D-F10,
 [`0010`](../../adr/0010-firmware-accepts-only-current-formats.md)); a
 reserved flag bit set `RESERVED_FLAGS`; flag bit 0 clear `NONCANONICAL`; more
-than seven domains `CAPACITY_EXCEEDED`.
+than eight domains `CAPACITY_EXCEEDED`.
 
 Held by: `tests/host/run_profile_blob_v1_tests.sh` (`profile_blob_v1_test.c`), `tests/fixtures/profile_blob_v1.fixture`.
 
@@ -73,16 +73,23 @@ requested domains, a record's domain mask, capability page 1 byte 12) is
 | 0 | `0x01` | `0x10` | 4 | Lighting | [rgb-domain-v1.md](../rgb-domain-v1.md) |
 | 1 | `0x02` | `0x20` | 2 | Key behaviours | [key-behavior-domain.md](key-behavior-domain.md) |
 | 2 | `0x04` | `0x30` | 3 | Combos | [combo-domain.md](combo-domain.md) |
-| 3 | `0x08` | `0x40` | 8 | Settings: layer records, custom keys and their shortcuts, layer, macro and custom-key names, the keyboard name | [settings-domain.md](settings-domain.md) |
-| 4 | `0x10` | `0x50` | 3 | Pointing slots | [pd-mode-domain-v1.md](../pd-mode-domain-v1.md) |
+| 3 | `0x08` | `0x40` | 11 | Settings: layer records, custom keys and their shortcuts, layer, macro and custom-key names, the keyboard name | [settings-domain.md](settings-domain.md) |
+| 4 | `0x10` | `0x50` | 4 | Pointing slots | [pd-mode-domain-v1.md](../pd-mode-domain-v1.md) |
 | 5 | `0x20` | `0x60` | 1 | Keymap | [keymap-domain.md](keymap-domain.md) |
 | 6 | `0x40` | `0x70` | 1 | Macros | [macro-domain.md](macro-domain.md) |
+| 7 | `0x80` | `0x80` | 1 | Autocorrect list | [autocorrect-domain.md](autocorrect-domain.md) |
+
+The eight rows fill the one-byte mask (D-F68,
+[`0068`](../../adr/0068-the-autocorrect-list-is-a-readable-profile-domain.md)):
+every bit names a domain, so no mask is refused for a bit alone, and a ninth
+domain needs a wider mask in every place one travels.
 
 The registry is the wire vocabulary in every build. Which domains a build
 admits is separate: its supported domain mask (capability page 1 byte 12) is
 the domains its compiled defaults hold, plus combos in a build with combos
 and settings in a build that saves (`NOAH_PORTABLE_PROFILE_ENABLE`), and zero until the live-profile owner reports. The pointing domain is required
-in every profile the keyboard validates. Admission is the
+in every profile the keyboard validates. The autocorrect list is in every
+build's compiled defaults, an empty list being its header. Admission is the
 [device-resident profile](../device-resident-profile.md)'s.
 
 Held by: `tests/host/run_profile_blob_v1_tests.sh` (`profile_blob_v1_test.c`, the registry test), `tests/host/run_profile_wire_v1_tests.sh` (`qmk_profile_channel_test.c`, the supported domain mask), `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_test.c`).

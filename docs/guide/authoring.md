@@ -14,6 +14,8 @@ The authored profile lives in
 | [`rgb_config.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | lighting: layer, pointing-mode and feedback colours, LED groups |
 | [`pd_config.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/pd_config.c) | the 32 pointing slots |
 | `authored_macro_bank.h` | generated from the macros; never edited by hand |
+| [`autocorrect.txt`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/autocorrect.txt) | the autocorrect list: typos and what each becomes |
+| `authored_autocorrect_list.h` | generated from the list; never edited by hand |
 
 The runtime under [`users/noah/`](../../users/noah/) is generic: it holds no
 names, timings or colours of mine, and you shouldn't need to touch it.
@@ -92,6 +94,33 @@ tests/host/run_real_profile_validation_tests.sh ```
 
 A stale copy fails the build. Authored macros play uninterruptibly only when
 they need Unicode entry ([Macros](macros.md#uninterruptible-playback)).
+
+### The autocorrect list
+
+`autocorrect.txt` lists the typos the keyboard corrects, one a line, in the
+form QMK's autocorrect lists use:
+
+```
+:teh: -> the        # the whole word
+:nu -> un           # at the start of a word
+mnet: -> ment       # at the end of a word
+tihng -> thing      # anywhere in a word
+```
+
+A colon before the typo ties it to the start of a word and one after it to
+the end; both make it the whole word, and neither lets it match anywhere.
+Several typos can name one correction, and each typo names only one. A typo
+is letters and digits, with apostrophes only between them, and matches
+whatever its case; the correction is typed as you write it. The list holds
+1,024 typos and 1,024 corrections of up to 32 bytes each. It ships empty.
+
+After changing it, regenerate `authored_autocorrect_list.h`:
+
+```sh
+python3 tools/autocorrect/build.py --write-authored keyboards/bastardkb/charybdis/4x6/keymaps/noah
+```
+
+A stale copy fails the build, and so does a list the keyboard cannot hold.
 
 ### Combos
 
@@ -262,7 +291,8 @@ It builds both halves in the same Docker image releases are built in and
 writes them to `../builds/<branch>/` (or `BUILD_ROOT`) as
 `<n>_charybdis_left.uf2` and `<n>_charybdis_right.uf2`, with a note of what
 they were built from. Every build also validates the authored profile: a
-misplaced action, a stale macro bank or a bad colour fails it.
+misplaced action, a stale macro bank or autocorrect list or a bad colour fails
+it.
 
 [Development](../development.md) has the details, and
 [Hook overrides](hooks.md) is for adding code of your own.

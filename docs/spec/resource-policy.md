@@ -126,7 +126,7 @@ engineering regression policies, not SRAM limits:
 | Lighting domain view / its validation | 40 / 72 | `NOAH_PROFILE_RGB_V1_EMBEDDED_VIEW_BUDGET`, `NOAH_PROFILE_RGB_V1_EMBEDDED_VALIDATION_BUDGET` |
 | Lighting row selectors, one byte per group row (D-F63) | 656 | `rgb_active_profile_config.c` |
 | Lighting render snapshot | 96 | `rgb_runtime.c` |
-| Compiled-profile handle | 76 | `profile_compiled_defaults_v1.c` |
+| Compiled-profile handle: its metadata and eight 32-bit ranges (D-F68) | 84 | `profile_compiled_defaults_v1.c` |
 | Durable-I/O grant | 28 | `NOAH_QMK_DURABLE_IO_STATE_BUDGET_32BIT` |
 
 Held by: the firmware compile (`sh tools/build-firmware-pair.sh`). The host

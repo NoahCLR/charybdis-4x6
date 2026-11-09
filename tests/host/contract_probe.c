@@ -94,16 +94,11 @@ int main(void) {
     noah_profile_channel_apply_owner_capabilities(&service.capabilities, compiled.metadata.action_abi_digest, compiled.metadata.digest, compatibility.allowed_domain_mask);
 
     printf("{\"format\":1,\"actionAbiDigest\":\"0x%08lx\",\"compiledDefaultDigest\":\"0x%08lx\",\"supportedDomainMask\":%u,\"capabilityPages\":[", (unsigned long)compiled.metadata.action_abi_digest, (unsigned long)compiled.metadata.digest, (unsigned)compatibility.allowed_domain_mask);
-    if (print_page(&service, 0u) != 0) {
-        return 1;
-    }
-    printf(",");
-    if (print_page(&service, 1u) != 0) {
-        return 1;
-    }
-    printf(",");
-    if (print_page(&service, 2u) != 0) {
-        return 1;
+    for (uint8_t page = 0u; page < NOAH_PROFILE_WIRE_V1_CAPABILITY_PAGES; page++) {
+        if (page != 0u) printf(",");
+        if (print_page(&service, page) != 0) {
+            return 1;
+        }
     }
     printf("]}\n");
     return 0;
