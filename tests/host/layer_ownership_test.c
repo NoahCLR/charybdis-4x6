@@ -133,6 +133,33 @@ static void test_is_held_tracks_key_holds_not_locks(void) {
     CHECK(!layer_ownership_is_held(2));
 }
 
+// Any owner keeps a layer: a key's hold, a lock, a one-shot or a pointing
+// mode. A layer something outside ownership turned on has none.
+static void test_owns_names_every_owner(void) {
+    keypos_t key_a = test_keypos(0, 0);
+
+    test_reset_stubs();
+
+    layer_on(4);
+    CHECK(!layer_ownership_owns(4));
+    layer_off(4);
+    layer_ownership_momentary_press(key_a, 4);
+    CHECK(layer_ownership_owns(4) && !layer_ownership_owns(3));
+    (void)layer_ownership_momentary_release(key_a);
+    CHECK(!layer_ownership_owns(4));
+    CHECK(layer_ownership_toggle_lock_state(4));
+    CHECK(layer_ownership_owns(4));
+    CHECK(layer_ownership_toggle_lock_state(4));
+    CHECK(layer_ownership_oneshot_tap(4, 1000u, 200u));
+    CHECK(layer_ownership_owns(4));
+    CHECK(layer_ownership_oneshot_consume());
+    CHECK(!layer_ownership_owns(4));
+    CHECK(layer_ownership_set_pointing_mode_layers(test_layer_mask(4)));
+    CHECK(layer_ownership_owns(4));
+    CHECK(layer_ownership_set_pointing_mode_layers(0u));
+    CHECK(!layer_ownership_owns(4) && !layer_ownership_owns(LAYER_COUNT));
+}
+
 static void test_same_key_repress_same_layer_does_not_duplicate_refcount(void) {
     keypos_t key_pos = test_keypos(2, 4);
 
@@ -691,6 +718,7 @@ int main(void) {
     test_single_momentary_press_and_release_toggles_layer();
     test_multiple_keys_share_momentary_layer_reference();
     test_is_held_tracks_key_holds_not_locks();
+    test_owns_names_every_owner();
     test_same_key_repress_same_layer_does_not_duplicate_refcount();
     test_same_key_can_move_its_momentary_binding_between_layers();
     test_toggle_lock_state_activates_and_deactivates_layer();

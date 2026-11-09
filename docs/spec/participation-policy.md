@@ -33,6 +33,10 @@ standard key, its own switch, so `BH_ON` and `BH_TOGG` always work then.
 Switching behaviours off settles no press already decided: a press keeps its
 decision through its release.
 
+Auto-mouse has the same two switches outside participation: its stored
+setting and a runtime override that the switch keys `AM_ON`, `AM_OFF` and `AM_TOGG` set
+(D-F66, [toggles](profile-wire-v1/live-edits.md#toggles-and-the-settings-qmk-holds)).
+
 Switching something off keeps it: a disabled behaviour row keeps its branches,
 timing and layers, a disabled combo its inputs, output and window, and
 switching it on again restores them unchanged.

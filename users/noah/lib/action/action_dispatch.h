@@ -52,9 +52,10 @@ static inline uint8_t noah_action_keycode_layer_lock_layer(uint16_t action) {
 }
 
 // The switch keys (D-F66): QMK's CM_ON, CM_OFF and CM_TOGG for combos, and
-// the firmware's BH_ON, BH_OFF and BH_TOGG for behaviours.
+// the firmware's BH_ON, BH_OFF and BH_TOGG for behaviours and AM_ON, AM_OFF
+// and AM_TOGG for auto-mouse.
 static inline bool noah_action_keycode_is_switch_key(uint16_t action) {
-    return (action >= QK_COMBO_ON && action <= QK_COMBO_TOGGLE) || (action >= BH_ON && action <= BH_TOGG);
+    return (action >= QK_COMBO_ON && action <= QK_COMBO_TOGGLE) || (action >= BH_ON && action <= BH_TOGG) || (action >= AM_ON && action <= AM_TOGG);
 }
 
 static inline bool noah_action_keycode_is_momentary(uint16_t action) {

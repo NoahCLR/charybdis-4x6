@@ -396,7 +396,8 @@ Held by: `tests/host/run_qmk_profile_edit_channel_tests.sh` (`test_gets`), `test
 
 ### Runtime, GET 0x22
 
-Page 0, 24 bytes: QMK's live values beside the stored ones they override.
+Page 0, 25 bytes: the runtime overrides and QMK's live values beside the
+stored ones they override.
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
@@ -410,10 +411,12 @@ Page 0, 24 bytes: QMK's live values beside the stored ones they override.
 | 12 | 4 | RGB colour word |
 | 16 | 4 | default layers |
 | 20 | 4 | keymap options |
+| 24 | 1 | auto-mouse override (D-F66) |
 
 Bytes 4–23 are QMK's live values in the settings scalars' encodings
 ([settings domain](settings-domain.md)); a build without the portable
-profile leaves them zero.
+profile leaves them zero. Auto-mouse runs while its stored setting (scalar 4,
+read through settings readback) and byte 24 are both on.
 
 Held by: `tests/host/run_qmk_profile_edit_channel_tests.sh` (`test_gets`).
 
@@ -529,12 +532,21 @@ reports the stored values.
 A toggle is a runtime override beside its stored master, never an edit:
 combos run only while the stored master and QMK's combo flag both allow;
 behaviours only while the stored master and the firmware's behaviours
-override both allow. The switch keys set the flag (`CM_ON`, `CM_OFF`,
-`CM_TOGG`) and the override (`BH_ON`, `BH_OFF`, `BH_TOGG`), D-F66. An override starts allowed
+override both allow; auto-mouse only while its stored setting and the
+firmware's auto-mouse override both allow. The switch keys set the flag
+(`CM_ON`, `CM_OFF`, `CM_TOGG`) and the overrides (`BH_ON`, `BH_OFF`,
+`BH_TOGG`; `AM_ON`, `AM_OFF`, `AM_TOGG`), D-F66. An override starts allowed
 at boot, is never saved, and reads back through GET `0x22`. RGB on and off
 is a lighting adjustment, not a toggle.
 
-Held by: `tests/host/run_qmk_portable_profile_tests.sh` (`qmk_portable_profile_test.c`), `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_overrides_beside_the_masters`).
+Auto-mouse is pushed into QMK as its stored setting AND its override, so a
+push of the settings never undoes the override. Switching auto-mouse off, by
+key or by an edit, turns the pointer layer off unless a key's hold, a lock, a
+one-shot or a pointing mode's layers keep it: QMK leaves the layer on and,
+with auto-mouse off, never times it out. While it is off no anchor forces the
+pointer layer on.
+
+Held by: `tests/host/run_qmk_portable_profile_tests.sh` (`qmk_portable_profile_test.c`), `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_overrides_beside_the_masters`), `tests/host/run_auto_mouse_switch_tests.sh` (`auto_mouse_switch_test.c`).
 
 ## A stopped keyboard
 

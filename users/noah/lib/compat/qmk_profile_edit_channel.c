@@ -13,6 +13,7 @@
 #    include "qmk_keyboard_restart.h"
 #    include "qmk_portable_profile.h"
 #    include "../key/behavior/participation.h"
+#    include "../pointing/policy/auto_mouse_switch.h"
 #    include "../profile/protocol/profile_candidate_v1.h"
 #    include "../profile/protocol/profile_wire_v1.h"
 #    include "../profile/runtime/active_profile_settings_runtime.h"
@@ -219,6 +220,7 @@ static void runtime_page(uint8_t *payload) {
     put_u32(&payload[16], noah_qmk_portable_live_setting(NOAH_SETTING_DEFAULT_LAYERS));
     put_u32(&payload[20], noah_qmk_portable_live_setting(NOAH_SETTING_KEYMAP_OPTIONS));
 #    endif
+    payload[24] = auto_mouse_switch_override() ? 1u : 0u;
 }
 
 static bool handle_get(uint8_t *data) {
@@ -258,7 +260,7 @@ static bool handle_get(uint8_t *data) {
                 return true;
             }
             runtime_page(payload);
-            get_status(data, NOAH_PROFILE_WIRE_V1_STATUS_OK, 24u);
+            get_status(data, NOAH_PROFILE_WIRE_V1_STATUS_OK, 25u);
             return true;
         case NOAH_PROFILE_WIRE_V1_VALUE_EDIT_MODE:
             if (page != 0u) {

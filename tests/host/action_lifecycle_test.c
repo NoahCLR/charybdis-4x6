@@ -316,6 +316,17 @@ void owned_keycode_tap_literal(uint16_t keycode) {
 
 void pointer_layer_policy_sync_layer_ownership_anchor(void) {}
 
+// The auto-mouse keys' switch; auto_mouse_switch_test.c covers what it does.
+static bool auto_mouse_override = true;
+
+void auto_mouse_switch_set_override(bool allowed) {
+    auto_mouse_override = allowed;
+}
+
+bool auto_mouse_switch_override(void) {
+    return auto_mouse_override;
+}
+
 void pointer_layer_policy_settle_record(void) {}
 
 void pointer_layer_policy_take_back_qmk_toggle(uint16_t keycode, const keyrecord_t *record) {
@@ -787,7 +798,7 @@ static void test_qmk_functions_dispatch_as_synthetic_qmk_records(void) {
 
 // An unassigned userspace code sends nothing, whichever way it is dispatched.
 static void test_unassigned_userspace_codes_send_nothing(void) {
-    const uint16_t unassigned[] = {NOAH_KEYCODE_PD_HOLD_BASE + POINTING_MODE_COUNT, LAYER_LOCK_BASE + LAYER_COUNT, NOAH_KEYCODE_USERSPACE_END, QK_USER_MAX};
+    const uint16_t unassigned[] = {NOAH_KEYCODE_PD_HOLD_BASE + POINTING_MODE_COUNT, LAYER_LOCK_BASE + LAYER_COUNT, AM_TOGG + 1, QK_USER_MAX};
     keypos_t       key_pos      = {.row = 1, .col = 2};
     for (size_t index = 0; index < ARRAY_SIZE(unassigned); index++) {
         test_reset_stubs();

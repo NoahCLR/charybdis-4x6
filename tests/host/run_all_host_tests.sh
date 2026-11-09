@@ -55,6 +55,7 @@ sh run_pointing_mode_tests.sh
 sh run_pointing_mode_handlers_tests.sh
 sh run_pd_runtime_tests.sh
 sh run_pointer_layer_policy_tests.sh
+sh run_auto_mouse_switch_tests.sh
 sh run_split_runtime_sync_tests.sh
 sh run_profile_storage_layout_tests.sh
 sh run_profile_blob_v1_tests.sh

@@ -11,6 +11,7 @@
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/key/behavior/participation.h"
 #include "users/noah/lib/key/runtime/api.h"
+#include "users/noah/lib/pointing/policy/auto_mouse_switch.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
@@ -26,6 +27,7 @@ enum {
     TEST_TOGGLE_TAP_KEY      = SAFE_RANGE + 0x72,
     TEST_ONESHOT_HOLD_KEY    = SAFE_RANGE + 0x73,
     TEST_BEHAVIORS_OFF_KEY   = SAFE_RANGE + 0x74,
+    TEST_AUTO_MOUSE_OFF_KEY  = SAFE_RANGE + 0x75,
     TEST_NUM_LAYER           = 1,
     TEST_OTHER_LAYER         = 2,
 };
@@ -82,6 +84,7 @@ static void test_reset_state(void) {
     tap_count             = 0;
     noah_runtime_reset_for_test();
     noah_participation_set_behaviors_override(true);
+    auto_mouse_switch_set_override(true);
 }
 
 static void test_run_thumb_like_double_tap_hold_cycle_with_release_keycode(keypos_t key_pos, uint16_t release_keycode) {
@@ -272,6 +275,15 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
                     .tap  = TAP_SENDS(BH_OFF),
                     .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(TEST_NUM_LAYER)),
                 },
+        };
+    }
+
+    if (keycode == TEST_AUTO_MOUSE_OFF_KEY) {
+        return (key_behavior_view_t){
+            .keycode       = keycode,
+            .handled       = true,
+            .tap_hold_term = 150,
+            .single        = {.tap = TAP_SENDS(AM_OFF)},
         };
     }
 
@@ -867,6 +879,53 @@ static void test_switch_key_held_for_its_behaviour_does_not_switch(void) {
     CHECK(noah_runtime_debug_active_slot_count() == 0);
 }
 
+// The auto-mouse keys switch its override the same way, act at their press,
+// and never reach QMK.
+static void test_plain_auto_mouse_keys_switch_the_override(void) {
+    keypos_t key_pos = test_keypos(4, 0);
+
+    test_reset_state();
+
+    CHECK(!test_plain_key_tap(AM_OFF, key_pos));
+    CHECK(!auto_mouse_switch_override());
+    CHECK(!test_plain_key_tap(AM_OFF, key_pos));
+    CHECK(!auto_mouse_switch_override());
+    CHECK(!test_plain_key_tap(AM_TOGG, key_pos));
+    CHECK(auto_mouse_switch_override());
+    CHECK(!test_plain_key_tap(AM_TOGG, key_pos));
+    CHECK(!auto_mouse_switch_override());
+    CHECK(!test_plain_key_tap(AM_ON, key_pos));
+    CHECK(auto_mouse_switch_override());
+    CHECK(noah_participation_behaviors_override());
+    CHECK(tap_count == 0);
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+}
+
+// A behaviour step can send AM_OFF, and with behaviours off a plain AM_ON
+// still switches auto-mouse back.
+static void test_behavior_step_switches_auto_mouse_off(void) {
+    keypos_t step_pos = test_keypos(3, 2);
+
+    test_reset_state();
+
+    const key_runtime_integration_step_t step_tap[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(TEST_AUTO_MOUSE_OFF_KEY, step_pos.row, step_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(30),
+        KEY_RUNTIME_INTEGRATION_RELEASE(TEST_AUTO_MOUSE_OFF_KEY, step_pos.row, step_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(200),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+    key_runtime_integration_run(&fake_time, step_tap, ARRAY_SIZE(step_tap));
+    CHECK(!auto_mouse_switch_override());
+    CHECK(tap_count == 0);
+
+    noah_participation_set_behaviors_override(false);
+    CHECK(!test_plain_key_tap(AM_ON, test_keypos(4, 0)));
+    CHECK(auto_mouse_switch_override());
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
+}
+
 int main(void) {
     test_owned_mod_tap_consumes_oneshot();
     test_double_tap_hold_toggles_num_layer_lock_off_on_second_cycle();
@@ -882,6 +941,9 @@ int main(void) {
     test_behaviors_off_keeps_the_way_back();
     test_behavior_tap_switches_behaviors_off_and_a_held_one_still_releases();
     test_switch_key_held_for_its_behaviour_does_not_switch();
+
+    test_plain_auto_mouse_keys_switch_the_override();
+    test_behavior_step_switches_auto_mouse_off();
 
     puts("key_runtime layer-lock integration tests passed");
     return 0;

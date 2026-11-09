@@ -173,7 +173,7 @@ _Static_assert((QK_MACRO_0 + MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "Macro slot 
 //   0x7ea0–0x7ebf  PD_MODE_n_LOCK       lock slot n's mode      (32, all used)
 //   0x7ec0–0x7edf  LOCK_LAYER(n)        toggle layer n's lock   (32 reserved)
 //   0x7ee0–0x7eef  BH_ON, BH_OFF, BH_TOGG  behaviours on, off, the other way (16 reserved)
-//   0x7ef0–0x7eff  unassigned: inert, refused as a step or combo output
+//   0x7ef0–0x7eff  AM_ON, AM_OFF, AM_TOGG  auto-mouse on, off, the other way (16 reserved)
 //   0x7f00–0x7f7f  CUSTOM_KEY_0–127     named keys: their shortcut and behaviour
 //   0x7f80–0x7fff  CUSTOM_KEY_LAYER_TAP(n)  runtime only: what custom key
 //                  n's own tap does to its layers; inert on a key, refused as
@@ -192,16 +192,18 @@ _Static_assert((QK_MACRO_0 + MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "Macro slot 
 // for explicit tap, hold, long-hold or multi-tap behavior on top of that
 // default.
 // LOCK_LAYER(n) toggles a layer lock from actions authored in key_behaviors[].
-// BH_ON, BH_OFF and BH_TOGG are switch keys: they set the behaviours override
-// as CM_ON, CM_OFF and CM_TOGG set QMK's combo flag, until the keyboard
-// restarts, never saved (D-F66).
+// BH_ON, BH_OFF and BH_TOGG, and AM_ON, AM_OFF and AM_TOGG, are switch keys:
+// they set the behaviours and auto-mouse overrides as CM_ON, CM_OFF and
+// CM_TOGG set QMK's combo flag, until the keyboard restarts, never saved
+// (D-F66).
 
 #define NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE (SAFE_RANGE + 0x00)
 #define NOAH_KEYCODE_PD_HOLD_BASE (SAFE_RANGE + 0x40)
 #define NOAH_KEYCODE_PD_LOCK_BASE (SAFE_RANGE + 0x60)
 #define NOAH_KEYCODE_LAYER_LOCK_BASE (SAFE_RANGE + 0x80)
 #define NOAH_KEYCODE_BEHAVIORS_SWITCH_BASE (SAFE_RANGE + 0xa0)
-#define NOAH_KEYCODE_USERSPACE_END (SAFE_RANGE + 0xb0)
+#define NOAH_KEYCODE_AUTO_MOUSE_SWITCH_BASE (SAFE_RANGE + 0xb0)
+#define NOAH_KEYCODE_USERSPACE_END (SAFE_RANGE + 0xc0)
 #define NOAH_KEYCODE_CUSTOM_KEY_BASE (SAFE_RANGE + 0xc0)
 #define NOAH_KEYCODE_CUSTOM_KEY_LAYER_TAP_BASE (SAFE_RANGE + 0x140)
 #define NOAH_KEYCODE_RETIRED_CUSTOM_KEY_RESERVED 64
@@ -209,6 +211,7 @@ _Static_assert((QK_MACRO_0 + MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "Macro slot 
 #define NOAH_KEYCODE_PD_RESERVED 32
 #define NOAH_KEYCODE_LAYER_LOCK_RESERVED 32
 #define NOAH_KEYCODE_BEHAVIORS_SWITCH_RESERVED 16
+#define NOAH_KEYCODE_AUTO_MOUSE_SWITCH_RESERVED 16
 #define CUSTOM_KEY_SLOT_COUNT 128
 
 enum {
@@ -360,14 +363,20 @@ enum {
     BH_OFF,
     BH_TOGG,
 };
+enum {
+    AM_ON = NOAH_KEYCODE_AUTO_MOUSE_SWITCH_BASE,
+    AM_OFF,
+    AM_TOGG,
+};
 
-_Static_assert(NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE == 0x7e40 && NOAH_KEYCODE_PD_HOLD_BASE == 0x7e80 && NOAH_KEYCODE_PD_LOCK_BASE == 0x7ea0 && NOAH_KEYCODE_LAYER_LOCK_BASE == 0x7ec0 && NOAH_KEYCODE_BEHAVIORS_SWITCH_BASE == 0x7ee0 && NOAH_KEYCODE_CUSTOM_KEY_BASE == 0x7f00, "userspace keycode blocks are the action ABI");
+_Static_assert(NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE == 0x7e40 && NOAH_KEYCODE_PD_HOLD_BASE == 0x7e80 && NOAH_KEYCODE_PD_LOCK_BASE == 0x7ea0 && NOAH_KEYCODE_LAYER_LOCK_BASE == 0x7ec0 && NOAH_KEYCODE_BEHAVIORS_SWITCH_BASE == 0x7ee0 && NOAH_KEYCODE_AUTO_MOUSE_SWITCH_BASE == 0x7ef0 && NOAH_KEYCODE_CUSTOM_KEY_BASE == 0x7f00, "userspace keycode blocks are the action ABI");
 _Static_assert(NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE + NOAH_KEYCODE_RETIRED_CUSTOM_KEY_RESERVED == NOAH_KEYCODE_PD_HOLD_BASE, "the retired custom-key block ends where pointing holds begin");
 _Static_assert(CUSTOM_KEY_SLOT_COUNT <= NOAH_KEYCODE_CUSTOM_KEY_RESERVED && CUSTOM_KEY_127 == 0x7f7f && NOAH_KEYCODE_CUSTOM_KEY_BASE + NOAH_KEYCODE_CUSTOM_KEY_RESERVED - 1 <= QK_USER_MAX, "custom keys fill their block inside QMK's user range");
 _Static_assert(PD_MODE_0 == 0x7e80 && PD_MODE_31 == 0x7e9f && PD_MODE_31 - PD_MODE_0 + 1 <= NOAH_KEYCODE_PD_RESERVED && NOAH_KEYCODE_PD_HOLD_BASE + NOAH_KEYCODE_PD_RESERVED == NOAH_KEYCODE_PD_LOCK_BASE, "pointing holds stay inside their block");
 _Static_assert(PD_MODE_0_LOCK == 0x7ea0 && PD_MODE_31_LOCK == 0x7ebf && PD_MODE_31_LOCK - PD_MODE_0_LOCK + 1 <= NOAH_KEYCODE_PD_RESERVED && NOAH_KEYCODE_PD_LOCK_BASE + NOAH_KEYCODE_PD_RESERVED == NOAH_KEYCODE_LAYER_LOCK_BASE, "pointing locks stay inside their block");
 _Static_assert(LAYER_COUNT <= NOAH_KEYCODE_LAYER_LOCK_RESERVED && NOAH_KEYCODE_LAYER_LOCK_BASE + NOAH_KEYCODE_LAYER_LOCK_RESERVED == NOAH_KEYCODE_BEHAVIORS_SWITCH_BASE, "layer locks stay inside their block");
-_Static_assert(BH_ON == 0x7ee0 && BH_OFF == 0x7ee1 && BH_TOGG == 0x7ee2 && BH_TOGG < NOAH_KEYCODE_BEHAVIORS_SWITCH_BASE + NOAH_KEYCODE_BEHAVIORS_SWITCH_RESERVED && NOAH_KEYCODE_BEHAVIORS_SWITCH_BASE + NOAH_KEYCODE_BEHAVIORS_SWITCH_RESERVED == NOAH_KEYCODE_USERSPACE_END, "the behaviours keys stay inside their block");
+_Static_assert(BH_ON == 0x7ee0 && BH_OFF == 0x7ee1 && BH_TOGG == 0x7ee2 && BH_TOGG < NOAH_KEYCODE_BEHAVIORS_SWITCH_BASE + NOAH_KEYCODE_BEHAVIORS_SWITCH_RESERVED && NOAH_KEYCODE_BEHAVIORS_SWITCH_BASE + NOAH_KEYCODE_BEHAVIORS_SWITCH_RESERVED == NOAH_KEYCODE_AUTO_MOUSE_SWITCH_BASE, "the behaviours keys stay inside their block");
+_Static_assert(AM_ON == 0x7ef0 && AM_OFF == 0x7ef1 && AM_TOGG == 0x7ef2 && AM_TOGG < NOAH_KEYCODE_AUTO_MOUSE_SWITCH_BASE + NOAH_KEYCODE_AUTO_MOUSE_SWITCH_RESERVED && NOAH_KEYCODE_AUTO_MOUSE_SWITCH_BASE + NOAH_KEYCODE_AUTO_MOUSE_SWITCH_RESERVED == NOAH_KEYCODE_USERSPACE_END, "the auto-mouse keys stay inside their block");
 _Static_assert(NOAH_KEYCODE_USERSPACE_END - 1 <= QK_USER_MAX, "userspace keycodes stay in QMK's user range");
 _Static_assert(NOAH_KEYCODE_CUSTOM_KEY_LAYER_TAP_BASE == CUSTOM_KEY_127 + 1 && NOAH_KEYCODE_CUSTOM_KEY_LAYER_TAP_BASE + CUSTOM_KEY_SLOT_COUNT - 1 == QK_USER_MAX, "custom keys' runtime layer taps fill the last block of QMK's user range");
 

@@ -42,7 +42,7 @@ keycode runs its slot's mode, which comes from the active profile (D-F50,
 | `0x7ea0..0x7ebf` | `PD_MODE_n_LOCK`, lock slot `n`'s mode | 32, the whole block |
 | `0x7ec0..0x7edf` | `LOCK_LAYER(n)`, toggle layer `n`'s lock | 16 (`0x7ec0..0x7ecf`) |
 | `0x7ee0..0x7eef` | `BH_ON`, `BH_OFF`, `BH_TOGG`: behaviours on, off, or the other way (D-F66) | 3 (`0x7ee0..0x7ee2`) |
-| `0x7ef0..0x7eff` | unassigned: inert | — |
+| `0x7ef0..0x7eff` | `AM_ON`, `AM_OFF`, `AM_TOGG`: auto-mouse on, off, or the other way (D-F66) | 3 (`0x7ef0..0x7ef2`) |
 | `0x7f00..0x7f7f` | `CUSTOM_KEY_0..127` | 128 |
 | `0x7f80..0x7fff` | `CUSTOM_KEY_LAYER_TAP(n)`, the runtime's own: what custom key `n`'s tap does to its layers (D-F26); inert on a key, never stored | — |
 | `0x7700..0x777f` | `QK_MACRO_0..127`, QMK's macro block | 128 |
@@ -52,7 +52,7 @@ Profiles store slot keys as action kinds 4 (held) and 5 (locked)
 ([action encoding](profile-wire-v1/blob-and-digests.md#action-encoding)), so
 a block move changes the action-ABI digest and nothing else.
 
-Held by: `tests/host/run_pointing_mode_tests.sh` (`pointing_mode_profile_registry_test.c`), `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, the keycode assertions), `tests/host/run_action_dispatch_tests.sh` (`action_dispatch_test.c`, `test_behaviors_keys_go_where_the_combo_keys_go`), and the block assertions in `users/noah/noah_keymap_ids.h`.
+Held by: `tests/host/run_pointing_mode_tests.sh` (`pointing_mode_profile_registry_test.c`), `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, the keycode assertions), `tests/host/run_action_dispatch_tests.sh` (`action_dispatch_test.c`, `test_behaviors_keys_go_where_the_combo_keys_go`, `test_auto_mouse_keys_go_where_the_combo_keys_go`), and the block assertions in `users/noah/noah_keymap_ids.h`.
 
 ## Header
 

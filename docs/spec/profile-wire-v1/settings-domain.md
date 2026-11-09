@@ -59,7 +59,7 @@ Unless the table says otherwise a scalar is at most 65,535.
 | 1 | tap / hold threshold, ms | | `CUSTOM_TAP_HOLD_TERM` |
 | 2 | long hold threshold, ms | | `CUSTOM_LONGER_HOLD_TERM` |
 | 3 | multi tap window, ms | | `CUSTOM_MULTI_TAP_TERM` |
-| 4 | auto-mouse on | boolean | 1 |
+| 4 | auto-mouse on: the stored setting beside the runtime override (D-F66, [toggles](live-edits.md#toggles-and-the-settings-qmk-holds)) | boolean | 1 |
 | 5 | pointer layer for auto-mouse | layer | `AUTO_MOUSE_DEFAULT_LAYER` |
 | 6 | auto-mouse timeout, ms | nonzero | `AUTO_MOUSE_TIME` |
 | 7 | auto-mouse debounce, ms | at most 255 | `AUTO_MOUSE_DEBOUNCE` |

@@ -165,9 +165,9 @@ output. A combo holds its output while it is held.
 | `LM()` | yes | no | no | no | yes |
 | `LT()` | yes | no | no | no | no |
 | `TG()`, `TO()`, `LOCK_LAYER()` | yes | yes | yes | yes | yes |
-| The switch keys: `CM_ON`, `CM_OFF`, `CM_TOGG`, `BH_ON`, `BH_OFF`, `BH_TOGG` (D-F66) | yes | yes | yes | yes | yes |
+| The switch keys: `CM_ON`, `CM_OFF`, `CM_TOGG`, `BH_ON`, `BH_OFF`, `BH_TOGG`, `AM_ON`, `AM_OFF`, `AM_TOGG` (D-F66) | yes | yes | yes | yes | yes |
 | `DF()`, `PDF()`, and any layer keycode naming a layer at or above the layer count | no | no | no | no | no |
-| Any other keycode in QMK's user range `0x7e40..0x7fff`: the inert `0x7e40..0x7e7f` block, layer locks past the layer count, `0x7ee3..0x7eff`, and `0x7f80..0x7fff`, which only the runtime sends (`CUSTOM_KEY_LAYER_TAP(n)`, D-F26) | no | no | no | no | no |
+| Any other keycode in QMK's user range `0x7e40..0x7fff`: the inert `0x7e40..0x7e7f` block, layer locks past the layer count, `0x7ee3..0x7eef`, `0x7ef3..0x7eff`, and `0x7f80..0x7fff`, which only the runtime sends (`CUSTOM_KEY_LAYER_TAP(n)`, D-F26) | no | no | no | no | no |
 
 A refused behaviour action is `INVALID_REFERENCE` at its row, tap index and
 field; a refused combo output refuses the combo domain at its row; a refused
@@ -222,7 +222,7 @@ The FNV-1a digest of this byte stream, integers little-endian:
 | 9 | 2 each | `KC_NO`, `KC_TRNS`, `MO(0)`, `LT(0, KC_NO)`, `OSM(0)`, `MT(0, KC_NO)`, `QK_MACRO_0`, `CUSTOM_KEY_0`, the first layer lock |
 | 10 | 1 + 2 + 2 per layer | layer id, `MO(n)`, `LOCK_LAYER(n)` |
 | 11 | 1 + 4 + 2 + 2 per slot | slot id, its 32-bit mode flag, its hold keycode, its lock keycode |
-| 12 | 2 + 2 | the end of the userspace keycode blocks before custom keys (`0x7ef0`), then `0xFFFF` |
+| 12 | 2 + 2 | the end of the userspace keycode blocks before custom keys (`0x7f00`), then `0xFFFF` |
 
 It depends on no authored row, so an empty profile and a populated one share
 it. Because it includes the firmware version and the layer count, a new

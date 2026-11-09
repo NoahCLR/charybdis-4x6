@@ -13,6 +13,7 @@
 #    include "../profile/storage/profile_checksum.h"
 #    include "../profile/storage/profile_store_runtime.h"
 #    include "../pointing/defs/pointing_modes.h"
+#    include "../pointing/policy/auto_mouse_switch.h"
 
 // Cold readback workspace, never used by key events or RGB rendering.
 void noah_qmk_portable_storage_init(void) {
@@ -104,8 +105,9 @@ static uint32_t projected_setting(uint8_t id, uint32_t fallback) {
 // durable owner of these values, so QMK's EEPROM copies are never written
 // here and never win at boot. Combos on/off is not pushed: QMK's combo flag
 // is the runtime override beside the stored master (participation.c).
+// Auto-mouse on/off reaches QMK with its override (auto_mouse_switch.c).
 void noah_qmk_portable_apply(void) {
-    set_auto_mouse_enable(projected_setting(NOAH_SETTING_AUTO_MOUSE_ENABLED, get_auto_mouse_enable()));
+    auto_mouse_switch_apply(projected_setting(NOAH_SETTING_AUTO_MOUSE_ENABLED, 1u) != 0u);
     set_auto_mouse_layer(projected_setting(NOAH_SETTING_AUTO_MOUSE_LAYER, get_auto_mouse_layer()));
     set_auto_mouse_timeout(projected_setting(NOAH_SETTING_AUTO_MOUSE_TIMEOUT, get_auto_mouse_timeout()));
     set_auto_mouse_debounce(projected_setting(NOAH_SETTING_AUTO_MOUSE_DEBOUNCE, get_auto_mouse_debounce()));

@@ -279,9 +279,10 @@ How close together a combo's keys must be pressed.
 _Avoid_: combo term, combo timeout
 
 **Switch key**:
-A key that turns combos (`CM_ON`, `CM_OFF`, `CM_TOGG`) or behaviours
-(`BH_ON`, `BH_OFF`, `BH_TOGG`) on, off or the other way for the whole
-keyboard until it restarts, never saved; the stored switch stays as it is.
+A key that turns combos (`CM_ON`, `CM_OFF`, `CM_TOGG`), behaviours
+(`BH_ON`, `BH_OFF`, `BH_TOGG`) or auto-mouse (`AM_ON`, `AM_OFF`, `AM_TOGG`)
+on, off or the other way for the whole keyboard until it restarts, never
+saved; the stored switch stays as it is.
 _Avoid_: toggle key, combo toggle, behaviour key
 
 **Participation**:

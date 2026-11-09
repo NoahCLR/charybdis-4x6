@@ -42,6 +42,12 @@ uint8_t get_auto_mouse_debounce(void) {
 void set_auto_mouse_enable(bool value) {
     am_enabled = value;
 }
+// The stored setting reaches QMK through the auto-mouse switch, which adds
+// its override (auto_mouse_switch_test.c).
+static int am_stored = -1;
+void auto_mouse_switch_apply(bool stored) {
+    am_stored = stored;
+}
 void set_auto_mouse_layer(uint8_t value) {
     am_layer = value;
 }
@@ -333,6 +339,11 @@ int main(int argc, char **argv) {
     view.changed_domain_mask = NOAH_PROFILE_DOMAIN_MASK_SETTINGS;
     noah_active_profile_settings_invalidate(NULL, 4, view.identity, view.identity, &view);
     assert(projections == 6 && durable_writes == 0);
+    // Auto-mouse on/off is pushed as the stored setting, through the switch.
+    assert(am_stored == 1);
+    am_stored = -1;
+    noah_qmk_portable_apply();
+    assert(am_stored == 1);
     am_timeout = 900; // a key moving QMK's value shows in the runtime readback only
     assert(noah_qmk_portable_live_setting(NOAH_SETTING_AUTO_MOUSE_TIMEOUT) == 900 && noah_qmk_portable_live_setting(NOAH_SETTING_COMBOS_ENABLED) == 0u);
     FILE *responses = argc > 1 ? fopen(argv[1], "wb") : NULL;
@@ -344,6 +355,7 @@ int main(int argc, char **argv) {
     // QMK's own dual-role keys resolve on the live term.
     assert(get_tapping_term(0, &record) == 180 && get_quick_tap_term(0, &record) == 180);
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_AUTO_MOUSE_TIMEOUT * 4) == 1200);
+    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_AUTO_MOUSE_ENABLED * 4) == 1);
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_COMBOS_ENABLED * 4) == 1);
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_LAYER_COMBOS * 4) == 0x7fff);
     assert(!memcmp(bytes + NOAH_SETTINGS_LAYER_RECORDS_OFFSET, stored + NOAH_SETTINGS_LAYER_RECORDS_OFFSET, names - NOAH_SETTINGS_LAYER_RECORDS_OFFSET));

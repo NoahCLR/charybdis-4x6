@@ -41,6 +41,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/runtime/process.c" \
     "$ROOT/users/noah/lib/macro/macro_input_guard.c" \
     "$ROOT/users/noah/lib/key/behavior/participation.c" \
+    "$ROOT/users/noah/lib/pointing/policy/auto_mouse_switch.c" \
     "$ROOT/users/noah/lib/key/runtime/release.c" \
     "$ROOT/users/noah/lib/key/runtime/deferred_release.c" \
     "$ROOT/users/noah/lib/key/runtime/scan.c" \
