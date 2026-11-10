@@ -331,6 +331,39 @@ static void test_a_correction_borrows_the_shared_window(void) {
     CHECK(correction_finishes == 1u);
 }
 
+// A correction that plays a macro asks first whether the macro would start
+// (D-F69): nothing is sent, the window is left free, and the erase that
+// follows has nothing to type.
+static void test_can_start_checks_without_playing(void) {
+    static const uint8_t        erase[]     = {MACRO_PAYLOAD_IR_OP_ERASE, 3u};
+    const macro_slot_provider_t provider    = {.slot_count = 1u, .load_ir = test_load_ir};
+    macro_slot_metadata_t       metadata[1] = {0};
+
+    test_reset();
+    CHECK(macro_slot_provider_can_start(&provider, metadata, 0u));
+    CHECK(!engine_active && load_call_count == 1u);
+    // An erase alone borrows the window the check left free.
+    CHECK(macro_slot_provider_start_correction(3u, NULL, 0u, 5u, test_correction_finished) == MACRO_PAYLOAD_START_STARTED);
+    CHECK(captured_ir->length == sizeof(erase) && captured_ir->bytes[0] == erase[0] && captured_ir->bytes[1] == erase[1]);
+    // Nothing can start while it plays.
+    CHECK(!macro_slot_provider_can_start(&provider, metadata, 0u));
+    test_finish_active();
+
+    // A slot that does not decode, one past the slots, and one preflight
+    // refuses cannot start.
+    load_succeeds = false;
+    macro_slot_provider_invalidate(&provider, metadata, 0u);
+    CHECK(!macro_slot_provider_can_start(&provider, metadata, 0u));
+    load_succeeds = true;
+    macro_slot_provider_invalidate(&provider, metadata, 0u);
+    CHECK(!macro_slot_provider_can_start(&provider, metadata, 1u));
+    preflight_window_calls = 0u;
+    preflight_fail_window  = 0u;
+    CHECK(!macro_slot_provider_can_start(&provider, metadata, 0u));
+    preflight_fail_window = UINT8_MAX;
+    CHECK(macro_slot_provider_can_start(&provider, metadata, 0u));
+}
+
 int main(void) {
     test_active_invalidation_and_busy_start_preserve_shared_ir();
     test_engine_busy_start_keeps_valid_metadata_without_pinning();
@@ -340,6 +373,7 @@ int main(void) {
     test_rejected_later_window_types_nothing();
     test_storage_change_cancels_any_active_stored_macro();
     test_a_correction_borrows_the_shared_window();
+    test_can_start_checks_without_playing();
     puts("macro_slot_provider host tests passed");
     return 0;
 }

@@ -68,6 +68,8 @@ for case in fixture["cases"]:
     lines.append(f"ON {0 if case.get('on') is False else 1}")
     lines.append(f"CAPS {1 if caps else 0}")
     lines.append(f"LIST {autocorrect.encode(case['list']).hex()}")
+    for slot, text in case.get("macros", {}).items():
+        lines.append(f"SLOT {int(slot)} {hexed(text)}")
     for event in case["events"]:
         if "type" in event or ("fast" in event and "macro" not in event):
             fast = "fast" in event
@@ -98,7 +100,7 @@ for case in fixture["cases"]:
     if "strokes" in case:
         lines.append(f"STROKES {case['strokes']['erased']} {case['strokes']['typed']}")
     lines.append(f"{'RESULT' if 'result' in case else 'ENDS'} {hexed(case.get('result', case.get('resultEndsWith')))}")
-assert rules >= set(range(1, 10)), "every rule needs a case"
+assert rules >= set(range(1, 11)), "every rule needs a case"
 pathlib.Path(sys.argv[2]).write_text("\n".join(lines) + "\n", encoding="utf-8")
 PYCODE
 

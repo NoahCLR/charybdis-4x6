@@ -30,10 +30,12 @@ enum {
     NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX   = NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX,
     // Regression policy for the payload-independent 32-bit scan state. This
     // is not a hardware SRAM-capacity claim; target resource gates account
-    // for the linked instance separately. D-F14's 128-byte pointing records
-    // make the PD iterator the largest domain state; D-F28's 32-bit blob
-    // lengths and offsets add 20 bytes: 392 bytes on Cortex-M0+.
-    NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET = 400u,
+    // for the linked instance separately. D-F68's 128-byte correction, held
+    // whole to order the next one against it, makes the autocorrect list's
+    // walk the largest domain state, past D-F14's 128-byte pointing records;
+    // D-F28's 32-bit blob lengths and offsets add 20 bytes: 412 bytes on
+    // Cortex-M0+.
+    NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET = 416u,
     NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8      = 0xffu,
     NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16     = 0xffffu,
 };

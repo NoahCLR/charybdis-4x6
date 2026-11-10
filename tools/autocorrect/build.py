@@ -33,7 +33,10 @@ AUTHORED_HEADER = "authored_autocorrect_list.h"
 VERSION = 1
 MAX_CORRECTIONS = 1024
 MAX_TYPOS = 1024
-MAX_TEXT = 32
+MAX_TEXT = 32  # bytes in one typo
+MAX_CORRECTION = 128  # bytes in one text correction
+MACRO_SLOTS = 128
+KIND_TEXT, KIND_MACRO = 0, 1
 MAX_TEXT_BYTES = 20480
 HEADER_SIZE, CORRECTION_ROW_SIZE, TYPO_ROW_SIZE, PART_ROW_SIZE = 8, 6, 6, 2
 MAX_SIZE = HEADER_SIZE + CORRECTION_ROW_SIZE * MAX_CORRECTIONS + (TYPO_ROW_SIZE + PART_ROW_SIZE) * MAX_TYPOS + MAX_TEXT_BYTES
@@ -89,19 +92,19 @@ def fold(text: str) -> str:
 
 # --- Encoding ----------------------------------------------------------------
 
-def check_text(text: str, what: str) -> bytes:
+def check_text(text: str, what: str, most: int = MAX_CORRECTION) -> bytes:
     encoded = text.encode("utf-8")
     if not encoded:
         raise ListError(f"an empty {what}")
-    if len(encoded) > MAX_TEXT:
-        raise ListError(f"{what} {text!r} is over {MAX_TEXT} bytes")
+    if len(encoded) > most:
+        raise ListError(f"{what} {text!r} is over {most} bytes")
     if any(ord(char) < 0x20 or 0x7F <= ord(char) < 0xA0 for char in text):
         raise ListError(f"{what} {text!r} holds a control character")
     return encoded
 
 
 def check_typo(typo: str) -> bytes:
-    encoded = check_text(typo, "typo")
+    encoded = check_text(typo, "typo", MAX_TEXT)
     for index, char in enumerate(typo):
         if char == APOSTROPHE and 0 < index < len(typo) - 1:
             continue
@@ -114,8 +117,8 @@ def check_typo(typo: str) -> bytes:
 
 def pack(corrections: list[tuple[int, int, int, int]], typos: list[tuple[int, int, int, int]], part: list[int], text: bytes, counts: tuple[int, int, int, int] | None = None) -> bytes:
     """The domain's bytes from its rows as given, with no checks: corrections
-    are (text offset, length, reserved, first typo), typos (text offset,
-    length, match, correction)."""
+    are (text offset or macro slot, length, kind, first typo), typos (text
+    offset, length, match, correction)."""
     header = counts or (len(corrections), len(typos), len(part), len(text))
     out = struct.pack("<HHHH", *header)
     out += b"".join(struct.pack("<HBBH", *row) for row in corrections)
@@ -124,25 +127,40 @@ def pack(corrections: list[tuple[int, int, int, int]], typos: list[tuple[int, in
     return out + text
 
 
+def macro_slot(entry: dict) -> int:
+    slot = entry["macro"]
+    if not isinstance(slot, int) or isinstance(slot, bool) or not 0 <= slot < MACRO_SLOTS:
+        raise ListError(f"macro {slot!r} is not one of the {MACRO_SLOTS} macro slots")
+    return slot
+
+
 def rows(entries: list[dict]) -> tuple[list, list, list, bytes]:
-    """Canonical rows for a list of entries: {"correction": str, "typos":
-    [{"typo": str, "match": one of MATCHES}]}."""
-    by_correction: dict[bytes, list] = {}
-    typo_owner: dict[bytes, tuple[int, bytes]] = {}
+    """Canonical rows for a list of entries. An entry is a text correction,
+    {"correction": str, "typos": [{"typo": str, "match": one of MATCHES}]}, or
+    a macro one, {"macro": slot, "typos": [...]}, whose typos match the whole
+    word. Text corrections come first, by their bytes; macro ones by slot."""
+    by_correction: dict[tuple, list] = {}
+    typo_owner: dict[bytes, tuple[int, tuple]] = {}
     for entry in entries:
-        correction = check_text(entry["correction"], "correction")
-        if correction in by_correction:
-            raise ListError(f"correction {entry['correction']!r} is listed twice")
+        if ("macro" in entry) == ("correction" in entry):
+            raise ListError("an entry has a correction or a macro, one of them")
+        plays = "macro" in entry
+        key = (KIND_MACRO, macro_slot(entry)) if plays else (KIND_TEXT, check_text(entry["correction"], "correction"))
+        shown = f"macro {entry['macro']}" if plays else repr(entry["correction"])
+        if key in by_correction:
+            raise ListError(f"correction {shown} is listed twice")
         if not entry["typos"]:
-            raise ListError(f"correction {entry['correction']!r} has no typo")
-        by_correction[correction] = entry["typos"]
+            raise ListError(f"correction {shown} has no typo")
+        by_correction[key] = entry["typos"]
         for item in entry["typos"]:
             typo = check_typo(item["typo"])
             if typo in typo_owner:
                 raise ListError(f"typo {item['typo']!r} is listed twice")
-            if typo == correction:
+            if not plays and typo == key[1]:
                 raise ListError(f"typo {item['typo']!r} is its own correction")
-            typo_owner[typo] = (MATCHES.index(item["match"]), correction)
+            if plays and item["match"] != MATCHES[WHOLE_WORD]:
+                raise ListError(f"typo {item['typo']!r} plays a macro, so it matches the whole word only")
+            typo_owner[typo] = (MATCHES.index(item["match"]), key)
     if len(by_correction) > MAX_CORRECTIONS:
         raise ListError(f"{len(by_correction)} corrections; the list holds {MAX_CORRECTIONS}")
     if len(typo_owner) > MAX_TYPOS:
@@ -153,9 +171,12 @@ def rows(entries: list[dict]) -> tuple[list, list, list, bytes]:
     first_typo = {}
     for index, typo in enumerate(typo_order):
         first_typo.setdefault(typo_owner[typo][1], index)
-    for correction in correction_order:
-        correction_rows.append((len(text), len(correction), 0, first_typo[correction]))
-        text += correction
+    for kind, value in correction_order:
+        if kind == KIND_MACRO:
+            correction_rows.append((value, 0, KIND_MACRO, first_typo[(kind, value)]))
+            continue
+        correction_rows.append((len(text), len(value), KIND_TEXT, first_typo[(kind, value)]))
+        text += value
     for index, typo in enumerate(typo_order):
         match, correction = typo_owner[typo]
         typo_rows.append((len(text), len(typo), match, correction_order.index(correction)))
@@ -177,20 +198,29 @@ def encode(entries: list[dict]) -> bytes:
 def parse_authored(source: str) -> list[dict]:
     """autocorrect.txt: `typo -> correction` lines in QMK's form. A colon
     before the typo ties it to the start of a word, one after it to the end,
-    both to the whole word; with neither it matches anywhere in a word. `#`
-    starts a comment. Typos are folded; lines naming one correction make one
+    both to the whole word; with neither it matches anywhere in a word. A
+    line `:typo: => N` plays macro slot N instead of typing text. `#` starts
+    a comment. Typos are folded; lines naming one correction make one
     entry."""
     entries: dict[str, list] = {}
+    macros: dict[int, list] = {}
     for number, raw in enumerate(source.splitlines(), 1):
         line = raw.split("#", 1)[0].strip()
         if not line:
             continue
-        typo, arrow, correction = (part.strip() for part in line.partition("->"))
+        plays = "->" not in line and "=>" in line
+        typo, arrow, correction = (part.strip() for part in line.partition("=>" if plays else "->"))
         if not arrow or not typo.strip(":") or not correction:
-            raise ListError(f"line {number}: expected `typo -> correction`")
+            raise ListError(f"line {number}: expected `typo -> correction` or `:typo: => macro slot`")
         match = (WHOLE_WORD if typo.endswith(":") else START) if typo.startswith(":") else (END if typo.endswith(":") else ANYWHERE)
-        entries.setdefault(correction, []).append({"typo": fold(typo.strip(":")), "match": MATCHES[match]})
-    return [{"correction": correction, "typos": typos} for correction, typos in entries.items()]
+        item = {"typo": fold(typo.strip(":")), "match": MATCHES[match]}
+        if plays:
+            if not correction.isdecimal():
+                raise ListError(f"line {number}: `=>` is followed by a macro slot, 0 to {MACRO_SLOTS - 1}")
+            macros.setdefault(int(correction), []).append(item)
+        else:
+            entries.setdefault(correction, []).append(item)
+    return [{"correction": correction, "typos": typos} for correction, typos in entries.items()] + [{"macro": slot, "typos": typos} for slot, typos in macros.items()]
 
 
 def render_authored(keymap: Path) -> str:
@@ -214,8 +244,9 @@ def render_authored(keymap: Path) -> str:
 
 # --- Golden vectors ------------------------------------------------------------
 
-def entry(correction: str, *typos: str | tuple[str, int]) -> dict:
-    return {"correction": correction, "typos": [{"typo": t, "match": MATCHES[WHOLE_WORD]} if isinstance(t, str) else {"typo": t[0], "match": MATCHES[t[1]]} for t in typos]}
+def entry(correction: str | int, *typos: str | tuple[str, int]) -> dict:
+    """An entry: a text correction, or for a number the macro slot it plays."""
+    return {"macro" if isinstance(correction, int) else "correction": correction, "typos": [{"typo": t, "match": MATCHES[WHOLE_WORD]} if isinstance(t, str) else {"typo": t[0], "match": MATCHES[t[1]]} for t in typos]}
 
 
 SMALL = [
@@ -232,17 +263,33 @@ SMALL = [
 ]
 
 
+# A correction of 128 bytes: text with spaces, digits and punctuation.
+LONG = [
+    entry("Kind regards, Sam Example | +31 6 1234 5678 | sam@example.com | Example Street 12, 1234 AB Amsterdam, The Netherlands | KvK 0000", "sigoff"),
+    entry("+31 6 1234 5678", "pnumber"),
+    entry("the", "teh"),
+]
+assert len(LONG[0]["correction"].encode()) == MAX_CORRECTION
+# Macro corrections beside text ones: they follow them, by slot.
+MACROS = [
+    entry(127, "sigfull"),
+    entry("the", "teh"),
+    entry(3, "addr", "adres"),
+    entry("sam@example.com", "myemail"),
+]
+
+
 def maximum_entries() -> list[dict]:
     """A list at every ceiling at once: 1,024 corrections with one typo each,
-    every typo part of a word, one correction and one typo of 32 bytes, and
-    the text exactly full."""
+    every typo part of a word, one correction of 128 bytes and one typo of 32,
+    and the text exactly full."""
 
     def code(index: int, width: int) -> str:
         return "".join("abcdefghijklmnopqrstuvwxyz"[index // 26**place % 26] for place in reversed(range(width)))
 
     typos = ["t" + code(index, 7) for index in range(MAX_TYPOS - 1)] + ["z" + "é" * 15 + "z"]
-    spare = MAX_TEXT_BYTES - sum(len(typo.encode()) for typo in typos) - MAX_TEXT
-    corrections = ["Z" + "é" * 15 + "!"]
+    spare = MAX_TEXT_BYTES - sum(len(typo.encode()) for typo in typos) - MAX_CORRECTION
+    corrections = ["Z" + "é" * 63 + "!"]
     for index in range(MAX_CORRECTIONS - 1):
         length = spare // (MAX_CORRECTIONS - 1 - index)
         corrections.append("C" + code(index, 3) + "-" * (length - 4))
@@ -263,13 +310,21 @@ def invalid_vectors() -> list[dict]:
     def changed(change) -> bytes:
         return pack(*change(*rows(base)))
 
-    def raw(corrections: list[str], typos: list[tuple[str, int, int]], part: list[int] | None = None, first: list[int] | None = None) -> bytes:
-        """Rows laid out canonically from texts in the order given, unchecked."""
+    def raw(corrections: list, typos: list[tuple[str, int, int]], part: list[int] | None = None, first: list[int] | None = None) -> bytes:
+        """Rows laid out canonically from texts in the order given, unchecked.
+        A correction that is a number is a macro slot; a tuple is a row's
+        (slot, length, kind) as given."""
         text, correction_rows, typo_rows = b"", [], []
         for index, correction in enumerate(corrections):
+            lowest = first[index] if first else next((i for i, typo in enumerate(typos) if typo[2] == index), 0)
+            if isinstance(correction, int):
+                correction_rows.append((correction, 0, KIND_MACRO, lowest))
+                continue
+            if isinstance(correction, tuple):
+                correction_rows.append((*correction, lowest))
+                continue
             encoded = correction if isinstance(correction, bytes) else correction.encode()
-            lowest = next((i for i, typo in enumerate(typos) if typo[2] == index), 0)
-            correction_rows.append((len(text), len(encoded), 0, first[index] if first else lowest))
+            correction_rows.append((len(text), len(encoded), KIND_TEXT, lowest))
             text += encoded
         for typo, match, correction in typos:
             encoded = typo if isinstance(typo, bytes) else typo.encode()
@@ -291,9 +346,15 @@ def invalid_vectors() -> list[dict]:
     add("typo-offset", "A typo's text does not begin where the one before it ended.", "INVALID_OFFSET", 1, 0, changed(lambda c, t, p, x: (c, [(t[0][0] - 1, *t[0][1:])] + t[1:], p, x)))
     add("empty-correction", "A correction of no bytes.", "INVALID_TEXT_LENGTH", 0, 0, raw(["", "the"], [("teh", WHOLE_WORD, 1)]))
     add("empty-typo", "A typo of no bytes.", "INVALID_TEXT_LENGTH", 1, 0, raw(["the"], [("", WHOLE_WORD, 0), ("teh", WHOLE_WORD, 0)]))
-    add("long-correction", "A correction of 33 bytes.", "INVALID_TEXT_LENGTH", 0, 0, raw(["a" * 33], [("teh", WHOLE_WORD, 0)]))
+    add("long-correction", "A correction of 129 bytes.", "INVALID_TEXT_LENGTH", 0, 0, raw(["a" * 129], [("teh", WHOLE_WORD, 0)]))
     add("long-typo", "A typo of 33 bytes.", "INVALID_TEXT_LENGTH", 1, 0, raw(["the"], [("a" * 33, WHOLE_WORD, 0)]))
-    add("correction-reserved", "A correction row's reserved byte is not zero.", "RESERVED", 0, 0, changed(lambda c, t, p, x: ([(c[0][0], c[0][1], 1, c[0][3])] + c[1:], t, p, x)))
+    add("correction-kind", "A correction that is neither text nor a macro.", "INVALID_KIND", 0, 0, changed(lambda c, t, p, x: ([(c[0][0], c[0][1], 2, c[0][3])] + c[1:], t, p, x)))
+    add("macro-with-length", "A macro correction with a text length.", "INVALID_TEXT_LENGTH", 0, 1, raw(["the", (5, 3, KIND_MACRO)], [("sig", WHOLE_WORD, 1), ("teh", WHOLE_WORD, 0)]))
+    add("macro-slot-out-of-range", "A macro correction names a slot past the macro slots.", "INVALID_MACRO", 0, 1, raw(["the", MACRO_SLOTS], [("sig", WHOLE_WORD, 1), ("teh", WHOLE_WORD, 0)]))
+    add("macro-order", "Macro corrections out of slot order.", "ORDER", 0, 1, raw([7, 3], [("addr", WHOLE_WORD, 1), ("sig", WHOLE_WORD, 0)]))
+    add("duplicate-macro", "One macro slot stored twice.", "ORDER", 0, 1, raw([7, 7], [("addr", WHOLE_WORD, 1), ("sig", WHOLE_WORD, 0)]))
+    add("text-after-macro", "A text correction after a macro one.", "ORDER", 0, 1, raw([7, "the"], [("sig", WHOLE_WORD, 0), ("teh", WHOLE_WORD, 1)]))
+    add("macro-part-of-word-typo", "A macro correction's typo that matches part of a word.", "INVALID_MATCH", 1, 0, raw([7], [("sig", START, 0)]))
     add("correction-order", "Corrections out of order.", "ORDER", 0, 1, raw(["thing", "the"], [("teh", WHOLE_WORD, 1), ("thnig", WHOLE_WORD, 0)]))
     add("duplicate-correction", "One correction stored twice.", "ORDER", 0, 1, raw(["the", "the"], [("hte", WHOLE_WORD, 0), ("teh", WHOLE_WORD, 1)]))
     add("typo-order", "Typos out of order.", "ORDER", 1, 1, raw(["the"], [("teh", WHOLE_WORD, 0), ("hte", WHOLE_WORD, 0)]))
@@ -324,10 +385,10 @@ def invalid_vectors() -> list[dict]:
 
 def build_fixture() -> dict:
     return {
-        "description": "Autocorrect list domain 0x80 version 1: golden vectors and the word-character table, for the firmware and its clients. Layout and rules: docs/spec/profile-wire-v1/autocorrect-domain.md. Payload, integers little-endian: header [corrections u16, typos u16, part-of-word typos u16, text bytes u16]; a 6-byte row per correction [text offset u16, length u8, 0, first typo u16]; a 6-byte row per typo [text offset u16, length u8, match u8, correction u16]; the part index, one u16 typo index per typo whose match is not whole word, ascending; then the text, every correction's bytes then every typo's, in row order, back to back. Corrections and typos each ascend strictly by their UTF-8 bytes. wordCharacters lists every character a typo may hold besides an apostrophe between two of them, as [character, folded]; a typo holds folded characters only, and a typed word is folded with this table before it is looked up. Error codes are the firmware's NOAH_PROFILE_AUTOCORRECT_V1_* names, with the table (0 corrections, 1 typos, 2 part index) and row they name. Test evidence, never a migration source.",
+        "description": "Autocorrect list domain 0x80 version 1: golden vectors and the word-character table, for the firmware and its clients. Layout and rules: docs/spec/profile-wire-v1/autocorrect-domain.md. Payload, integers little-endian: header [corrections u16, typos u16, part-of-word typos u16, text bytes u16]; a 6-byte row per correction [text offset u16, length u8, kind u8 (0 text, 1 macro), first typo u16], a macro correction holding its macro slot in place of the offset and a length of 0; a 6-byte row per typo [text offset u16, length u8, match u8, correction u16]; the part index, one u16 typo index per typo whose match is not whole word, ascending; then the text, every text correction's bytes then every typo's, in row order, back to back. Text corrections come first and ascend strictly by their UTF-8 bytes, macro corrections follow and ascend strictly by slot, and typos ascend strictly by their bytes. An entry is {correction, typos} for text or {macro, typos} for a macro slot, whose typos match the whole word only. wordCharacters lists every character a typo may hold besides an apostrophe between two of them, as [character, folded]; a typo holds folded characters only, and a typed word is folded with this table before it is looked up. Error codes are the firmware's NOAH_PROFILE_AUTOCORRECT_V1_* names, with the table (0 corrections, 1 typos, 2 part index) and row they name. Test evidence, never a migration source.",
         "generator": "tools/autocorrect/build.py",
         "version": VERSION,
-        "ceilings": {"corrections": MAX_CORRECTIONS, "typos": MAX_TYPOS, "bytesPerText": MAX_TEXT, "textBytes": MAX_TEXT_BYTES, "domainBytes": MAX_SIZE},
+        "ceilings": {"corrections": MAX_CORRECTIONS, "typos": MAX_TYPOS, "bytesPerTypo": MAX_TEXT, "bytesPerCorrection": MAX_CORRECTION, "macroSlots": MACRO_SLOTS, "textBytes": MAX_TEXT_BYTES, "domainBytes": MAX_SIZE},
         "matches": list(MATCHES),
         "apostrophe": APOSTROPHE,
         "wordCharacters": [[char, folded] for char, folded in WORDS.items()],
@@ -335,6 +396,8 @@ def build_fixture() -> dict:
             {"name": "empty", "description": "No entries: the header alone.", "entries": [], "hex": encode([]).hex()},
             {"name": "one", "description": "One correction with one whole-word typo.", "entries": [entry("the", "teh")], "hex": encode([entry("the", "teh")]).hex()},
             {"name": "small", "description": "Several typos for one correction, every match, a capital in a correction, an apostrophe, a space in a correction and letters outside ASCII.", "entries": SMALL, "hex": encode(SMALL).hex()},
+            {"name": "long", "description": "A correction of 128 bytes with spaces, digits and punctuation, beside short ones.", "entries": LONG, "hex": encode(LONG).hex()},
+            {"name": "macros", "description": "Macro corrections after the text ones, by slot, each with whole-word typos.", "entries": MACROS, "hex": encode(MACROS).hex()},
         ],
         "invalid": invalid_vectors(),
     }

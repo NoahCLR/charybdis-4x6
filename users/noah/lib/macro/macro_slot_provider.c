@@ -119,6 +119,19 @@ macro_payload_start_result_t macro_slot_provider_start(const macro_slot_provider
     return result;
 }
 
+bool macro_slot_provider_can_start(const macro_slot_provider_t *provider, macro_slot_metadata_t *metadata, uint8_t slot) {
+    macro_payload_preflight_t preflight;
+    bool                      playable;
+
+    if (macro_slot_active_metadata || macro_slot_correction_finish || !macro_payload_engine_idle()) return false;
+    macro_payload_preflight_begin(&preflight);
+    playable = macro_slot_provider_compile(provider, metadata, slot, &preflight) && macro_payload_preflight_end(&preflight) && macro_slot_active_ir.length != 0u;
+    // The window is free again: nothing was started.
+    macro_slot_active_ir.length = 0u;
+    macro_slot_active_ir.more   = false;
+    return playable;
+}
+
 static void macro_slot_provider_correction_finished(macro_payload_finish_result_t result, void *context) {
     macro_payload_finish_fn finish = macro_slot_correction_finish;
 

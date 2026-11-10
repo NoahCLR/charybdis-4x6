@@ -241,17 +241,27 @@ const noah_profile_autocorrect_v1_list_t *noah_active_profile_autocorrect_list(v
 
 static macro_payload_ir_t macro_ir;
 static char               macro_text[64];
+// The macros a case stores, by slot, for corrections that play one. A macro
+// key's own text is macro_text.
+static char     stored_macros[NOAH_PROFILE_AUTOCORRECT_V1_MACRO_SLOTS][64];
+static unsigned macros_started;
 
 // The slot's macro, as the provider would start it.
 bool noah_profile_macro_start(uint16_t action) {
-    size_t length = strlen(macro_text);
+    const char *text   = stored_macros[action - QK_MACRO][0] ? stored_macros[action - QK_MACRO] : macro_text;
+    size_t      length = strlen(text);
 
-    (void)action;
+    macros_started++;
     macro_ir          = (macro_payload_ir_t){.protection = 2u, .length = (uint16_t)(length + 2u)};
     macro_ir.bytes[0] = MACRO_PAYLOAD_IR_OP_TEXT;
     macro_ir.bytes[1] = (uint8_t)length;
-    memcpy(&macro_ir.bytes[2], macro_text, length);
+    memcpy(&macro_ir.bytes[2], text, length);
     return macro_payload_start_ir(&macro_ir, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 2u, MACRO_PAYLOAD_SOURCE_SLOT, 0u, NULL, NULL) == MACRO_PAYLOAD_START_STARTED;
+}
+
+// A correction plays only a macro that is stored.
+bool noah_profile_macro_can_play(uint16_t action) {
+    return stored_macros[action - QK_MACRO][0] != '\0';
 }
 
 // A macro key, as noah_profile_macro_try_play handles it.
@@ -317,6 +327,8 @@ static void reset(void) {
     memset(raw_keys, 0, sizeof(raw_keys));
     memset(seen_keys, 0, sizeof(seen_keys));
     memset(modifier_owners, 0, sizeof(modifier_owners));
+    memset(stored_macros, 0, sizeof(stored_macros));
+    macros_started = 0u;
     physical_mods = seen_mods = oneshot_mods = 0u;
     screen_length = cursor = 0u;
     host_dead              = 0u;
@@ -411,6 +423,12 @@ static unsigned run_fixture(const char *path) {
         } else if (strcmp(word, "LIST") == 0) {
             CHECK(sscanf(line, "LIST %8199s", text) == 1);
             use_list(list_bytes, unhex(text, list_bytes, sizeof(list_bytes)));
+        } else if (strcmp(word, "SLOT") == 0) {
+            uint8_t bytes[sizeof(stored_macros[0])];
+            CHECK(sscanf(line, "SLOT %u %8199s", &a, text) == 2 && a < NOAH_PROFILE_AUTOCORRECT_V1_MACRO_SLOTS);
+            size_t length = unhex(text, bytes, sizeof(bytes) - 1u);
+            memcpy(stored_macros[a], bytes, length);
+            stored_macros[a][length] = '\0';
         } else if (strcmp(word, "TAP") == 0 || strcmp(word, "FAST") == 0) {
             CHECK(sscanf(line, "%*s %u %u", &a, &b) == 2);
             tap((uint8_t)a, (uint8_t)b, word[0] == 'F');
@@ -615,36 +633,85 @@ static void test_no_correction_starts_behind_a_long_queue(void) {
     expect_screen("the xyxyxyxy teh zzzzzzzzz", false);
 }
 
-// The queue full while a correction is typed: the correction stops, and no
-// key is lost or reordered. A correction of 35 strokes lasts 350 ms; a key
-// every 4 ms fills the queue of 64 changes long before it ends.
-static void test_a_full_queue_loses_no_key(void) {
-    static const char correction[] = "abcdefghijklmnopqrstuvwxyz012345";
-    static uint8_t    long_list[8 + 6 + 6 + 35];
-    char              expected[200], shown[400];
-    size_t            length;
+// The longest correction: 128 characters after "teh". They are digits, so
+// no letter typed behind it is a key the correction is holding.
+enum { LONGEST = NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX };
+static uint8_t longest_list[8 + 6 + 6 + LONGEST + 3];
 
-    memcpy(long_list, (uint8_t[]){1, 0, 1, 0, 0, 0, 35, 0, /* correction */ 0, 0, 32, 0, 0, 0, /* typo */ 32, 0, 3, 0, 0, 0}, 20);
-    memcpy(&long_list[20], correction, 32);
-    memcpy(&long_list[52], "teh", 3);
-    begin("a full queue loses no key", long_list, sizeof(long_list));
+static void begin_longest(const char *name) {
+    memcpy(longest_list, (uint8_t[]){1, 0, 1, 0, 0, 0, LONGEST + 3, 0, /* correction */ 0, 0, LONGEST, 0, 0, 0, /* typo */ LONGEST, 0, 3, 0, 0, 0}, 20);
+    for (unsigned i = 0; i < LONGEST; i++)
+        longest_list[20u + i] = (uint8_t)('0' + i % 10u);
+    memcpy(&longest_list[20 + LONGEST], "teh", 3);
+    begin(name, longest_list, sizeof(longest_list));
     type("teh", false);
     key(KC_SPACE, true);
     scan(3u);
     key(KC_SPACE, false);
-    for (unsigned i = 0; i < 78u; i++) {
+}
+
+// `count` keys, one every `period` ms, while the correction is typed.
+static void type_behind(char *expected, unsigned count, unsigned period) {
+    for (unsigned i = 0; i < count; i++) {
         uint8_t usage = (uint8_t)(KC_A + i % 26u);
         expected[i]   = (char)('a' + i % 26u);
         scan(1u);
         key(usage, true);
-        scan(3u);
+        scan(period - 2u);
         key(usage, false);
+        scan(1u);
     }
-    expected[78] = '\0';
+    expected[count] = '\0';
+}
+
+// The queue full while a correction is typed: the correction stops, and no
+// key is lost or reordered. The longest correction of 131 strokes lasts
+// 1.3 s; a key every 4 ms fills the queue of 240 changes before it ends.
+static void test_a_full_queue_loses_no_key(void) {
+    static char expected[400], shown[1200];
+    size_t      length;
+
+    begin_longest("a full queue loses no key");
+    type_behind(expected, 300u, 4u);
     settle();
     length = screen_utf8(shown, sizeof(shown));
     // The correction did not finish, and the Space still came first.
-    CHECK(length >= 79u && length < 3u + 32u + 79u && strcmp(shown + length - 78u, expected) == 0 && shown[length - 79u] == ' ');
+    CHECK(length >= 301u && length < 3u + LONGEST + 301u && strcmp(shown + length - 300u, expected) == 0 && shown[length - 301u] == ' ');
+    expect_screen(expected, true);
+}
+
+// Fast typing never fills the queue while the longest correction is typed:
+// a key every 40 ms, 25 a second and two changes each, through its 1.3 s.
+// The correction finishes, and every key comes out after it in order.
+static void test_typing_through_the_longest_correction(void) {
+    static char expected[LONGEST + 1u + 64u + 1u], behind[64];
+
+    begin_longest("typing through the longest correction");
+    type_behind(behind, 40u, 40u);
+    memcpy(expected, &longest_list[20], LONGEST);
+    expected[LONGEST] = ' ';
+    memcpy(&expected[LONGEST + 1u], behind, 41u);
+    expect_screen(expected, false);
+}
+
+// A macro correction whose erase the queue cut short plays no macro, and one
+// whose macro the queue cut short stops; either way no key is lost.
+static void test_a_full_queue_stops_a_macro_correction(void) {
+    // sig -> macro 5, a whole word.
+    static const uint8_t macro_list[] = {1, 0, 1, 0, 0, 0, 3, 0, /* correction */ 5, 0, 0, 1, 0, 0, /* typo */ 0, 0, 3, 0, 0, 0, 's', 'i', 'g'};
+    static char          expected[400], shown[1200];
+    size_t               length;
+
+    begin("a full queue stops a macro correction", macro_list, sizeof(macro_list));
+    snprintf(stored_macros[5], sizeof(stored_macros[5]), "%s", "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz0123456");
+    type("sig", false);
+    key(KC_SPACE, true);
+    scan(3u);
+    key(KC_SPACE, false);
+    type_behind(expected, 300u, 3u);
+    settle();
+    length = screen_utf8(shown, sizeof(shown));
+    CHECK(macros_started == 1u && length >= 301u && strcmp(shown + length - 300u, expected) == 0 && shown[length - 301u] == ' ');
     expect_screen(expected, true);
 }
 
@@ -676,6 +743,8 @@ int main(int argc, char **argv) {
     test_a_one_shot_modifier_is_spent_once();
     test_no_correction_starts_behind_a_long_queue();
     test_a_full_queue_loses_no_key();
+    test_typing_through_the_longest_correction();
+    test_a_full_queue_stops_a_macro_correction();
     test_a_correction_keeps_its_pace();
     printf("autocorrect host tests passed: %u fixture cases\n", cases);
     return 0;

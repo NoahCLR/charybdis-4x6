@@ -36,7 +36,12 @@ for entries in (
     [{"correction": "the", "typos": [{"typo": "Teh", "match": "whole word"}]}],
     [{"correction": "the", "typos": [{"typo": "t-eh", "match": "whole word"}]}],
     [{"correction": "the", "typos": [{"typo": "teh", "match": "whole word"}]}, {"correction": "then", "typos": [{"typo": "teh", "match": "anywhere"}]}],
-    [{"correction": "x" * 33, "typos": [{"typo": "teh", "match": "whole word"}]}],
+    [{"correction": "x" * 129, "typos": [{"typo": "teh", "match": "whole word"}]}],
+    [{"correction": "the", "typos": [{"typo": "x" * 33, "match": "whole word"}]}],
+    [{"macro": 128, "typos": [{"typo": "sig", "match": "whole word"}]}],
+    [{"macro": 3, "typos": [{"typo": "sig", "match": "start of word"}]}],
+    [{"macro": 3, "typos": [{"typo": "sig", "match": "whole word"}]}, {"macro": 3, "typos": [{"typo": "sgi", "match": "whole word"}]}],
+    [{"macro": 3, "correction": "both", "typos": [{"typo": "sig", "match": "whole word"}]}],
     build.maximum_entries() + [{"correction": "one more", "typos": [{"typo": "onemore", "match": "whole word"}]}],
 ):
     try:
@@ -65,7 +70,7 @@ build_and_run sanitized -fsanitize=address,undefined -fno-omit-frame-pointer
 # what was written and fails once the list and the header disagree.
 KEYMAP="$BUILD_DIR/keymap"
 mkdir "$KEYMAP"
-printf '# A test list.\n:teh: -> the\n:Hte: -> the\ntihng -> thing\n:nu -> un\nmnet: -> ment\n' >"$KEYMAP/autocorrect.txt"
+printf '# A test list.\n:teh: -> the\n:Hte: -> the\ntihng -> thing\n:nu -> un\nmnet: -> ment\n:Sig: => 12\n:pnumber: -> +31 6 1234 5678\n' >"$KEYMAP/autocorrect.txt"
 python3 "$ROOT/tools/autocorrect/build.py" --write-authored "$KEYMAP"
 python3 "$ROOT/tools/autocorrect/build.py" --check-authored "$KEYMAP"
 python3 - "$ROOT" "$KEYMAP/authored_autocorrect_list.h" <<'PYCODE'
@@ -79,6 +84,8 @@ assert data == build.encode([
     {"correction": "thing", "typos": [{"typo": "tihng", "match": anywhere}]},
     {"correction": "un", "typos": [{"typo": "nu", "match": start}]},
     {"correction": "ment", "typos": [{"typo": "mnet", "match": end}]},
+    {"macro": 12, "typos": [{"typo": "sig", "match": whole}]},
+    {"correction": "+31 6 1234 5678", "typos": [{"typo": "pnumber", "match": whole}]},
 ])
 PYCODE
 printf ':becuase: -> because\n' >>"$KEYMAP/autocorrect.txt"

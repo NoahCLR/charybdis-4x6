@@ -199,9 +199,10 @@ the ball moves.
   Hold, Chordal Hold and Flow Tap aren't used, and tapping a dual-role key
   then holding it starts a new hold rather than repeating the tap. Nothing is
   tuned for home row mods. This build has no Caps Word, Leader or key
-  overrides. Autocorrect is the firmware's own, not QMK's: it corrects the
-  list in your profile when a word ends
-  ([Autocorrect](docs/guide/autocorrect.md)).
+  overrides. Text replacement (autocorrect) is the firmware's own, not
+  QMK's: when a word ends it fixes a typo, types longer text or plays a macro
+  from the list in your profile
+  ([Text replacement](docs/guide/autocorrect.md)).
 - **Limits:** 16 layers, 128 behaviours with five tap counts each, 128 combos,
   128 custom keys, 128 macros and 32 pointing modes.
 - **Updates:** flashing never erases the saved profile, but the keyboard runs

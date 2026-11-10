@@ -260,12 +260,13 @@ static void assert_published(const uint8_t *base, const noah_profile_blob_v1_t *
             // the list returns, read in place from the published profile.
             const noah_profile_autocorrect_v1_list_t *list = noah_active_profile_autocorrect_list();
             noah_profile_autocorrect_v1_typo_t        typo, found;
-            uint8_t                                   text[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX], length;
+            uint8_t                                   text[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX];
+            noah_profile_autocorrect_v1_correction_t  stored;
             assert(list->corrections == (domain->payload[0] | domain->payload[1] << 8) && list->typos == (domain->payload[2] | domain->payload[3] << 8) && list->part_typos == (domain->payload[4] | domain->payload[5] << 8));
             for (uint16_t index = 0; index < list->typos; index++) {
                 assert(noah_profile_autocorrect_v1_typo_at(list, index, &typo, text));
                 assert(noah_profile_autocorrect_v1_find(list, text, typo.length, &found) && found.index == index);
-                assert(noah_profile_autocorrect_v1_correction(list, typo.correction, text, &length));
+                assert(noah_profile_autocorrect_v1_correction(list, typo.correction, &stored, text));
             }
             for (uint16_t position = 0; position < list->part_typos; position++)
                 assert(noah_profile_autocorrect_v1_part_at(list, position, &typo, NULL));
@@ -385,13 +386,14 @@ static void assert_maximum_edges(void) {
     assert(noah_active_profile_combo_get(1)->keycode == CUSTOM_KEY_0 + 126 && !noah_active_profile_combo_get(128));
     assert(noah_setting(NOAH_SETTING_AUTO_MOUSE_LAYER, 0) == 15 && noah_setting(NOAH_SETTING_LAYER_COMBOS, 0) == 0x7fff);
     // The autocorrect list at every ceiling: its first typo by binary search,
-    // naming the 32-byte correction, and its last, 32 bytes long.
+    // naming the 128-byte correction, and its last, 32 bytes long.
     const noah_profile_autocorrect_v1_list_t *list = noah_active_profile_autocorrect_list();
     noah_profile_autocorrect_v1_typo_t        typo;
-    uint8_t                                   text[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX], length;
+    uint8_t                                   text[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX];
+    noah_profile_autocorrect_v1_correction_t  stored;
     assert(list->corrections == NOAH_PROFILE_AUTOCORRECT_V1_MAX_CORRECTIONS && list->typos == NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS && list->part_typos == NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS && list->text_bytes == NOAH_PROFILE_AUTOCORRECT_V1_MAX_TEXT_BYTES);
     assert(noah_profile_autocorrect_v1_find(list, (const uint8_t *)"taaaaaaa", 8u, &typo) && typo.index == 0u && typo.match == NOAH_PROFILE_AUTOCORRECT_V1_MATCH_START);
-    assert(noah_profile_autocorrect_v1_correction(list, typo.correction, text, &length) && length == NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX && text[0] == 'Z' && text[31] == '!');
+    assert(noah_profile_autocorrect_v1_correction(list, typo.correction, &stored, text) && stored.length == NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX && text[0] == 'Z' && text[127] == '!');
     assert(noah_profile_autocorrect_v1_part_at(list, NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS - 1u, &typo, text) && typo.length == NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX && text[0] == 'z' && text[31] == 'z');
 }
 
@@ -626,10 +628,11 @@ int main(int argc, char **argv) {
         if (use_imported) {
             const noah_profile_autocorrect_v1_list_t *list = noah_active_profile_autocorrect_list();
             noah_profile_autocorrect_v1_typo_t        first, second;
-            uint8_t                                   text[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX], text_length;
+            uint8_t                                   text[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX];
+            noah_profile_autocorrect_v1_correction_t  stored;
             assert(list->corrections == 10u && list->typos == 15u && list->part_typos == 3u);
             assert(noah_profile_autocorrect_v1_find(list, (const uint8_t *)"becuase", 7u, &first) && noah_profile_autocorrect_v1_find(list, (const uint8_t *)"becasue", 7u, &second) && first.correction == second.correction);
-            assert(noah_profile_autocorrect_v1_correction(list, first.correction, text, &text_length) && text_length == 7u && memcmp(text, "because", 7u) == 0);
+            assert(noah_profile_autocorrect_v1_correction(list, first.correction, &stored, text) && stored.length == 7u && memcmp(text, "because", 7u) == 0);
         }
         reboot();
         until_state(NOAH_PROFILE_OWNER_READY_VALIDATED);

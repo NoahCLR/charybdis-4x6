@@ -37,6 +37,9 @@ typedef struct {
 _Static_assert(sizeof(macro_slot_metadata_t) == 1u, "macro slot metadata must remain one byte");
 
 macro_payload_start_result_t macro_slot_provider_start(const macro_slot_provider_t *provider, macro_slot_metadata_t *metadata, uint8_t slot, macro_payload_text_output_t text_output, uint8_t interval, macro_payload_source_t source);
+// Whether the slot's macro would start now: it is there, decodes, and passes
+// playback's checks on this host, with nothing playing. Nothing is sent.
+bool                         macro_slot_provider_can_start(const macro_slot_provider_t *provider, macro_slot_metadata_t *metadata, uint8_t slot);
 void                         macro_slot_provider_invalidate(const macro_slot_provider_t *provider, macro_slot_metadata_t *metadata, uint8_t slot);
 void                         macro_slot_provider_invalidate_all(const macro_slot_provider_t *provider, macro_slot_metadata_t *metadata);
 // Plays a correction (D-F69) from the shared window, uninterruptibly:

@@ -131,8 +131,9 @@ Page 3, the [autocorrect list](autocorrect-domain.md#ceilings)'s ceilings
 | 2–3 | maximum typos | 1,024 |
 | 4–5 | text capacity in bytes, corrections and typos together | 20,480 |
 | 6–9 | autocorrect domain capacity in bytes | 34,824 |
-| 10 | maximum bytes in one correction or typo | 32 |
-| 11–24 | zero | |
+| 10 | maximum bytes in one typo | 32 |
+| 11 | maximum bytes in one text correction | 128 |
+| 12–24 | zero | |
 
 The values come from one header, `users/noah/lib/compat/qmk_profile_capabilities.h`,
 which the Raw HID channel and the contract probe (`tests/host/run_contract_probe.sh`)

@@ -100,7 +100,8 @@ static void encode_capabilities_page_three(uint8_t *payload, const noah_profile_
     write_u16(&payload[4], capabilities->autocorrect_text_bytes);
     write_u32(&payload[6], capabilities->autocorrect_bytes);
     payload[10] = capabilities->autocorrect_text_max;
-    // Bytes 11..24 remain canonical zero padding.
+    payload[11] = capabilities->autocorrect_correction_max;
+    // Bytes 12..24 remain canonical zero padding.
 }
 
 static void encode_status_page_zero(uint8_t *payload, const noah_profile_wire_v1_device_status_t *status) {

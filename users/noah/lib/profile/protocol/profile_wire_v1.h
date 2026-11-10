@@ -154,7 +154,8 @@ typedef struct {
     uint16_t autocorrect_typos;
     uint16_t autocorrect_text_bytes;
     uint32_t autocorrect_bytes;
-    uint8_t  autocorrect_text_max;
+    uint8_t  autocorrect_text_max;       // bytes in one typo
+    uint8_t  autocorrect_correction_max; // bytes in one text correction
     uint8_t  supported_domain_mask;
     uint8_t  max_name_bytes;
     uint8_t  layer_mask_bits;

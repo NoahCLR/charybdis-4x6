@@ -1,12 +1,19 @@
 # Autocorrect v1
 
-The keyboard corrects the typos on the profile's
-[autocorrect list](profile-wire-v1/autocorrect-domain.md) as they are typed,
-on any computer, with nothing installed there (D-F69,
-[ADR](../adr/0069-autocorrect-is-the-firmwares-own-and-corrects-at-the-word-end.md)).
+The keyboard replaces what is on the profile's
+[autocorrect list](profile-wire-v1/autocorrect-domain.md) as it is typed, on
+any computer, with nothing installed there (D-F69,
+[ADR](../adr/0069-autocorrect-is-the-firmwares-own-and-corrects-at-the-word-end.md)):
+a typo with the right word, an abbreviation with a phone number or a
+sign-off, a typed form with a macro. People know the feature as **text
+replacement**; the code, the domain and the keys call it autocorrect. A list
+entry is a **replacement** with the **typed forms** that produce it, which
+the bytes and fixtures call a correction and its typos
+([glossary](../../GLOSSARY.md#autocorrect)).
+
 This file is what it does: how it reads what is typed, when and what it
-corrects, the undo, when it forgets the word, how a correction is typed and
-what happens to keys pressed meanwhile. The list's bytes are the
+replaces, the undo, when it forgets the word, how a replacement is typed or
+played and what happens to keys pressed meanwhile. The list's bytes are the
 [autocorrect domain](profile-wire-v1/autocorrect-domain.md)'s; the layouts
 are [host layouts](host-layouts-v1.md)'s; how it sits in the report path is
 [macro playback](../architecture/macro-playback.md#corrections)'s.
@@ -65,8 +72,8 @@ A **word character** is a letter or digit of the
 [word table](profile-wire-v1/autocorrect-domain.md#corrections-and-typos),
 or an apostrophe (U+0027). A **word** is the word characters typed since the
 last word end. Apostrophes before its first letter or digit and after its
-last stay on screen and are not part of what a typo matches: `'teh'` is
-matched as `teh`.
+last stay on screen and are not part of what a typed form matches: `'teh'`
+is matched as `teh`.
 
 The word **ends** at the next character that is not a word character (a
 space, punctuation, a hyphen) or at Enter or Tab.
@@ -76,85 +83,123 @@ characters of a word; a longer word is left alone.
 
 Held by: `tests/host/run_autocorrect_tests.sh` (rule 2 cases: `apostrophe-after`, `apostrophes-around`, `apostrophe-inside`, `digits-are-word-characters`, `word-end-punctuation`; `backspace-inside-a-word`).
 
-## Which typo
+## Which typed form
 
 When a word ends, it is folded with the word table and looked up:
 
-1. A typo that matches the **whole word** and is the word wins.
-2. Otherwise, of the part-of-word typos that fit (at the **start**, at the
-   **end**, or **anywhere**, where the first place it is found counts), the
-   one with the most characters wins, and of equal ones the first in the
+1. A typed form that matches the **whole word** and is the word wins.
+2. Otherwise, of the part-of-word typed forms that fit (at the **start**, at
+   the **end**, or **anywhere**, where the first place it is found counts),
+   the one with the most characters wins, and of equal ones the first in the
    list, which is the lower in the domain's byte order.
 
-A typo whose correction this host cannot type is passed over as if it were
-not on the list. A word found nowhere, or still being typed, is never
-touched.
+A client may write the three part-of-word matches with `*` where other
+letters may go (`recieve*`, `*mnet`, `*tihng*`); the list stores the match,
+never the `*`
+([the domain](profile-wire-v1/autocorrect-domain.md#layout)).
+
+A typed form whose replacement this host cannot type, or whose macro cannot
+play, is passed over as if it were not on the list. A word found nowhere, or
+still being typed, is never touched.
 
 Held by: `tests/host/run_autocorrect_tests.sh` (rule 3 cases: `two-typos-one-correction`, `anywhere-in-a-word`, `end-of-a-word`, `start-of-a-word`, `longest-typo-wins`, `whole-word-beats-part`, `first-in-the-list-wins-a-tie`; `inside-a-longer-word`, `unfinished-word`).
 
 ## Case
 
-Typos match whatever their case. The correction takes the case of the part
-of the word the typo matched, as the computer shows it. A letter is a
+Typed forms match whatever their case. A text replacement takes the case of
+the part of the word the typed form matched, as the computer shows it. A letter is a
 capital when the word table folds it to another character, and small when
 one character folds to it, which is then its capital; any other character
 has no case.
 
-| The matched part | The correction |
+| The matched part | The replacement |
 | --- | --- |
 | two or more letters, all capitals (`TEH`) | every small letter as its capital (`THE`) |
-| one capital, its first character, and the correction is written without capitals (`Teh`) | its first character as its capital (`The`) |
-| anything else (`teh`, `tEh`), or a correction written with capitals (`Iphone` for `iPhone`) | as written |
+| one capital, its first character, and the replacement is written without capitals (`Teh`) | its first character as its capital (`The`) |
+| anything else (`teh`, `tEh`), or a replacement written with capitals (`Iphone` for `iPhone`) | as written |
 
-When the layout cannot type that form, the correction is typed as written;
-when it cannot type that either, the typo is passed over. A word that
-already reads as the correction would leave it is left as it is.
+Digits, spaces and punctuation have no case, so `+31 6 1234 5678` is typed
+as written whatever the case of `pnumber`. When the layout cannot type that
+form, the replacement is typed as written; when it cannot type that either,
+the typed form is passed over. A word that already reads as the replacement
+would leave it is left as it is. A macro has no case: it plays as stored.
 
-The correction is typed so that it shows in that case under the computer's
+The replacement is typed so that it shows in that case under the computer's
 Caps Lock: a letter goes out as the stroke of its other case, except on
 macOS, where a capital is typed as itself and a small letter cannot be typed
 while Caps Lock is on.
 
 Held by: `tests/host/run_autocorrect_tests.sh` (rule 4 cases).
 
-## The correction
+## The replacement
 
-The corrected word is what stood before the typo, the correction, and what
-followed the typo, apostrophes included. Only what differs is typed again:
-the keyboard erases back to the first character that changes and types the
-rest. `becuase` to `because` erases four characters and types four.
+A text replacement is up to 128 bytes: a word, or text that is no word, with
+spaces, digits and punctuation the layout types. The word after it is what
+stood before the typed form, the replacement, and what followed the typed
+form, apostrophes included. Only what differs is typed again: the keyboard
+erases back to the first character that changes and types the rest.
+`becuase` to `because` erases four characters and types four.
 
-The key that ended the word is held back until the correction is typed. It
+The key that ended the word is held back until the replacement is typed. It
 then goes to the computer as the real key, still held if the person still
-holds it: Enter in a chat box sends the corrected text, and a held Space
+holds it: Enter in a chat box sends the replaced text, and a held Space
 repeats.
 
-A correction is never typed through Unicode entry, and never takes more than
-48 key strokes, erasing included; a longer one is passed over.
+A replacement is never typed through Unicode entry, and never takes more
+than 288 key strokes, erasing included: a word of 32 characters erased and
+128 typed, each of two strokes. One that would take more is passed over.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (`word-end-space`, `differing-suffix`, `word-end-enter`; `character-the-layout-cannot-type`; `test_held_keys_around_a_correction`), `tests/host/run_macro_slot_provider_tests.sh` (`test_a_correction_borrows_the_shared_window`).
+Held by: `tests/host/run_autocorrect_tests.sh` (`word-end-space`, `differing-suffix`, `word-end-enter`, `replacement-with-digits-and-spaces`, `longest-replacement`, `replacement-keeps-its-case`; `character-the-layout-cannot-type`; `test_held_keys_around_a_correction`), `tests/host/run_macro_slot_provider_tests.sh` (`test_a_correction_borrows_the_shared_window`).
+
+## A macro as the replacement
+
+A replacement may be a macro slot in place of text, for text of more than one
+line or more than 128 bytes, or anything else a
+[macro](profile-wire-v1/macro-domain.md) does. When a word that is one of its
+typed forms ends:
+
+1. the keyboard erases the typed form, as it erases before typing text;
+2. the macro plays through the macro engine, as it plays from a key, with
+   its own protection and pace;
+3. the key that ended the word goes to the computer, and the keys pressed
+   meanwhile after it, in order.
+
+A macro replaces the whole word only: its typed forms have no part-of-word
+match. Apostrophes before the typed form stay on screen. With an apostrophe
+after it the macro does not play and the word is left as typed, since the
+erase would take the apostrophe along.
+
+There is no case rule and no undo for a macro. It plays as stored whatever
+the case of the typed form, and Backspace after it is only Backspace: what a
+macro does (keys, shortcuts, waits) cannot be taken back by erasing.
+
+A replacement whose macro slot is empty, or whose macro cannot play on this
+host (its text needs Unicode entry the host has not set up, say), is passed
+over, and nothing is erased. The check is made before the erase.
+
+Held by: `tests/host/run_autocorrect_tests.sh` (rule 10 cases: `macro-replacement`, `macro-replacement-has-no-case`, `macro-replacement-has-no-undo`, `macro-replacement-ended-by-enter`, `keys-during-a-macro-replacement`, `macro-replacement-empty-slot`, `macro-replacement-apostrophes`, `macro-replacement-whole-word-only`; `test_a_full_queue_stops_a_macro_correction`), `tests/host/run_macro_slot_provider_tests.sh` (`test_can_start_checks_without_playing`), `tests/host/run_profile_autocorrect_v1_tests.sh` (the `macros` vector and the macro refusals).
 
 ## Undo
 
-When a correction was ended by a key that prints (a space, punctuation) and
-the very next key press is Backspace, that Backspace never reaches the
-computer. Instead the keyboard erases the ending character and what the
-correction typed, and types back the word exactly as it was typed. The word
-is then left alone: ending it again corrects nothing.
+When a text replacement was ended by a key that prints (a space,
+punctuation) and the very next key press is Backspace, that Backspace never
+reaches the computer. Instead the keyboard erases the ending character and
+what the replacement typed, and types back the word exactly as it was typed.
+The word is then left alone: ending it again replaces nothing.
 
 After Enter or Tab there is no undo, since the text may be sent or the focus
-moved: Backspace is Backspace. Any other key press between the correction
-and Backspace ends the chance, and so does holding the ending key until it
+moved: Backspace is Backspace. After a macro there is none either. Any other
+key press between the replacement and Backspace ends the chance, and so does holding the ending key until it
 repeats. When the layout can no longer type the word back (Caps Lock went on
 on macOS), Backspace is Backspace.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (rule 5 cases).
+Held by: `tests/host/run_autocorrect_tests.sh` (rule 5 cases, `undo-a-long-replacement` among them).
 
 ## Forgetting the word
 
 The keyboard forgets the word it was following in one of two ways.
 
-**Fresh start**: the next character starts a new word, which is corrected
+**Fresh start**: the next character starts a new word, which is replaced
 normally. After:
 
 - a shortcut;
@@ -162,7 +207,7 @@ normally. After:
 - a mouse button going down;
 - a macro, whatever it types.
 
-**Suspended**: nothing is corrected until the next word end, because the
+**Suspended**: nothing is replaced until the next word end, because the
 keyboard no longer knows where the word on screen starts. After:
 
 - Backspace with no character of the word left;
@@ -176,45 +221,72 @@ keyboard no longer knows where the word on screen starts. After:
 
 Held by: `tests/host/run_autocorrect_tests.sh` (rule 6 cases; `test_switching_off_forgets_the_word`).
 
-## Typing a correction and holding keys back
+## Typing a replacement and holding keys back
 
-A correction plays through the macro engine with its output isolated, as an
-uninterruptible macro's is (D-F17): a neutral report and a 10 ms settle,
-then each key held 5 ms and followed by 5 ms, Backspace first, then the
-characters through the host layout. Modifiers the person holds never reach
-it, and are back afterwards. A key that was down when the correction began
-is up for the computer from then on and is not pressed again.
+A text replacement plays through the macro engine with its output isolated,
+as an uninterruptible macro's is (D-F17): a neutral report and a 10 ms
+settle, then each key held 5 ms and followed by 5 ms, Backspace first, then
+the characters through the host layout. Modifiers the person holds never
+reach it, and are back afterwards. A key that was down when the replacement
+began is up for the computer from then on and is not pressed again.
 
 Unlike a macro's, the presses that arrive meanwhile are not ignored. Every
-key and modifier change since the ending key waits in the queue, which holds
-64 changes, the ending key first, and comes out afterwards in the order it
-happened, one key change a scan. What comes out is
-read as typing in its turn, so a typo typed while a correction plays is
-corrected when its own word end comes out. A macro key pressed meanwhile
-waits in the same queue and starts when its turn comes; the keys behind it
-wait until it has played.
+key and modifier change since the ending key waits in the queue, the ending
+key first, and comes out afterwards in the order it happened, one key change
+a scan. What comes out is read as typing in its turn, so a typed form typed
+while a replacement plays is replaced when its own word end comes out. A
+macro key pressed meanwhile waits in the same queue and starts when its turn
+comes; the keys behind it wait until it has played. The same holds while a
+replacement's macro plays.
+
+### The queue
+
+The queue holds 240 changes, and a replacement stops once 192 wait. That is
+sized from the pace above for the longest replacement the keyboard types:
+
+| Replacement | Key strokes | Lasts | Changes a second that reach 192 before it ends |
+| --- | ---: | ---: | ---: |
+| 128 characters of one stroke each, for a typed form of 7 | 135 | 1.36 s | 141 |
+| 128 characters of two strokes each (dead keys), for one of 32 | 288 | 2.89 s | 66 |
+
+Typing makes two changes a character, and a few more for Shift: about 25 a
+second at 120 words a minute and 45 at 200. So typing on through the longest
+replacement never fills the queue; only keys arriving several times faster
+than anyone types do, or a macro replacement that plays for many seconds.
 
 The queue is never allowed to cost a key:
 
-- A correction does not start while more than 16 changes are waiting. The
-  typo is left as typed.
-- If the queue fills while a correction is typed, the correction stops where
-  it is, the word is left as far as it got, and the queue empties. A change
-  that does not fit stays in the keyboard's report and is taken up at the
-  next scan, late, never dropped.
+- A replacement does not start while more than 16 changes are waiting. The
+  typed form is left as typed.
+- Once 192 changes wait while a replacement is typed, or while its macro
+  plays, the replacement stops where it is and the queue empties, a key
+  change a scan. The word is left as far as the replacement got, which is the
+  one thing given up; nothing typed is lost or reordered. The 48 places left
+  take the changes that arrive while it stops.
+- A change that finds the queue full all the same stays in the keyboard's
+  report and is taken up at the next scan, late. That needs 48 changes within
+  the few milliseconds a replacement takes to stop, or more than 240 during a
+  macro a key started, which is never stopped (D-F17). Only then can a key
+  pressed and released again before there is room go unseen.
+
+One press is not seen whatever the queue holds: a key tapped entirely within
+the 5 ms for which a replacement, or a macro, holds that same key down. The
+computer already has the key down, and the keyboard cannot show it a second
+press. A key held longer than that, as typing holds one, is shown when the
+replacement lets go of it.
 
 The lookup runs from the scan too: the whole word at once, then 32
-part-of-word typos a scan. The ending key waits for it, at
-most 33 scans for a full list and one for a list without part-of-word typos.
+part-of-word typed forms a scan. The ending key waits for it, at most 33
+scans for a full list and one for a list without part-of-word typed forms.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (rule 7 cases; `test_no_correction_starts_behind_a_long_queue`, `test_a_full_queue_loses_no_key`, `test_a_correction_keeps_its_pace`, `test_a_one_shot_modifier_is_spent_once`), `tests/host/run_macro_payload_engine_tests.sh` (`test_erase_taps_backspace_at_the_text_pace`, `test_a_correction_is_isolated_without_ignoring_presses`).
+Held by: `tests/host/run_autocorrect_tests.sh` (rule 7 cases, `typing-over-the-longest-replacement` and `full-queue` among them; `test_no_correction_starts_behind_a_long_queue`, `test_a_full_queue_loses_no_key`, `test_typing_through_the_longest_correction`, `test_a_full_queue_stops_a_macro_correction`, `test_a_correction_keeps_its_pace`, `test_a_one_shot_modifier_is_spent_once`), `tests/host/run_macro_payload_engine_tests.sh` (`test_erase_taps_backspace_at_the_text_pace`, `test_a_correction_is_isolated_without_ignoring_presses`).
 
 ## On and off
 
-Autocorrect runs while the stored switch is on (key option 12 of settings
+Text replacement runs while the stored switch is on (key option 12 of settings
 scalar 24,
 [settings](profile-wire-v1/settings-domain.md#editor-metadata--get-0x08)), the
-autocorrect override allows it and the list holds a typo. The override is
+autocorrect override allows it and the list holds a typed form. The override is
 the switch keys' (`AC_ON`, `AC_OFF`, `AC_TOGG`, D-F66): allowed at boot,
 never saved, read back on
 [GET `0x22` page 1](profile-wire-v1/live-edits.md#runtime-get-0x22). No key
@@ -222,7 +294,7 @@ turns on what the profile has off.
 
 With the override off the keyboard still follows words, so switching back
 on finds the next word; switched in the middle of a word, that word is left
-alone. A correction already being typed finishes. With the stored switch
+alone. A replacement already being typed finishes. With the stored switch
 off or the list empty, keyboard reports are not read at all.
 
 The keyboard cannot see a password field or a terminal: `AC_OFF` or
@@ -236,22 +308,23 @@ Held by: `tests/host/run_autocorrect_tests.sh` (`switched-off`; `test_the_stage_
 
 | Field | Meaning |
 | --- | --- |
-| `name`, `rule`, `description` | The case, and the rule of the nine in the ADR it holds |
+| `name`, `rule`, `description` | The case, and the rule of the ten in the ADR it holds |
 | `layout` | A host layout's slug |
 | `capsLock` | The computer's Caps Lock when the case starts |
-| `list` | The entries, as in `autocorrect_domain_v1.json` |
+| `list` | The entries, as in `autocorrect_domain_v1.json`: `correction` and `typos`, or `macro` (a slot) and `typos` |
+| `macros` | For a case with a macro replacement, the text each stored macro types, by slot; a slot left out is empty |
 | `on` | `false` when the stored switch is off; absent otherwise |
 | `events` | The keys, below |
 | `result` | The text the computer ends with |
 | `resultEndsWith` | In place of `result`, only its end, where the rest depends on timing |
-| `screen` | The same input as the characters the computer would show with autocorrect off, `\b` for Backspace: what a text matcher is run over, with the case's list, layout and Caps Lock, to produce `result` |
+| `screen` | The same input as the characters the computer would show with autocorrect off, `\b` for Backspace: what a text matcher is run over, with the case's list, layout, Caps Lock and macros, to produce `result` |
 | `keyboardOnly` | In place of `screen`, why the case has no text form |
-| `strokes` | For one case, how many characters the correction erased and typed |
+| `strokes` | For one case, how many characters the replacement erased and typed |
 
 | Event | Meaning |
 | --- | --- |
 | `{"type": text}` | the keys that show those characters on the layout under the case's Caps Lock, one after another; `\n` is Enter and `\t` Tab |
-| `{"fast": text}` | the same with no pause, so later keys arrive while a correction is typed |
+| `{"fast": text}` | the same with no pause, so later keys arrive while a replacement is typed |
 | `{"key": name, "mods": [...]}` | a named key tapped: `Backspace`, `Enter`, `Left`, `Right`, or a letter with `Ctrl` |
 | `{"stroke": stroke}` | a layout stroke tapped, in the host layouts' notation |
 | `{"tap": key}` | a key tapped by its QMK name, with whatever modifiers are held |

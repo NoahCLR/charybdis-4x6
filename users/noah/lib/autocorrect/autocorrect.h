@@ -17,12 +17,17 @@
 enum {
     // Characters of a word that are followed; a longer word is left alone.
     NOAH_AUTOCORRECT_WORD_MAX = 32u,
-    // Key and modifier changes held back at once.
-    NOAH_AUTOCORRECT_QUEUE_SIZE = 64u,
+    // Key and modifier changes held back at once: more than fast typing makes
+    // while the longest correction is typed (docs/spec/autocorrect-v1.md).
+    NOAH_AUTOCORRECT_QUEUE_SIZE = 240u,
+    // A correction being typed stops once this many wait, which leaves room
+    // for the changes that arrive while it stops.
+    NOAH_AUTOCORRECT_QUEUE_STOP_AT = 192u,
     // No correction starts with more than this many already waiting.
     NOAH_AUTOCORRECT_QUEUE_START_MAX = 16u,
-    // The most key strokes one correction types, erasing included.
-    NOAH_AUTOCORRECT_STROKES_MAX = 48u,
+    // The most key strokes one correction types, erasing included: a word of
+    // 32 characters erased and 128 typed, each of two strokes.
+    NOAH_AUTOCORRECT_STROKES_MAX = 288u,
     // A correction's keys are each held this long and followed by as long a gap.
     NOAH_AUTOCORRECT_PACE_MS = 5u,
     // A key held this long is taken to repeat on the host.
@@ -30,7 +35,9 @@ enum {
     // Part-of-word typos compared in one scan.
     NOAH_AUTOCORRECT_LOOKUP_STEP = 32u,
     // Regression policy for the 32-bit target's state, not an SRAM limit.
-    NOAH_AUTOCORRECT_EMBEDDED_STATE_BUDGET = 304u,
+    NOAH_AUTOCORRECT_EMBEDDED_STATE_BUDGET = 656u,
+    // And for the scan's static workspace for one correction.
+    NOAH_AUTOCORRECT_EMBEDDED_WORK_BUDGET = 704u,
 };
 
 void noah_autocorrect_init(void);

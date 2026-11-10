@@ -9,7 +9,8 @@ a shortcut on every custom key, most of them six keys with layers, and
 every one of its 273 names at 32 bytes of UTF-8; and 32 pointing slots (v4), each named with 32
 bytes, with every layer starting one of them; the full 1,920-byte matrix and
 34,903-byte macro bank; and an autocorrect list of 1,024 corrections and 1,024
-typos, every typo part of a word, in 20,480 bytes of text (34,824 bytes).
+typos, every typo part of a word and one correction of 128 bytes, in 20,480
+bytes of text (34,824 bytes).
 Values reach the edges the plan names: layers 7, 8 and
 15, combo rows 31, 32, 63, 64 and 127, macros and custom keys 0, 63, 64 and
 127. It is test evidence built from the byte specs, not from firmware code.

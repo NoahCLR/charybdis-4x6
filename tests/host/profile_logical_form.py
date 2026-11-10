@@ -183,14 +183,15 @@ def macros(data: bytes) -> list:
 
 
 def autocorrect(data: bytes) -> list:
-    """Each correction with its typos and where each matches, in stored order."""
+    """Each correction, its text or the macro slot it plays, with its typos
+    and where each matches, in stored order."""
     corrections, typos, part, text_length = struct.unpack_from("<HHHH", data, 0)
     text = 8 + 6 * corrections + 6 * typos + 2 * part
     assert len(data) == text + text_length
     entries = []
     for index in range(corrections):
-        offset, length = struct.unpack_from("<HB", data, 8 + 6 * index)
-        entries.append({"correction": data[text + offset : text + offset + length].decode("utf-8"), "typos": []})
+        offset, length, kind = struct.unpack_from("<HBB", data, 8 + 6 * index)
+        entries.append({"macro": offset, "typos": []} if kind else {"correction": data[text + offset : text + offset + length].decode("utf-8"), "typos": []})
     for index in range(typos):
         offset, length, match, correction = struct.unpack_from("<HBBH", data, 8 + 6 * corrections + 6 * index)
         entries[correction]["typos"].append({"typo": data[text + offset : text + offset + length].decode("utf-8"), "match": match})

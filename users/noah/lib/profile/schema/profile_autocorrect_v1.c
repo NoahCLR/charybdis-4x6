@@ -19,7 +19,7 @@ enum {
 };
 
 // Correction and typo rows share one size and the place of their text
-// offset, length and 16-bit link.
+// offset, length, kind or match, and 16-bit link.
 #define ROW_SIZE NOAH_PROFILE_AUTOCORRECT_V1_TYPO_ROW_SIZE
 #define NO_TABLE UINT8_MAX
 
@@ -32,7 +32,8 @@ _Static_assert(NOAH_PROFILE_AUTOCORRECT_V1_MAX_TEXT_BYTES <= UINT16_MAX && NOAH_
 _Static_assert(sizeof(noah_profile_autocorrect_v1_validation_t) <= NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_VALIDATION_BUDGET, "autocorrect validation state exceeded its firmware regression policy");
 _Static_assert(sizeof(noah_profile_autocorrect_v1_list_t) <= NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_LIST_BUDGET, "autocorrect list handle exceeded its firmware regression policy");
 #endif
-_Static_assert((unsigned)NOAH_PROFILE_AUTOCORRECT_V1_TYPO_ROW_SIZE <= (unsigned)NOAH_PROFILE_AUTOCORRECT_V1_STEP_READ_MAX && (unsigned)NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX <= 2u * NOAH_PROFILE_AUTOCORRECT_V1_STEP_READ_MAX, "a row is one read and a text at most two");
+_Static_assert((unsigned)NOAH_PROFILE_AUTOCORRECT_V1_TYPO_ROW_SIZE <= (unsigned)NOAH_PROFILE_AUTOCORRECT_V1_STEP_READ_MAX && (unsigned)NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX <= 2u * NOAH_PROFILE_AUTOCORRECT_V1_STEP_READ_MAX && (unsigned)NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX <= 7u * NOAH_PROFILE_AUTOCORRECT_V1_STEP_READ_MAX, "a row is one read, a typo at most two and a correction at most seven");
+_Static_assert((unsigned)NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX <= (unsigned)NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX && NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX <= UINT8_MAX, "one buffer holds either text, counted in a byte");
 
 bool noah_profile_autocorrect_v1_fold(uint32_t character, uint32_t *folded) {
     uint16_t low = 0u, high = noah_profile_autocorrect_v1_word_count;
@@ -151,10 +152,11 @@ static void next_row(validation_t *state) {
     state->phase = state->row < state->typos ? PHASE_TYPO_ROW : PHASE_COMPLETE;
 }
 
-// A table row's text offset and length, common to both tables.
-static noah_profile_autocorrect_v1_result_t begin_text(validation_t *state, const uint8_t row[ROW_SIZE]) {
+// A table row's text offset and length, common to both tables; `most` is the
+// table's longest text.
+static noah_profile_autocorrect_v1_result_t begin_text(validation_t *state, const uint8_t row[ROW_SIZE], uint8_t most) {
     uint8_t length = row[2];
-    if (length == 0u || length > NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX) return NOAH_PROFILE_AUTOCORRECT_V1_INVALID_TEXT_LENGTH;
+    if (length == 0u || length > most) return NOAH_PROFILE_AUTOCORRECT_V1_INVALID_TEXT_LENGTH;
     if (read_u16(row) != state->text_offset || length > state->text_bytes - state->text_offset) return NOAH_PROFILE_AUTOCORRECT_V1_INVALID_OFFSET;
     state->length = length;
     state->have   = 0u;
@@ -247,14 +249,33 @@ noah_profile_autocorrect_v1_validation_step_t noah_profile_autocorrect_v1_valida
             break;
         }
         case PHASE_CORRECTION_ROW:
-            result = begin_text(state, bytes);
-            if (result == NOAH_PROFILE_AUTOCORRECT_V1_OK && bytes[3] != 0u) result = NOAH_PROFILE_AUTOCORRECT_V1_RESERVED;
             state->link = read_u16(&bytes[4]);
+            if (bytes[3] == NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO) {
+                // A macro correction has no text: its slot stands where the
+                // offset would, and the slots ascend after every text one.
+                uint16_t macro = read_u16(bytes);
+                if (bytes[2] != 0u) {
+                    result = NOAH_PROFILE_AUTOCORRECT_V1_INVALID_TEXT_LENGTH;
+                } else if (macro >= NOAH_PROFILE_AUTOCORRECT_V1_MACRO_SLOTS) {
+                    result = NOAH_PROFILE_AUTOCORRECT_V1_INVALID_MACRO;
+                } else if (state->macros && macro <= state->macro) {
+                    result = NOAH_PROFILE_AUTOCORRECT_V1_ORDER;
+                }
+                state->macros = true;
+                state->macro  = macro;
+                state->length = 0u;
+                state->phase  = PHASE_CORRECTION_FIRST_TYPO;
+            } else if (bytes[3] != NOAH_PROFILE_AUTOCORRECT_V1_KIND_TEXT) {
+                result = NOAH_PROFILE_AUTOCORRECT_V1_INVALID_KIND;
+            } else {
+                result = begin_text(state, bytes, NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX);
+                if (result == NOAH_PROFILE_AUTOCORRECT_V1_OK && state->macros) result = NOAH_PROFILE_AUTOCORRECT_V1_ORDER;
+                state->phase = PHASE_CORRECTION_TEXT;
+            }
             if (result == NOAH_PROFILE_AUTOCORRECT_V1_OK && state->link >= state->typos) result = NOAH_PROFILE_AUTOCORRECT_V1_INVALID_REFERENCE;
-            state->phase = PHASE_CORRECTION_TEXT;
             break;
         case PHASE_TYPO_ROW:
-            result       = begin_text(state, bytes);
+            result       = begin_text(state, bytes, NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX);
             state->match = bytes[3];
             state->link  = read_u16(&bytes[4]);
             if (result == NOAH_PROFILE_AUTOCORRECT_V1_OK && state->match > NOAH_PROFILE_AUTOCORRECT_V1_MATCH_ANYWHERE) result = NOAH_PROFILE_AUTOCORRECT_V1_INVALID_MATCH;
@@ -283,6 +304,15 @@ noah_profile_autocorrect_v1_validation_step_t noah_profile_autocorrect_v1_valida
             offset = typo_rows_offset(state->corrections) + (size_t)ROW_SIZE * state->row;
             if (read_u16(&bytes[4]) > state->row) {
                 result = NOAH_PROFILE_AUTOCORRECT_V1_FIRST_TYPO;
+                break;
+            }
+            // A macro plays for the whole word only.
+            if (bytes[3] == NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO) {
+                if (state->match != NOAH_PROFILE_AUTOCORRECT_V1_MATCH_WHOLE_WORD) {
+                    result = NOAH_PROFILE_AUTOCORRECT_V1_INVALID_MATCH;
+                    break;
+                }
+                state->phase = PHASE_TYPO_PART;
                 break;
             }
             // Only a correction of the typo's length can equal it. Its row was
@@ -343,12 +373,20 @@ static bool list_read(const list_t *list, size_t offset, uint8_t *bytes, size_t 
     return noah_profile_reader_read(&list->reader, list->base + offset, bytes, count);
 }
 
-// A row's text, bounded by the text area whatever the row says.
-static bool row_text(const list_t *list, const uint8_t row[ROW_SIZE], uint8_t text[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX], uint8_t *length) {
+// A row's text of at most `most` bytes, bounded by the text area whatever the
+// row says.
+static bool row_text(const list_t *list, const uint8_t row[ROW_SIZE], uint8_t most, uint8_t *text, uint8_t *length) {
     uint16_t offset = read_u16(row);
     *length         = row[2];
-    if (*length == 0u || *length > NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX || offset > list->text_bytes || *length > list->text_bytes - offset) return false;
-    return !text || list_read(list, text_area_offset(list->corrections, list->typos, list->part_typos) + offset, text, *length);
+    if (*length == 0u || *length > most || offset > list->text_bytes || *length > list->text_bytes - offset) return false;
+    // A typo's bytes a read, as a storage reader takes them; a longer
+    // correction in as many reads as it needs.
+    for (uint8_t have = 0u; text && have < *length;) {
+        uint8_t count = (uint8_t)(*length - have) > NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX ? NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX : (uint8_t)(*length - have);
+        if (!list_read(list, text_area_offset(list->corrections, list->typos, list->part_typos) + offset + have, &text[have], count)) return false;
+        have = (uint8_t)(have + count);
+    }
+    return true;
 }
 
 bool noah_profile_autocorrect_v1_open(noah_profile_autocorrect_v1_list_t *list, const noah_profile_reader_t *reader, size_t base, size_t length) {
@@ -364,7 +402,7 @@ bool noah_profile_autocorrect_v1_open(noah_profile_autocorrect_v1_list_t *list, 
 
 bool noah_profile_autocorrect_v1_typo_at(const noah_profile_autocorrect_v1_list_t *list, uint16_t index, noah_profile_autocorrect_v1_typo_t *typo, uint8_t text[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX]) {
     uint8_t row[ROW_SIZE], length;
-    if (!list || !typo || index >= list->typos || !list_read(list, typo_rows_offset(list->corrections) + (size_t)ROW_SIZE * index, row, sizeof(row)) || !row_text(list, row, text, &length)) return false;
+    if (!list || !typo || index >= list->typos || !list_read(list, typo_rows_offset(list->corrections) + (size_t)ROW_SIZE * index, row, sizeof(row)) || !row_text(list, row, NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX, text, &length)) return false;
     if (row[3] > NOAH_PROFILE_AUTOCORRECT_V1_MATCH_ANYWHERE || read_u16(&row[4]) >= list->corrections) return false;
     *typo = (noah_profile_autocorrect_v1_typo_t){.index = index, .correction = read_u16(&row[4]), .match = row[3], .length = length};
     return true;
@@ -397,7 +435,15 @@ bool noah_profile_autocorrect_v1_part_at(const noah_profile_autocorrect_v1_list_
     return noah_profile_autocorrect_v1_typo_at(list, read_u16(row), typo, text) && typo->match != NOAH_PROFILE_AUTOCORRECT_V1_MATCH_WHOLE_WORD;
 }
 
-bool noah_profile_autocorrect_v1_correction(const noah_profile_autocorrect_v1_list_t *list, uint16_t correction, uint8_t text[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX], uint8_t *length) {
-    uint8_t row[ROW_SIZE];
-    return list && text && length && correction < list->corrections && list_read(list, NOAH_PROFILE_AUTOCORRECT_V1_HEADER_SIZE + (size_t)ROW_SIZE * correction, row, sizeof(row)) && row_text(list, row, text, length);
+bool noah_profile_autocorrect_v1_correction(const noah_profile_autocorrect_v1_list_t *list, uint16_t index, noah_profile_autocorrect_v1_correction_t *correction, uint8_t text[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX]) {
+    uint8_t row[ROW_SIZE], length = 0u;
+    if (!list || !correction || index >= list->corrections || !list_read(list, NOAH_PROFILE_AUTOCORRECT_V1_HEADER_SIZE + (size_t)ROW_SIZE * index, row, sizeof(row))) return false;
+    if (row[3] == NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO) {
+        if (row[2] != 0u || read_u16(row) >= NOAH_PROFILE_AUTOCORRECT_V1_MACRO_SLOTS) return false;
+        *correction = (noah_profile_autocorrect_v1_correction_t){.kind = NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO, .macro = read_u16(row)};
+        return true;
+    }
+    if (row[3] != NOAH_PROFILE_AUTOCORRECT_V1_KIND_TEXT || !row_text(list, row, NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX, text, &length)) return false;
+    *correction = (noah_profile_autocorrect_v1_correction_t){.kind = NOAH_PROFILE_AUTOCORRECT_V1_KIND_TEXT, .length = length};
+    return true;
 }

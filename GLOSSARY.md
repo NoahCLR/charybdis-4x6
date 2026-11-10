@@ -307,56 +307,73 @@ _Avoid_: protected playback, input protection
 
 ## Autocorrect
 
+**Text replacement**:
+The keyboard replacing what is typed when a word ends: a typo with the right
+word, an abbreviation with longer text, a typed form with a macro. It is the
+name people see. The code, the domain, the specs, the fixtures and the keys
+(`AC_ON`, `AC_OFF`, `AC_TOGG`) were named for **autocorrect** and keep that
+name, and they call a replacement a `correction` and a typed form a `typo`.
+_Avoid_: text expansion, snippets, abbreviations (for the feature), shortcut
+(a custom key's)
+
 **Autocorrect list**:
-The typos the keyboard corrects and what each becomes, kept in the profile as
-its own domain.
+What the keyboard replaces and with what, kept in the profile as its own
+domain.
 _Avoid_: dictionary, autocorrect table, trie, word list
 
 **Entry**:
-One correction with every typo that becomes it.
+One replacement with every typed form that produces it.
 _Avoid_: rule, pair, row (for this), mapping
 
-**Correction**:
-The right word of an entry, stored once, as it is to be typed.
-_Avoid_: replacement, fix, target, output
+**Replacement**:
+What an entry puts in place of what was typed, stored once: text of up to 128
+bytes on one line, typed as written, or a macro slot, played. `correction` in
+code, on the wire and in fixtures.
+_Avoid_: correction (outside those names), fix, target, output, expansion
 
-**Typo**:
-A misspelling an entry corrects, stored case-folded; it belongs to exactly one
-correction.
-_Avoid_: trigger, pattern, source, input, misspelling (as a second term)
+**Typed form**:
+What is typed to get an entry's replacement, stored case-folded: a
+misspelling, or an abbreviation such as `pnumber`. It belongs to exactly one
+replacement. `typo` in code, on the wire and in fixtures.
+_Avoid_: typo (as the term, outside those names; a misspelling is still a
+typo), trigger, pattern, source, input, abbreviation (as a second term)
 
 **Word**:
-What autocorrect follows as it is typed: letters and digits, with apostrophes
-between them. Apostrophes before and after it stay on screen and are not part
-of what a typo matches.
+What text replacement follows as it is typed: letters and digits, with
+apostrophes between them. Apostrophes before and after it stay on screen and
+are not part of what a typed form matches.
 _Avoid_: token, string (for this)
 
 **Word end**:
 The character that finishes a word: anything that is not a letter, a digit or
-an apostrophe, and Enter or Tab. A typo is corrected only here.
+an apostrophe, and Enter or Tab. A typed form is replaced only here.
 _Avoid_: delimiter, boundary, trigger key
 
-**Undo a correction**:
-Backspace pressed right after a correction that a printing character ended:
-the ending character goes and the word comes back as typed.
+**Undo a replacement**:
+Backspace pressed right after a text replacement that a printing character
+ended: the ending character goes and the word comes back as typed. A macro
+has none.
 _Avoid_: revert (for this), rollback
 
 **Fresh start**:
-Autocorrect forgetting the word because the cursor may have moved: the next
-character starts a new word.
+Text replacement forgetting the word because the cursor may have moved: the
+next character starts a new word.
 
 **Suspended**:
-Autocorrect correcting nothing until the next word end, because it no longer
-knows where the word on screen starts.
+Text replacement replacing nothing until the next word end, because it no
+longer knows where the word on screen starts.
 
 **Typing stage**:
-The step between live key ownership and the keyboard report where autocorrect
-reads what is typed and holds keys back while a correction is typed.
+The step between live key ownership and the keyboard report where text
+replacement reads what is typed and holds keys back while a replacement is
+typed or its macro plays.
 _Avoid_: filter, interceptor, deferral layer
 
 **Where it matches**:
-What part of a word a typo has to be: the whole word, the start of a word,
-the end of a word, or anywhere in a word.
+What part of a word a typed form has to be: the whole word, the start of a
+word, the end of a word, or anywhere in a word. A stored number; a client may
+write the last three with `*` where other letters may go (`recieve*`,
+`*mnet`, `*tihng*`). A macro's typed forms match the whole word only.
 _Avoid_: boundary, anchor, mode, match type
 
 ## Pointing

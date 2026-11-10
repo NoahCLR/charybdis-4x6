@@ -34,7 +34,7 @@ static const char *const code_names[] = {
     [NOAH_PROFILE_AUTOCORRECT_V1_CAPACITY_EXCEEDED] = "CAPACITY_EXCEEDED",
     [NOAH_PROFILE_AUTOCORRECT_V1_INVALID_OFFSET] = "INVALID_OFFSET",
     [NOAH_PROFILE_AUTOCORRECT_V1_INVALID_TEXT_LENGTH] = "INVALID_TEXT_LENGTH",
-    [NOAH_PROFILE_AUTOCORRECT_V1_RESERVED] = "RESERVED",
+    [NOAH_PROFILE_AUTOCORRECT_V1_INVALID_KIND] = "INVALID_KIND",
     [NOAH_PROFILE_AUTOCORRECT_V1_INVALID_TEXT] = "INVALID_TEXT",
     [NOAH_PROFILE_AUTOCORRECT_V1_ORDER] = "ORDER",
     [NOAH_PROFILE_AUTOCORRECT_V1_INVALID_MATCH] = "INVALID_MATCH",
@@ -44,9 +44,10 @@ static const char *const code_names[] = {
     [NOAH_PROFILE_AUTOCORRECT_V1_NOT_FOLDED] = "NOT_FOLDED",
     [NOAH_PROFILE_AUTOCORRECT_V1_TYPO_IS_CORRECTION] = "TYPO_IS_CORRECTION",
     [NOAH_PROFILE_AUTOCORRECT_V1_PART_INDEX] = "PART_INDEX",
+    [NOAH_PROFILE_AUTOCORRECT_V1_INVALID_MACRO] = "INVALID_MACRO",
 };
 // The codes travel as a validation error's field id.
-_Static_assert(NOAH_PROFILE_AUTOCORRECT_V1_INVALID_LENGTH == 3 && NOAH_PROFILE_AUTOCORRECT_V1_ORDER == 9 && NOAH_PROFILE_AUTOCORRECT_V1_PART_INDEX == 16, "refusal codes are fixed");
+_Static_assert(NOAH_PROFILE_AUTOCORRECT_V1_INVALID_LENGTH == 3 && NOAH_PROFILE_AUTOCORRECT_V1_ORDER == 9 && NOAH_PROFILE_AUTOCORRECT_V1_PART_INDEX == 16 && NOAH_PROFILE_AUTOCORRECT_V1_INVALID_MACRO == 17, "refusal codes are fixed");
 
 // One line of the converted fixture: code, table, row (-1 for none), name, hex.
 static bool read_vector(FILE *file, vector_t *vector) {
@@ -85,9 +86,10 @@ static noah_profile_autocorrect_v1_result_t validate_bounded(const uint8_t *byte
     noah_profile_autocorrect_v1_validation_t      state   = {0};
     noah_profile_autocorrect_v1_validation_step_t step;
     size_t                                        steps = 0u;
-    // A row, two reads of text, and for a typo its correction's row, two
-    // reads of that text and a part-index row.
-    const size_t most_steps = 1u + 4u * NOAH_PROFILE_AUTOCORRECT_V1_MAX_CORRECTIONS + 7u * NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS;
+    // A correction's row, its first typo's and its text, twenty bytes a
+    // read; and for a typo its row, two reads of text, its correction's row,
+    // two reads of that text and a part-index row.
+    const size_t most_steps = 1u + 2u * NOAH_PROFILE_AUTOCORRECT_V1_MAX_CORRECTIONS + (NOAH_PROFILE_AUTOCORRECT_V1_MAX_TEXT_BYTES / NOAH_PROFILE_AUTOCORRECT_V1_STEP_READ_MAX + NOAH_PROFILE_AUTOCORRECT_V1_MAX_CORRECTIONS) + 7u * NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS;
     do {
         size_t before = counted.calls;
         step          = noah_profile_autocorrect_v1_validation_step(&state, &reader, 0u, length, error);
@@ -99,7 +101,7 @@ static noah_profile_autocorrect_v1_result_t validate_bounded(const uint8_t *byte
     return error->code;
 }
 
-static vector_t small;
+static vector_t small, long_list, macros;
 
 static size_t check_vectors(const char *path) {
     static vector_t vector;
@@ -116,12 +118,14 @@ static size_t check_vectors(const char *path) {
         }
         seen[result] = true;
         if (strcmp(vector.name, "small") == 0) small = vector;
+        if (strcmp(vector.name, "long") == 0) long_list = vector;
+        if (strcmp(vector.name, "macros") == 0) macros = vector;
         count++;
     }
     fclose(file);
     // Every refusal a client can cause has a vector.
     for (size_t code = NOAH_PROFILE_AUTOCORRECT_V1_INVALID_LENGTH; code < sizeof(seen); code++) CHECK(seen[code]);
-    CHECK(seen[NOAH_PROFILE_AUTOCORRECT_V1_OK] && small.length != 0u);
+    CHECK(seen[NOAH_PROFILE_AUTOCORRECT_V1_OK] && small.length != 0u && long_list.length != 0u && macros.length != 0u);
     return count;
 }
 
@@ -145,17 +149,54 @@ static bool find(const noah_profile_autocorrect_v1_list_t *list, const char *typ
 }
 
 static void expect_correction(const noah_profile_autocorrect_v1_list_t *list, uint16_t correction, const char *expected) {
-    uint8_t text[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX], length = 0u;
-    CHECK(noah_profile_autocorrect_v1_correction(list, correction, text, &length));
-    CHECK(length == strlen(expected) && memcmp(text, expected, length) == 0);
+    uint8_t                                  text[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX];
+    noah_profile_autocorrect_v1_correction_t stored;
+    CHECK(noah_profile_autocorrect_v1_correction(list, correction, &stored, text));
+    CHECK(stored.kind == NOAH_PROFILE_AUTOCORRECT_V1_KIND_TEXT && stored.length == strlen(expected) && memcmp(text, expected, stored.length) == 0);
+}
+
+static void expect_macro(const noah_profile_autocorrect_v1_list_t *list, const char *typo, uint16_t slot) {
+    noah_profile_autocorrect_v1_typo_t       found;
+    noah_profile_autocorrect_v1_correction_t stored;
+    CHECK(noah_profile_autocorrect_v1_find(list, (const uint8_t *)typo, (uint8_t)strlen(typo), &found) && found.match == NOAH_PROFILE_AUTOCORRECT_V1_MATCH_WHOLE_WORD);
+    // A macro correction has a slot and no text, asked for or not.
+    CHECK(noah_profile_autocorrect_v1_correction(list, found.correction, &stored, NULL));
+    CHECK(stored.kind == NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO && stored.macro == slot && stored.length == 0u);
+}
+
+// A correction of 128 bytes is read whole, and macro corrections give their
+// slots, after the text ones.
+static void test_long_and_macro_corrections(void) {
+    noah_profile_reader_t                    reader = noah_profile_reader_from_memory(long_list.bytes, long_list.length);
+    noah_profile_autocorrect_v1_list_t       list;
+    noah_profile_autocorrect_v1_typo_t       typo;
+    uint8_t                                  text[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX];
+    noah_profile_autocorrect_v1_correction_t stored;
+
+    CHECK(noah_profile_autocorrect_v1_open(&list, &reader, 0u, long_list.length));
+    CHECK(noah_profile_autocorrect_v1_find(&list, (const uint8_t *)"sigoff", 6u, &typo));
+    CHECK(noah_profile_autocorrect_v1_correction(&list, typo.correction, &stored, text));
+    CHECK(stored.length == NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX && memcmp(text, "Kind regards, ", 14u) == 0 && text[127] == '0');
+    CHECK(noah_profile_autocorrect_v1_find(&list, (const uint8_t *)"pnumber", 7u, &typo));
+    expect_correction(&list, typo.correction, "+31 6 1234 5678");
+
+    reader = noah_profile_reader_from_memory(macros.bytes, macros.length);
+    CHECK(noah_profile_autocorrect_v1_open(&list, &reader, 0u, macros.length));
+    CHECK(list.corrections == 4u && list.typos == 5u && list.part_typos == 0u);
+    expect_macro(&list, "addr", 3u);
+    expect_macro(&list, "adres", 3u);
+    expect_macro(&list, "sigfull", 127u);
+    CHECK(noah_profile_autocorrect_v1_find(&list, (const uint8_t *)"myemail", 7u, &typo));
+    expect_correction(&list, typo.correction, "sam@example.com");
 }
 
 // The fixture's "small" list, as an engine reads it.
 static void test_lookups(void) {
     noah_profile_reader_t              reader = noah_profile_reader_from_memory(small.bytes, small.length);
     noah_profile_autocorrect_v1_list_t list;
-    noah_profile_autocorrect_v1_typo_t typo, other;
-    uint8_t                            text[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX];
+    noah_profile_autocorrect_v1_typo_t       typo, other;
+    uint8_t                                  text[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX];
+    noah_profile_autocorrect_v1_correction_t stored;
 
     CHECK(noah_profile_autocorrect_v1_open(&list, &reader, 0u, small.length));
     CHECK(list.corrections == 10u && list.typos == 15u && list.part_typos == 3u);
@@ -197,7 +238,7 @@ static void test_lookups(void) {
     }
     CHECK(!noah_profile_autocorrect_v1_part_at(&list, 3u, &typo, text));
     CHECK(!noah_profile_autocorrect_v1_typo_at(&list, 15u, &typo, text));
-    CHECK(!noah_profile_autocorrect_v1_correction(&list, 10u, text, &typo.length));
+    CHECK(!noah_profile_autocorrect_v1_correction(&list, 10u, &stored, text));
 
     // Every typo is found by its own bytes, at its own row.
     for (uint16_t index = 0u; index < list.typos; index++) {
@@ -251,7 +292,8 @@ static void test_malformed_lists_stay_bounded(void) {
             noah_profile_reader_t              reader  = {.read = counted_read, .context = &counted, .length = small.length};
             noah_profile_autocorrect_v1_list_t list;
             noah_profile_autocorrect_v1_typo_t typo;
-            uint8_t                            text[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX], length;
+            uint8_t                                  text[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX];
+            noah_profile_autocorrect_v1_correction_t stored;
             if (!noah_profile_autocorrect_v1_open(&list, &reader, 0u, small.length)) continue;
             counted.calls = 0u;
             (void)find(&list, "teh", &typo);
@@ -260,7 +302,7 @@ static void test_malformed_lists_stay_bounded(void) {
             CHECK(counted.calls <= 2u * 2u * 11u);
             for (uint16_t index = 0u; index < list.typos; index++) (void)noah_profile_autocorrect_v1_typo_at(&list, index, &typo, text);
             for (uint16_t position = 0u; position < list.part_typos; position++) (void)noah_profile_autocorrect_v1_part_at(&list, position, &typo, text);
-            for (uint16_t correction = 0u; correction < list.corrections; correction++) (void)noah_profile_autocorrect_v1_correction(&list, correction, text, &length);
+            for (uint16_t correction = 0u; correction < list.corrections; correction++) (void)noah_profile_autocorrect_v1_correction(&list, correction, &stored, text);
         }
     }
     // Nearly every change is refused; a letter changed to another valid,
@@ -287,6 +329,7 @@ int main(int argc, char **argv) {
     size_t vectors = check_vectors(argv[1]);
     test_fold();
     test_lookups();
+    test_long_and_macro_corrections();
     test_empty_list();
     test_malformed_lists_stay_bounded();
     test_arguments();

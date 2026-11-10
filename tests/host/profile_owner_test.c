@@ -2409,8 +2409,9 @@ static void test_live_edit_reaches_both_halves_and_save_writes_both(void) {
 static bool list_corrects(const char *typo, const char *correction) {
     const noah_profile_autocorrect_v1_list_t *list = noah_active_profile_autocorrect_list();
     noah_profile_autocorrect_v1_typo_t        found;
-    uint8_t                                   text[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX], length;
-    return noah_profile_autocorrect_v1_find(list, (const uint8_t *)typo, (uint8_t)strlen(typo), &found) && noah_profile_autocorrect_v1_correction(list, found.correction, text, &length) && length == strlen(correction) && memcmp(text, correction, length) == 0;
+    uint8_t                                   text[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX];
+    noah_profile_autocorrect_v1_correction_t  stored;
+    return noah_profile_autocorrect_v1_find(list, (const uint8_t *)typo, (uint8_t)strlen(typo), &found) && noah_profile_autocorrect_v1_correction(list, found.correction, &stored, text) && stored.length == strlen(correction) && memcmp(text, correction, stored.length) == 0;
 }
 
 // The autocorrect list (domain 0x80, D-F68) is read in place from whatever is

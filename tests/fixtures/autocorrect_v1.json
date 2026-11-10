@@ -1,5 +1,5 @@
 {
-  "description": "Autocorrect behaviour version 1: what the computer ends with when the keyboard corrects a list while keys are typed. Rules: docs/spec/autocorrect-v1.md; each case names the rule it holds. A case has a list (entries as in autocorrect_domain_v1.json), a host layout (a slug of host_layouts_v1.json), the host's Caps Lock at its start, and events. Events: {type: text} presses the keys that show those characters on that layout under that Caps Lock, one after another ('\\n' is Enter, '\\t' Tab); {fast: text} the same with no pause, so later keys arrive while a correction is typed; {key, mods} taps a named key; {stroke} taps a layout stroke; {tap} taps a key by its QMK name with whatever modifiers are held; {press} and {release} hold a modifier; {click}; {hold, ms, repeats} holds a key that long while the computer repeats it; {macro: text, fast} presses a macro key that types the text; {mash, count} taps a key that many times with no pause. result is the text the computer ends with; resultEndsWith holds only its end where the rest depends on timing. screen, when present, is the same input as the characters the computer would show with autocorrect off ('\\b' is Backspace): a client's text matcher run over it with the case's list, layout and Caps Lock must produce result. A case with keyboardOnly has no screen form and says why. The case folding and capitals are wordCharacters in autocorrect_domain_v1.json: a small letter's capital is the one character that folds to it. Test evidence, never a migration source.",
+  "description": "Autocorrect behaviour version 1: what the computer ends with when the keyboard corrects a list while keys are typed. Rules: docs/spec/autocorrect-v1.md; each case names the rule it holds. A case has a list (entries as in autocorrect_domain_v1.json), macros when a correction plays one (the text each stored macro types, by slot; a slot left out is empty), a host layout (a slug of host_layouts_v1.json), the host's Caps Lock at its start, and events. Events: {type: text} presses the keys that show those characters on that layout under that Caps Lock, one after another ('\\n' is Enter, '\\t' Tab); {fast: text} the same with no pause, so later keys arrive while a correction is typed; {key, mods} taps a named key; {stroke} taps a layout stroke; {tap} taps a key by its QMK name with whatever modifiers are held; {press} and {release} hold a modifier; {click}; {hold, ms, repeats} holds a key that long while the computer repeats it; {macro: text, fast} presses a macro key that types the text; {mash, count} taps a key that many times with no pause. result is the text the computer ends with; resultEndsWith holds only its end where the rest depends on timing. screen, when present, is the same input as the characters the computer would show with autocorrect off ('\\b' is Backspace): a client's text matcher run over it with the case's list, layout and Caps Lock must produce result. A case with keyboardOnly has no screen form and says why. The case folding and capitals are wordCharacters in autocorrect_domain_v1.json: a small letter's capital is the one character that folds to it. Test evidence, never a migration source.",
   "spec": "docs/spec/autocorrect-v1.md",
   "version": 1,
   "cases": [
@@ -3966,7 +3966,7 @@
     {
       "name": "full-queue",
       "rule": 7,
-      "description": "More key changes than the queue holds arrive while a correction is typed: the correction stops where it is and every key still comes out, in order.",
+      "description": "More key changes than the queue holds arrive while the longest replacement is typed: the replacement stops where it is and no key is lost or reordered.",
       "layout": "us",
       "capsLock": false,
       "list": [
@@ -3976,67 +3976,32 @@
             {
               "typo": "teh",
               "match": "whole word"
-            },
+            }
+          ]
+        },
+        {
+          "correction": "+31 6 1234 5678",
+          "typos": [
             {
-              "typo": "hte",
+              "typo": "pnumber",
               "match": "whole word"
             }
           ]
         },
         {
-          "correction": "because",
+          "correction": "Kind regards, Sam Example | +31 6 1234 5678 | sam@example.com | Example Street 12, 1234 AB Amsterdam, The Netherlands | KvK 0000",
           "typos": [
             {
-              "typo": "becuase",
-              "match": "whole word"
-            },
-            {
-              "typo": "becasue",
+              "typo": "sigoff",
               "match": "whole word"
             }
           ]
         },
         {
-          "correction": "thing",
+          "correction": "sam@example.com",
           "typos": [
             {
-              "typo": "tihng",
-              "match": "anywhere"
-            }
-          ]
-        },
-        {
-          "correction": "iPhone",
-          "typos": [
-            {
-              "typo": "iphone",
-              "match": "whole word"
-            }
-          ]
-        },
-        {
-          "correction": "ment",
-          "typos": [
-            {
-              "typo": "mnet",
-              "match": "end of word"
-            }
-          ]
-        },
-        {
-          "correction": "receive",
-          "typos": [
-            {
-              "typo": "recieve",
-              "match": "start of word"
-            }
-          ]
-        },
-        {
-          "correction": "doesn't",
-          "typos": [
-            {
-              "typo": "dosen't",
+              "typo": "myemail",
               "match": "whole word"
             }
           ]
@@ -4044,18 +4009,18 @@
       ],
       "events": [
         {
-          "fast": "becuase "
+          "fast": "sigoff "
         },
         {
-          "mash": "x",
-          "count": 40
+          "mash": "q",
+          "count": 200
         },
         {
-          "fast": "y"
+          "fast": "j"
         }
       ],
       "keyboardOnly": "more keys than the queue holds",
-      "resultEndsWith": " xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxy"
+      "resultEndsWith": " qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqj"
     },
     {
       "name": "character-the-layout-cannot-type",
@@ -4178,6 +4143,646 @@
       "keyboardOnly": "the stored switch",
       "on": false,
       "result": "teh "
+    },
+    {
+      "name": "replacement-with-digits-and-spaces",
+      "rule": 2,
+      "description": "A typed form may stand for text that is no word: digits, spaces and punctuation.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "+31 6 1234 5678",
+          "typos": [
+            {
+              "typo": "pnumber",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "Kind regards, Sam Example | +31 6 1234 5678 | sam@example.com | Example Street 12, 1234 AB Amsterdam, The Netherlands | KvK 0000",
+          "typos": [
+            {
+              "typo": "sigoff",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "sam@example.com",
+          "typos": [
+            {
+              "typo": "myemail",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "pnumber, myemail "
+        }
+      ],
+      "screen": "pnumber, myemail ",
+      "result": "+31 6 1234 5678, sam@example.com "
+    },
+    {
+      "name": "longest-replacement",
+      "rule": 2,
+      "description": "A replacement of 128 bytes is typed whole.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "+31 6 1234 5678",
+          "typos": [
+            {
+              "typo": "pnumber",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "Kind regards, Sam Example | +31 6 1234 5678 | sam@example.com | Example Street 12, 1234 AB Amsterdam, The Netherlands | KvK 0000",
+          "typos": [
+            {
+              "typo": "sigoff",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "sam@example.com",
+          "typos": [
+            {
+              "typo": "myemail",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "sigoff\n"
+        }
+      ],
+      "screen": "sigoff\n",
+      "result": "Kind regards, Sam Example | +31 6 1234 5678 | sam@example.com | Example Street 12, 1234 AB Amsterdam, The Netherlands | KvK 0000\n"
+    },
+    {
+      "name": "replacement-keeps-its-case",
+      "rule": 4,
+      "description": "A replacement with capitals, digits or punctuation is typed as written, whatever the case of the typed form.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "+31 6 1234 5678",
+          "typos": [
+            {
+              "typo": "pnumber",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "Kind regards, Sam Example | +31 6 1234 5678 | sam@example.com | Example Street 12, 1234 AB Amsterdam, The Netherlands | KvK 0000",
+          "typos": [
+            {
+              "typo": "sigoff",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "sam@example.com",
+          "typos": [
+            {
+              "typo": "myemail",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "Sigoff MYEMAIL "
+        }
+      ],
+      "screen": "Sigoff MYEMAIL ",
+      "result": "Kind regards, Sam Example | +31 6 1234 5678 | sam@example.com | Example Street 12, 1234 AB Amsterdam, The Netherlands | KvK 0000 SAM@EXAMPLE.COM "
+    },
+    {
+      "name": "undo-a-long-replacement",
+      "rule": 5,
+      "description": "Backspace right after a long replacement takes all of it back.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "+31 6 1234 5678",
+          "typos": [
+            {
+              "typo": "pnumber",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "Kind regards, Sam Example | +31 6 1234 5678 | sam@example.com | Example Street 12, 1234 AB Amsterdam, The Netherlands | KvK 0000",
+          "typos": [
+            {
+              "typo": "sigoff",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "sam@example.com",
+          "typos": [
+            {
+              "typo": "myemail",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "sigoff "
+        },
+        {
+          "key": "Backspace"
+        }
+      ],
+      "screen": "sigoff \b",
+      "result": "sigoff"
+    },
+    {
+      "name": "typing-over-the-longest-replacement",
+      "rule": 7,
+      "description": "Keys typed while the longest replacement is typed, which takes over a second, all come out after it in order. The replacement is digits and hyphens, so no key typed meanwhile is one it is holding.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "0123456789-0123456789-0123456789-0123456789-0123456789-0123456789-0123456789-0123456789-0123456789-0123456789-0123456789-0123456",
+          "typos": [
+            {
+              "typo": "longnum",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "fast": "longnum and typing goes on all the while "
+        }
+      ],
+      "screen": "longnum and typing goes on all the while ",
+      "result": "0123456789-0123456789-0123456789-0123456789-0123456789-0123456789-0123456789-0123456789-0123456789-0123456789-0123456789-0123456 and typing goes on all the while "
+    },
+    {
+      "name": "macro-replacement",
+      "rule": 10,
+      "description": "A typed form whose replacement is a macro: the typed form is erased, the macro plays, then the ending key.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "macro": 5,
+          "typos": [
+            {
+              "typo": "sig",
+              "match": "whole word"
+            },
+            {
+              "typo": "sgi",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        }
+      ],
+      "macros": {
+        "5": "Kind regards, Sam"
+      },
+      "events": [
+        {
+          "type": "sig, sgi "
+        }
+      ],
+      "screen": "sig, sgi ",
+      "result": "Kind regards, Sam, Kind regards, Sam "
+    },
+    {
+      "name": "macro-replacement-has-no-case",
+      "rule": 10,
+      "description": "A macro plays as it is stored, whatever the case of the typed form.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "macro": 5,
+          "typos": [
+            {
+              "typo": "sig",
+              "match": "whole word"
+            },
+            {
+              "typo": "sgi",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        }
+      ],
+      "macros": {
+        "5": "Kind regards, Sam"
+      },
+      "events": [
+        {
+          "type": "SIG Sig "
+        }
+      ],
+      "screen": "SIG Sig ",
+      "result": "Kind regards, Sam Kind regards, Sam "
+    },
+    {
+      "name": "macro-replacement-has-no-undo",
+      "rule": 10,
+      "description": "After a macro replacement Backspace is only Backspace.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "macro": 5,
+          "typos": [
+            {
+              "typo": "sig",
+              "match": "whole word"
+            },
+            {
+              "typo": "sgi",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        }
+      ],
+      "macros": {
+        "5": "Kind regards, Sam"
+      },
+      "events": [
+        {
+          "type": "sig "
+        },
+        {
+          "key": "Backspace"
+        },
+        {
+          "key": "Backspace"
+        }
+      ],
+      "screen": "sig \b\b",
+      "result": "Kind regards, Sa"
+    },
+    {
+      "name": "macro-replacement-ended-by-enter",
+      "rule": 10,
+      "description": "Enter after a macro replacement comes after the macro.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "macro": 5,
+          "typos": [
+            {
+              "typo": "sig",
+              "match": "whole word"
+            },
+            {
+              "typo": "sgi",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        }
+      ],
+      "macros": {
+        "5": "Kind regards, Sam"
+      },
+      "events": [
+        {
+          "type": "sig\n"
+        }
+      ],
+      "screen": "sig\n",
+      "result": "Kind regards, Sam\n"
+    },
+    {
+      "name": "keys-during-a-macro-replacement",
+      "rule": 10,
+      "description": "Keys pressed while the typed form is erased and its macro plays come out afterwards, in order, and are corrected in their turn.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "macro": 5,
+          "typos": [
+            {
+              "typo": "sig",
+              "match": "whole word"
+            },
+            {
+              "typo": "sgi",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        }
+      ],
+      "macros": {
+        "5": "Kind regards, Sam"
+      },
+      "events": [
+        {
+          "fast": "sig and teh rest "
+        }
+      ],
+      "screen": "sig and teh rest ",
+      "result": "Kind regards, Sam and the rest "
+    },
+    {
+      "name": "macro-replacement-empty-slot",
+      "rule": 10,
+      "description": "A replacement whose macro slot is empty is passed over: the typed form stays.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "macro": 5,
+          "typos": [
+            {
+              "typo": "sig",
+              "match": "whole word"
+            },
+            {
+              "typo": "sgi",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        }
+      ],
+      "macros": {},
+      "events": [
+        {
+          "type": "sig teh "
+        }
+      ],
+      "screen": "sig teh ",
+      "result": "sig the "
+    },
+    {
+      "name": "macro-replacement-apostrophes",
+      "rule": 10,
+      "description": "An apostrophe before the typed form stays; with one after it the macro does not play, since erasing would take it along.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "macro": 5,
+          "typos": [
+            {
+              "typo": "sig",
+              "match": "whole word"
+            },
+            {
+              "typo": "sgi",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        }
+      ],
+      "macros": {
+        "5": "Kind regards, Sam"
+      },
+      "events": [
+        {
+          "type": "'sig sig' "
+        }
+      ],
+      "screen": "'sig sig' ",
+      "result": "'Kind regards, Sam sig' "
+    },
+    {
+      "name": "macro-replacement-whole-word-only",
+      "rule": 10,
+      "description": "A macro plays for the whole word only, never inside a longer one.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "macro": 5,
+          "typos": [
+            {
+              "typo": "sig",
+              "match": "whole word"
+            },
+            {
+              "typo": "sgi",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        }
+      ],
+      "macros": {
+        "5": "Kind regards, Sam"
+      },
+      "events": [
+        {
+          "type": "sigs design "
+        }
+      ],
+      "screen": "sigs design ",
+      "result": "sigs design "
     }
   ]
 }

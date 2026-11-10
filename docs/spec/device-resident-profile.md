@@ -430,7 +430,7 @@ Every ceiling holds at once (D-F14, [`0014`](../adr/0014-bigger-profiles.md)):
 | Behaviours / branches per behaviour / branches in all | 128 / tap depth `d` (5) / `128 × d` (640) |
 | Combos / inputs per combo | 128 / 2–16 |
 | Macros / macro bank | 128 / 34,903 bytes |
-| Autocorrect corrections / typos / bytes in one / text in all / the domain | 1,024 / 1,024 / 32 / 20,480 / 34,824 bytes |
+| Autocorrect corrections / typos / bytes in one typo / in one text correction / text in all / the domain | 1,024 / 1,024 / 32 / 128 / 20,480 / 34,824 bytes |
 | Custom keys | 128 |
 | Names | 32 bytes of UTF-8 each |
 | Reusable lighting groups / group rows in one table / in all (D-F63) | 128 / 255 / 640 |

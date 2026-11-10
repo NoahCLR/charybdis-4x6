@@ -1,11 +1,13 @@
 {
- "description": "Autocorrect list domain 0x80 version 1: golden vectors and the word-character table, for the firmware and its clients. Layout and rules: docs/spec/profile-wire-v1/autocorrect-domain.md. Payload, integers little-endian: header [corrections u16, typos u16, part-of-word typos u16, text bytes u16]; a 6-byte row per correction [text offset u16, length u8, 0, first typo u16]; a 6-byte row per typo [text offset u16, length u8, match u8, correction u16]; the part index, one u16 typo index per typo whose match is not whole word, ascending; then the text, every correction's bytes then every typo's, in row order, back to back. Corrections and typos each ascend strictly by their UTF-8 bytes. wordCharacters lists every character a typo may hold besides an apostrophe between two of them, as [character, folded]; a typo holds folded characters only, and a typed word is folded with this table before it is looked up. Error codes are the firmware's NOAH_PROFILE_AUTOCORRECT_V1_* names, with the table (0 corrections, 1 typos, 2 part index) and row they name. Test evidence, never a migration source.",
+ "description": "Autocorrect list domain 0x80 version 1: golden vectors and the word-character table, for the firmware and its clients. Layout and rules: docs/spec/profile-wire-v1/autocorrect-domain.md. Payload, integers little-endian: header [corrections u16, typos u16, part-of-word typos u16, text bytes u16]; a 6-byte row per correction [text offset u16, length u8, kind u8 (0 text, 1 macro), first typo u16], a macro correction holding its macro slot in place of the offset and a length of 0; a 6-byte row per typo [text offset u16, length u8, match u8, correction u16]; the part index, one u16 typo index per typo whose match is not whole word, ascending; then the text, every text correction's bytes then every typo's, in row order, back to back. Text corrections come first and ascend strictly by their UTF-8 bytes, macro corrections follow and ascend strictly by slot, and typos ascend strictly by their bytes. An entry is {correction, typos} for text or {macro, typos} for a macro slot, whose typos match the whole word only. wordCharacters lists every character a typo may hold besides an apostrophe between two of them, as [character, folded]; a typo holds folded characters only, and a typed word is folded with this table before it is looked up. Error codes are the firmware's NOAH_PROFILE_AUTOCORRECT_V1_* names, with the table (0 corrections, 1 typos, 2 part index) and row they name. Test evidence, never a migration source.",
  "generator": "tools/autocorrect/build.py",
  "version": 1,
  "ceilings": {
   "corrections": 1024,
   "typos": 1024,
-  "bytesPerText": 32,
+  "bytesPerTypo": 32,
+  "bytesPerCorrection": 128,
+  "macroSlots": 128,
   "textBytes": 20480,
   "domainBytes": 34824
  },
@@ -2121,6 +2123,87 @@
     }
    ],
    "hex": "0a000f0003007c000000050000000500070001000c00050004001100070006001800060009001e0004000a00220003000800250005000d002a0002000b002c0005000e003100040000003500070001003c00070001004300070001004a00040002004e00050002005300060003005900070003006000030006006300060004006900040205006d00020108006f00030006007200050307007700050009000a000b000d0061206c6f7462656361757365636166c3a9646f65736e27746950686f6e656d656e747468657468696e67756ec3bc626572616c6f7462656163757365626563617375656265637561736563616665636166c3a8646f65736e74646f73656e27746874656970686f6e656d6e65746e757465687469686e677565626572"
+  },
+  {
+   "name": "long",
+   "description": "A correction of 128 bytes with spaces, digits and punctuation, beside short ones.",
+   "entries": [
+    {
+     "correction": "Kind regards, Sam Example | +31 6 1234 5678 | sam@example.com | Example Street 12, 1234 AB Amsterdam, The Netherlands | KvK 0000",
+     "typos": [
+      {
+       "typo": "sigoff",
+       "match": "whole word"
+      }
+     ]
+    },
+    {
+     "correction": "+31 6 1234 5678",
+     "typos": [
+      {
+       "typo": "pnumber",
+       "match": "whole word"
+      }
+     ]
+    },
+    {
+     "correction": "the",
+     "typos": [
+      {
+       "typo": "teh",
+       "match": "whole word"
+      }
+     ]
+    }
+   ],
+   "hex": "030003000000a20000000f0000000f00800001008f00030002009200070000009900060001009f00030002002b33312036203132333420353637384b696e6420726567617264732c2053616d204578616d706c65207c202b3331203620313233342035363738207c2073616d406578616d706c652e636f6d207c204578616d706c65205374726565742031322c203132333420414220416d7374657264616d2c20546865204e65746865726c616e6473207c204b764b2030303030746865706e756d6265727369676f6666746568"
+  },
+  {
+   "name": "macros",
+   "description": "Macro corrections after the text ones, by slot, each with whole-word typos.",
+   "entries": [
+    {
+     "macro": 127,
+     "typos": [
+      {
+       "typo": "sigfull",
+       "match": "whole word"
+      }
+     ]
+    },
+    {
+     "correction": "the",
+     "typos": [
+      {
+       "typo": "teh",
+       "match": "whole word"
+      }
+     ]
+    },
+    {
+     "macro": 3,
+     "typos": [
+      {
+       "typo": "addr",
+       "match": "whole word"
+      },
+      {
+       "typo": "adres",
+       "match": "whole word"
+      }
+     ]
+    },
+    {
+     "correction": "sam@example.com",
+     "typos": [
+      {
+       "typo": "myemail",
+       "match": "whole word"
+      }
+     ]
+    }
+   ],
+   "hex": "0400050000002c0000000f0002000f00030004000300000100007f00000103001200040002001600050002001b000700000022000700030029000300010073616d406578616d706c652e636f6d7468656164647261647265736d79656d61696c73696766756c6c746568"
   }
  ],
  "invalid": [
@@ -2246,8 +2329,8 @@
   },
   {
    "name": "long-correction",
-   "description": "A correction of 33 bytes.",
-   "hex": "0100010000002400000021000000210003000000616161616161616161616161616161616161616161616161616161616161616161746568",
+   "description": "A correction of 129 bytes.",
+   "hex": "0100010000008400000081000000810003000000616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161746568",
    "error": {
     "code": "INVALID_TEXT_LENGTH",
     "table": 0,
@@ -2265,12 +2348,72 @@
    }
   },
   {
-   "name": "correction-reserved",
-   "description": "A correction row's reserved byte is not zero.",
-   "hex": "02000300010015000000030100000300050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e67",
+   "name": "correction-kind",
+   "description": "A correction that is neither text nor a macro.",
+   "hex": "02000300010015000000030200000300050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e67",
    "error": {
-    "code": "RESERVED",
+    "code": "INVALID_KIND",
     "table": 0,
+    "row": 0
+   }
+  },
+  {
+   "name": "macro-with-length",
+   "description": "A macro correction with a text length.",
+   "hex": "0200020000000900000003000100050003010000030003000100060003000000746865736967746568",
+   "error": {
+    "code": "INVALID_TEXT_LENGTH",
+    "table": 0,
+    "row": 1
+   }
+  },
+  {
+   "name": "macro-slot-out-of-range",
+   "description": "A macro correction names a slot past the macro slots.",
+   "hex": "0200020000000900000003000100800000010000030003000100060003000000746865736967746568",
+   "error": {
+    "code": "INVALID_MACRO",
+    "table": 0,
+    "row": 1
+   }
+  },
+  {
+   "name": "macro-order",
+   "description": "Macro corrections out of slot order.",
+   "hex": "020002000000070007000001010003000001000000000400010004000300000061646472736967",
+   "error": {
+    "code": "ORDER",
+    "table": 0,
+    "row": 1
+   }
+  },
+  {
+   "name": "duplicate-macro",
+   "description": "One macro slot stored twice.",
+   "hex": "020002000000070007000001010007000001000000000400010004000300000061646472736967",
+   "error": {
+    "code": "ORDER",
+    "table": 0,
+    "row": 1
+   }
+  },
+  {
+   "name": "text-after-macro",
+   "description": "A text correction after a macro one.",
+   "hex": "0200020000000900070000010000000003000100030003000000060003000100746865736967746568",
+   "error": {
+    "code": "ORDER",
+    "table": 0,
+    "row": 1
+   }
+  },
+  {
+   "name": "macro-part-of-word-typo",
+   "description": "A macro correction's typo that matches part of a word.",
+   "hex": "01000100010003000700000100000000030100000000736967",
+   "error": {
+    "code": "INVALID_MATCH",
+    "table": 1,
     "row": 0
    }
   },

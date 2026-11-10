@@ -18,7 +18,7 @@ make:
 | | [rgb-domain-v1.md](rgb-domain-v1.md) | The lighting domain and how it is drawn |
 | | [participation-policy.md](participation-policy.md) | When a press uses its behaviour or joins a combo |
 | | [host-layouts-v1.md](host-layouts-v1.md) | The host layout catalogue macro text is typed through and typing is read through |
-| | [autocorrect-v1.md](autocorrect-v1.md) | What autocorrect reads, corrects, undoes and holds back |
+| | [autocorrect-v1.md](autocorrect-v1.md) | What text replacement (autocorrect) reads, replaces, undoes and holds back |
 | | [field-classification.md](field-classification.md) | Which authored values are profile data and which only a build changes |
 | Split | [profile-split-v1.md](profile-split-v1.md) | How the halves compare and copy saved profiles, candidates and the working copy |
 | | [split-activity-sync.md](split-activity-sync.md) | The split link, activity and runtime state, and its diagnostic recorders |

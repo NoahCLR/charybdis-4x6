@@ -17,8 +17,8 @@ set there.
    how the halves stay the same.
 6. [Macros and host layouts](macros.md): playback, your computer's keyboard
    layout and Unicode entry.
-7. [Autocorrect](autocorrect.md): what it corrects and when, capitals, the
-   undo, and turning it off.
+7. [Text replacement (autocorrect)](autocorrect.md): what it replaces and
+   when, text and macro replacements, capitals, the undo, and turning it off.
 8. [Authoring in C](authoring.md): the profile files, `config.h`, adding a
    pointing mode and building the pair.
 9. [Hook overrides](hooks.md): adding code of your own without losing the

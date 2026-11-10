@@ -24,6 +24,7 @@ typedef enum {
     AUTOCORRECT_UNDO_START,   // The Backspace at the head may undo a correction.
     AUTOCORRECT_MACRO_START,  // A macro key's turn has come.
     AUTOCORRECT_PLAYING,      // A correction or its undo is being typed.
+    AUTOCORRECT_REPLACEMENT_START, // The typo is erased; its macro comes next.
     AUTOCORRECT_MACRO_PLAYING // The macro whose turn came is playing.
 } autocorrect_state_t;
 
@@ -62,11 +63,13 @@ typedef struct {
     uint16_t correction;
     uint8_t  start;
     uint8_t  length;
+    uint8_t  macro;     // The slot a macro correction plays.
     bool     found;
+    bool     plays;     // The correction is a macro, not text.
     bool     unchanged; // The word already reads as the correction would leave it.
 } autocorrect_choice_t;
 
-enum { AUTOCORRECT_TEXT_MAX = NOAH_AUTOCORRECT_WORD_MAX + NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX };
+enum { AUTOCORRECT_TEXT_MAX = NOAH_AUTOCORRECT_WORD_MAX + NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX };
 
 typedef struct {
     // Usages and modifiers as live ownership last had them, and as the host
@@ -98,6 +101,7 @@ typedef struct {
     bool     corrected : 1;      // That word was corrected.
     bool     undo_armed : 1;     // The next key may undo it.
     bool     playing_undo : 1;
+    bool     replacing : 1;      // A macro correction: its erase, then its macro.
     bool     watch_started : 1;
     bool     watched_end : 1;    // The watched key ended a word.
     bool     ending_enter : 1;   // The key that ended the word prints nothing.
@@ -105,10 +109,22 @@ typedef struct {
 
 static autocorrect_t autocorrect;
 
+// The scan's workspace for one correction: its bytes, its characters, and the
+// word as it leaves it. Static, so the longest correction costs the scan's
+// stack nothing; only the scan's lookup and start use it, one after another.
+static struct {
+    uint8_t  bytes[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX];
+    uint16_t correction[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX];
+    uint16_t text[AUTOCORRECT_TEXT_MAX];
+} autocorrect_work;
+
 #if UINTPTR_MAX == UINT32_MAX
 _Static_assert(sizeof(autocorrect_t) <= NOAH_AUTOCORRECT_EMBEDDED_STATE_BUDGET, "autocorrect state exceeded its firmware regression policy");
+_Static_assert(sizeof(autocorrect_work) <= NOAH_AUTOCORRECT_EMBEDDED_WORK_BUDGET, "autocorrect's correction workspace exceeded its firmware regression policy");
 #endif
-_Static_assert(NOAH_AUTOCORRECT_QUEUE_SIZE <= UINT8_MAX && NOAH_AUTOCORRECT_QUEUE_START_MAX < NOAH_AUTOCORRECT_QUEUE_SIZE, "the queue is indexed in a byte");
+_Static_assert(NOAH_AUTOCORRECT_QUEUE_SIZE <= UINT8_MAX && NOAH_AUTOCORRECT_QUEUE_START_MAX < NOAH_AUTOCORRECT_QUEUE_STOP_AT && NOAH_AUTOCORRECT_QUEUE_STOP_AT < NOAH_AUTOCORRECT_QUEUE_SIZE, "the queue is indexed in a byte");
+_Static_assert(NOAH_AUTOCORRECT_STROKES_MAX >= NOAH_AUTOCORRECT_WORD_MAX + 2u * NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX, "the longest correction, every character two strokes, is typed");
+_Static_assert(NOAH_PROFILE_AUTOCORRECT_V1_MACRO_SLOTS <= UINT8_MAX + 1u, "a macro correction's slot is kept in a byte");
 _Static_assert(AUTOCORRECT_TEXT_MAX + 1u <= UINT8_MAX, "a corrected word and its ending are counted in a byte");
 
 // ── Characters ──────────────────────────────────────────────────────────────
@@ -333,13 +349,13 @@ static bool autocorrect_key_down(uint8_t usage) {
 
 static bool autocorrect_push(uint8_t kind, uint8_t value) {
     if (autocorrect.count == NOAH_AUTOCORRECT_QUEUE_SIZE) return false;
-    autocorrect.queue[(uint8_t)(autocorrect.head + autocorrect.count) % NOAH_AUTOCORRECT_QUEUE_SIZE] = (autocorrect_edge_t){.kind = kind, .value = value};
+    autocorrect.queue[((uint16_t)autocorrect.head + autocorrect.count) % NOAH_AUTOCORRECT_QUEUE_SIZE] = (autocorrect_edge_t){.kind = kind, .value = value};
     autocorrect.count++;
     return true;
 }
 
 static void autocorrect_pop(void) {
-    autocorrect.head = (uint8_t)((autocorrect.head + 1u) % NOAH_AUTOCORRECT_QUEUE_SIZE);
+    autocorrect.head = (uint8_t)(((uint16_t)autocorrect.head + 1u) % NOAH_AUTOCORRECT_QUEUE_SIZE);
     autocorrect.count--;
 }
 
@@ -375,14 +391,14 @@ static __attribute__((noinline)) bool autocorrect_pump(void) {
     return changed;
 }
 
-// A change that does not fit stays in the report and is read again at the
-// next one, so it is late and never lost; a correction being typed stops, so
-// the queue can empty.
+// A change that finds the queue full stays in the report and is read again
+// at the next scan. The scan keeps that from happening: it stops a correction
+// once the queue is nearly full (autocorrect_stop_before_full).
 static bool autocorrect_queue_change(uint8_t kind, uint8_t value) {
-    if (autocorrect_push(kind, value)) return true;
-    autocorrect.lagging = true;
-    if (autocorrect.state == AUTOCORRECT_PLAYING) (void)macro_payload_engine_cancel();
-    return false;
+    bool queued = autocorrect_push(kind, value);
+
+    if (!queued) autocorrect.lagging = true;
+    return queued;
 }
 
 // ── The typing stage ────────────────────────────────────────────────────────
@@ -477,7 +493,17 @@ static void autocorrect_release(void) {
 
 static void autocorrect_playback_finished(macro_payload_finish_result_t result, void *context) {
     (void)context;
-    if (autocorrect.playing_undo) {
+    if (autocorrect.replacing) {
+        // A macro's output cannot be taken back, so there is no undo. The
+        // macro starts from the scan; an erase that did not finish plays none.
+        autocorrect.head_decided = true;
+        autocorrect.corrected    = false;
+        if (result == MACRO_PAYLOAD_FINISH_SUCCESS) {
+            autocorrect.state = AUTOCORRECT_REPLACEMENT_START;
+            return;
+        }
+        autocorrect.replacing = false;
+    } else if (autocorrect.playing_undo) {
         // The word is on screen as it was typed, and stays that way.
         autocorrect.left_alone = true;
     } else {
@@ -541,7 +567,8 @@ static uint8_t autocorrect_decode(const uint8_t *bytes, uint8_t length, uint16_t
 static bool autocorrect_plan(const autocorrect_choice_t *choice, autocorrect_form_t form, const uint16_t *correction, uint8_t correction_length, uint16_t text[AUTOCORRECT_TEXT_MAX], uint8_t *length, uint8_t *kept) {
     const macro_payload_typing_host_t host      = macro_payload_typing_host();
     bool                              caps_lock = macro_payload_unicode_caps_lock();
-    uint8_t                           count     = 0u, same = 0u, strokes;
+    uint8_t                           count     = 0u, same = 0u;
+    uint16_t                          strokes;
     uint8_t                           after     = (uint8_t)(choice->start + choice->length);
     uint16_t                          capital, typed;
 
@@ -557,11 +584,11 @@ static bool autocorrect_plan(const autocorrect_choice_t *choice, autocorrect_for
 
     while (same < count && same < autocorrect.length && text[same] == autocorrect.word[same])
         same++;
-    strokes = (uint8_t)(autocorrect.length - same);
+    strokes = (uint16_t)(autocorrect.length - same);
     for (uint8_t index = same; index < count; index++) {
         uint8_t needed = autocorrect_strokes_for(&host, caps_lock, text[index], &typed);
         if (!needed || strokes + needed > NOAH_AUTOCORRECT_STROKES_MAX) return false;
-        strokes = (uint8_t)(strokes + needed);
+        strokes = (uint16_t)(strokes + needed);
     }
     *length = count;
     *kept   = same;
@@ -580,25 +607,33 @@ static void autocorrect_to_strokes(uint16_t *characters, uint8_t count) {
 // Whether the chosen typo's correction can be typed, in the case the typo
 // was typed in or else as written, and the text it makes.
 static bool autocorrect_correction_text(const autocorrect_choice_t *choice, uint16_t text[AUTOCORRECT_TEXT_MAX], uint8_t *length, uint8_t *kept) {
-    uint8_t            bytes[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX];
-    uint16_t           correction[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX];
-    uint8_t            size = 0u, count;
-    autocorrect_form_t form;
+    noah_profile_autocorrect_v1_correction_t stored;
+    uint8_t                                 *bytes      = autocorrect_work.bytes;
+    uint16_t                                *correction = autocorrect_work.correction;
+    uint8_t                                  count;
+    autocorrect_form_t                       form;
 
-    if (!noah_profile_autocorrect_v1_correction(noah_active_profile_autocorrect_list(), choice->correction, bytes, &size)) return false;
-    count = autocorrect_decode(bytes, size, correction);
+    if (!noah_profile_autocorrect_v1_correction(noah_active_profile_autocorrect_list(), choice->correction, &stored, bytes) || stored.kind != NOAH_PROFILE_AUTOCORRECT_V1_KIND_TEXT) return false;
+    count = autocorrect_decode(bytes, stored.length, correction);
     form  = autocorrect_form(&autocorrect.word[choice->start], choice->length, correction, count);
     if (autocorrect_plan(choice, form, correction, count, text, length, kept)) return true;
     return form != AUTOCORRECT_FORM_AS_WRITTEN && autocorrect_plan(choice, AUTOCORRECT_FORM_AS_WRITTEN, correction, count, text, length, kept);
 }
 
 static __attribute__((noinline)) void autocorrect_start_correction(void) {
-    uint16_t text[AUTOCORRECT_TEXT_MAX];
-    uint8_t  length = 0u, kept = 0u;
+    uint16_t *text   = autocorrect_work.text;
+    uint8_t   length = 0u, kept = 0u;
 
+    // A macro correction: the typo goes, then its macro plays. The macro was
+    // found able to play when it was chosen.
+    if (autocorrect.choice.found && autocorrect.choice.plays && autocorrect.count <= NOAH_AUTOCORRECT_QUEUE_START_MAX) {
+        autocorrect.replacing = true;
+        if (autocorrect_play(autocorrect.choice.length, NULL, 0u)) return;
+        autocorrect.replacing = false;
+    }
     // With too much already waiting, the typo is left as typed rather than
     // risking a key that does not fit the queue.
-    if (autocorrect.choice.found && !autocorrect.choice.unchanged && autocorrect.count <= NOAH_AUTOCORRECT_QUEUE_START_MAX && autocorrect_correction_text(&autocorrect.choice, text, &length, &kept)) {
+    if (autocorrect.choice.found && !autocorrect.choice.plays && !autocorrect.choice.unchanged && autocorrect.count <= NOAH_AUTOCORRECT_QUEUE_START_MAX && autocorrect_correction_text(&autocorrect.choice, text, &length, &kept)) {
         autocorrect_to_strokes(&text[kept], (uint8_t)(length - kept));
         if (autocorrect_play((uint8_t)(autocorrect.length - kept), &text[kept], (uint8_t)(length - kept))) {
             autocorrect.kept  = kept;
@@ -610,13 +645,23 @@ static __attribute__((noinline)) void autocorrect_start_correction(void) {
     autocorrect_release();
 }
 
-// A candidate takes the word's choice when the keyboard can type it.
-static void autocorrect_consider(uint16_t correction, uint8_t start, uint8_t length) {
-    autocorrect_choice_t candidate = {.correction = correction, .start = start, .length = length, .found = true};
-    uint16_t             text[AUTOCORRECT_TEXT_MAX];
-    uint8_t              count, kept;
+// A candidate takes the word's choice when the keyboard can type it. A macro
+// correction is one for the whole word, with nothing typed after it that the
+// erase would take along, and a macro that is there and can play on this host.
+static void autocorrect_consider(uint16_t correction, uint8_t start, uint8_t length, bool whole_word) {
+    autocorrect_choice_t                     candidate = {.correction = correction, .start = start, .length = length, .found = true};
+    noah_profile_autocorrect_v1_correction_t stored;
+    uint8_t                                  count, kept;
 
-    if (!autocorrect_correction_text(&candidate, text, &count, &kept)) return;
+    if (!noah_profile_autocorrect_v1_correction(noah_active_profile_autocorrect_list(), correction, &stored, NULL)) return;
+    if (stored.kind == NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO) {
+        if (!whole_word || start + length != autocorrect.length || !noah_profile_macro_can_play((uint16_t)(QK_MACRO + stored.macro))) return;
+        candidate.plays    = true;
+        candidate.macro    = (uint8_t)stored.macro;
+        autocorrect.choice = candidate;
+        return;
+    }
+    if (!autocorrect_correction_text(&candidate, autocorrect_work.text, &count, &kept)) return;
     candidate.unchanged = kept == count && kept == autocorrect.length;
     autocorrect.choice  = candidate;
 }
@@ -663,7 +708,7 @@ static __attribute__((noinline)) void autocorrect_lookup(void) {
             }
         }
         if (size <= sizeof(bytes) && noah_profile_autocorrect_v1_find(list, bytes, size, &typo) && typo.match == NOAH_PROFILE_AUTOCORRECT_V1_MATCH_WHOLE_WORD) {
-            autocorrect_consider(typo.correction, start, length);
+            autocorrect_consider(typo.correction, start, length, true);
             if (autocorrect.choice.found) {
                 autocorrect_start_correction();
                 return;
@@ -683,7 +728,7 @@ static __attribute__((noinline)) void autocorrect_lookup(void) {
         at = typo.match == NOAH_PROFILE_AUTOCORRECT_V1_MATCH_END ? (uint8_t)(length - count) : 0u;
         for (uint8_t last = typo.match == NOAH_PROFILE_AUTOCORRECT_V1_MATCH_ANYWHERE ? (uint8_t)(length - count) : at; at <= last; at++) {
             if (memcmp(&folded[at], part, count * sizeof(part[0])) != 0) continue;
-            autocorrect_consider(typo.correction, (uint8_t)(start + at), count);
+            autocorrect_consider(typo.correction, (uint8_t)(start + at), count, false);
             break;
         }
     }
@@ -720,6 +765,18 @@ static void autocorrect_start_macro(void) {
     autocorrect_forget(false);
     if (noah_profile_macro_start((uint16_t)(QK_MACRO + slot))) autocorrect.state = AUTOCORRECT_MACRO_PLAYING;
     else autocorrect_release();
+}
+
+// The typo is erased: its macro plays, with the ending key and every key
+// since still held back behind it.
+static void autocorrect_start_replacement(void) {
+    autocorrect_forget(false);
+    if (noah_profile_macro_start((uint16_t)(QK_MACRO + autocorrect.choice.macro))) {
+        autocorrect.state = AUTOCORRECT_MACRO_PLAYING;
+        return;
+    }
+    autocorrect.replacing = false;
+    autocorrect_release();
 }
 
 // A key held until the host repeats it types characters the keyboard does not
@@ -760,11 +817,20 @@ static void autocorrect_read_switches(void) {
     if (autocorrect.state == AUTOCORRECT_IDLE && !macro_payload_engine_idle()) autocorrect_forget(false);
 }
 
+// A correction being typed, or the macro a correction plays, stops once the
+// queue is nearly full, so the queue can empty while there is still room for
+// the changes that arrive as it stops.
+static void autocorrect_stop_before_full(void) {
+    if (autocorrect.count < NOAH_AUTOCORRECT_QUEUE_STOP_AT) return;
+    if (autocorrect.state == AUTOCORRECT_PLAYING || (autocorrect.state == AUTOCORRECT_MACRO_PLAYING && autocorrect.replacing)) (void)macro_payload_engine_cancel();
+}
+
 void noah_autocorrect_scan(void) {
     bool changed = false;
 
     if (!autocorrect.synced) return;
     autocorrect_read_switches();
+    autocorrect_stop_before_full();
     switch (autocorrect.state) {
         case AUTOCORRECT_LOOKUP:
             autocorrect_lookup();
@@ -775,8 +841,14 @@ void noah_autocorrect_scan(void) {
         case AUTOCORRECT_MACRO_START:
             autocorrect_start_macro();
             break;
+        case AUTOCORRECT_REPLACEMENT_START:
+            autocorrect_start_replacement();
+            break;
         case AUTOCORRECT_MACRO_PLAYING:
-            if (macro_payload_engine_idle()) autocorrect_release();
+            if (macro_payload_engine_idle()) {
+                autocorrect.replacing = false;
+                autocorrect_release();
+            }
             break;
         default:
             break;

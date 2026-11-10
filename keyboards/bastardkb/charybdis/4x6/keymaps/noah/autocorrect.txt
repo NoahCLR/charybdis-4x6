@@ -1,16 +1,18 @@
-# The autocorrect list this firmware is built with: the typos the keyboard
-# corrects until a profile with its own list is saved.
+# The autocorrect list this firmware is built with: what the keyboard
+# replaces as it is typed until a profile with its own list is saved.
 #
-# One typo per line, in QMK's form:
+# One typed form per line, in QMK's form (typo -> correction):
 #
-#   :teh: -> the        the whole word "teh"
-#   :nu -> un           "nu" at the start of a word
-#   mnet: -> ment       "mnet" at the end of a word
-#   tihng -> thing      "tihng" anywhere in a word
+#   :teh: -> the                  the whole word "teh"
+#   :nu -> un                     "nu" at the start of a word
+#   mnet: -> ment                 "mnet" at the end of a word
+#   tihng -> thing                "tihng" anywhere in a word
+#   :pnumber: -> +31 6 1234 5678  text of up to 128 bytes, on one line
+#   :sig: => 12                   plays macro slot 12, for the whole word
 #
-# Several typos may name one correction; a typo names only one. Typos are
-# letters and digits, with apostrophes only between them, and are matched
-# whatever their case. After a change, regenerate authored_autocorrect_list.h:
+# Several typed forms may name one replacement; each names only one. A typed
+# form is letters and digits, with apostrophes only between them, and is
+# matched whatever its case. After a change, regenerate authored_autocorrect_list.h:
 #
 #   python3 tools/autocorrect/build.py --write-authored keyboards/bastardkb/charybdis/4x6/keymaps/noah
 #

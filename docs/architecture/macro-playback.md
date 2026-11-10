@@ -187,6 +187,15 @@ before the macro's own projection.
   `MACRO_PAYLOAD_SOURCE_CORRECTION`: uninterruptible output, 5 ms a key, but
   `macro_payload_engine_ignores_presses` stays false, so the press guard
   drops nothing. A slot start meanwhile is busy.
+- **Playing a macro.** A correction that is a macro slot first asks
+  `noah_profile_macro_can_play` (`macro_slot_provider_can_start`: the slot
+  decodes, passes preflight and is not empty, with nothing sent). It then
+  plays the erase step alone as a correction, and from the next scan starts
+  the slot with `noah_profile_macro_start`, as its key would. The queue waits
+  behind both.
+- **Stopping.** Once 192 of the queue's 240 changes wait, the scan cancels a
+  correction being typed, or the macro a correction plays, so the queue can
+  empty before it is full.
 - **Letting out.** When playback ends the scan goes on showing the queue,
   reading each key as typing. A macro trigger that arrived
   meanwhile (`noah_typing_stage_defer_macro`, from

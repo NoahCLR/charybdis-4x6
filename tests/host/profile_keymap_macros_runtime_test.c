@@ -26,6 +26,10 @@ void macro_slot_provider_invalidate_all(const macro_slot_provider_t *provider, m
     assert(provider->slot_count == 128 && metadata);
     invalidations++;
 }
+bool macro_slot_provider_can_start(const macro_slot_provider_t *provider, macro_slot_metadata_t *metadata, uint8_t slot) {
+    (void)provider; (void)metadata; (void)slot;
+    return false;
+}
 macro_payload_start_result_t macro_slot_provider_start(const macro_slot_provider_t *provider, macro_slot_metadata_t *metadata, uint8_t slot, macro_payload_text_output_t text_output, uint8_t interval, macro_payload_source_t source) {
     (void)metadata; (void)text_output; (void)interval; (void)source;
     macro_payload_ir_t ir;
