@@ -6051,14 +6051,18 @@ static void test_macro_protection_drops_presses_keeps_releases(void) {
     CHECK(noah_record_admission_macro_admit(&release, false, false));
 }
 
+#ifndef NOAH_TEST_QMK_GESTURES
 // Uninterruptible output alone drops nothing: while a correction, or the
 // macro one plays, is typed, the press guard lets every press through for
-// the typing stage to hold back.
+// the typing stage to hold back. An admitted press goes on into the runtime,
+// so this runs where records are handed to it directly, not through QMK's
+// gesture engine.
 extern bool key_runtime_test_macro_holds_presses_back;
 static void test_a_correction_drops_no_press(void) {
+    test_reset_state();
     noah_record_admission_reset();
-    keyrecord_t press = {.event={.type=KEY_EVENT,.pressed=true,.key={1,1}}};
-    keyrecord_t release = press; release.event.pressed = false;
+    keyrecord_t press = test_record(test_keypos(0, 1), true);
+    keyrecord_t release = test_record(test_keypos(0, 1), false);
     key_runtime_test_macro_protected = true;
     key_runtime_test_macro_holds_presses_back = true;
     CHECK(noah_pre_process_record_user(KC_A, &press));
@@ -6067,10 +6071,13 @@ static void test_a_correction_drops_no_press(void) {
     CHECK(noah_pre_process_record_user(KC_A, &release));
     noah_record_admission_reset();
 }
+#endif
 
 int main(int argc, char **argv) {
     test_macro_protection_drops_presses_keeps_releases();
+#ifndef NOAH_TEST_QMK_GESTURES
     test_a_correction_drops_no_press();
+#endif
 #ifdef NOAH_TEST_QMK_GESTURES
     const char *regression = getenv("NOAH_GESTURE_REGRESSION");
     if (regression) {
