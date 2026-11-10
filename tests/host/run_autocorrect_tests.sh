@@ -109,6 +109,10 @@ def entry(correction, typo, match="whole word"):
 
 lists = {
     "phone": [entry("+31 6 1234 5678", "pnumber")],
+    # More part-of-word typos than one scan compares, and a list whose first
+    # correction is another text.
+    "forty": [entry(f"ab{n:02}", f"aq{n:02}", "anywhere") for n in range(1, 41)],
+    "other": [entry("WRONG", "zq", "anywhere")],
 }
 pathlib.Path(sys.argv[3]).write_text("".join(f"{name} {autocorrect.encode(entries).hex()}\n" for name, entries in lists.items()), encoding="utf-8")
 PYCODE

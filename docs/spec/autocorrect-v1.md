@@ -111,7 +111,7 @@ A typed form whose replacement this host cannot type, or whose macro cannot
 play, is passed over as if it were not on the list. A word found nowhere, or
 still being typed, is never touched.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (rule 3 cases: `two-typos-one-correction`, `anywhere-in-a-word`, `end-of-a-word`, `start-of-a-word`, `longest-typo-wins`, `whole-word-beats-part`, `first-in-the-list-wins-a-tie`; `inside-a-longer-word`, `unfinished-word`).
+Held by: `tests/host/run_autocorrect_tests.sh` (rule 3 cases: `two-typos-one-correction`, `anywhere-in-a-word`, `end-of-a-word`, `start-of-a-word`, `longest-typo-wins`, `whole-word-beats-part`, `first-in-the-list-wins-a-tie`, `more-part-of-word-typos-than-one-step`; `inside-a-longer-word`, `unfinished-word`).
 
 ## Case
 
@@ -302,8 +302,10 @@ again inside that hold is not seen.
 The lookup runs from the scan too: the whole word at once, then 32
 part-of-word typed forms a scan. The ending key waits for it, at most 33
 scans for a full list and one for a list without part-of-word typed forms.
+A list published while a lookup is spread over scans (an Apply or a live
+edit) starts that lookup over on the new list.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (rule 7 cases, `typing-over-the-longest-replacement` and `full-queue` among them; `test_no_correction_starts_behind_a_long_queue`, `test_a_full_queue_loses_no_key`, `test_typing_through_the_longest_correction`, `test_a_full_queue_stops_a_macro_correction`, `test_a_correction_keeps_its_pace`, `test_a_one_shot_modifier_is_spent_once`, `test_a_tap_of_a_key_the_correction_holds`), `tests/host/run_macro_payload_engine_tests.sh` (`test_erase_taps_backspace_at_the_text_pace`, `test_a_correction_is_isolated_without_ignoring_presses`).
+Held by: `tests/host/run_autocorrect_tests.sh` (rule 7 cases, `typing-over-the-longest-replacement` and `full-queue` among them; `test_no_correction_starts_behind_a_long_queue`, `test_a_full_queue_loses_no_key`, `test_typing_through_the_longest_correction`, `test_a_full_queue_stops_a_macro_correction`, `test_a_correction_keeps_its_pace`, `test_a_one_shot_modifier_is_spent_once`, `test_a_tap_of_a_key_the_correction_holds`, `test_a_list_published_during_a_lookup`; rule 3's `more-part-of-word-typos-than-one-step`), `tests/host/run_profile_owner_tests.sh` (the list's publication count), `tests/host/run_macro_payload_engine_tests.sh` (`test_erase_taps_backspace_at_the_text_pace`, `test_a_correction_is_isolated_without_ignoring_presses`).
 
 ## On and off
 

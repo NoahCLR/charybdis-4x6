@@ -235,9 +235,14 @@ void send_keyboard_report(void) {
 
 static uint8_t                            list_bytes[4096];
 static noah_profile_autocorrect_v1_list_t list;
+static uint32_t                           list_publication;
 
 const noah_profile_autocorrect_v1_list_t *noah_active_profile_autocorrect_list(void) {
     return &list;
+}
+
+uint32_t noah_active_profile_autocorrect_publication(void) {
+    return list_publication;
 }
 
 static macro_payload_ir_t macro_ir;
@@ -374,6 +379,7 @@ static size_t unhex(const char *text, uint8_t *bytes, size_t capacity) {
 static void use_list(const uint8_t *bytes, size_t length) {
     noah_profile_reader_t reader = noah_profile_reader_from_memory(bytes, length);
     CHECK(noah_profile_autocorrect_v1_open(&list, &reader, 0u, length));
+    list_publication++;
 }
 
 static size_t screen_utf8(char *out, size_t capacity) {
@@ -559,6 +565,34 @@ static void test_the_stage_is_idle_without_a_list(void) {
     CHECK(!noah_typing_stage_active());
     keymap_config.autocorrect_enable = true;
     CHECK(noah_typing_stage_active());
+}
+
+// A list published while a word's lookup is spread over scans: the lookup
+// starts over on the new list, and nothing chosen from the old one is typed
+// from the new one's rows.
+static void test_a_list_published_during_a_lookup(void) {
+    static uint8_t other[64];
+    size_t         other_length;
+
+    use_named_list("other");
+    other_length = list.text_bytes + (size_t)NOAH_PROFILE_AUTOCORRECT_V1_HEADER_SIZE + NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_ROW_SIZE + NOAH_PROFILE_AUTOCORRECT_V1_TYPO_ROW_SIZE + NOAH_PROFILE_AUTOCORRECT_V1_PART_ROW_SIZE;
+    CHECK(other_length <= sizeof(other));
+    memcpy(other, list_bytes, other_length);
+
+    begin_named("a list published during a lookup", "forty");
+    type("xaq01", false);
+    key(KC_SPACE, true);
+    // The Space is read, and the first 32 of the 40 typos compared: aq01
+    // has matched, and the rest wait for the next scan.
+    scan(2u);
+    use_list(other, other_length);
+    key(KC_SPACE, false);
+    expect_screen("xaq01 ", false);
+
+    // Unpublished, the same word is corrected over the two scans.
+    begin_named("a lookup over two scans", "forty");
+    type("xaq01 xaq40 ", false);
+    expect_screen("xab01 xab40 ", false);
 }
 
 // The stage starting to read reports while a key is held shows the computer
@@ -931,6 +965,7 @@ int main(int argc, char **argv) {
     test_the_stage_is_idle_without_a_list();
     test_switching_off_forgets_the_word();
     test_the_stage_starts_with_a_key_held();
+    test_a_list_published_during_a_lookup();
     test_a_switch_key_during_a_replacement_ends_the_undo();
     test_the_override_and_the_stored_switch_both_allow();
     test_held_keys_around_a_correction();

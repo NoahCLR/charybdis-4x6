@@ -2442,12 +2442,15 @@ static void test_the_autocorrect_list_follows_the_active_profile(void) {
     // The compiled defaults: the authored list.
     assert(noah_active_profile_autocorrect_list()->typos == 1u && list_corrects("teh", "the") && !list_corrects("hte", "the"));
 
-    // A live edit creates the domain on both halves, in RAM.
+    // A live edit creates the domain on both halves, in RAM, and says the
+    // list was published again: a lookup under way starts over on it.
     {
-        uint32_t writes = left_memory.writes + right_memory.writes;
+        uint32_t writes    = left_memory.writes + right_memory.writes;
+        uint32_t published = noah_active_profile_autocorrect_publication();
         assert(live_edit(&left, &right, 1u, &create, edited_list, sizeof(edited_list), &now) == NOAH_PROFILE_WORKING_OK);
         scan_until_converged(&left, &right, &now);
         assert(left_memory.writes + right_memory.writes == writes);
+        assert(noah_active_profile_autocorrect_publication() != published);
     }
     memcpy(expected, compiled_blob, sizeof(compiled_blob));
     expected[6] = (uint8_t)(compiled_blob[6] + 1u);

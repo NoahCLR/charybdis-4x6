@@ -1511,6 +1511,337 @@
       "result": "xcd "
     },
     {
+      "name": "more-part-of-word-typos-than-one-step",
+      "rule": 3,
+      "description": "A list with more part-of-word typos than the keyboard compares in one scan (32): the ones past the first 32 still match, and the longest still wins.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "ab01",
+          "typos": [
+            {
+              "typo": "aq01",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab02",
+          "typos": [
+            {
+              "typo": "aq02",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab03",
+          "typos": [
+            {
+              "typo": "aq03",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab04",
+          "typos": [
+            {
+              "typo": "aq04",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab05",
+          "typos": [
+            {
+              "typo": "aq05",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab06",
+          "typos": [
+            {
+              "typo": "aq06",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab07",
+          "typos": [
+            {
+              "typo": "aq07",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab08",
+          "typos": [
+            {
+              "typo": "aq08",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab09",
+          "typos": [
+            {
+              "typo": "aq09",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab10",
+          "typos": [
+            {
+              "typo": "aq10",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab11",
+          "typos": [
+            {
+              "typo": "aq11",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab12",
+          "typos": [
+            {
+              "typo": "aq12",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab13",
+          "typos": [
+            {
+              "typo": "aq13",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab14",
+          "typos": [
+            {
+              "typo": "aq14",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab15",
+          "typos": [
+            {
+              "typo": "aq15",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab16",
+          "typos": [
+            {
+              "typo": "aq16",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab17",
+          "typos": [
+            {
+              "typo": "aq17",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab18",
+          "typos": [
+            {
+              "typo": "aq18",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab19",
+          "typos": [
+            {
+              "typo": "aq19",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab20",
+          "typos": [
+            {
+              "typo": "aq20",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab21",
+          "typos": [
+            {
+              "typo": "aq21",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab22",
+          "typos": [
+            {
+              "typo": "aq22",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab23",
+          "typos": [
+            {
+              "typo": "aq23",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab24",
+          "typos": [
+            {
+              "typo": "aq24",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab25",
+          "typos": [
+            {
+              "typo": "aq25",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab26",
+          "typos": [
+            {
+              "typo": "aq26",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab27",
+          "typos": [
+            {
+              "typo": "aq27",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab28",
+          "typos": [
+            {
+              "typo": "aq28",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab29",
+          "typos": [
+            {
+              "typo": "aq29",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab30",
+          "typos": [
+            {
+              "typo": "aq30",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab31",
+          "typos": [
+            {
+              "typo": "aq31",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab32",
+          "typos": [
+            {
+              "typo": "aq32",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "ab33",
+          "typos": [
+            {
+              "typo": "aq33",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "think",
+          "typos": [
+            {
+              "typo": "tihngk",
+              "match": "anywhere"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "sometihng tihngk xaq07 "
+        }
+      ],
+      "screen": "sometihng tihngk xaq07 ",
+      "result": "something think xab07 "
+    },
+    {
       "name": "first-letter-capital",
       "rule": 4,
       "description": "First letter capital, the rest small: the correction's first letter is capitalized.",

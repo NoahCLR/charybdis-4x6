@@ -3,12 +3,14 @@
 #include "noah_keymap_ids.h"
 
 static noah_profile_autocorrect_v1_list_t active_list;
+static uint32_t                           epoch;
 
 void noah_active_profile_autocorrect_invalidate(void *context, uint32_t publication, noah_active_profile_identity_t previous, noah_active_profile_identity_t active, const noah_active_profile_snapshot_t *view) {
     (void)context;
     (void)publication;
     (void)previous;
     noah_profile_domain_range_t range;
+    epoch++;
     // A working-copy edit to another domain can still move this one, so the
     // range is found again on every publication.
     if (view && active.kind != NOAH_ACTIVE_PROFILE_KIND_COMPILED_DEFAULTS && (view->profile.domain_mask & NOAH_PROFILE_DOMAIN_MASK_AUTOCORRECT)) {
@@ -27,4 +29,8 @@ void noah_active_profile_autocorrect_invalidate(void *context, uint32_t publicat
 
 const noah_profile_autocorrect_v1_list_t *noah_active_profile_autocorrect_list(void) {
     return &active_list;
+}
+
+uint32_t noah_active_profile_autocorrect_publication(void) {
+    return epoch;
 }

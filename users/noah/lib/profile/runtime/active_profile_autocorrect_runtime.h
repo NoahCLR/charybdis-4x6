@@ -13,3 +13,7 @@ void noah_active_profile_autocorrect_invalidate(void *context, uint32_t publicat
 // cannot be opened. Look typos up with noah_profile_autocorrect_v1_find,
 // _part_at and _correction.
 const noah_profile_autocorrect_v1_list_t *noah_active_profile_autocorrect_list(void);
+
+// Changes whenever the list may have: a row or an index read before a
+// publication says nothing about the list after it.
+uint32_t noah_active_profile_autocorrect_publication(void);

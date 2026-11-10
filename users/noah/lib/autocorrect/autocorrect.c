@@ -103,6 +103,7 @@ typedef struct {
     uint8_t  state;
     uint16_t dead;            // A dead key's stroke, waiting for its second.
     uint16_t lookup_position; // Part-of-word typos compared so far.
+    uint32_t lookup_list;     // The list's publication they were compared in.
     autocorrect_choice_t choice;
     uint8_t  kept, typed;     // Of the corrected word: characters unchanged, characters typed.
     uint8_t  watched;         // The usage whose hold is timed, zero for none.
@@ -728,6 +729,13 @@ static __attribute__((noinline)) void autocorrect_lookup(void) {
     uint8_t                                   start, length = autocorrect_core(&start);
     uint16_t                                  end;
 
+    // A list published since the lookup's last step has other rows: what was
+    // compared and chosen so far belongs to the old one, so it starts over.
+    if (autocorrect.lookup_list != noah_active_profile_autocorrect_publication()) {
+        autocorrect.lookup_list     = noah_active_profile_autocorrect_publication();
+        autocorrect.lookup_position = 0u;
+        autocorrect.choice.found    = false;
+    }
     if (!length || autocorrect.known != AUTOCORRECT_WORD_FOLLOWED) {
         autocorrect.choice.found = false;
         autocorrect_start_correction();
