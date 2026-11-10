@@ -100,9 +100,19 @@ A replacement of more than a line, or more than 128 bytes, is a macro the
 profile already holds, so the list names its slot instead of growing a
 second kind of long text. The stage erases the typed form with the same
 erase step, and when that has played starts the slot's macro through the
-slot provider exactly as its key would, protection and pace included; the
-ending key and everything pressed since stay in the queue behind it, as they
-do behind a macro key pressed during a correction.
+slot provider at its stored pace, as a fourth source
+(`MACRO_PAYLOAD_SOURCE_REPLACEMENT`): its output is isolated and its
+presses are held back exactly as a text replacement's are, whatever
+protection the macro is stored with. The ending key and everything pressed
+since stay in the queue behind it, as they do behind a macro key pressed
+during a correction.
+
+The first design played the macro exactly as its key would. An
+interruptible macro then took the modifiers of the key that ended the word,
+so `sig!` came out in capitals, and an uninterruptible one ignored what was
+typed while it played, which D-F17 means for a macro the person started and
+not for one a finished word did. One rule for text and for a macro removes
+both.
 
 Two things a text replacement has are left out on purpose. There is no case
 rule, because a macro is steps, not letters. There is no undo, because

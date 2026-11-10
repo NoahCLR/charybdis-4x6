@@ -140,11 +140,14 @@ cannot check.
 ## Uninterruptible playback
 
 D-F17. A macro plays uninterruptibly when its protection step says on, or,
-without one, when preflight found a character that needs Unicode entry.
+without one, when preflight found a character that needs Unicode entry. A
+correction, and the macro one plays, are always uninterruptible, with the
+press guard open ([Corrections](#corrections)).
 
 - **Input.** `noah_pre_process_record_user` asks
   `noah_record_admission_macro_admit` first, before combos and tapping. A new
-  physical press during uninterruptible playback is dropped and its position
+  physical press while playback ignores presses
+  (`macro_payload_engine_ignores_presses`) is dropped and its position
   marked (`macro_input_guard.c`); its release is dropped too, even after
   playback ends. Releases of keys pressed earlier and synthetic records pass. The marks
   clear at boot (`noah_record_admission_reset`).
@@ -191,8 +194,10 @@ before the macro's own projection.
   `noah_profile_macro_can_play` (`macro_slot_provider_can_start`: the slot
   decodes, passes preflight and is not empty, with nothing sent). It then
   plays the erase step alone as a correction, and from the next scan starts
-  the slot with `noah_profile_macro_start`, as its key would. The queue waits
-  behind both.
+  the slot with `noah_profile_macro_start_replacement`: the stored macro at
+  its own pace, as source `MACRO_PAYLOAD_SOURCE_REPLACEMENT`, which plays
+  uninterruptibly with the press guard open whatever protection the macro
+  carries. The queue waits behind both.
 - **Stopping.** Once 192 of the queue's 240 changes wait, the scan cancels a
   correction being typed, or the macro a correction plays, so the queue can
   empty before it is full.

@@ -274,6 +274,31 @@ static void test_a_correction_is_isolated_without_ignoring_presses(void) {
     CHECK(macro_payload_engine_idle());
 }
 
+// The stored macro a correction plays is isolated and keeps its presses the
+// same way whatever protection it is stored with: on, or off, where the same
+// macro from its key would play interruptibly.
+static void test_a_corrections_macro_is_isolated_whatever_its_protection(void) {
+    for (uint8_t protection = 1u; protection <= 2u; protection++) {
+        const macro_payload_ir_t ir = {.length = 3u, .protection = protection, .bytes = {MACRO_PAYLOAD_IR_OP_TEXT, 1u, 'a'}};
+
+        test_reset();
+        live_mods = MOD_BIT(KC_LEFT_SHIFT);
+        CHECK(macro_payload_start_ir(&ir, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_SLOT, 0, NULL, NULL) == MACRO_PAYLOAD_START_STARTED);
+        CHECK(macro_payload_engine_protected() == (protection == 1u) && macro_payload_engine_ignores_presses() == (protection == 1u));
+        CHECK(macro_payload_engine_cancel());
+        test_drain_cleanup();
+        CHECK(macro_payload_start_ir(&ir, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_REPLACEMENT, 0, NULL, NULL) == MACRO_PAYLOAD_START_STARTED);
+        CHECK(macro_payload_engine_protected() && !macro_payload_engine_ignores_presses());
+        // The held Shift is not in what the computer is sent.
+        send_keyboard_report();
+        CHECK(last_report_mods == 0u);
+        CHECK(macro_payload_engine_cancel());
+        test_drain_cleanup();
+        CHECK(macro_payload_engine_idle());
+        live_mods = 0u;
+    }
+}
+
 static void test_busy_start_is_rejected_without_restarting_active_ir(void) {
     macro_payload_ir_t             active = {.length = 3u, .bytes = {MACRO_PAYLOAD_IR_OP_DELAY, 100u, 0u}};
     macro_payload_ir_t             other  = {.length = 3u, .bytes = {MACRO_PAYLOAD_IR_OP_DELAY, 1u, 0u}};
@@ -639,6 +664,7 @@ static void test_protected_unicode_cancellation_never_replays_existing_keys(void
 int main(void) {
     test_erase_taps_backspace_at_the_text_pace();
     test_a_correction_is_isolated_without_ignoring_presses();
+    test_a_corrections_macro_is_isolated_whatever_its_protection();
     test_protected_output_isolates_existing_keys_and_modifiers();
     test_protected_unicode_cancellation_never_replays_existing_keys();
     test_protection_is_latched_and_released();

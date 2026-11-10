@@ -123,6 +123,7 @@ for flags in "" "-fsanitize=address,undefined -fno-omit-frame-pointer"; do
         "$ROOT/users/noah/lib/autocorrect/autocorrect.c" \
         "$ROOT/users/noah/lib/autocorrect/autocorrect_switch.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_run.c" \
+        "$ROOT/users/noah/lib/macro/macro_input_guard.c" \
         "$ROOT/users/noah/lib/macro/macro_slot_provider.c" \
         "$ROOT/users/noah/lib/macro/host_layout.c" \
         "$ROOT/users/noah/lib/macro/host_layout_tables.c" \

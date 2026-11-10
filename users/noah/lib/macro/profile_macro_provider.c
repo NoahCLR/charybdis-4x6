@@ -106,13 +106,21 @@ bool noah_profile_macro_can_play(uint16_t action) {
     return macro_slot_provider_can_start(&profile_macro_provider, profile_macro_slots, (uint8_t)(action - QK_MACRO));
 }
 
-bool noah_profile_macro_start(uint16_t action) {
+static bool profile_macro_start_from(uint16_t action, macro_payload_source_t source) {
     if (!IS_QK_MACRO(action)) {
         return false;
     }
 
     profile_macro_provider_follow_publication();
-    return macro_slot_provider_start(&profile_macro_provider, profile_macro_slots, (uint8_t)(action - QK_MACRO), MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, NOAH_MACRO_SLOT_DELAY, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_STARTED;
+    return macro_slot_provider_start(&profile_macro_provider, profile_macro_slots, (uint8_t)(action - QK_MACRO), MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, NOAH_MACRO_SLOT_DELAY, source) == MACRO_PAYLOAD_START_STARTED;
+}
+
+bool noah_profile_macro_start(uint16_t action) {
+    return profile_macro_start_from(action, MACRO_PAYLOAD_SOURCE_SLOT);
+}
+
+bool noah_profile_macro_start_replacement(uint16_t action) {
+    return profile_macro_start_from(action, MACRO_PAYLOAD_SOURCE_REPLACEMENT);
 }
 
 // A build or host test without the typing stage (typing_stage.h).

@@ -159,8 +159,10 @@ line or more than 128 bytes, or anything else a
 typed forms ends:
 
 1. the keyboard erases the typed form, as it erases before typing text;
-2. the macro plays through the macro engine, as it plays from a key, with
-   its own protection and pace;
+2. the macro plays through the macro engine at its own pace, with its
+   output isolated as a text replacement's is, whatever protection the macro
+   is stored with: modifiers the person holds never reach it, and keys
+   pressed meanwhile are held back, never ignored;
 3. the key that ended the word goes to the computer, and the keys pressed
    meanwhile after it, in order.
 
@@ -177,7 +179,7 @@ A replacement whose macro slot is empty, or whose macro cannot play on this
 host (its text needs Unicode entry the host has not set up, say), is passed
 over, and nothing is erased. The check is made before the erase.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (rule 10 cases: `macro-replacement`, `macro-replacement-has-no-case`, `macro-replacement-has-no-undo`, `macro-replacement-ended-by-enter`, `keys-during-a-macro-replacement`, `macro-replacement-empty-slot`, `macro-replacement-apostrophes`, `macro-replacement-whole-word-only`; `test_a_full_queue_stops_a_macro_correction`), `tests/host/run_macro_slot_provider_tests.sh` (`test_can_start_checks_without_playing`), `tests/host/run_profile_autocorrect_v1_tests.sh` (the `macros` vector and the macro refusals).
+Held by: `tests/host/run_autocorrect_tests.sh` (rule 10 cases: `macro-replacement`, `macro-replacement-has-no-case`, `macro-replacement-has-no-undo`, `macro-replacement-ended-by-enter`, `macro-replacement-ended-by-a-shifted-key`, `macro-replacement-ended-by-shift-enter`, `keys-during-a-macro-replacement`, `macro-replacement-empty-slot`, `macro-replacement-apostrophes`, `macro-replacement-whole-word-only`; `held-shift-stays-out-of-a-macro-replacement`; `test_typing_through_a_protected_macro_correction`, `test_a_full_queue_stops_a_macro_correction`), `tests/host/run_macro_payload_engine_tests.sh` (`test_a_corrections_macro_is_isolated_whatever_its_protection`), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_a_correction_drops_no_press`), `tests/host/run_macro_slot_provider_tests.sh` (`test_can_start_checks_without_playing`), `tests/host/run_profile_autocorrect_v1_tests.sh` (the `macros` vector and the macro refusals).
 
 ## Undo
 

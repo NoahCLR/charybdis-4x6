@@ -11,4 +11,6 @@ output carries only the macro's keys, and held modifiers resume afterwards.
 Rules: [`macro-playback.md`](../architecture/macro-playback.md#uninterruptible-playback).
 
 Amended by D-F69: a correction the keyboard types is isolated the same way,
-but its presses are held back and replayed, never ignored.
+but its presses are held back and replayed, never ignored. The macro a
+correction plays in place of text is treated as the correction is, whatever
+protection it is stored with.

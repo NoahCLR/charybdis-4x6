@@ -911,7 +911,7 @@ macro_payload_start_result_t macro_payload_start_windows(const macro_payload_ir_
     }
 
     macro_payload_engine = (macro_payload_engine_t){
-        .protected      = ir->protection == 1u || (ir->protection == 0u && preflight->needs_unicode),
+        .protected      = ir->protection == 1u || (ir->protection == 0u && preflight->needs_unicode) || source == MACRO_PAYLOAD_SOURCE_REPLACEMENT,
         .unicode_mode   = preflight->unicode_mode,
         .layout         = (const host_layout_t *)preflight->layout,
         .layout_iso     = preflight->iso,
@@ -1004,7 +1004,7 @@ bool macro_payload_engine_protected(void) {
 }
 
 bool macro_payload_engine_ignores_presses(void) {
-    return macro_payload_engine_protected() && macro_payload_engine.source != MACRO_PAYLOAD_SOURCE_CORRECTION;
+    return macro_payload_engine_protected() && macro_payload_engine.source != MACRO_PAYLOAD_SOURCE_CORRECTION && macro_payload_engine.source != MACRO_PAYLOAD_SOURCE_REPLACEMENT;
 }
 
 bool macro_payload_engine_idle(void) {

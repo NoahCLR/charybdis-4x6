@@ -3870,6 +3870,77 @@
       "result": "THE Xx"
     },
     {
+      "name": "held-shift-stays-out-of-a-macro-replacement",
+      "rule": 7,
+      "description": "A Shift held across a macro replacement does not change what the macro types, and is still held afterwards.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "macro": 5,
+          "typos": [
+            {
+              "typo": "sig",
+              "match": "whole word"
+            },
+            {
+              "typo": "sgi",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        }
+      ],
+      "macros": {
+        "5": "Kind regards, Sam"
+      },
+      "events": [
+        {
+          "press": "Shift"
+        },
+        {
+          "tap": "KC_S"
+        },
+        {
+          "tap": "KC_I"
+        },
+        {
+          "tap": "KC_G"
+        },
+        {
+          "tap": "KC_SPC"
+        },
+        {
+          "tap": "KC_X"
+        },
+        {
+          "release": "Shift"
+        },
+        {
+          "tap": "KC_X"
+        }
+      ],
+      "keyboardOnly": "a held modifier",
+      "result": "Kind regards, Sam Xx"
+    },
+    {
       "name": "macro-key-during-a-correction",
       "rule": 7,
       "description": "A macro key pressed while a correction is typed waits its turn behind the ending key.",
@@ -4732,6 +4803,112 @@
       "events": [
         {
           "type": "sig\n"
+        }
+      ],
+      "screen": "sig\n",
+      "result": "Kind regards, Sam\n"
+    },
+    {
+      "name": "macro-replacement-ended-by-a-shifted-key",
+      "rule": 10,
+      "description": "The Shift of the key that ended the word stays out of the macro, and is back for that key.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "macro": 5,
+          "typos": [
+            {
+              "typo": "sig",
+              "match": "whole word"
+            },
+            {
+              "typo": "sgi",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        }
+      ],
+      "macros": {
+        "5": "Kind regards, Sam"
+      },
+      "events": [
+        {
+          "type": "sig!"
+        }
+      ],
+      "screen": "sig!",
+      "result": "Kind regards, Sam!"
+    },
+    {
+      "name": "macro-replacement-ended-by-shift-enter",
+      "rule": 10,
+      "description": "Shift+Enter after a macro replacement: the macro plays without the Shift, then Enter.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "macro": 5,
+          "typos": [
+            {
+              "typo": "sig",
+              "match": "whole word"
+            },
+            {
+              "typo": "sgi",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        }
+      ],
+      "macros": {
+        "5": "Kind regards, Sam"
+      },
+      "events": [
+        {
+          "type": "sig"
+        },
+        {
+          "key": "Enter",
+          "mods": [
+            "Shift"
+          ]
         }
       ],
       "screen": "sig\n",

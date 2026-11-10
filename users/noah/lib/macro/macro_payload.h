@@ -66,6 +66,9 @@ typedef enum {
     // macro's is, but presses meanwhile are held back by the typing stage and
     // come out afterwards, never ignored.
     MACRO_PAYLOAD_SOURCE_CORRECTION,
+    // The stored macro a correction plays in place of text (D-F69): isolated
+    // and its presses held back the same way, whatever its own protection.
+    MACRO_PAYLOAD_SOURCE_REPLACEMENT,
 } macro_payload_source_t;
 
 typedef enum {
@@ -133,7 +136,7 @@ void                         macro_payload_engine_scan(void);
 bool                         macro_payload_engine_cancel(void);
 bool                         macro_payload_engine_protected(void);
 // Uninterruptible playback that ignores new presses (D-F17): a protected
-// macro, never a correction.
+// macro a key or a client started, never a correction or the macro one plays.
 bool                         macro_payload_engine_ignores_presses(void);
 bool                         macro_payload_engine_idle(void);
 // How many of the playing macro's leases hold `usage`. False while the macro

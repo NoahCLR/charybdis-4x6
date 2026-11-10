@@ -12,6 +12,7 @@
 #include "users/noah/lib/autocorrect/autocorrect.h"
 #include "users/noah/lib/autocorrect/autocorrect_switch.h"
 #include "users/noah/lib/macro/host_layout.h"
+#include "users/noah/lib/macro/macro_input_guard.h"
 #include "users/noah/lib/macro/macro_payload.h"
 #include "users/noah/lib/macro/macro_slot_provider.h"
 #include "users/noah/lib/macro/typing_stage.h"
@@ -245,18 +246,28 @@ static char               macro_text[64];
 // key's own text is macro_text.
 static char     stored_macros[NOAH_PROFILE_AUTOCORRECT_V1_MACRO_SLOTS][64];
 static unsigned macros_started;
+// The protection the stored macros carry: 2 is off, 1 on (D-F17).
+static uint8_t stored_protection;
 
 // The slot's macro, as the provider would start it.
-bool noah_profile_macro_start(uint16_t action) {
+static bool start_macro(uint16_t action, macro_payload_source_t source) {
     const char *text   = stored_macros[action - QK_MACRO][0] ? stored_macros[action - QK_MACRO] : macro_text;
     size_t      length = strlen(text);
 
     macros_started++;
-    macro_ir          = (macro_payload_ir_t){.protection = 2u, .length = (uint16_t)(length + 2u)};
+    macro_ir          = (macro_payload_ir_t){.protection = stored_protection, .length = (uint16_t)(length + 2u)};
     macro_ir.bytes[0] = MACRO_PAYLOAD_IR_OP_TEXT;
     macro_ir.bytes[1] = (uint8_t)length;
     memcpy(&macro_ir.bytes[2], text, length);
-    return macro_payload_start_ir(&macro_ir, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 2u, MACRO_PAYLOAD_SOURCE_SLOT, 0u, NULL, NULL) == MACRO_PAYLOAD_START_STARTED;
+    return macro_payload_start_ir(&macro_ir, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 2u, source, 0u, NULL, NULL) == MACRO_PAYLOAD_START_STARTED;
+}
+
+bool noah_profile_macro_start(uint16_t action) {
+    return start_macro(action, MACRO_PAYLOAD_SOURCE_SLOT);
+}
+
+bool noah_profile_macro_start_replacement(uint16_t action) {
+    return start_macro(action, MACRO_PAYLOAD_SOURCE_REPLACEMENT);
 }
 
 // A correction plays only a macro that is stored.
@@ -288,10 +299,15 @@ static void settle(void) {
     }
 }
 
+// Each usage is its own key of the matrix. A press goes through the press
+// guard first, as noah_pre_process_record_user sends it: uninterruptible
+// playback that ignores presses drops it, and its release with it.
 static void key(uint8_t usage, bool down) {
-    keyrecord_t record   = {.event = {.type = KEY_EVENT, .pressed = down, .key = {.row = 0, .col = 0}}};
-    bool        suppress = owned_keycode_should_suppress_default(usage, &record);
+    keyrecord_t record = {.event = {.type = KEY_EVENT, .pressed = down, .key = {.row = (uint8_t)(usage / MATRIX_COLS % MATRIX_ROWS), .col = (uint8_t)(usage % MATRIX_COLS)}}};
+    bool        suppress;
 
+    if (!noah_record_admission_macro_admit(&record, macro_payload_engine_ignores_presses(), false)) return;
+    suppress = owned_keycode_should_suppress_default(usage, &record);
     owned_keycode_track_physical_event(usage, &record);
     if (suppress) return;
     if (down) register_code(usage);
@@ -328,7 +344,9 @@ static void reset(void) {
     memset(seen_keys, 0, sizeof(seen_keys));
     memset(modifier_owners, 0, sizeof(modifier_owners));
     memset(stored_macros, 0, sizeof(stored_macros));
-    macros_started = 0u;
+    noah_macro_input_guard_reset();
+    macros_started    = 0u;
+    stored_protection = 2u;
     physical_mods = seen_mods = oneshot_mods = 0u;
     screen_length = cursor = 0u;
     host_dead              = 0u;
@@ -808,11 +826,24 @@ static void test_typing_through_the_longest_correction(void) {
     expect_screen(expected, false);
 }
 
+// sig -> macro 5, a whole word.
+static const uint8_t macro_list[] = {1, 0, 1, 0, 0, 0, 3, 0, /* correction */ 5, 0, 0, 1, 0, 0, /* typo */ 0, 0, 3, 0, 0, 0, 's', 'i', 'g'};
+
+// A correction's macro stored uninterruptible still loses no key: what is
+// typed while it plays is held back and comes out after it, where a macro a
+// key started would have its presses ignored (D-F17).
+static void test_typing_through_a_protected_macro_correction(void) {
+    begin("typing through a protected macro correction", macro_list, sizeof(macro_list));
+    snprintf(stored_macros[5], sizeof(stored_macros[5]), "%s", "Kind regards, Sam");
+    stored_protection = 1u;
+    type("sig and the rest ", true);
+    expect_screen("Kind regards, Sam and the rest ", false);
+    CHECK(macros_started == 1u);
+}
+
 // A macro correction whose erase the queue cut short plays no macro, and one
 // whose macro the queue cut short stops; either way no key is lost.
 static void test_a_full_queue_stops_a_macro_correction(void) {
-    // sig -> macro 5, a whole word.
-    static const uint8_t macro_list[] = {1, 0, 1, 0, 0, 0, 3, 0, /* correction */ 5, 0, 0, 1, 0, 0, /* typo */ 0, 0, 3, 0, 0, 0, 's', 'i', 'g'};
     static char          expected[400], shown[1200];
     size_t               length;
 
@@ -861,6 +892,7 @@ int main(int argc, char **argv) {
     test_no_correction_starts_behind_a_long_queue();
     test_a_full_queue_loses_no_key();
     test_typing_through_the_longest_correction();
+    test_typing_through_a_protected_macro_correction();
     test_a_full_queue_stops_a_macro_correction();
     test_a_correction_keeps_its_pace();
     printf("autocorrect host tests passed: %u fixture cases\n", cases);

@@ -797,11 +797,11 @@ static void autocorrect_start_macro(void) {
     else autocorrect_release();
 }
 
-// The typo is erased: its macro plays, with the ending key and every key
-// since still held back behind it.
+// The typo is erased: its macro plays, isolated as a text correction is, with
+// the ending key and every key since still held back behind it.
 static void autocorrect_start_replacement(void) {
     autocorrect_forget(false);
-    if (noah_profile_macro_start((uint16_t)(QK_MACRO + autocorrect.choice.macro))) autocorrect.state = AUTOCORRECT_REPLACEMENT_PLAYING;
+    if (noah_profile_macro_start_replacement((uint16_t)(QK_MACRO + autocorrect.choice.macro))) autocorrect.state = AUTOCORRECT_REPLACEMENT_PLAYING;
     else autocorrect_release();
 }
 
