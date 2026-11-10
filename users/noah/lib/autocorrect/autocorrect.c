@@ -461,19 +461,23 @@ void noah_typing_stage_keys(uint8_t keys[32], const uint8_t macro_keys[32], uint
     uint8_t mods   = (uint8_t)(get_mods() | get_weak_mods() | get_oneshot_mods());
     bool    typing = false;
 
-    // The person's own keys: what a macro holds is not theirs, and while it
-    // holds a usage or modifier theirs stays as it last was.
-    mods = (uint8_t)((mods & ~macro_mods) | (autocorrect.live_mods & macro_mods));
     if (!autocorrect.synced) {
         // Reports went out unread: the keyboard does not know where the word
-        // on screen began. Every key now down is read as going down, which
-        // shows the host nothing new and misses no key that ends a word.
+        // on screen began, so the scan suspends it. The host may already
+        // have any key of this report down, so all of them stay shown as
+        // they are, and none is released and pressed again. Each is still
+        // read as going down, which misses no key that ends a word: the one
+        // this report is for may be such a key.
         memset(autocorrect.live, 0, sizeof(autocorrect.live));
-        memset(autocorrect.shown, 0, sizeof(autocorrect.shown));
-        autocorrect.live_mods = autocorrect.shown_mods = mods;
+        for (uint8_t index = 0u; index < 32u; index++)
+            autocorrect.shown[index] = (uint8_t)(keys[index] & ~macro_keys[index]);
+        autocorrect.live_mods = autocorrect.shown_mods = (uint8_t)(mods & ~macro_mods);
         autocorrect.synced                             = true;
         autocorrect.resumed                            = true;
     }
+    // The person's own keys: what a macro holds is not theirs, and while it
+    // holds a usage or modifier theirs stays as it last was.
+    mods = (uint8_t)((mods & ~macro_mods) | (autocorrect.live_mods & macro_mods));
     autocorrect.lagging = false;
     for (uint8_t index = 0u; index < 32u; index++) {
         keys[index] = (uint8_t)((keys[index] & ~macro_keys[index]) | (autocorrect.live[index] & macro_keys[index]));

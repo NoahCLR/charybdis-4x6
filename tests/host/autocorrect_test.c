@@ -561,6 +561,35 @@ static void test_the_stage_is_idle_without_a_list(void) {
     CHECK(noah_typing_stage_active());
 }
 
+// The stage starting to read reports while a key is held shows the computer
+// nothing new: the key stays down for it, and is not pressed a second time.
+static void test_the_stage_starts_with_a_key_held(void) {
+    begin("the stage starts with a key held", the_list, sizeof(the_list));
+    keymap_config.autocorrect_enable = false;
+    key(KC_A, true);
+    scan(30u);
+    keymap_config.autocorrect_enable = true;
+    key(KC_B, true);
+    scan(30u);
+    CHECK(seen_keys[KC_A / 8u] & (1u << (KC_A % 8u)));
+    key(KC_A, false);
+    key(KC_B, false);
+    expect_screen("ab", false);
+
+    // A held Shift and its letter: the letter is not typed again as text.
+    begin("the stage starts inside a shortcut", the_list, sizeof(the_list));
+    keymap_config.autocorrect_enable = false;
+    modifiers(MOD_BIT(KC_LEFT_CTRL), true);
+    key(KC_A, true);
+    scan(30u);
+    keymap_config.autocorrect_enable = true;
+    modifiers(MOD_BIT(KC_LEFT_CTRL), false);
+    scan(30u);
+    key(KC_A, false);
+    type("teh teh ", false);
+    expect_screen("teh the ", false);
+}
+
 // Switched by key while a replacement is typed, the replacement finishes and
 // the word is forgotten: Backspace after it is only Backspace.
 static void test_a_switch_key_during_a_replacement_ends_the_undo(void) {
@@ -901,6 +930,7 @@ int main(int argc, char **argv) {
     unsigned cases = run_fixture(argv[1]);
     test_the_stage_is_idle_without_a_list();
     test_switching_off_forgets_the_word();
+    test_the_stage_starts_with_a_key_held();
     test_a_switch_key_during_a_replacement_ends_the_undo();
     test_the_override_and_the_stored_switch_both_allow();
     test_held_keys_around_a_correction();

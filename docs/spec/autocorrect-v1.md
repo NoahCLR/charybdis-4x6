@@ -321,10 +321,15 @@ on finds the next word; switched in the middle of a word, that word is left
 alone. A replacement already being typed finishes. With the stored switch
 off or the list empty, keyboard reports are not read at all.
 
+When reports start being read with keys held (the switch or a list has just
+been applied), the computer sees nothing change: those keys stay down for
+it and are not pressed again. They are read as typing from there, so a held
+key that ends a word still ends the [suspension](#forgetting-the-word).
+
 The keyboard cannot see a password field or a terminal: `AC_OFF` or
 `AC_TOGG` is how to keep it out of one.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (`switched-off`; `test_the_stage_is_idle_without_a_list`, `test_the_override_and_the_stored_switch_both_allow`), `tests/host/run_key_runtime_layer_lock_integration_tests.sh` (`test_plain_autocorrect_keys_switch_the_override`).
+Held by: `tests/host/run_autocorrect_tests.sh` (`switched-off`; `test_the_stage_is_idle_without_a_list`, `test_the_override_and_the_stored_switch_both_allow`, `test_the_stage_starts_with_a_key_held`), `tests/host/run_key_runtime_layer_lock_integration_tests.sh` (`test_plain_autocorrect_keys_switch_the_override`).
 
 ## The fixture
 
