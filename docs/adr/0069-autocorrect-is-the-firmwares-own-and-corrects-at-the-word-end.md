@@ -179,7 +179,10 @@ entries shrank from 8 to 6 bytes, so every table together stays inside the
 480 of them the queue, with 704 more of static workspace for the one
 replacement being worked on, which keeps a 128-byte replacement off the
 scan's stack. Its replacement uses the macro window, so no second window is
-held.
+held. With the list's handle, the filters' working copies and D-F66's switch
+keys, each half links 1,588 bytes more static RAM than before them (203,364
+to 204,952), so the static-RAM regression tripwire rises by that much, to
+205,764 bytes; it is a policy line, not free memory.
 
 ## What it does not do
 

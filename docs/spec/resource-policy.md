@@ -76,7 +76,7 @@ on any of these:
 
 | Policy | Value | What it is |
 | --- | ---: | --- |
-| SRAM0–3 `.data + .bss` | at most 204,176 bytes | a regression tripwire just above the largest build; crossing it means justify the growth and raise the line deliberately, not that the chip is full |
+| SRAM0–3 `.data + .bss` | at most 205,764 bytes | a regression tripwire just above the largest build; crossing it means justify the growth and raise the line deliberately, not that the chip is full |
 | Core-memory span at boot | at least 4,096 bytes | the safety floor for the newlib arena, about two orders of magnitude above its observed use; raise it only with evidence of a new allocator |
 | Named macro storage | at most 8,192 bytes | the playback symbols `profile_macro_slots` and `macro_slot_active_ir` (both required) plus the provider's bookkeeping symbols |
 | Reclaimed macro storage | at least 32,768 bytes below a 41,440-byte baseline | the VIA-era bank's footprint; the 8,192-byte line above always fails first |
@@ -85,7 +85,7 @@ Only the sum of `.data` and `.bss` is gated. The split between them is an
 initialisation artifact: one nonzero member moves a whole object to `.data`,
 where it also costs flash. `.bss` alone is gated only when
 `--max-static-bss` is passed, and nothing passes it; the report prints both
-sections. The script states how the 204,176 bytes are composed: a 56 KiB base
+sections. The script states how the 205,764 bytes are composed: a 56 KiB base
 plus each reviewed increment and decrement since, each named by its decision.
 A change that moves the tripwire edits that sum and its comment and says why
 in its commit.
@@ -157,7 +157,9 @@ whose adjacency the linker no longer makes fails the gate.
 
 The keyboard-report filters end the deepest of these paths, so they keep
 nothing large on the stack: their working copies of a report's usages are
-static, and the typing stage only queues what changed there. Autocorrect's
+static, and the typing stage only queues what changed there. The ledger
+tells the stage of a usage's owners from the same key paths, with one small
+frame that queues at most one change. Autocorrect's
 lookup and its starts each keep their workspace in a frame of their own
 below the matrix scan, and the correction being worked on, which may be 128
 bytes, in static workspace (D-F69).
