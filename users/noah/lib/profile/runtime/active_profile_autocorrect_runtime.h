@@ -9,6 +9,10 @@
 // holds the list's range and its four counts. Publication is scan-owned.
 void noah_active_profile_autocorrect_invalidate(void *context, uint32_t publication, noah_active_profile_identity_t previous, noah_active_profile_identity_t active, const noah_active_profile_snapshot_t *view);
 
+// The authored list, for an image without a live-profile owner to publish
+// one (D-F35): it corrects what the keymap authored.
+void noah_active_profile_autocorrect_load_authored(void);
+
 // Never NULL. Empty before the first publication, and when a profile's list
 // cannot be opened. Look typos up with noah_profile_autocorrect_v1_find,
 // _part_at and _correction.

@@ -25,6 +25,7 @@
 #include "lib/compat/qmk_portable_profile.h"
 #include "lib/compat/qmk_usb_product_name.h"
 #include "lib/profile/storage/profile_store_runtime_hooks.h"
+#include "lib/profile/runtime/active_profile_autocorrect_runtime.h"
 #include "lib/profile/runtime/active_profile_pd_runtime.h"
 #include "lib/pointing/defs/pointing_modes.h"
 #include "lib/rgb/core/rgb_runtime.h"
@@ -114,7 +115,7 @@ void noah_keyboard_post_init_user(void) {
         // written the sensor's CPI.
         noah_runtime_shared_state_post_init, pointing_mode_forget_applied_dpi, key_origin_registry_init, noah_qmk_combo_origin_init, noah_record_admission_reset, macro_payload_engine_init, noah_autocorrect_init, noah_qmk_portable_storage_init, noah_profile_store_runtime_init,
 #if !defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
-        noah_runtime_init_compiled_pd,
+        noah_runtime_init_compiled_pd, noah_active_profile_autocorrect_load_authored,
 #endif
         noah_rgb_runtime_post_init, split_runtime_sync_init,
 #if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE)

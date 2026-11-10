@@ -75,6 +75,11 @@ void noah_active_profile_pd_load_compiled_defaults(const noah_pd_config_t defaul
     test_log_stage("active_profile_pd_load_compiled_defaults");
 }
 
+// And reads the authored autocorrect list, which the owner would publish.
+void noah_active_profile_autocorrect_load_authored(void) {
+    test_log_stage("active_profile_autocorrect_load_authored");
+}
+
 void noah_record_admission_reset(void) {
     test_log_stage("record_admission_reset");
 }
@@ -222,7 +227,7 @@ static void test_keyboard_post_init_order(void) {
         // QMK's Charybdis post-init wrote the sensor's CPI just before.
         "pointing_mode_forget_applied_dpi", "qmk_combo_origin_init", "record_admission_reset", "macro_payload_engine_init", "autocorrect_init", "profile_store_runtime_init",
 #ifndef NOAH_LIVE_PROFILE_OWNER_ENABLE
-        "active_profile_pd_load_compiled_defaults",
+        "active_profile_pd_load_compiled_defaults", "active_profile_autocorrect_load_authored",
 #endif
         "rgb_runtime_post_init", "split_runtime_sync_init",
     };
