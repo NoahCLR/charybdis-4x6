@@ -6,7 +6,7 @@ longer text for you (`pnumber` becomes your phone number) and can play a
 macro. Your list is part of your profile: Ark's Text replacement page edits
 it, both halves save it and a backup holds it. The list that ships is empty.
 
-An entry is one **replacement** with every **typed form** that should
+An entry is one **replacement** with every **input** that should
 produce it: `because` for `becuase`, `becasue` and `beacuse`; an address for
 `myaddr`. The firmware's own words for the two are a correction and a typo,
 which is what you will see in the keys' names (`AC_` for autocorrect) and in
@@ -16,32 +16,32 @@ which is what you will see in the keys' names (`AC_` for autocorrect) and in
 
 Only when you finish a word. A word is letters and digits, with apostrophes
 between them; it ends at a space, Enter, Tab, punctuation or a hyphen. If
-the finished word is a typed form on your list, the keyboard replaces it
+the finished word is an input on your list, the keyboard replaces it
 before that ending key reaches the computer:
 
 - It erases only what differs and types the rest: `becuase` to `because` is
   four Backspaces and four letters.
 - The ending key then goes through as the real key, so Enter in a chat box
   sends the replaced text and a held Space still repeats.
-- A typed form inside a word you are still typing is never touched.
+- An input inside a word you are still typing is never touched.
 
-A typed form is itself always letters and digits, so it is one word:
+An input is itself always letters and digits, so it is one word:
 `pnumber`, `myemail`, `sig2`.
 
 ## Part of a word
 
-A typed form matches the whole word unless it says otherwise. It can also
+An input matches the whole word unless it says otherwise. It can also
 match the start of a word, the end of a word, or anywhere in one. Ark writes
 those with a `*` where other letters may go:
 
-| Typed form | Matches | So it also fixes |
+| Input | Matches | So it also fixes |
 | --- | --- | --- |
 | `recieve*` | the start of a word | `recieved`, `recieving` |
 | `*mnet` | the end of a word | `statemnet` |
 | `*tihng*` | anywhere in a word | `sometihng`, `tihngs` |
 
 Only the matched part is replaced; the rest of the word stays. When several
-typed forms fit, the longest wins, and one for the whole word beats one for
+inputs fit, the longest wins, and one for the whole word beats one for
 part of it.
 
 ## What a replacement can be
@@ -52,7 +52,7 @@ host layout types.
 
 **A macro**, for anything longer, anything of more than one line, or
 anything that is more than text. Pick one of your [macros](macros.md): when
-you finish the typed form the keyboard erases it and plays the macro, then
+you finish the input the keyboard erases it and plays the macro, then
 sends the key you ended the word with. A macro replacement differs from text
 in four ways:
 
@@ -64,7 +64,7 @@ in four ways:
 
 ## Capitals
 
-Typed forms match whatever their case, and a text replacement follows what
+Inputs match whatever their case, and a text replacement follows what
 you typed:
 
 - `Teh` becomes `The`;

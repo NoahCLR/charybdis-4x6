@@ -334,9 +334,11 @@ _Avoid_: correction (outside those names), fix, target, output, expansion
 **Typed form**:
 What is typed to get an entry's replacement, stored case-folded: a
 misspelling, or an abbreviation such as `pnumber`. It belongs to exactly one
-replacement. `typo` in code, on the wire and in fixtures.
+replacement. People know it as an **input**: the guide says input, as the
+app and its files do, and the specs and ADRs here say typed form for the
+same thing. `typo` in code, on the wire and in fixtures.
 _Avoid_: typo (as the term, outside those names; a misspelling is still a
-typo), trigger, pattern, source, input, abbreviation (as a second term)
+typo), trigger, pattern, source, abbreviation (as a second term)
 
 **Word**:
 What text replacement follows as it is typed: letters and digits, with

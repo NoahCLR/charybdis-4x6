@@ -98,8 +98,8 @@ they need Unicode entry ([Macros](macros.md#uninterruptible-playback)).
 ### The autocorrect list
 
 `autocorrect.txt` lists what the keyboard replaces
-([Text replacement](autocorrect.md)), one typed form a line, in the form
-QMK's autocorrect lists use, which calls a typed form a typo and its
+([Text replacement](autocorrect.md)), one input a line, in the form
+QMK's autocorrect lists use, which calls an input a typo and its
 replacement a correction:
 
 ```
@@ -111,14 +111,14 @@ tihng -> thing                  # anywhere in a word
 :sig: => 12                     # plays macro slot 12
 ```
 
-A colon before the typed form ties it to the start of a word and one after
+A colon before the input ties it to the start of a word and one after
 it to the end; both make it the whole word, and neither lets it match
 anywhere. These are the matches Ark writes with `*`. `=>` names a macro slot
-in place of text, for a whole word only. Several typed forms can name one
-replacement, and each names only one. A typed form is letters and digits,
+in place of text, for a whole word only. Several inputs can name one
+replacement, and each names only one. An input is letters and digits,
 with apostrophes only between them, of up to 32 bytes, and matches whatever
 its case; the replacement is up to 128 bytes on one line, typed as you write
-it. The list holds 1,024 typed forms and 1,024 replacements. It ships empty.
+it. The list holds 1,024 inputs and 1,024 replacements. It ships empty.
 
 After changing it, regenerate `authored_autocorrect_list.h`:
 
