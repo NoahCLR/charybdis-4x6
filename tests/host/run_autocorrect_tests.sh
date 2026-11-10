@@ -13,8 +13,9 @@ BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
 
 # Each case as lines the test reads: the list encoded as the domain, and the
-# events as key strokes on the case's layout.
-python3 - "$ROOT" "$BUILD_DIR/cases.txt" <<'PYCODE'
+# events as key strokes on the case's layout. Then the lists the test's own
+# cases name, encoded the same way.
+python3 - "$ROOT" "$BUILD_DIR/cases.txt" "$BUILD_DIR/lists.txt" <<'PYCODE'
 import importlib.util, json, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 
@@ -102,6 +103,14 @@ for case in fixture["cases"]:
     lines.append(f"{'RESULT' if 'result' in case else 'ENDS'} {hexed(case.get('result', case.get('resultEndsWith')))}")
 assert rules >= set(range(1, 11)), "every rule needs a case"
 pathlib.Path(sys.argv[2]).write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+def entry(correction, typo, match="whole word"):
+    return {"correction": correction, "typos": [{"typo": typo, "match": match}]}
+
+lists = {
+    "phone": [entry("+31 6 1234 5678", "pnumber")],
+}
+pathlib.Path(sys.argv[3]).write_text("".join(f"{name} {autocorrect.encode(entries).hex()}\n" for name, entries in lists.items()), encoding="utf-8")
 PYCODE
 
 for flags in "" "-fsanitize=address,undefined -fno-omit-frame-pointer"; do
@@ -122,7 +131,7 @@ for flags in "" "-fsanitize=address,undefined -fno-omit-frame-pointer"; do
         "$ROOT/users/noah/lib/profile/schema/profile_autocorrect_words_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
         -o "$BUILD_DIR/test"
-    "$BUILD_DIR/test" "$BUILD_DIR/cases.txt"
+    "$BUILD_DIR/test" "$BUILD_DIR/cases.txt" "$BUILD_DIR/lists.txt"
 done
 
 # The firmware's compiler takes the module and holds its state to its policy.

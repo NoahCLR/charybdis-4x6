@@ -4356,6 +4356,157 @@
       "result": "sigoff"
     },
     {
+      "name": "no-undo-after-a-click-meanwhile",
+      "rule": 5,
+      "description": "A mouse click while the replacement is typed forgets the word: Backspace afterwards is only Backspace, and what the replacement typed stays.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "+31 6 1234 5678",
+          "typos": [
+            {
+              "typo": "pnumber",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "Kind regards, Sam Example | +31 6 1234 5678 | sam@example.com | Example Street 12, 1234 AB Amsterdam, The Netherlands | KvK 0000",
+          "typos": [
+            {
+              "typo": "sigoff",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "sam@example.com",
+          "typos": [
+            {
+              "typo": "myemail",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "fast": "pnumber "
+        },
+        {
+          "click": true
+        },
+        {
+          "key": "Backspace"
+        }
+      ],
+      "keyboardOnly": "a mouse click",
+      "result": "+31 6 1234 5678"
+    },
+    {
+      "name": "no-undo-after-a-click-meanwhile-with-letters-kept",
+      "rule": 5,
+      "description": "The same when the replacement kept the word's first letter: Backspace removes the space and nothing else.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "fast": "teh "
+        },
+        {
+          "click": true
+        },
+        {
+          "key": "Backspace"
+        }
+      ],
+      "keyboardOnly": "a mouse click",
+      "result": "the"
+    },
+    {
       "name": "typing-over-the-longest-replacement",
       "rule": 7,
       "description": "Keys typed while the longest replacement is typed, which takes over a second, all come out after it in order. The replacement is digits and hyphens, so no key typed meanwhile is one it is holding.",

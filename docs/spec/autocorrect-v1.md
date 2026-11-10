@@ -189,11 +189,15 @@ The word is then left alone: ending it again replaces nothing.
 
 After Enter or Tab there is no undo, since the text may be sent or the focus
 moved: Backspace is Backspace. After a macro there is none either. Any other
-key press between the replacement and Backspace ends the chance, and so does holding the ending key until it
-repeats. When the layout can no longer type the word back (Caps Lock went on
-on macOS), Backspace is Backspace.
+key press between the replacement and Backspace ends the chance, and so does
+holding the ending key until it repeats. So does anything that makes the
+keyboard [forget the word](#forgetting-the-word) from the moment the
+replacement starts, a mouse click or a switch key while it is still being
+typed included: the cursor may be elsewhere by then. When the layout can no
+longer type the word back (Caps Lock went on on macOS), Backspace is
+Backspace.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (rule 5 cases, `undo-a-long-replacement` among them).
+Held by: `tests/host/run_autocorrect_tests.sh` (rule 5 cases, `undo-a-long-replacement` and `no-undo-after-a-click-meanwhile` among them; `test_a_switch_key_during_a_replacement_ends_the_undo`).
 
 ## Forgetting the word
 
@@ -205,7 +209,8 @@ normally. After:
 - a shortcut;
 - a key that moves the cursor or deletes forward;
 - a mouse button going down;
-- a macro, whatever it types.
+- a macro, whatever it types;
+- the override being switched by key anywhere but in the middle of a word.
 
 **Suspended**: nothing is replaced until the next word end, because the
 keyboard no longer knows where the word on screen starts. After:

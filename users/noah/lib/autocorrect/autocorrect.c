@@ -20,13 +20,29 @@
 // What the stage is waiting for. Anything but idle holds every later key back.
 typedef enum {
     AUTOCORRECT_IDLE = 0,
-    AUTOCORRECT_LOOKUP,       // The key at the head of the queue ended a word.
-    AUTOCORRECT_UNDO_START,   // The Backspace at the head may undo a correction.
-    AUTOCORRECT_MACRO_START,  // A macro key's turn has come.
-    AUTOCORRECT_PLAYING,      // A correction or its undo is being typed.
-    AUTOCORRECT_REPLACEMENT_START, // The typo is erased; its macro comes next.
-    AUTOCORRECT_MACRO_PLAYING // The macro whose turn came is playing.
+    AUTOCORRECT_LOOKUP,              // The key at the head of the queue ended a word.
+    AUTOCORRECT_UNDO_START,          // The Backspace at the head may undo a correction.
+    AUTOCORRECT_MACRO_START,         // A macro key's turn has come.
+    AUTOCORRECT_CORRECTING,          // A text correction is being typed.
+    AUTOCORRECT_UNDOING,             // A correction's undo is being typed.
+    AUTOCORRECT_ERASING,             // A typo is being erased for its macro.
+    AUTOCORRECT_REPLACEMENT_START,   // The typo is erased; its macro comes next.
+    AUTOCORRECT_REPLACEMENT_PLAYING, // That macro is playing.
+    AUTOCORRECT_MACRO_PLAYING        // The macro whose turn came is playing.
 } autocorrect_state_t;
+
+// What the keyboard knows of the word on screen. A correction can be undone
+// only while its word goes from corrected to undoable, so forgetting the
+// word, whenever that happens, ends the undo with it.
+typedef enum {
+    AUTOCORRECT_WORD_FOLLOWED = 0, // `length` characters of it have been read.
+    AUTOCORRECT_WORD_SUSPENDED,    // Nothing is corrected until the next word end.
+    AUTOCORRECT_WORD_LEFT_ALONE,   // An undo put it back as typed; it is not corrected again.
+    AUTOCORRECT_WORD_CORRECTING,   // Its correction is being typed.
+    AUTOCORRECT_WORD_CORRECTED,    // Its correction is typed; the key that ended it comes next.
+    AUTOCORRECT_WORD_UNDOABLE,     // That key is out: Backspace next undoes the correction.
+    AUTOCORRECT_WORD_RESTORING,    // The undo is being typed.
+} autocorrect_word_t;
 
 typedef enum {
     AUTOCORRECT_EDGE_UP = 0,
@@ -83,6 +99,7 @@ typedef struct {
     // holds the word as typed, for the undo.
     uint16_t word[NOAH_AUTOCORRECT_WORD_MAX];
     uint8_t  length;
+    uint8_t  known; // autocorrect_word_t
     uint8_t  state;
     uint16_t dead;            // A dead key's stroke, waiting for its second.
     uint16_t lookup_position; // Part-of-word typos compared so far.
@@ -94,14 +111,8 @@ typedef struct {
     bool     resumed : 1;     // The stage has just started reading reports again.
     bool     on : 1;
     bool     allowed : 1;     // The override, as the stage last read it.
-    bool     suspended : 1;   // Nothing is corrected until the next word end.
-    bool     left_alone : 1;  // This word was put back by an undo.
     bool     lagging : 1;     // A change did not fit the queue and waits in the report.
     bool     head_decided : 1;   // The ending key at the head has had its lookup.
-    bool     corrected : 1;      // That word was corrected.
-    bool     undo_armed : 1;     // The next key may undo it.
-    bool     playing_undo : 1;
-    bool     replacing : 1;      // A macro correction: its erase, then its macro.
     bool     watch_started : 1;
     bool     watched_end : 1;    // The watched key ended a word.
     bool     ending_enter : 1;   // The key that ended the word prints nothing.
@@ -181,12 +192,9 @@ static uint8_t autocorrect_strokes_for(const macro_payload_typing_host_t *host, 
 // ── The word ────────────────────────────────────────────────────────────────
 
 static void autocorrect_forget(bool suspend) {
-    autocorrect.length     = 0u;
-    autocorrect.dead       = 0u;
-    autocorrect.suspended  = suspend;
-    autocorrect.left_alone = false;
-    autocorrect.corrected  = false;
-    autocorrect.undo_armed = false;
+    autocorrect.length = 0u;
+    autocorrect.dead   = 0u;
+    autocorrect.known  = suspend ? AUTOCORRECT_WORD_SUSPENDED : AUTOCORRECT_WORD_FOLLOWED;
 }
 
 // The word without the apostrophes before and after it: what a typo matches.
@@ -270,12 +278,8 @@ static void autocorrect_watch(uint8_t usage, bool ends_word) {
 // A word end with nothing left to decide: after a correction that a printing
 // key ended, the next key may undo it; otherwise the next word starts fresh.
 static void autocorrect_end_word(uint8_t usage) {
-    if (autocorrect.corrected && !autocorrect.ending_enter) {
-        autocorrect.corrected  = false;
-        autocorrect.undo_armed = true;
-    } else {
-        autocorrect_forget(false);
-    }
+    if (autocorrect.known == AUTOCORRECT_WORD_CORRECTED && !autocorrect.ending_enter) autocorrect.known = AUTOCORRECT_WORD_UNDOABLE;
+    else autocorrect_forget(false);
     autocorrect_watch(usage, true);
 }
 
@@ -292,7 +296,7 @@ static bool autocorrect_key_down(uint8_t usage) {
         return true;
     }
     key = autocorrect_read_key(usage, autocorrect.shown_mods, &character);
-    if (autocorrect.undo_armed) {
+    if (autocorrect.known == AUTOCORRECT_WORD_UNDOABLE) {
         if (key == AUTOCORRECT_KEY_BACKSPACE) {
             autocorrect.state = AUTOCORRECT_UNDO_START;
             return false;
@@ -311,7 +315,7 @@ static bool autocorrect_key_down(uint8_t usage) {
         case AUTOCORRECT_KEY_BACKSPACE:
             // With no character of the word left, it deletes into text the
             // keyboard no longer knows.
-            if (!autocorrect.suspended) {
+            if (autocorrect.known != AUTOCORRECT_WORD_SUSPENDED) {
                 if (autocorrect.length) autocorrect.length--;
                 else autocorrect_forget(true);
             }
@@ -319,7 +323,7 @@ static bool autocorrect_key_down(uint8_t usage) {
             return true;
         case AUTOCORRECT_KEY_CHARACTER:
             if (autocorrect_is_word_character(character)) {
-                if (!autocorrect.suspended) {
+                if (autocorrect.known != AUTOCORRECT_WORD_SUSPENDED) {
                     if (autocorrect.length == NOAH_AUTOCORRECT_WORD_MAX) autocorrect_forget(true);
                     else autocorrect.word[autocorrect.length++] = character;
                 }
@@ -334,7 +338,7 @@ static bool autocorrect_key_down(uint8_t usage) {
     // The word ended.
     if (autocorrect.head_decided) {
         autocorrect.head_decided = false;
-    } else if (autocorrect.allowed && !autocorrect.suspended && !autocorrect.left_alone && autocorrect_core(&start) != 0u) {
+    } else if (autocorrect.allowed && autocorrect.known == AUTOCORRECT_WORD_FOLLOWED && autocorrect_core(&start) != 0u) {
         autocorrect.ending_enter    = key == AUTOCORRECT_KEY_ENTER;
         autocorrect.lookup_position = 0u;
         autocorrect.choice.found    = false;
@@ -491,37 +495,45 @@ static void autocorrect_release(void) {
     autocorrect.state = AUTOCORRECT_IDLE;
 }
 
+// The word may have been forgotten while this played (a click, a switch
+// key): then it stays forgotten, and nothing can be undone.
 static void autocorrect_playback_finished(macro_payload_finish_result_t result, void *context) {
     (void)context;
-    if (autocorrect.replacing) {
-        // A macro's output cannot be taken back, so there is no undo. The
-        // macro starts from the scan; an erase that did not finish plays none.
-        autocorrect.head_decided = true;
-        autocorrect.corrected    = false;
-        if (result == MACRO_PAYLOAD_FINISH_SUCCESS) {
-            autocorrect.state = AUTOCORRECT_REPLACEMENT_START;
-            return;
-        }
-        autocorrect.replacing = false;
-    } else if (autocorrect.playing_undo) {
-        // The word is on screen as it was typed, and stays that way.
-        autocorrect.left_alone = true;
-    } else {
-        autocorrect.head_decided = true;
-        // A correction that did not finish leaves a word nothing can undo.
-        autocorrect.corrected = result == MACRO_PAYLOAD_FINISH_SUCCESS;
+    switch (autocorrect.state) {
+        case AUTOCORRECT_ERASING:
+            // The macro starts from the scan; an erase that did not finish
+            // plays none.
+            autocorrect.head_decided = true;
+            if (result == MACRO_PAYLOAD_FINISH_SUCCESS) {
+                autocorrect.state = AUTOCORRECT_REPLACEMENT_START;
+                return;
+            }
+            break;
+        case AUTOCORRECT_UNDOING:
+            // The word is on screen as it was typed, and stays that way.
+            if (autocorrect.known == AUTOCORRECT_WORD_RESTORING) autocorrect.known = AUTOCORRECT_WORD_LEFT_ALONE;
+            break;
+        default:
+            autocorrect.head_decided = true;
+            if (autocorrect.known == AUTOCORRECT_WORD_CORRECTING) {
+                // A correction that did not finish leaves a word nothing can
+                // undo.
+                if (result == MACRO_PAYLOAD_FINISH_SUCCESS) autocorrect.known = AUTOCORRECT_WORD_CORRECTED;
+                else autocorrect_forget(false);
+            }
+            break;
     }
-    autocorrect.playing_undo = false;
     autocorrect_release();
 }
 
-// Types `count` characters after erasing `erase`. The keys the host saw down
-// go up with the playback's neutral report, and stay out until released.
-static bool autocorrect_play(uint8_t erase, const uint16_t *characters, uint8_t count) {
+// Types `count` characters after erasing `erase`, as `state`. The keys the
+// host saw down go up with the playback's neutral report, and stay out until
+// released.
+static bool autocorrect_play(autocorrect_state_t state, uint8_t erase, const uint16_t *characters, uint8_t count) {
     if (macro_slot_provider_start_correction(erase, characters, count, NOAH_AUTOCORRECT_PACE_MS, autocorrect_playback_finished) != MACRO_PAYLOAD_START_STARTED) return false;
     memset(autocorrect.shown, 0, sizeof(autocorrect.shown));
     autocorrect.watched = 0u;
-    autocorrect.state   = AUTOCORRECT_PLAYING;
+    autocorrect.state   = state;
     return true;
 }
 
@@ -626,16 +638,13 @@ static __attribute__((noinline)) void autocorrect_start_correction(void) {
 
     // A macro correction: the typo goes, then its macro plays. The macro was
     // found able to play when it was chosen.
-    if (autocorrect.choice.found && autocorrect.choice.plays && autocorrect.count <= NOAH_AUTOCORRECT_QUEUE_START_MAX) {
-        autocorrect.replacing = true;
-        if (autocorrect_play(autocorrect.choice.length, NULL, 0u)) return;
-        autocorrect.replacing = false;
-    }
+    if (autocorrect.choice.found && autocorrect.choice.plays && autocorrect.count <= NOAH_AUTOCORRECT_QUEUE_START_MAX && autocorrect_play(AUTOCORRECT_ERASING, autocorrect.choice.length, NULL, 0u)) return;
     // With too much already waiting, the typo is left as typed rather than
     // risking a key that does not fit the queue.
     if (autocorrect.choice.found && !autocorrect.choice.plays && !autocorrect.choice.unchanged && autocorrect.count <= NOAH_AUTOCORRECT_QUEUE_START_MAX && autocorrect_correction_text(&autocorrect.choice, text, &length, &kept)) {
         autocorrect_to_strokes(&text[kept], (uint8_t)(length - kept));
-        if (autocorrect_play((uint8_t)(autocorrect.length - kept), &text[kept], (uint8_t)(length - kept))) {
+        if (autocorrect_play(AUTOCORRECT_CORRECTING, (uint8_t)(autocorrect.length - kept), &text[kept], (uint8_t)(length - kept))) {
+            autocorrect.known = AUTOCORRECT_WORD_CORRECTING;
             autocorrect.kept  = kept;
             autocorrect.typed = (uint8_t)(length - kept);
             return;
@@ -679,7 +688,7 @@ static __attribute__((noinline)) void autocorrect_lookup(void) {
     uint8_t                                   start, length = autocorrect_core(&start);
     uint16_t                                  end;
 
-    if (!length || autocorrect.suspended) {
+    if (!length || autocorrect.known != AUTOCORRECT_WORD_FOLLOWED) {
         autocorrect.choice.found = false;
         autocorrect_start_correction();
         return;
@@ -737,20 +746,21 @@ static __attribute__((noinline)) void autocorrect_lookup(void) {
 
 // Backspace right after a correction: the ending character and what the
 // correction typed go, and the word comes back as it was typed. The
-// Backspace itself never reaches the host. When this host cannot type the
-// word back, it is an ordinary Backspace.
+// Backspace itself never reaches the host. When the word was forgotten since
+// the Backspace was read, or this host cannot type it back, it is an ordinary
+// Backspace, read again as one.
 static __attribute__((noinline)) void autocorrect_start_undo(void) {
     const macro_payload_typing_host_t host      = macro_payload_typing_host();
     bool                              caps_lock = macro_payload_unicode_caps_lock();
     uint16_t                          text[NOAH_AUTOCORRECT_WORD_MAX];
-    uint8_t                           count = (uint8_t)(autocorrect.length - autocorrect.kept);
-    bool                              typeable = true;
+    // Only a word still undoable has the characters the count names.
+    bool    typeable = autocorrect.known == AUTOCORRECT_WORD_UNDOABLE && autocorrect.kept <= autocorrect.length;
+    uint8_t count    = typeable ? (uint8_t)(autocorrect.length - autocorrect.kept) : 0u;
 
     for (uint8_t index = 0u; index < count; index++)
         typeable = typeable && autocorrect_strokes_for(&host, caps_lock, autocorrect.word[autocorrect.kept + index], &text[index]) != 0u;
-    autocorrect.undo_armed = false;
-    if (typeable && autocorrect_play((uint8_t)(autocorrect.typed + 1u), text, count)) {
-        autocorrect.playing_undo = true;
+    if (typeable && autocorrect_play(AUTOCORRECT_UNDOING, (uint8_t)(autocorrect.typed + 1u), text, count)) {
+        autocorrect.known = AUTOCORRECT_WORD_RESTORING;
         autocorrect_pop();
         return;
     }
@@ -771,12 +781,8 @@ static void autocorrect_start_macro(void) {
 // since still held back behind it.
 static void autocorrect_start_replacement(void) {
     autocorrect_forget(false);
-    if (noah_profile_macro_start((uint16_t)(QK_MACRO + autocorrect.choice.macro))) {
-        autocorrect.state = AUTOCORRECT_MACRO_PLAYING;
-        return;
-    }
-    autocorrect.replacing = false;
-    autocorrect_release();
+    if (noah_profile_macro_start((uint16_t)(QK_MACRO + autocorrect.choice.macro))) autocorrect.state = AUTOCORRECT_REPLACEMENT_PLAYING;
+    else autocorrect_release();
 }
 
 // A key held until the host repeats it types characters the keyboard does not
@@ -808,9 +814,10 @@ static void autocorrect_read_switches(void) {
     }
     if (autocorrect_switch_override() != autocorrect.allowed) {
         // Switched by key in the middle of a word, that word is left alone.
+        // Anywhere else the next word starts fresh, and a correction from
+        // before the switch is not undone after it.
         autocorrect.allowed = !autocorrect.allowed;
-        if (autocorrect.length) autocorrect_forget(true);
-        autocorrect.undo_armed = false;
+        autocorrect_forget((autocorrect.known == AUTOCORRECT_WORD_FOLLOWED || autocorrect.known == AUTOCORRECT_WORD_LEFT_ALONE) && autocorrect.length != 0u);
     }
     // A macro's text is never typing: whatever it types, the next word
     // starts fresh.
@@ -822,7 +829,16 @@ static void autocorrect_read_switches(void) {
 // the changes that arrive as it stops.
 static void autocorrect_stop_before_full(void) {
     if (autocorrect.count < NOAH_AUTOCORRECT_QUEUE_STOP_AT) return;
-    if (autocorrect.state == AUTOCORRECT_PLAYING || (autocorrect.state == AUTOCORRECT_MACRO_PLAYING && autocorrect.replacing)) (void)macro_payload_engine_cancel();
+    switch (autocorrect.state) {
+        case AUTOCORRECT_CORRECTING:
+        case AUTOCORRECT_UNDOING:
+        case AUTOCORRECT_ERASING:
+        case AUTOCORRECT_REPLACEMENT_PLAYING:
+            (void)macro_payload_engine_cancel();
+            break;
+        default:
+            break;
+    }
 }
 
 void noah_autocorrect_scan(void) {
@@ -844,11 +860,9 @@ void noah_autocorrect_scan(void) {
         case AUTOCORRECT_REPLACEMENT_START:
             autocorrect_start_replacement();
             break;
+        case AUTOCORRECT_REPLACEMENT_PLAYING:
         case AUTOCORRECT_MACRO_PLAYING:
-            if (macro_payload_engine_idle()) {
-                autocorrect.replacing = false;
-                autocorrect_release();
-            }
+            if (macro_payload_engine_idle()) autocorrect_release();
             break;
         default:
             break;

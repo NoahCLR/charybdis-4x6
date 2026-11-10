@@ -494,6 +494,32 @@ static void begin(const char *name, const uint8_t *bytes, size_t length) {
     use_list(bytes, length);
 }
 
+// A list the runner encoded for these cases, by its name there.
+static const char *lists_path;
+
+static void use_named_list(const char *list_name) {
+    static char line[9000];
+    size_t      named = strlen(list_name);
+    FILE       *file  = fopen(lists_path, "r");
+
+    CHECK(file);
+    while (fgets(line, sizeof(line), file)) {
+        line[strcspn(line, "\n")] = '\0';
+        if (strncmp(line, list_name, named) == 0 && line[named] == ' ') {
+            use_list(list_bytes, unhex(&line[named + 1u], list_bytes, sizeof(list_bytes)));
+            fclose(file);
+            return;
+        }
+    }
+    CHECK(false);
+}
+
+static void begin_named(const char *name, const char *list_name) {
+    reset();
+    snprintf(case_name, sizeof(case_name), "%s", name);
+    use_named_list(list_name);
+}
+
 static void type(const char *text, bool fast) {
     for (; *text; text++) {
         uint16_t strokes[2];
@@ -515,6 +541,33 @@ static void test_the_stage_is_idle_without_a_list(void) {
     CHECK(!noah_typing_stage_active());
     keymap_config.autocorrect_enable = true;
     CHECK(noah_typing_stage_active());
+}
+
+// Switched by key while a replacement is typed, the replacement finishes and
+// the word is forgotten: Backspace after it is only Backspace.
+static void test_a_switch_key_during_a_replacement_ends_the_undo(void) {
+    begin_named("a switch key during a replacement ends the undo", "phone");
+    type("pnumber", false);
+    key(KC_SPACE, true);
+    scan(40u);
+    CHECK(!macro_payload_engine_idle());
+    autocorrect_switch_set_override(false);
+    key(KC_SPACE, false);
+    settle();
+    tap(KC_BACKSPACE, 0u, false);
+    expect_screen("+31 6 1234 5678", false);
+
+    // The same with the word's first letter kept by the correction.
+    begin("a switch key during a correction that kept a letter", the_list, sizeof(the_list));
+    type("teh", false);
+    key(KC_SPACE, true);
+    scan(20u);
+    CHECK(!macro_payload_engine_idle());
+    autocorrect_switch_set_override(false);
+    key(KC_SPACE, false);
+    settle();
+    tap(KC_BACKSPACE, 0u, false);
+    expect_screen("the", false);
 }
 
 // Switched off in the middle of a word and on again, the keyboard does not
@@ -734,10 +787,12 @@ static void test_a_correction_keeps_its_pace(void) {
 }
 
 int main(int argc, char **argv) {
-    assert(argc == 2);
+    assert(argc == 3);
+    lists_path     = argv[2];
     unsigned cases = run_fixture(argv[1]);
     test_the_stage_is_idle_without_a_list();
     test_switching_off_forgets_the_word();
+    test_a_switch_key_during_a_replacement_ends_the_undo();
     test_the_override_and_the_stored_switch_both_allow();
     test_held_keys_around_a_correction();
     test_a_one_shot_modifier_is_spent_once();
