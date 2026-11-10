@@ -78,10 +78,19 @@ is matched as `teh`.
 The word **ends** at the next character that is not a word character (a
 space, punctuation, a hyphen) or at Enter or Tab.
 
+A word whose ending character was composed through a dead key is passed
+over: it is not looked up, and the next word starts fresh. On
+US-International the quote is such a character, a dead key and then Space.
+The dead key reached the computer before the keyboard could know the word
+had ended, so the computer is in the middle of composing, and what a
+replacement erased and typed would land inside that. A text matcher cannot
+tell how a character was typed, so this is one place where the keyboard
+replaces less than a client's preview shows.
+
 Backspace inside a word removes its last character. The keyboard follows 32
 characters of a word; a longer word is left alone.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (rule 2 cases: `apostrophe-after`, `apostrophes-around`, `apostrophe-inside`, `digits-are-word-characters`, `word-end-punctuation`; `backspace-inside-a-word`).
+Held by: `tests/host/run_autocorrect_tests.sh` (rule 2 cases: `apostrophe-after`, `apostrophes-around`, `apostrophe-inside`, `digits-are-word-characters`, `word-end-punctuation`, `word-ended-through-a-dead-key`; `backspace-inside-a-word`).
 
 ## Which typed form
 
@@ -219,14 +228,14 @@ keyboard no longer knows where the word on screen starts. After:
 
 - Backspace with no character of the word left;
 - a key held 200 ms, which is taken to repeat on the computer (after a word
-  end this only ends the chance to undo);
+  end this only ends the chance to undo, and changes nothing else);
 - a dead key the layout composes nothing from;
 - a keypad character;
 - a word past 32 characters;
 - autocorrect coming on after reports went out unread, or its override being
   switched while a word is being typed.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (rule 6 cases; `test_switching_off_forgets_the_word`).
+Held by: `tests/host/run_autocorrect_tests.sh` (rule 6 cases, `dead-key-right-after-a-replacement` among them; `test_switching_off_forgets_the_word`, `test_a_held_ending_key_keeps_a_suspension`).
 
 ## Typing a replacement and holding keys back
 

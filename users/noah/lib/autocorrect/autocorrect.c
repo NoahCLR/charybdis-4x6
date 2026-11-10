@@ -275,6 +275,14 @@ static void autocorrect_watch(uint8_t usage, bool ends_word) {
     autocorrect.watched_end   = ends_word;
 }
 
+// The chance to undo is over and the next word starts fresh. Unlike
+// forgetting, this keeps a dead key that has just been read.
+static void autocorrect_end_undo(void) {
+    if (autocorrect.known != AUTOCORRECT_WORD_UNDOABLE) return;
+    autocorrect.known  = AUTOCORRECT_WORD_FOLLOWED;
+    autocorrect.length = 0u;
+}
+
 // A word end with nothing left to decide: after a correction that a printing
 // key ended, the next key may undo it; otherwise the next word starts fresh.
 static void autocorrect_end_word(uint8_t usage) {
@@ -285,23 +293,23 @@ static void autocorrect_end_word(uint8_t usage) {
 
 // A key going down as the host is about to see it. False when it has to wait
 // at the head of the queue: it ended a word that may be a typo, or it may undo
-// a correction.
+// a correction. It is read once: the key that waited is not read again when
+// its turn comes (autocorrect_pump).
 static bool autocorrect_key_down(uint8_t usage) {
     uint16_t          character = 0u;
     autocorrect_key_t key;
     uint8_t           start;
+    bool              composed;
 
-    if (!autocorrect.on) {
-        autocorrect.head_decided = false;
-        return true;
-    }
-    key = autocorrect_read_key(usage, autocorrect.shown_mods, &character);
+    if (!autocorrect.on) return true;
+    composed = autocorrect.dead != 0u;
+    key      = autocorrect_read_key(usage, autocorrect.shown_mods, &character);
     if (autocorrect.known == AUTOCORRECT_WORD_UNDOABLE) {
         if (key == AUTOCORRECT_KEY_BACKSPACE) {
             autocorrect.state = AUTOCORRECT_UNDO_START;
             return false;
         }
-        autocorrect_forget(false);
+        autocorrect_end_undo();
     }
     switch (key) {
         case AUTOCORRECT_KEY_NOTHING:
@@ -335,10 +343,10 @@ static bool autocorrect_key_down(uint8_t usage) {
         default:
             break;
     }
-    // The word ended.
-    if (autocorrect.head_decided) {
-        autocorrect.head_decided = false;
-    } else if (autocorrect.allowed && autocorrect.known == AUTOCORRECT_WORD_FOLLOWED && autocorrect_core(&start) != 0u) {
+    // The word ended. Ended by a character a dead key composed, it is passed
+    // over: that dead key is already with the host, which is in the middle of
+    // composing and cannot have text erased behind it.
+    if (autocorrect.allowed && autocorrect.known == AUTOCORRECT_WORD_FOLLOWED && !composed && autocorrect_core(&start) != 0u) {
         autocorrect.ending_enter    = key == AUTOCORRECT_KEY_ENTER;
         autocorrect.lookup_position = 0u;
         autocorrect.choice.found    = false;
@@ -381,7 +389,15 @@ static __attribute__((noinline)) bool autocorrect_pump(void) {
                 autocorrect_set_bit(autocorrect.shown, edge.value, false);
                 break;
             case AUTOCORRECT_EDGE_DOWN:
-                if (!autocorrect_key_down(edge.value)) return changed;
+                if (autocorrect.head_decided) {
+                    // The key that ended a word, read when it reached the
+                    // head: the word has had its lookup, and the key is not
+                    // read a second time.
+                    autocorrect.head_decided = false;
+                    if (autocorrect.on) autocorrect_end_word(edge.value);
+                } else if (!autocorrect_key_down(edge.value)) {
+                    return changed;
+                }
                 autocorrect_set_bit(autocorrect.shown, edge.value, true);
                 break;
             default:
@@ -815,7 +831,8 @@ static void autocorrect_watch_hold(uint32_t now) {
         autocorrect.watched_at    = now;
     } else if (now - autocorrect.watched_at >= NOAH_AUTOCORRECT_HOLD_MS) {
         autocorrect.watched = 0u;
-        autocorrect_forget(!autocorrect.watched_end);
+        if (autocorrect.watched_end) autocorrect_end_undo();
+        else autocorrect_forget(true);
     }
 }
 

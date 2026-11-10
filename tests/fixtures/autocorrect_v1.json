@@ -2554,6 +2554,186 @@
       "result": "'teh the "
     },
     {
+      "name": "word-ended-through-a-dead-key",
+      "rule": 2,
+      "description": "A word ended by a character composed through a dead key (the quote on US-International is a dead key, then Space) is passed over: the dead key reached the computer before the word was known to have ended. The next word is replaced as usual.",
+      "layout": "windows-us-international",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "teh\" teh "
+        }
+      ],
+      "keyboardOnly": "a word ended through a dead key",
+      "result": "teh\" the "
+    },
+    {
+      "name": "dead-key-right-after-a-replacement",
+      "rule": 6,
+      "description": "A dead key pressed right after a replacement is still read: one the layout composes nothing with suspends the word it begins.",
+      "layout": "windows-us-international",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            },
+            {
+              "typo": "hte",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "because",
+          "typos": [
+            {
+              "typo": "becuase",
+              "match": "whole word"
+            },
+            {
+              "typo": "becasue",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "thing",
+          "typos": [
+            {
+              "typo": "tihng",
+              "match": "anywhere"
+            }
+          ]
+        },
+        {
+          "correction": "iPhone",
+          "typos": [
+            {
+              "typo": "iphone",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "ment",
+          "typos": [
+            {
+              "typo": "mnet",
+              "match": "end of word"
+            }
+          ]
+        },
+        {
+          "correction": "receive",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        },
+        {
+          "correction": "doesn't",
+          "typos": [
+            {
+              "typo": "dosen't",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "teh "
+        },
+        {
+          "stroke": "KC_QUOT"
+        },
+        {
+          "type": "teh teh "
+        }
+      ],
+      "keyboardOnly": "a dead-key sequence the layout does not resolve",
+      "result": "the 'teh the "
+    },
+    {
       "name": "undo-after-space",
       "rule": 5,
       "description": "Backspace right after a correction removes the space and puts the word back as typed; ending it again leaves it alone.",

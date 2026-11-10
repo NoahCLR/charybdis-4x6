@@ -19,7 +19,9 @@ list entry is a replacement with its typed forms (D-F68).
 2. **Whole words, at the end of the word.** A word is letters and digits
    with apostrophes between them. It is looked up only when a character that
    is none of those ends it, and the replacement is typed before that ending
-   key reaches the computer, erasing only what differs.
+   key reaches the computer, erasing only what differs. A word ended by a
+   character a dead key composed is passed over: the dead key is with the
+   computer before the word is known to have ended.
 3. **One replacement, many typed forms, matched whole or in part.** The
    longest typed form wins, and a whole-word one beats a part-of-word one.
 4. **Case follows what is on screen**: a capitalized typed form gives a

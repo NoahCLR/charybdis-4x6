@@ -109,6 +109,11 @@ Typing is read, and replacements are typed, through the host layout you chose
 keys included. An entry whose replacement your layout cannot type is
 skipped; the keyboard never falls back to Unicode entry for it.
 
+One case is left as you typed it: a word you end with a character that
+takes a dead key, such as the quote on US-International (the quote key, then
+Space). The computer is already composing that character when the word
+ends, so the keyboard does not replace the word before it.
+
 ## Typing on while it works
 
 A replacement takes a moment: about a hundredth of a second for each

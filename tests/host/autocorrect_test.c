@@ -721,6 +721,23 @@ static void test_a_tap_of_a_key_the_correction_holds(void) {
     expect_screen("the ", false);
 }
 
+// The key that ended a word, held until it repeats, only ends the chance to
+// undo: a keypad character typed meanwhile still leaves the next word
+// unknown until it ends.
+static void test_a_held_ending_key_keeps_a_suspension(void) {
+    begin("a held ending key keeps a suspension", the_list, sizeof(the_list));
+    type("xy", false);
+    key(KC_SPACE, true);
+    scan(20u);
+    key(KC_KP_1, true);
+    scan(20u);
+    key(KC_KP_1, false);
+    scan(NOAH_AUTOCORRECT_HOLD_MS + 50u);
+    key(KC_SPACE, false);
+    type("teh teh ", false);
+    expect_screen("xy teh the ", false);
+}
+
 // A one-shot modifier read with a held-back key is spent on that key alone.
 static void test_a_one_shot_modifier_is_spent_once(void) {
     begin("a one-shot modifier is spent once", the_list, sizeof(the_list));
@@ -888,6 +905,7 @@ int main(int argc, char **argv) {
     test_the_override_and_the_stored_switch_both_allow();
     test_held_keys_around_a_correction();
     test_a_one_shot_modifier_is_spent_once();
+    test_a_held_ending_key_keeps_a_suspension();
     test_a_tap_of_a_key_the_correction_holds();
     test_no_correction_starts_behind_a_long_queue();
     test_a_full_queue_loses_no_key();
