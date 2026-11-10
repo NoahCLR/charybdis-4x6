@@ -4,6 +4,8 @@
 
 extern const uint16_t noah_profile_autocorrect_v1_words[][2];
 extern const uint16_t noah_profile_autocorrect_v1_word_count;
+extern const uint16_t noah_profile_autocorrect_v1_capitals[][2];
+extern const uint16_t noah_profile_autocorrect_v1_capital_count;
 
 enum {
     PHASE_HEADER = 0u,
@@ -35,13 +37,15 @@ _Static_assert(sizeof(noah_profile_autocorrect_v1_list_t) <= NOAH_PROFILE_AUTOCO
 _Static_assert((unsigned)NOAH_PROFILE_AUTOCORRECT_V1_TYPO_ROW_SIZE <= (unsigned)NOAH_PROFILE_AUTOCORRECT_V1_STEP_READ_MAX && (unsigned)NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX <= 2u * NOAH_PROFILE_AUTOCORRECT_V1_STEP_READ_MAX && (unsigned)NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX <= 7u * NOAH_PROFILE_AUTOCORRECT_V1_STEP_READ_MAX, "a row is one read, a typo at most two and a correction at most seven");
 _Static_assert((unsigned)NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX <= (unsigned)NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX && NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX <= UINT8_MAX, "one buffer holds either text, counted in a byte");
 
-bool noah_profile_autocorrect_v1_fold(uint32_t character, uint32_t *folded) {
-    uint16_t low = 0u, high = noah_profile_autocorrect_v1_word_count;
+// A character's partner in a generated table of pairs ascending by their
+// first character.
+static bool paired(const uint16_t table[][2], uint16_t count, uint32_t character, uint32_t *partner) {
+    uint16_t low = 0u, high = count;
     while (low < high) {
         uint16_t middle = (uint16_t)(low + (high - low) / 2u);
-        uint16_t entry  = noah_profile_autocorrect_v1_words[middle][0];
+        uint16_t entry  = table[middle][0];
         if (entry == character) {
-            if (folded) *folded = noah_profile_autocorrect_v1_words[middle][1];
+            if (partner) *partner = table[middle][1];
             return true;
         }
         if (entry < character) {
@@ -53,24 +57,19 @@ bool noah_profile_autocorrect_v1_fold(uint32_t character, uint32_t *folded) {
     return false;
 }
 
+bool noah_profile_autocorrect_v1_fold(uint32_t character, uint32_t *folded) {
+    return paired(noah_profile_autocorrect_v1_words, noah_profile_autocorrect_v1_word_count, character, folded);
+}
+
 bool noah_profile_autocorrect_v1_capital(uint32_t character, uint32_t *capital) {
-    for (uint16_t index = 0u; index < noah_profile_autocorrect_v1_word_count; index++) {
-        if (noah_profile_autocorrect_v1_words[index][1] == character && noah_profile_autocorrect_v1_words[index][0] != character) {
-            if (capital) *capital = noah_profile_autocorrect_v1_words[index][0];
-            return true;
-        }
-    }
-    return false;
+    return paired(noah_profile_autocorrect_v1_capitals, noah_profile_autocorrect_v1_capital_count, character, capital);
 }
 
 static uint16_t read_u16(const uint8_t *bytes) {
     return (uint16_t)(bytes[0] | (uint16_t)bytes[1] << 8u);
 }
 
-// One canonical UTF-8 character from the front of `bytes`: its length, or
-// zero for an overlong form, a surrogate, a value past U+10FFFF, a control
-// character, or one cut off by `count`.
-static uint8_t utf8_character(const uint8_t *bytes, uint8_t count, uint32_t *character) {
+uint8_t noah_profile_autocorrect_v1_character(const uint8_t *bytes, uint8_t count, uint32_t *character) {
     uint8_t  lead  = bytes[0];
     uint8_t  size  = lead < 0x80u ? 1u : lead >= 0xC2u && lead <= 0xDFu ? 2u : lead >= 0xE0u && lead <= 0xEFu ? 3u : lead >= 0xF0u && lead <= 0xF4u ? 4u : 0u;
     uint32_t value = size == 1u ? lead : lead & (size == 2u ? 0x1Fu : size == 3u ? 0x0Fu : 0x07u);
@@ -89,7 +88,7 @@ static uint8_t utf8_character(const uint8_t *bytes, uint8_t count, uint32_t *cha
 static noah_profile_autocorrect_v1_result_t check_text(const uint8_t *text, uint8_t length, bool typo) {
     for (uint8_t i = 0u; i < length;) {
         uint32_t character, folded;
-        uint8_t  size = utf8_character(&text[i], (uint8_t)(length - i), &character);
+        uint8_t  size = noah_profile_autocorrect_v1_character(&text[i], (uint8_t)(length - i), &character);
         if (size == 0u) return NOAH_PROFILE_AUTOCORRECT_V1_INVALID_TEXT;
         if (typo && !(character == NOAH_PROFILE_AUTOCORRECT_V1_APOSTROPHE && i != 0u && i + size != length)) {
             if (!noah_profile_autocorrect_v1_fold(character, &folded)) return NOAH_PROFILE_AUTOCORRECT_V1_NOT_A_WORD;

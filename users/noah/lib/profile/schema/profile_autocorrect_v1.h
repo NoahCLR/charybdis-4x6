@@ -136,6 +136,10 @@ bool noah_profile_autocorrect_v1_fold(uint32_t character, uint32_t *folded);
 // A small letter's capital: the one word character that folds to it. False
 // for a capital, a digit and a letter without one.
 bool noah_profile_autocorrect_v1_capital(uint32_t character, uint32_t *capital);
+// One character of a list's text, canonical UTF-8, from the front of `bytes`:
+// its length in bytes, or zero for an overlong form, a surrogate, a value
+// past U+10FFFF, a control character, or one cut off by `count`.
+uint8_t noah_profile_autocorrect_v1_character(const uint8_t *bytes, uint8_t count, uint32_t *character);
 
 // ── Validation ──────────────────────────────────────────────────────────────
 

@@ -595,19 +595,19 @@ static autocorrect_form_t autocorrect_form(const uint16_t *typed, uint8_t length
     return AUTOCORRECT_FORM_FIRST_CAPITAL;
 }
 
-static uint8_t autocorrect_decode(const uint8_t *bytes, uint8_t length, uint16_t characters[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX]) {
+// A list's text as characters, at most one for each of its bytes. No layout
+// types a character outside the Basic Multilingual Plane; U+FFFF is none, so
+// such a correction, like bytes that are no character, is one nothing can
+// type.
+static uint8_t autocorrect_decode(const uint8_t *bytes, uint8_t length, uint16_t *characters) {
     uint8_t count = 0u;
 
     for (uint8_t index = 0u; index < length; count++) {
-        uint8_t  first = bytes[index];
-        uint8_t  width = first < 0x80u ? 1u : first < 0xE0u ? 2u : first < 0xF0u ? 3u : 4u;
-        uint32_t value = first & (width == 1u ? 0x7Fu : width == 2u ? 0x1Fu : width == 3u ? 0x0Fu : 0x07u);
-        for (uint8_t more = 1u; more < width && index + more < length; more++)
-            value = (value << 6u) | (bytes[index + more] & 0x3Fu);
-        // No layout types a character outside the Basic Multilingual Plane;
-        // U+FFFF is none, so such a correction is one nothing can type.
+        uint32_t value = 0xFFFFu;
+        uint8_t  width = noah_profile_autocorrect_v1_character(&bytes[index], (uint8_t)(length - index), &value);
+
         characters[count] = value > 0xFFFFu ? 0xFFFFu : (uint16_t)value;
-        index             = (uint8_t)(index + width);
+        index             = (uint8_t)(index + (width ? width : 1u));
     }
     return count;
 }

@@ -103,12 +103,15 @@ The table is generated from `tests/fixtures/host_layouts_v1.json` by
 `tests/fixtures/autocorrect_domain_v1.json` as `wordCharacters`, each
 `[character, folded]`: 491 characters today. It is part of this domain
 version. A host layout that types a new letter extends it, which admits typos
-the firmware before it refuses, so that change raises the schema minor.
+the firmware before it refuses, so that change raises the schema minor. The
+firmware's file also holds the table read the other way, each small letter
+with the one character that folds to it, which the case rule looks up for
+every character of a replacement.
 
 A typed form is never equal, byte for byte, to the text replacement it names.
 One that differs from it only by case is allowed (`iphone` for `iPhone`).
 
-Held by: `tests/host/run_profile_autocorrect_v1_tests.sh` (`build.py --check`; `profile_autocorrect_v1_test.c`, `test_fold` and the `invalid` vectors).
+Held by: `tests/host/run_profile_autocorrect_v1_tests.sh` (`build.py --check`; `profile_autocorrect_v1_test.c`, `test_fold`, `test_capital` and the `invalid` vectors).
 
 ## Ceilings
 

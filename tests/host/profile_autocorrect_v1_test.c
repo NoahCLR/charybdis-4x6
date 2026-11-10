@@ -129,6 +129,54 @@ static size_t check_vectors(const char *path) {
     return count;
 }
 
+// A small letter's capital is the one word character that folds to it: held
+// against every row of the word table, in both directions.
+extern const uint16_t noah_profile_autocorrect_v1_words[][2];
+extern const uint16_t noah_profile_autocorrect_v1_word_count;
+
+static void test_capital(void) {
+    uint32_t capital;
+    unsigned capitals = 0u;
+
+    for (uint16_t index = 0u; index < noah_profile_autocorrect_v1_word_count; index++) {
+        uint16_t character = noah_profile_autocorrect_v1_words[index][0], folded = noah_profile_autocorrect_v1_words[index][1];
+        bool     is_folded_to = false;
+
+        if (folded != character) {
+            capitals++;
+            CHECK(noah_profile_autocorrect_v1_capital(folded, &capital) && capital == character);
+            // A capital has no capital of its own.
+            CHECK(!noah_profile_autocorrect_v1_capital(character, &capital));
+            continue;
+        }
+        for (uint16_t other = 0u; other < noah_profile_autocorrect_v1_word_count; other++)
+            is_folded_to = is_folded_to || (noah_profile_autocorrect_v1_words[other][1] == character && noah_profile_autocorrect_v1_words[other][0] != character);
+        CHECK(noah_profile_autocorrect_v1_capital(character, NULL) == is_folded_to);
+    }
+    CHECK(capitals > 26u);
+    CHECK(noah_profile_autocorrect_v1_capital('a', &capital) && capital == 'A');
+    CHECK(noah_profile_autocorrect_v1_capital(0xE9u, &capital) && capital == 0xC9u); // é, É
+    CHECK(!noah_profile_autocorrect_v1_capital('7', &capital));
+    CHECK(!noah_profile_autocorrect_v1_capital(0xFB01u, &capital)); // ﬁ: a letter without one
+    CHECK(!noah_profile_autocorrect_v1_capital(' ', &capital));
+    CHECK(!noah_profile_autocorrect_v1_capital(0x10FFFFu, &capital));
+}
+
+// One character of a list's text at a time, as the engine reads a correction.
+static void test_character(void) {
+    static const uint8_t text[] = {'a', 0xC3u, 0xA9u, 0xE2u, 0x82u, 0xACu, 0xF0u, 0x9Fu, 0x98u, 0x80u};
+    uint32_t             character;
+
+    CHECK(noah_profile_autocorrect_v1_character(&text[0], 10u, &character) == 1u && character == 'a');
+    CHECK(noah_profile_autocorrect_v1_character(&text[1], 9u, &character) == 2u && character == 0xE9u);
+    CHECK(noah_profile_autocorrect_v1_character(&text[3], 7u, &character) == 3u && character == 0x20ACu);
+    CHECK(noah_profile_autocorrect_v1_character(&text[6], 4u, &character) == 4u && character == 0x1F600u);
+    // Cut off, a continuation byte alone, and a control character are none.
+    CHECK(noah_profile_autocorrect_v1_character(&text[3], 2u, &character) == 0u);
+    CHECK(noah_profile_autocorrect_v1_character(&text[2], 1u, &character) == 0u);
+    CHECK(noah_profile_autocorrect_v1_character((const uint8_t *)"\n", 1u, &character) == 0u);
+}
+
 static void test_fold(void) {
     uint32_t folded = 0u;
     CHECK(noah_profile_autocorrect_v1_fold('A', &folded) && folded == 'a');
@@ -328,6 +376,8 @@ int main(int argc, char **argv) {
     CHECK(argc == 2);
     size_t vectors = check_vectors(argv[1]);
     test_fold();
+    test_capital();
+    test_character();
     test_lookups();
     test_long_and_macro_corrections();
     test_empty_list();

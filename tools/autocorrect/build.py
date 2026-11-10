@@ -416,6 +416,15 @@ def render_table() -> str:
     ]
     lines += [f"    {{0x{ord(char):04X}u, 0x{ord(folded):04X}u}}," for char, folded in WORDS.items()]
     lines += ["};", "", f"const uint16_t noah_profile_autocorrect_v1_word_count = {len(WORDS)}u;"]
+    capitals = sorted((folded, char) for char, folded in WORDS.items() if folded != char)
+    lines += [
+        "",
+        "// Every small letter that has a capital, with that capital: the one",
+        "// character that folds to it. Ascending by small letter.",
+        "const uint16_t noah_profile_autocorrect_v1_capitals[][2] = {",
+    ]
+    lines += [f"    {{0x{ord(small):04X}u, 0x{ord(capital):04X}u}}," for small, capital in capitals]
+    lines += ["};", "", f"const uint16_t noah_profile_autocorrect_v1_capital_count = {len(capitals)}u;"]
     return "\n".join(lines) + "\n"
 
 
