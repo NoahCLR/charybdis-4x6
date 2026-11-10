@@ -274,17 +274,25 @@ The queue is never allowed to cost a key:
   macro a key started, which is never stopped (D-F17). Only then can a key
   pressed and released again before there is room go unseen.
 
-One press is not seen whatever the queue holds: a key tapped entirely within
-the 5 ms for which a replacement, or a macro, holds that same key down. The
-computer already has the key down, and the keyboard cannot show it a second
-press. A key held longer than that, as typing holds one, is shown when the
-replacement lets go of it.
+A key pressed while a replacement, or a macro, holds that same key down
+changes no report: the computer already has the key down. The keyboard reads
+that press and its release where its own ledger of held keys records them,
+and queues them like any other, so even a tap that begins and ends inside
+those 5 ms comes out after the replacement. A behaviour's tap, a combo's
+output and a custom key's tap are all that short: pressed and released in
+one step.
+
+A modifier is not read that way. While a replacement, or a macro, holds a
+modifier (Shift for a capital, 5 ms), the person's own press or release of
+that modifier is read when the replacement lets go of it. A key they press
+in between is read without the change, and a modifier pressed and released
+again inside that hold is not seen.
 
 The lookup runs from the scan too: the whole word at once, then 32
 part-of-word typed forms a scan. The ending key waits for it, at most 33
 scans for a full list and one for a list without part-of-word typed forms.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (rule 7 cases, `typing-over-the-longest-replacement` and `full-queue` among them; `test_no_correction_starts_behind_a_long_queue`, `test_a_full_queue_loses_no_key`, `test_typing_through_the_longest_correction`, `test_a_full_queue_stops_a_macro_correction`, `test_a_correction_keeps_its_pace`, `test_a_one_shot_modifier_is_spent_once`), `tests/host/run_macro_payload_engine_tests.sh` (`test_erase_taps_backspace_at_the_text_pace`, `test_a_correction_is_isolated_without_ignoring_presses`).
+Held by: `tests/host/run_autocorrect_tests.sh` (rule 7 cases, `typing-over-the-longest-replacement` and `full-queue` among them; `test_no_correction_starts_behind_a_long_queue`, `test_a_full_queue_loses_no_key`, `test_typing_through_the_longest_correction`, `test_a_full_queue_stops_a_macro_correction`, `test_a_correction_keeps_its_pace`, `test_a_one_shot_modifier_is_spent_once`, `test_a_tap_of_a_key_the_correction_holds`), `tests/host/run_macro_payload_engine_tests.sh` (`test_erase_taps_backspace_at_the_text_pace`, `test_a_correction_is_isolated_without_ignoring_presses`).
 
 ## On and off
 

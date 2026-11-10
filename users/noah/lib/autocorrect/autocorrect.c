@@ -422,6 +422,11 @@ static bool autocorrect_settled(void) {
     return !autocorrect_holding() && !autocorrect.lagging && autocorrect.live_mods == autocorrect.shown_mods && memcmp(autocorrect.live, autocorrect.shown, sizeof(autocorrect.live)) == 0;
 }
 
+// The reports since the stage last ran have all been read, and still are.
+static bool autocorrect_reading(void) {
+    return autocorrect.synced && (autocorrect_wanted() || !autocorrect_settled());
+}
+
 bool noah_typing_stage_active(void) {
     if (autocorrect_wanted() || (autocorrect.synced && !autocorrect_settled())) return true;
     // This is asked for every report: one is passing unread, so what the
@@ -486,6 +491,21 @@ bool noah_typing_stage_defer_macro(uint8_t slot) {
 
 void noah_typing_stage_note_click(void) {
     autocorrect_forget(false);
+}
+
+// While a macro holds a usage, the person's own hold of it is frozen in the
+// reports (noah_typing_stage_keys): the host already has the key down, and
+// the ledger sends nothing for a second owner. Their press and release are
+// read here, where the ledger makes them, and queued like any other key, so
+// a tap that begins and ends inside the macro's hold comes out after it.
+void noah_typing_stage_note_owners(uint8_t usage, uint16_t owners) {
+    uint8_t leases;
+    bool    held;
+
+    if (!autocorrect_reading() || !macro_payload_engine_leases(usage, &leases) || leases == 0u) return;
+    held = owners > leases;
+    if (held == autocorrect_bit(autocorrect.live, usage)) return;
+    if (autocorrect_queue_change(held ? AUTOCORRECT_EDGE_DOWN : AUTOCORRECT_EDGE_UP, usage)) autocorrect_set_bit(autocorrect.live, usage, held);
 }
 
 // ── Corrections ─────────────────────────────────────────────────────────────

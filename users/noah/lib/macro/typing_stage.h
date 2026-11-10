@@ -30,3 +30,9 @@ bool noah_typing_stage_defer_macro(uint8_t slot);
 
 // A mouse button went down (action/owned_keycode.c).
 void noah_typing_stage_note_click(void);
+
+// A usage's owners in the ledger changed, and `owners` hold it now, a playing
+// macro's leases among them (action/owned_keycode.c). While a macro holds a
+// usage the report shows nothing of the person pressing or releasing that
+// same usage, so the stage reads those changes here.
+void noah_typing_stage_note_owners(uint8_t usage, uint16_t owners);

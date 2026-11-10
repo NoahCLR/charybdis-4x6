@@ -136,6 +136,10 @@ bool                         macro_payload_engine_protected(void);
 // macro, never a correction.
 bool                         macro_payload_engine_ignores_presses(void);
 bool                         macro_payload_engine_idle(void);
+// How many of the playing macro's leases hold `usage`. False while the macro
+// is itself taking or letting go of a lease, when a change in the ledger is
+// its own and not yet in its leases.
+bool                         macro_payload_engine_leases(uint8_t usage, uint8_t *leases);
 void                         macro_payload_engine_init(void);
 void                         macro_payload_debug_snapshot(macro_payload_debug_snapshot_t *out);
 bool                         macro_payload_decode_qmk_stream(macro_payload_ir_t *ir, uint16_t length, macro_payload_read_byte_fn read_byte, void *context);

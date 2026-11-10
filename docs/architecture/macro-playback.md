@@ -203,6 +203,11 @@ before the macro's own projection.
   waits until it has played.
 - **Clicks.** The ledger tells the stage when a mouse button goes down
   (`noah_typing_stage_note_click`), which starts the next word fresh.
+- **A key the macro holds.** The ledger also tells the stage whenever a
+  usage's owners change (`noah_typing_stage_note_owners`). For a usage the
+  playing macro holds (`macro_payload_engine_leases`), no report shows the
+  person's own press or release, so the stage queues it from there. The
+  macro's own lease changes are not read.
 
 With autocorrect off in the profile or an empty list
 `noah_typing_stage_active` is false and none of this runs.

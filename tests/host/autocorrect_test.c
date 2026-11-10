@@ -642,6 +642,67 @@ static void test_held_keys_around_a_correction(void) {
     expect_screen("the ", false);
 }
 
+static void until_seen(uint8_t usage) {
+    for (unsigned guard = 0; !(seen_keys[usage / 8u] & (1u << (usage % 8u))); guard++) {
+        CHECK(guard < 5000u);
+        scan(1u);
+    }
+}
+
+static void end_a_typo_and_wait_for(uint8_t usage) {
+    type("teh", false);
+    key(KC_SPACE, true);
+    scan(3u);
+    key(KC_SPACE, false);
+    until_seen(usage);
+}
+
+// A key tapped while a correction holds that same key down changes no
+// report: the computer already has the key down. The ledger tells the stage,
+// so the tap comes out after the correction like any other key.
+static void test_a_tap_of_a_key_the_correction_holds(void) {
+    // A behaviour's tap, pressed and released in one step, of the h the
+    // correction is typing.
+    begin("a behaviour's tap of a key the correction holds", the_list, sizeof(the_list));
+    end_a_typo_and_wait_for(KC_H);
+    CHECK(owned_keycode_tap(KC_H));
+    expect_screen("the h", false);
+
+    // A key as short while the correction erases with it: Backspace, the
+    // next key after the correction, so its undo.
+    begin("a Backspace tapped while the correction erases", the_list, sizeof(the_list));
+    end_a_typo_and_wait_for(KC_BACKSPACE);
+    key(KC_BACKSPACE, true);
+    key(KC_BACKSPACE, false);
+    expect_screen("teh", false);
+
+    // Pressed while the correction holds it and held on, the key is shown
+    // once, after the correction, and stays down until it is released.
+    begin("a key held on from inside the correction's hold", the_list, sizeof(the_list));
+    end_a_typo_and_wait_for(KC_H);
+    key(KC_H, true);
+    settle();
+    CHECK(seen_keys[KC_H / 8u] & (1u << (KC_H % 8u)));
+    key(KC_H, false);
+    expect_screen("the h", false);
+
+    // A key the person already held when the correction took it is still
+    // theirs: a tap of it meanwhile is no second press, and its release is
+    // one release.
+    begin("a key already held when the correction takes it", the_list, sizeof(the_list));
+    type("te", false);
+    key(KC_H, true);
+    scan(10u);
+    key(KC_SPACE, true);
+    scan(3u);
+    key(KC_SPACE, false);
+    until_seen(KC_H);
+    CHECK(owned_keycode_tap(KC_H));
+    settle();
+    key(KC_H, false);
+    expect_screen("the ", false);
+}
+
 // A one-shot modifier read with a held-back key is spent on that key alone.
 static void test_a_one_shot_modifier_is_spent_once(void) {
     begin("a one-shot modifier is spent once", the_list, sizeof(the_list));
@@ -796,6 +857,7 @@ int main(int argc, char **argv) {
     test_the_override_and_the_stored_switch_both_allow();
     test_held_keys_around_a_correction();
     test_a_one_shot_modifier_is_spent_once();
+    test_a_tap_of_a_key_the_correction_holds();
     test_no_correction_starts_behind_a_long_queue();
     test_a_full_queue_loses_no_key();
     test_typing_through_the_longest_correction();

@@ -116,6 +116,22 @@ static void macro_payload_output_keys(uint8_t keys[32]) {
         macro_payload_lease_keys(&macro_payload_engine.transient_leases[i], keys);
 }
 
+static uint8_t macro_payload_lease_holds(const owned_keycode_lease_t *lease, uint8_t usage) {
+    return lease->active && lease->has_basic && lease->basic == usage ? 1u : 0u;
+}
+
+bool macro_payload_engine_leases(uint8_t usage, uint8_t *leases) {
+    uint8_t count = 0u;
+
+    if (macro_lease_changing) return false;
+    for (uint8_t i = 0u; i < macro_payload_engine.holds.balance.count; i++)
+        count = (uint8_t)(count + macro_payload_lease_holds(&macro_payload_engine.holds.leases[i], usage));
+    for (uint8_t i = 0u; i < macro_payload_engine.transient_count; i++)
+        count = (uint8_t)(count + macro_payload_lease_holds(&macro_payload_engine.transient_leases[i], usage));
+    *leases = count;
+    return true;
+}
+
 static uint8_t macro_payload_output_mods(void) {
     uint8_t mods = 0u;
     for (uint8_t i = 0u; i < macro_payload_engine.holds.balance.count; i++)

@@ -139,10 +139,20 @@ only when the queue was already full, in the report hook; a tap shorter than
 the stop then went unseen, and the stop ran inside the hook that the deepest
 stack paths end in. Stopping early, from the scan, removes both.
 
-One press is unseen for another reason: a key tapped entirely inside the
-5 ms for which a replacement holds that same key down. The computer already
-sees the key down, so there is no second press to show it. Typing holds a
-key far longer than that.
+A key pressed while a replacement holds that same key down is in no report:
+the computer already sees the key down, and the ledger sends nothing for a
+usage's second owner. The stage first read such a key only once the
+replacement let go of it, which lost every tap shorter than the 5 ms hold;
+and a behaviour's tap, a combo's output and a custom key's tap are pressed
+and released in one step. So the ledger tells the stage whenever the owners
+of a usage change (`noah_typing_stage_note_owners`), and for a usage the
+playing macro holds the stage takes the person's press and release from
+there. Modifiers are not read that way: the person's press or release of a
+modifier the replacement is holding is read when the replacement lets go, a
+key pressed in between is read without it, and a modifier tapped inside
+that hold is unseen. Reading those needs the modifier owners counted apart
+from the macro's inside the report hook, which the deepest stack paths end
+in.
 
 The alternative, dropping presses as D-F17 does, loses typing; a larger queue
 only moves the limit.
