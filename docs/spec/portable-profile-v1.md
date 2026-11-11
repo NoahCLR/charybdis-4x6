@@ -17,9 +17,9 @@ Which authored values become profile data at all is the
 A backup is a canonical profile blob
 ([blob and digests](profile-wire-v1/blob-and-digests.md)) holding every
 domain in the build's supported domain mask (capability page 1 byte 12): on
-this keyboard all seven, lighting `0x10`, key behaviours `0x20`, combos
-`0x30`, settings `0x40`, pointing `0x50`, keymap `0x60` and macros `0x70`, in
-registry order. It is at most 130,048 bytes, the blob ceiling. The profile is
+this keyboard all eight, lighting `0x10`, key behaviours `0x20`, combos
+`0x30`, settings `0x40`, pointing `0x50`, keymap `0x60`, macros `0x70` and the
+autocorrect list `0x80`, in registry order. It is at most 130,048 bytes, the blob ceiling. The profile is
 the whole of it: nothing outside the blob is part of a backup.
 
 A backup's identity is the blob's schema (header bytes 4–5), the domain

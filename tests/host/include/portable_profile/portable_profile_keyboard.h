@@ -1,6 +1,7 @@
 #pragma once
 // QMK_KEYBOARD_H for the portable-profile readback test: the QMK and
 // Charybdis surface qmk_portable_profile.c reads, as host declarations.
+#define NOAH_HOST_KEYMAP_CONFIG
 #include "qmk_stub.h"
 #define CHARYBDIS_AUTO_SNIPING_LAYER 3
 #define CHARYBDIS_DRAGSCROLL_DPI 100
@@ -9,6 +10,8 @@
 #define POINTING_MODE_ZOOM_DPI 400
 #define POINTING_MODE_ARROW_DPI 400
 #define RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS 200
+// Unlike the behaviour-feedback flash, so a default read from the wrong one shows.
+#define RGB_AUTOCORRECT_FEEDBACK_FLASH_MS 120
 #define AUTOMOUSE_RGB_DEAD_TIME 400
 bool     get_auto_mouse_enable(void);
 uint8_t  get_auto_mouse_layer(void);

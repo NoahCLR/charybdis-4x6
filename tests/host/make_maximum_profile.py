@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """Write the maximum profile fixture (D-F14), or check it is current.
 
-Every table at its simultaneous maximum in one schema 4.3 blob: RGB v4 with
+Every table at its simultaneous maximum in one schema 4.5 blob: RGB v5 with
 128 groups, sixteen layer colours and 640 group rows, 255 in one table
-(D-F63); 128 behaviour rows of
-five full steps (640 steps); 128 combos of sixteen inputs; settings v11 with
+(D-F63), 65 of them replacement rows beside a replacement feedback record
+(D-F70); 128 behaviour rows of
+five full steps (640 steps); 128 combos of sixteen inputs; settings v12 with
 a shortcut on every custom key, most of them six keys with layers, and
 every one of its 273 names at 32 bytes of UTF-8; and 32 pointing slots (v4), each named with 32
 bytes, with every layer starting one of them; the full 1,920-byte matrix and
-34,903-byte macro bank.
+34,903-byte macro bank; and an autocorrect list of 1,024 corrections and 1,024
+typos, every typo part of a word and one correction of 128 bytes, in 20,480
+bytes of text (34,824 bytes).
 Values reach the edges the plan names: layers 7, 8 and
 15, combo rows 31, 32, 63, 64 and 127, macros and custom keys 0, 63, 64 and
 127. It is test evidence built from the byte specs, not from firmware code.
@@ -26,6 +29,9 @@ import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools" / "autocorrect"))
+import build as autocorrect_list  # noqa: E402  (the list's one encoder)
+
 FIXTURE = ROOT / "tests/fixtures/maximum_profile_v4.fixture"
 LAYERS = 16
 DEPTH = 5
@@ -64,7 +70,7 @@ def basic_keycode(n: int) -> int:
 
 
 def rgb() -> bytes:
-    vectors = json.loads((ROOT / "tests/fixtures/rgb_domain_v4.json").read_text())
+    vectors = json.loads((ROOT / "tests/fixtures/rgb_domain_v5.json").read_text())
     compiled = bytes.fromhex(next(v for v in vectors["valid"] if v["name"] == "compiled")["hex"])
     g, l, lg, p, pg, cg, t, kg = compiled[4:12]
     offset = 16 + 9 * g + 5 * l + 5 * lg
@@ -73,13 +79,15 @@ def rgb() -> bytes:
     combo_feedback = compiled[offset:offset + 4]
     offset += 4 + 4 * cg + 3 * t
     key_feedback = compiled[offset:offset + 11]
-    assert t == DEPTH - 1 and l == LAYERS and p == 32
+    offset += 11 + 5 * kg
+    replacement_feedback = compiled[offset:offset + 10]
+    assert t == DEPTH - 1 and l == LAYERS and p == 32 and offset + 10 + 5 * compiled[14] == len(compiled)
 
     # D-F63: 128 LED sets; 640 group rows, 255 in each of the layer and
-    # pointing tables, the rest in key feedback.
-    groups, layer_rows, pd_rows, combo_rows = 128, 255, 255, 0
-    key_rows = 640 - layer_rows - pd_rows - combo_rows
-    out = bytearray([4, 0, 0x1F, 0x00, groups, LAYERS, layer_rows, 32, pd_rows, combo_rows, DEPTH - 1, key_rows, 58, 8, 0, 0])
+    # pointing tables, the rest shared by behaviour and replacement feedback.
+    groups, layer_rows, pd_rows, combo_rows, replacement_rows = 128, 255, 255, 0, 65
+    key_rows = 640 - layer_rows - pd_rows - combo_rows - replacement_rows
+    out = bytearray([5, 0, 0x3F, 0x00, groups, LAYERS, layer_rows, 32, pd_rows, combo_rows, DEPTH - 1, key_rows, 58, 8, replacement_rows, 0])
     # Distinct bitmaps over LEDs 0..57, already in ascending byte order.
     for i in range(groups):
         bitmap = bytearray(8)
@@ -103,7 +111,10 @@ def rgb() -> bytes:
     out += key_feedback
     for i in range(key_rows):
         out += bytes([[0, 1, 2, 3, 0xFF][i % 5], (30 * i) & 0xFF, 255, 200, (i + 4) % groups])
-    assert len(out) == 35 + 9 * groups + 5 * LAYERS + 5 * layer_rows + 5 * 32 + 5 * pd_rows + 4 * combo_rows + 3 * (DEPTH - 1) + 5 * key_rows == 4639
+    out += replacement_feedback
+    for i in range(replacement_rows):
+        out += bytes([[0, 1, 2, 0xFF][i % 4], (40 * i) & 0xFF, 255, 200, (i + 63) % groups])
+    assert len(out) == 45 + 9 * groups + 5 * LAYERS + 5 * layer_rows + 5 * 32 + 5 * pd_rows + 4 * combo_rows + 3 * (DEPTH - 1) + 5 * key_rows + 5 * replacement_rows == 4649
     return bytes(out)
 
 
@@ -142,7 +153,7 @@ def combos() -> bytes:
 
 
 def shortcuts() -> bytes:
-    """Settings v11 (D-F26): a modifier mask, six keys, a layer mask and the
+    """Settings v12 (D-F26): a modifier mask, six keys, a layer mask and the
     layer kind for each custom key.
 
     Slot 0 mixes sides (Left Ctrl + Right Alt + K), 63 holds modifiers alone
@@ -171,7 +182,7 @@ def shortcuts() -> bytes:
 
 
 def settings() -> bytes:
-    scalars = [0] * 31
+    scalars = [0] * 32
     scalars[0:4] = [200, 220, 600, 180]  # tapping, tap/hold, long hold, multi tap
     scalars[4:8] = [1, 15, 1200, 25]  # auto mouse on layer 15
     scalars[8:10] = [1, (1 << 8) | (1 << 15)]  # auto sniping on layers 8 and 15
@@ -184,7 +195,8 @@ def settings() -> bytes:
     scalars[24] = 0
     scalars[25:27] = [100, 8]
     scalars[28:31] = [1, 0xFF7F, 0x7FFF]  # behaviours off on layer 7, combos off on 15
-    out = bytearray([11, LAYERS, 31, 128, 128, 0, 128, 0])
+    scalars[31] = 65535  # the longest replacement flash
+    out = bytearray([12, LAYERS, 32, 128, 128, 0, 128, 0])
     out += b"".join(struct.pack("<I", v) for v in scalars)
     for layer in range(LAYERS):
         reference = (layer + 1) % LAYERS
@@ -196,7 +208,7 @@ def settings() -> bytes:
     for label in names:
         encoded = name(label)
         out += bytes([len(encoded)]) + encoded
-    assert len(out) == 10693
+    assert len(out) == 10697
     return bytes(out)
 
 
@@ -232,9 +244,15 @@ def macros() -> bytes:
     return b"a" * (34903 - 128) + b"\0" * 128
 
 
+def autocorrect() -> bytes:
+    payload = autocorrect_list.encode(autocorrect_list.maximum_entries())
+    assert len(payload) == autocorrect_list.MAX_SIZE == 34824
+    return payload
+
+
 def blob() -> tuple[bytes, list[tuple[int, int, bytes]]]:
-    domains = [(0x10, 4, rgb()), (0x20, 2, behaviors()), (0x30, 3, combos()), (0x40, 11, settings()), (0x50, 4, pointing()), (0x60, 1, keymap()), (0x70, 1, macros())]
-    out = bytearray(b"NLP1" + bytes([4, 3, len(domains), 1]))
+    domains = [(0x10, 5, rgb()), (0x20, 2, behaviors()), (0x30, 3, combos()), (0x40, 12, settings()), (0x50, 4, pointing()), (0x60, 1, keymap()), (0x70, 1, macros()), (0x80, 1, autocorrect())]
+    out = bytearray(b"NLP1" + bytes([4, 5, len(domains), 1]))
     for domain_id, version, payload in domains:
         out += bytes([domain_id, version]) + struct.pack("<I", len(payload)) + payload
     assert len(out) + ALLOWANCE <= PAYLOAD_MAX

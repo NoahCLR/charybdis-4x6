@@ -321,6 +321,14 @@ static void test_capability_hook(void) {
     // The group rows of all four lighting tables (D-F63).
     assert(read_u16(&frame[WIRE_PAYLOAD + 18u]) == 640u);
     for (uint8_t index = WIRE_PAYLOAD + 20u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) assert(frame[index] == 0u);
+
+    // ...and the autocorrect list's on page 3 (D-F68).
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x34u, 3u);
+    channel(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+    assert(read_u16(&frame[WIRE_PAYLOAD]) == 1024u && read_u16(&frame[WIRE_PAYLOAD + 2u]) == 1024u && read_u16(&frame[WIRE_PAYLOAD + 4u]) == 20480u);
+    assert(read_u32(&frame[WIRE_PAYLOAD + 6u]) == 34824u && frame[WIRE_PAYLOAD + 10u] == 32u && frame[WIRE_PAYLOAD + 11u] == 128u);
+    for (uint8_t index = WIRE_PAYLOAD + 12u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) assert(frame[index] == 0u);
 }
 
 #ifndef NOAH_LIVE_PROFILE_OWNER_ENABLE

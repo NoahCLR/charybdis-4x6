@@ -86,6 +86,8 @@ uint32_t noah_profile_settings_default(uint8_t id) {
         case NOAH_SETTING_LAYER_COMBOS:
             // Every layer allows its behaviours and combos.
             return (UINT32_C(1) << NOAH_SETTINGS_LAYERS) - 1u;
+        case NOAH_SETTING_AUTOCORRECT_FEEDBACK_PERIOD:
+            return RGB_AUTOCORRECT_FEEDBACK_FLASH_MS;
         default:
             return 0;
     }

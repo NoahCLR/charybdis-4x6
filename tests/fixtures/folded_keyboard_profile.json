@@ -1,9 +1,9 @@
 {
- "description": "Noah's keyboard profile as the authored defaults must reproduce it, in tests/host/profile_logical_form.py's logical form. Derived from his backup of 2026-10-19 (portable document version 3: profile schema 3.0, action ABI 0x837cf479, sixteen layers, 128 macro streams) by decoding it with the schema-3 codecs; the schema-3 and schema-4 domain versions are the same, so every value carries over unchanged. The backup's empty Delete row (0x004c, no steps) is left out, as the authored defaults dropped it: a row without steps is no row (firmware D-F27), so no key changes. The Backspace row (0x002a) comes from his export of 2026-10-25, the one difference that export had from these defaults. Since pointing version 4 the backup's Arrow mouse button overrides are not carried (version 4 retired them; Noah does not use them, 2026-10-25), and settings version 9 holds its auto-sniping layer, Navigation (3), as the layer mask 8. Settings version 10 gives each custom key's shortcut a layer mask and the layer kind they act as; the backup's one shortcut turns no layer on, so its kind is Hold (0). Settings version 11 holds up to six keys in place of the one key; the backup's shortcut is its one key. tests/host/folded_keyboard_profile_test.py compares the compiled defaults with it, domain by domain.",
+ "description": "Noah's keyboard profile as the authored defaults must reproduce it, in tests/host/profile_logical_form.py's logical form. Derived from his backup of 2026-10-19 (portable document version 3: profile schema 3.0, action ABI 0x837cf479, sixteen layers, 128 macro streams) by decoding it with the schema-3 codecs; the schema-3 and schema-4 domain versions are the same, so every value carries over unchanged. The backup's empty Delete row (0x004c, no steps) is left out, as the authored defaults dropped it: a row without steps is no row (firmware D-F27), so no key changes. The Backspace row (0x002a) comes from his export of 2026-10-25, the one difference that export had from these defaults. Since pointing version 4 the backup's Arrow mouse button overrides are not carried (version 4 retired them; Noah does not use them, 2026-10-25), and settings version 9 holds its auto-sniping layer, Navigation (3), as the layer mask 8. Settings version 10 gives each custom key's shortcut a layer mask and the layer kind they act as; the backup's one shortcut turns no layer on, so its kind is Hold (0). Settings version 11 holds up to six keys in place of the one key; the backup's shortcut is its one key. Schema 4.4 adds the autocorrect list, which the backup predates: the defaults' list is empty. Schema 4.5 (lighting version 5, settings version 12) adds replacement feedback, which the backup predates too: the stage is on (stage bit 5) with the defaults' colours for text, a macro and an undo, on the half of the key, and one accent row on the thumb LEDs; settings version 12 gives that flash its own length, scalar 31, the defaults' 200 ms, which the backup predates as well. tests/host/folded_keyboard_profile_test.py compares the compiled defaults with it, domain by domain.",
  "differences": [],
  "domains": {
   "rgb": {
-   "stages": 31,
+   "stages": 63,
    "leds": 58,
    "bitmapBytes": 8,
    "groups": [
@@ -296,6 +296,19 @@
     "locality": 3
    },
    "keyFeedbackGroups": [
+    {
+     "semantic": 255,
+     "hsv": [0, 0, 0],
+     "group": 1
+    }
+   ],
+   "replacementFeedback": {
+    "text": [106, 255, 200],
+    "macro": [234, 255, 200],
+    "undo": [0, 255, 200],
+    "locality": 3
+   },
+   "replacementGroups": [
     {
      "semantic": 255,
      "hsv": [0, 0, 0],
@@ -1224,7 +1237,8 @@
     "UNICODE_HOST_MODE": 131073,
     "BEHAVIORS_ENABLED": 1,
     "LAYER_BEHAVIORS": 65535,
-    "LAYER_COMBOS": 65535
+    "LAYER_COMBOS": 65535,
+    "AUTOCORRECT_FEEDBACK_PERIOD": 200
    },
    "layers": [
     {
@@ -1803,6 +1817,7 @@
    ["0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001"],
    ["0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001", "0x0000", "0x0001"]
   ],
-  "macros": ["0102e301012c0103e3", "0102e201012c0103e2", "0102e20102e301012c0103e30103e2", "0102e00102e20102e30101060103e30103e20103e0", "0102e00102e20102e301011b0103e30103e20103e0", "0102e00102e301012c0103e30103e0", "0102e20102e30101250103e30103e2", "0102e00102e20102e30101190103e30103e20103e0", "0102e10102e30101190103e30103e1", "0102e10102e30101130103e30103e1", "0102e30101040103e3010435307c0102e30101060103e3", "0102e30101040103e3", "0102e30101060103e3", "0102e30101190103e3", "0102e301011b0103e3", "0102e301011d0103e3", "0102e10102e301011d0103e30103e1", "", "", "0102e301012b01043132307c743320636f64650103e3", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+  "macros": ["0102e301012c0103e3", "0102e201012c0103e2", "0102e20102e301012c0103e30103e2", "0102e00102e20102e30101060103e30103e20103e0", "0102e00102e20102e301011b0103e30103e20103e0", "0102e00102e301012c0103e30103e0", "0102e20102e30101250103e30103e2", "0102e00102e20102e30101190103e30103e20103e0", "0102e10102e30101190103e30103e1", "0102e10102e30101130103e30103e1", "0102e30101040103e3010435307c0102e30101060103e3", "0102e30101040103e3", "0102e30101060103e3", "0102e30101190103e3", "0102e301011b0103e3", "0102e301011d0103e3", "0102e10102e301011d0103e30103e1", "", "", "0102e301012b01043132307c743320636f64650103e3", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+  "autocorrect": []
  }
 }

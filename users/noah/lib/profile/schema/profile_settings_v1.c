@@ -10,6 +10,7 @@ bool noah_profile_setting_v1_valid(uint8_t id, uint32_t v, uint8_t layers) {
         case NOAH_SETTING_UNICODE_HOST_MODE:
             return (v & ~NOAH_HOST_SETTING_BITS) == 0u && noah_host_layout_id(v) < NOAH_HOST_LAYOUT_LIMIT;
         case NOAH_SETTING_FEEDBACK_PERIOD:
+        case NOAH_SETTING_AUTOCORRECT_FEEDBACK_PERIOD:
             return v > 0 && v <= 65535;
         case NOAH_SETTING_AUTO_MOUSE_ENABLED:
         case NOAH_SETTING_AUTO_SNIPING_ENABLED:

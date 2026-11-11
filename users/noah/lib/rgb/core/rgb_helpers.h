@@ -117,6 +117,28 @@ typedef struct {
     rgb_led_group_t                        led_group;
 } key_behavior_feedback_led_group_t;
 
+// Replacement feedback: one colour for each thing a replacement can do
+// (D-F70). A colour of saturation and value 0 paints nothing for it.
+typedef struct {
+    hsv_t          text_color;  // A typed form was replaced with text.
+    hsv_t          macro_color; // A typed form was replaced by its macro.
+    hsv_t          undo_color;  // Backspace put a replaced word back.
+    rgb_locality_t locality;
+} autocorrect_feedback_color_config_t;
+
+typedef enum {
+    AUTOCORRECT_FEEDBACK_GROUP_TEXT = 0,
+    AUTOCORRECT_FEEDBACK_GROUP_MACRO,
+    AUTOCORRECT_FEEDBACK_GROUP_UNDO,
+    AUTOCORRECT_FEEDBACK_GROUP_ALL,
+} autocorrect_feedback_group_semantic_t;
+
+typedef struct {
+    autocorrect_feedback_group_semantic_t semantic;
+    hsv_t                                 color;
+    rgb_led_group_t                       led_group;
+} autocorrect_feedback_led_group_t;
+
 typedef struct {
     uint8_t         layer;
     hsv_t           color;

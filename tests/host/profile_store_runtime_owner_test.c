@@ -30,12 +30,16 @@ enum {
 // Every profile the keyboard runs carries its pointing slots (the PD domain);
 // this one carries it with every slot disabled.
 static const uint8_t compiled_blob[] = {
-    'N', 'L', 'P', '1', 4u, 3u, 1u, 1u,
+    'N', 'L', 'P', '1', 4u, 5u, 1u, 1u,
     NOAH_PROFILE_DOMAIN_V1_PD, NOAH_PROFILE_DOMAIN_VERSION_PD, NOAH_PROFILE_PD_V1_HEADER_SIZE, 0u, 0u, 0u,
     NOAH_PROFILE_PD_V1_VERSION, NOAH_PROFILE_PD_V1_SLOT_COUNT, NOAH_PROFILE_PD_V1_RECORD_SIZE, 0u, 0u, 0u, 0u, 0u,
 };
 
 // ── The compiled defaults and the owner's runtimes, stubbed ─────────────────
+
+// The authored autocorrect list the owner's reader falls back to: empty.
+const uint8_t  authored_autocorrect_list[NOAH_PROFILE_AUTOCORRECT_V1_HEADER_SIZE] = {0};
+const uint16_t authored_autocorrect_list_size                                    = sizeof(authored_autocorrect_list);
 
 static uint32_t crc_of(const uint8_t *bytes, size_t length) {
     return noah_profile_crc32_finish(noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, bytes, length));

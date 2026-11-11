@@ -9,8 +9,11 @@
 // A later capability raises the minor (D-F28): 4.1 links pointing slots to
 // layers and makes auto-sniping's layer a set (pointing v4, settings v9,
 // D-F62); 4.2 lets a custom key's shortcut turn layers on (settings v10,
-// D-F26); 4.3 lets it hold up to six keys together (settings v11, D-F26).
-#define NOAH_PROFILE_SCHEMA_MINOR 3u
+// D-F26); 4.3 lets it hold up to six keys together (settings v11, D-F26);
+// 4.4 adds the autocorrect list (domain 0x80, D-F68); 4.5 adds replacement
+// feedback to lighting and its flash length to settings (lighting v5,
+// settings v12, D-F70).
+#define NOAH_PROFILE_SCHEMA_MINOR 5u
 // A 128 KiB profile slot less the first kilobyte its header and commit
 // marker take on flash (D-F29).
 #define NOAH_PROFILE_PAYLOAD_MAX 130048u

@@ -962,6 +962,11 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 // NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh.
 #include "authored_macro_bank.h"
 
+// autocorrect.txt, beside this file, as the profile's autocorrect list.
+// Regenerate it with
+// python3 tools/autocorrect/build.py --write-authored keyboards/bastardkb/charybdis/4x6/keymaps/noah.
+#include "authored_autocorrect_list.h"
+
 // Expand the authored macro tables, combo table, and derived counts above
 // into the runtime symbols expected by the userspace runtime and QMK.
 MATERIALIZE_KEYMAP_DATA();

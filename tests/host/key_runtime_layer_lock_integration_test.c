@@ -9,7 +9,10 @@
 #include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
+#include "users/noah/lib/key/behavior/participation.h"
 #include "users/noah/lib/key/runtime/api.h"
+#include "users/noah/lib/pointing/policy/auto_mouse_switch.h"
+#include "users/noah/lib/autocorrect/autocorrect_switch.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
@@ -24,6 +27,8 @@ enum {
     TEST_FOREIGN_RELEASE_KEY = 0x0004u,
     TEST_TOGGLE_TAP_KEY      = SAFE_RANGE + 0x72,
     TEST_ONESHOT_HOLD_KEY    = SAFE_RANGE + 0x73,
+    TEST_BEHAVIORS_OFF_KEY   = SAFE_RANGE + 0x74,
+    TEST_AUTO_MOUSE_OFF_KEY  = SAFE_RANGE + 0x75,
     TEST_NUM_LAYER           = 1,
     TEST_OTHER_LAYER         = 2,
 };
@@ -79,6 +84,9 @@ static void test_reset_state(void) {
     last_tap              = KC_NO;
     tap_count             = 0;
     noah_runtime_reset_for_test();
+    noah_participation_set_behaviors_override(true);
+    auto_mouse_switch_set_override(true);
+    autocorrect_switch_set_override(true);
 }
 
 static void test_run_thumb_like_double_tap_hold_cycle_with_release_keycode(keypos_t key_pos, uint16_t release_keycode) {
@@ -236,6 +244,48 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
                     .tap  = TAP_SENDS(TG(TEST_OTHER_LAYER)),
                     .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(TEST_NUM_LAYER)),
                 },
+        };
+    }
+
+    // BH_TOGG's behaviour sets only a hold, so its tap is its own.
+    if (keycode == BH_TOGG) {
+        return (key_behavior_view_t){
+            .keycode       = keycode,
+            .handled       = true,
+            .tap_hold_term = 150,
+            .single        = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(TEST_NUM_LAYER))},
+        };
+    }
+
+    // BH_ON's behaviour, which runs only while behaviours are on, taps B.
+    if (keycode == BH_ON) {
+        return (key_behavior_view_t){
+            .keycode       = keycode,
+            .handled       = true,
+            .tap_hold_term = 150,
+            .single        = {.tap = TAP_SENDS(KC_B)},
+        };
+    }
+
+    if (keycode == TEST_BEHAVIORS_OFF_KEY) {
+        return (key_behavior_view_t){
+            .keycode       = keycode,
+            .handled       = true,
+            .tap_hold_term = 150,
+            .single =
+                {
+                    .tap  = TAP_SENDS(BH_OFF),
+                    .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(TEST_NUM_LAYER)),
+                },
+        };
+    }
+
+    if (keycode == TEST_AUTO_MOUSE_OFF_KEY) {
+        return (key_behavior_view_t){
+            .keycode       = keycode,
+            .handled       = true,
+            .tap_hold_term = 150,
+            .single        = {.tap = TAP_SENDS(AM_OFF)},
         };
     }
 
@@ -698,6 +748,211 @@ static void test_owned_mod_tap_consumes_oneshot(void) {
     CHECK(noah_runtime_debug_active_slot_count() == 0);
 }
 
+// The behaviours keys switch the runtime override the way the combo keys
+// switch QMK's combo flag: BH_OFF stops behaviours, BH_TOGG flips them, and
+// BH_ON allows them. QMK never sees them. BH_TOGG, whose behaviour sets only
+// a hold, switches at its tap.
+static void test_plain_behaviors_keys_switch_the_override(void) {
+    keypos_t key_pos = test_keypos(4, 0);
+
+    test_reset_state();
+
+    CHECK(!test_plain_key_tap(BH_OFF, key_pos));
+    CHECK(!noah_participation_behaviors_override());
+    CHECK(!test_plain_key_tap(BH_OFF, key_pos));
+    CHECK(!noah_participation_behaviors_override());
+    CHECK(!test_plain_key_tap(BH_TOGG, key_pos));
+    CHECK(noah_participation_behaviors_override());
+    CHECK(!test_plain_key_tap(BH_TOGG, key_pos));
+    CHECK(!noah_participation_behaviors_override());
+    CHECK(!test_plain_key_tap(BH_ON, key_pos));
+    CHECK(noah_participation_behaviors_override());
+    CHECK(tap_count == 0);
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+}
+
+// With behaviours off a key is the standard key, and a behaviours key's
+// standard key is its switch: BH_ON turns behaviours back on even though its
+// own behaviour taps B, and from then on its behaviour runs instead.
+static void test_behaviors_off_keeps_the_way_back(void) {
+    keypos_t toggle_pos = test_keypos(3, 0);
+    keypos_t on_pos     = test_keypos(4, 1);
+
+    test_reset_state();
+    noah_participation_set_behaviors_override(false);
+
+    const key_runtime_integration_step_t toggle_tap[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(TEST_TOGGLE_TAP_KEY, toggle_pos.row, toggle_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(30),
+        KEY_RUNTIME_INTEGRATION_RELEASE(TEST_TOGGLE_TAP_KEY, toggle_pos.row, toggle_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(200),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+    key_runtime_integration_run(&fake_time, toggle_tap, ARRAY_SIZE(toggle_tap));
+    CHECK(!test_layer_locked(TEST_OTHER_LAYER));
+
+    const key_runtime_integration_step_t on_tap[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(BH_ON, on_pos.row, on_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(30),
+        KEY_RUNTIME_INTEGRATION_RELEASE(BH_ON, on_pos.row, on_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(200),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+    key_runtime_integration_run(&fake_time, on_tap, ARRAY_SIZE(on_tap));
+    CHECK(noah_participation_behaviors_override());
+    CHECK(tap_count == 0);
+
+    key_runtime_integration_run(&fake_time, toggle_tap, ARRAY_SIZE(toggle_tap));
+    CHECK(test_layer_locked(TEST_OTHER_LAYER));
+
+    key_runtime_integration_run(&fake_time, on_tap, ARRAY_SIZE(on_tap));
+    CHECK(tap_count == 1 && last_tap == KC_B);
+    CHECK(noah_participation_behaviors_override());
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
+}
+
+// A behaviour's tap can send BH_OFF. A behaviour already holding something
+// when behaviours go off keeps it until its key is let go, and then lets go
+// of it.
+static void test_behavior_tap_switches_behaviors_off_and_a_held_one_still_releases(void) {
+    keypos_t step_pos = test_keypos(3, 2);
+    keypos_t hold_pos = test_keypos(3, 0);
+
+    test_reset_state();
+
+    const key_runtime_integration_step_t step_tap[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(TEST_BEHAVIORS_OFF_KEY, step_pos.row, step_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(30),
+        KEY_RUNTIME_INTEGRATION_RELEASE(TEST_BEHAVIORS_OFF_KEY, step_pos.row, step_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(200),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+    key_runtime_integration_run(&fake_time, step_tap, ARRAY_SIZE(step_tap));
+    CHECK(!noah_participation_behaviors_override());
+
+    test_reset_state();
+    const key_runtime_integration_step_t hold[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(TEST_TOGGLE_TAP_KEY, hold_pos.row, hold_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(200),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+    key_runtime_integration_run(&fake_time, hold, ARRAY_SIZE(hold));
+    CHECK(test_layer_active(TEST_NUM_LAYER));
+
+    CHECK(!test_plain_key_tap(BH_OFF, test_keypos(4, 0)));
+    CHECK(!noah_participation_behaviors_override());
+    CHECK(test_layer_active(TEST_NUM_LAYER));
+
+    const key_runtime_integration_step_t release[] = {
+        KEY_RUNTIME_INTEGRATION_RELEASE(TEST_TOGGLE_TAP_KEY, hold_pos.row, hold_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(200),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+    key_runtime_integration_run(&fake_time, release, ARRAY_SIZE(release));
+    CHECK(!test_layer_active(TEST_NUM_LAYER));
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
+}
+
+// The firmware decides a switch key's press before it switches: BH_TOGG held
+// past its hold threshold holds its behaviour's layer and switches nothing.
+static void test_switch_key_held_for_its_behaviour_does_not_switch(void) {
+    keypos_t key_pos = test_keypos(4, 2);
+
+    test_reset_state();
+    const key_runtime_integration_step_t hold[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(BH_TOGG, key_pos.row, key_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(200),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+    key_runtime_integration_run(&fake_time, hold, ARRAY_SIZE(hold));
+    CHECK(test_layer_active(TEST_NUM_LAYER));
+    CHECK(noah_participation_behaviors_override());
+
+    const key_runtime_integration_step_t release[] = {
+        KEY_RUNTIME_INTEGRATION_RELEASE(BH_TOGG, key_pos.row, key_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(200),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+    key_runtime_integration_run(&fake_time, release, ARRAY_SIZE(release));
+    CHECK(!test_layer_active(TEST_NUM_LAYER));
+    CHECK(noah_participation_behaviors_override());
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+}
+
+// The auto-mouse keys switch its override the same way, act at their press,
+// and never reach QMK.
+static void test_plain_auto_mouse_keys_switch_the_override(void) {
+    keypos_t key_pos = test_keypos(4, 0);
+
+    test_reset_state();
+
+    CHECK(!test_plain_key_tap(AM_OFF, key_pos));
+    CHECK(!auto_mouse_switch_override());
+    CHECK(!test_plain_key_tap(AM_OFF, key_pos));
+    CHECK(!auto_mouse_switch_override());
+    CHECK(!test_plain_key_tap(AM_TOGG, key_pos));
+    CHECK(auto_mouse_switch_override());
+    CHECK(!test_plain_key_tap(AM_TOGG, key_pos));
+    CHECK(!auto_mouse_switch_override());
+    CHECK(!test_plain_key_tap(AM_ON, key_pos));
+    CHECK(auto_mouse_switch_override());
+    CHECK(noah_participation_behaviors_override());
+    CHECK(tap_count == 0);
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+}
+
+// QMK's autocorrect keys switch the autocorrect override the same way: the
+// firmware owns them, they act at their press and never reach QMK, whose own
+// autocorrect is not built.
+static void test_plain_autocorrect_keys_switch_the_override(void) {
+    keypos_t key_pos = test_keypos(4, 0);
+
+    test_reset_state();
+
+    CHECK(autocorrect_switch_override());
+    CHECK(!test_plain_key_tap(QK_AUTOCORRECT_OFF, key_pos));
+    CHECK(!autocorrect_switch_override());
+    CHECK(!test_plain_key_tap(QK_AUTOCORRECT_OFF, key_pos));
+    CHECK(!autocorrect_switch_override());
+    CHECK(!test_plain_key_tap(QK_AUTOCORRECT_TOGGLE, key_pos));
+    CHECK(autocorrect_switch_override());
+    CHECK(!test_plain_key_tap(QK_AUTOCORRECT_TOGGLE, key_pos));
+    CHECK(!autocorrect_switch_override());
+    CHECK(!test_plain_key_tap(QK_AUTOCORRECT_ON, key_pos));
+    CHECK(autocorrect_switch_override());
+    // The other switches are untouched.
+    CHECK(noah_participation_behaviors_override() && auto_mouse_switch_override());
+    CHECK(tap_count == 0);
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+}
+
+// A behaviour step can send AM_OFF, and with behaviours off a plain AM_ON
+// still switches auto-mouse back.
+static void test_behavior_step_switches_auto_mouse_off(void) {
+    keypos_t step_pos = test_keypos(3, 2);
+
+    test_reset_state();
+
+    const key_runtime_integration_step_t step_tap[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(TEST_AUTO_MOUSE_OFF_KEY, step_pos.row, step_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(30),
+        KEY_RUNTIME_INTEGRATION_RELEASE(TEST_AUTO_MOUSE_OFF_KEY, step_pos.row, step_pos.col),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(200),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+    key_runtime_integration_run(&fake_time, step_tap, ARRAY_SIZE(step_tap));
+    CHECK(!auto_mouse_switch_override());
+    CHECK(tap_count == 0);
+
+    noah_participation_set_behaviors_override(false);
+    CHECK(!test_plain_key_tap(AM_ON, test_keypos(4, 0)));
+    CHECK(auto_mouse_switch_override());
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
+}
+
 int main(void) {
     test_owned_mod_tap_consumes_oneshot();
     test_double_tap_hold_toggles_num_layer_lock_off_on_second_cycle();
@@ -709,12 +964,23 @@ int main(void) {
     test_behavior_tap_toggles_layer_with_tg();
     test_behavior_tap_arms_osl_and_hold_holds_tt();
 
+    test_plain_behaviors_keys_switch_the_override();
+    test_behaviors_off_keeps_the_way_back();
+    test_behavior_tap_switches_behaviors_off_and_a_held_one_still_releases();
+    test_switch_key_held_for_its_behaviour_does_not_switch();
+
+    test_plain_auto_mouse_keys_switch_the_override();
+    test_plain_autocorrect_keys_switch_the_override();
+    test_behavior_step_switches_auto_mouse_off();
+
     puts("key_runtime layer-lock integration tests passed");
     return 0;
 }
 
-// Participation allows every press in this harness (no stored policy), so a
-// row-less view is never asked for beyond linking.
+// The stored policy allows every press in this harness; only the behaviours
+// override can stop one, and then a key has no row.
 key_behavior_view_t key_behavior_lookup_without_row(uint16_t keycode) {
-    return key_behavior_lookup(keycode);
+    return (key_behavior_view_t){
+        .keycode = keycode,
+    };
 }

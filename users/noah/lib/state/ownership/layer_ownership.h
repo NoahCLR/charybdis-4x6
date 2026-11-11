@@ -28,6 +28,9 @@ typedef struct {
 
 bool layer_ownership_is_locked(uint8_t layer);
 bool layer_ownership_is_held(uint8_t layer);
+// Whether any owner keeps the layer on: a lock, a key's hold, a one-shot or
+// a pointing mode.
+bool layer_ownership_owns(uint8_t layer);
 bool layer_ownership_set_lock_state(uint8_t layer, bool locked);
 bool layer_ownership_toggle_lock_state(uint8_t layer);
 // TO(layer): lock only this layer. Other locks are released; held momentary

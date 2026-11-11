@@ -57,7 +57,7 @@ const pointing_mode_led_group_t *const pointing_mode_led_groups = pointing_mode_
 const uint8_t                    pointing_mode_led_group_count = (uint8_t)ARRAY_SIZE(pointing_mode_led_groups_data);
 
 // Room for the compiled encoding of this test's lighting tables.
-EXPORT_RGB_COMPILED_CACHE(0u, 0u, ARRAY_SIZE(pointing_mode_led_groups_data), 0u, 0u);
+EXPORT_RGB_COMPILED_CACHE(0u, 0u, ARRAY_SIZE(pointing_mode_led_groups_data), 0u, 0u, 0u);
 
 static pointing_mode_snapshot_t fake_snapshot;
 

@@ -43,7 +43,7 @@ const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups 
 const uint8_t                                  key_behavior_feedback_led_group_count = (uint8_t)ARRAY_SIZE(key_behavior_feedback_groups);
 
 // Room for the compiled encoding of this test's lighting tables.
-EXPORT_RGB_COMPILED_CACHE(0u, ARRAY_SIZE(layer_groups), ARRAY_SIZE(pointing_mode_groups), ARRAY_SIZE(combo_feedback_groups), ARRAY_SIZE(key_behavior_feedback_groups));
+EXPORT_RGB_COMPILED_CACHE(0u, ARRAY_SIZE(layer_groups), ARRAY_SIZE(pointing_mode_groups), ARRAY_SIZE(combo_feedback_groups), ARRAY_SIZE(key_behavior_feedback_groups), 1u);
 const automouse_fade_end_config_t              automouse_fade_end_config             = {
     .mode      = (automouse_fade_end_mode_t)0xFFu,
     .end_color = HSV(3, 3, 3),
@@ -64,6 +64,13 @@ const uint8_t                              pointing_mode_color_count    = (uint8
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
     RGB_TAP_BRANCH_COLORS(HSV(0, 0, 1)), .tap_committed_color = HSV(0, 0, 2), .hold_active_color = HSV(0, 0, 3), .long_hold_active_color = HSV(0, 0, 4), .tap_commit_mode = (key_feedback_tap_commit_mode_t)0xFFu, .locality = (rgb_locality_t)0xFFu,
 };
+
+static const autocorrect_feedback_led_group_t autocorrect_feedback_groups[] = {
+    {.semantic = (autocorrect_feedback_group_semantic_t)0xFFu, .color = HSV(6, 6, 6), .led_group = RGB_LED_GROUP(RGB_MATRIX_LED_COUNT)},
+};
+const autocorrect_feedback_color_config_t     autocorrect_feedback_colors          = {.text_color = HSV(0, 0, 5), .macro_color = HSV(0, 0, 6), .undo_color = HSV(0, 0, 7), .locality = (rgb_locality_t)0xFFu};
+const autocorrect_feedback_led_group_t *const autocorrect_feedback_led_groups      = autocorrect_feedback_groups;
+const uint8_t                                 autocorrect_feedback_led_group_count = (uint8_t)ARRAY_SIZE(autocorrect_feedback_groups);
 
 const pointing_mode_def_t pointing_modes[POINTING_MODE_COUNT] = {
     [POINTING_MODE_INDEX_DRAGSCROLL] = {.mode_flag = POINTING_MODE_DRAGSCROLL, .keycode = PD_MODE_0}, [POINTING_MODE_INDEX_VOLUME] = {.mode_flag = POINTING_MODE_VOLUME, .keycode = PD_MODE_1}, [POINTING_MODE_INDEX_BRIGHTNESS] = {.mode_flag = POINTING_MODE_BRIGHTNESS, .keycode = PD_MODE_2}, [POINTING_MODE_INDEX_ZOOM] = {.mode_flag = POINTING_MODE_ZOOM, .keycode = PD_MODE_3}, [POINTING_MODE_INDEX_ARROW] = {.mode_flag = POINTING_MODE_ARROW, .keycode = PD_MODE_4}, [POINTING_MODE_INDEX_PINCH] = {.mode_flag = POINTING_MODE_PINCH, .keycode = PD_MODE_5},
@@ -112,6 +119,9 @@ int main(void) {
     CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_colors.tap_commit_mode") != NULL);
     CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_led_groups[0].semantic") != NULL);
     CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_led_groups") != NULL);
+    CHECK(strstr(log_buffer, "Invalid autocorrect_feedback_colors.locality") != NULL);
+    CHECK(strstr(log_buffer, "Invalid autocorrect_feedback_led_groups[0].semantic") != NULL);
+    CHECK(strstr(log_buffer, "Invalid autocorrect_feedback_led_groups[0].led_group.leds[0]") != NULL);
 
     puts("rgb_validation host tests passed");
     return 0;

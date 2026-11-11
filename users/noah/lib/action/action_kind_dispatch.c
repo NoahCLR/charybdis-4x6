@@ -13,9 +13,14 @@
 
 #include "owned_keycode.h"
 #include "synthetic_record.h"
+#include "../compat/qmk_combo_switch_contract.h"
 #include "../compat/qmk_oneshot_contract.h"
+#include "../key/behavior/participation.h"
+#include "../pointing/policy/auto_mouse_switch.h"
+#include "../autocorrect/autocorrect_switch.h"
 #include "../profile/runtime/active_profile_settings_runtime.h"
 #include "../state/ownership/layer_ownership.h"
+#include "../macro/typing_stage.h"
 
 typedef void (*noah_action_tap_impl_t)(noah_action_desc_t desc, keypos_t key_pos);
 typedef void (*noah_action_press_impl_t)(noah_action_desc_t desc, keypos_t key_pos);
@@ -146,6 +151,53 @@ static void noah_action_tap_pointing_mode_lock(noah_action_desc_t desc, keypos_t
 
 static void noah_action_press_pointing_mode_lock(noah_action_desc_t desc, keypos_t key_pos) {
     noah_action_toggle_pointing_mode_lock(desc, key_pos);
+}
+
+// A switch key turns combos (QMK's flag), behaviours, auto-mouse or
+// autocorrect (the firmware's overrides) on, off or the other way, at its tap
+// or press; no stored master changes (D-F66).
+static void noah_action_switch_key(noah_action_desc_t desc, keypos_t key_pos) {
+    (void)key_pos;
+    switch (desc.action) {
+        case QK_COMBO_ON:
+            noah_qmk_contract_switch_combos(true);
+            break;
+        case QK_COMBO_OFF:
+            noah_qmk_contract_switch_combos(false);
+            break;
+        case QK_COMBO_TOGGLE:
+            noah_qmk_contract_switch_combos(!noah_qmk_contract_combos_switched_on());
+            break;
+        case BH_ON:
+            noah_participation_set_behaviors_override(true);
+            break;
+        case BH_OFF:
+            noah_participation_set_behaviors_override(false);
+            break;
+        case BH_TOGG:
+            noah_participation_set_behaviors_override(!noah_participation_behaviors_override());
+            break;
+        case AM_ON:
+            auto_mouse_switch_set_override(true);
+            break;
+        case AM_OFF:
+            auto_mouse_switch_set_override(false);
+            break;
+        case AM_TOGG:
+            auto_mouse_switch_set_override(!auto_mouse_switch_override());
+            break;
+        case QK_AUTOCORRECT_ON:
+            autocorrect_switch_set_override(true);
+            break;
+        case QK_AUTOCORRECT_OFF:
+            autocorrect_switch_set_override(false);
+            break;
+        case QK_AUTOCORRECT_TOGGLE:
+            autocorrect_switch_set_override(!autocorrect_switch_override());
+            break;
+        default:
+            break;
+    }
 }
 
 static void noah_action_press_owned_momentary_layer(noah_action_desc_t desc, keypos_t key_pos) {
@@ -281,8 +333,14 @@ static const noah_action_kind_dispatch_ops_t *noah_action_desc_dispatch_ops(noah
     return &noah_action_kind_dispatch_ops[desc.kind];
 }
 
+// A build or host test without the typing stage (typing_stage.h).
+__attribute__((weak)) keypos_t noah_typing_stage_noted_key;
+
 void noah_action_desc_tap_dispatch(noah_action_desc_t desc, keypos_t key_pos) {
     const noah_action_kind_dispatch_ops_t *ops = noah_action_desc_dispatch_ops(desc);
+    // The tap's keys reach the report from here: the typing stage is told
+    // whose they are (typing_stage.h).
+    noah_typing_stage_noted_key = key_pos;
     ops->tap(desc, key_pos);
 }
 

@@ -64,7 +64,7 @@
 // Register the custom split RPCs for:
 // - base runtime-visible state (automouse / pd / preview)
 // - combo feedback locality
-// - truthful key-feedback semantics and tap branch state
+// - truthful behaviour-feedback semantics and tap branch state
 // - the profile copy and commit between halves
 // - the profile store's flash timing on the other half (diagnostics only)
 // - the working copy's live edits and the edit mode (D-F32)

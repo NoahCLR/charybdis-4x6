@@ -7,6 +7,7 @@
 // candidate headers and the keyboard's config.
 
 #include "../profile/schema/profile_macros_v1.h"
+#include "../profile/schema/profile_autocorrect_v1.h"
 
 #ifndef NOAH_FIRMWARE_VERSION
 #    define NOAH_FIRMWARE_VERSION 0u
@@ -74,6 +75,12 @@
         .profile_slot_payload         = NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX,                                                                                                                                                                                                                                           \
         .profile_slot_size            = NOAH_PROFILE_STORAGE_SLOT_A_SIZE,                                                                                                                                                                                                                                                \
         .macro_bytes                  = NOAH_PROFILE_MACROS_V1_MAX_SIZE,                                                                                                                                                                                                                                                 \
+        .autocorrect_corrections      = NOAH_PROFILE_AUTOCORRECT_V1_MAX_CORRECTIONS,                                                                                                                                                                                                                                     \
+        .autocorrect_typos            = NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS,                                                                                                                                                                                                                                           \
+        .autocorrect_text_bytes       = NOAH_PROFILE_AUTOCORRECT_V1_MAX_TEXT_BYTES,                                                                                                                                                                                                                                      \
+        .autocorrect_bytes            = NOAH_PROFILE_AUTOCORRECT_V1_MAX_SIZE,                                                                                                                                                                                                                                            \
+        .autocorrect_text_max         = NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX,                                                                                                                                                                                                                                            \
+        .autocorrect_correction_max   = NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX,                                                                                                                                                                                                                                      \
         .supported_domain_mask        = 0u,                                                                                                                                                                                                                                                                              \
         .max_name_bytes               = NOAH_PROFILE_WIRE_V1_MAX_NAME_BYTES,                                                                                                                                                                                                                                             \
         .layer_mask_bits              = NOAH_PROFILE_WIRE_V1_LAYER_MASK_BITS,                                                                                                                                                                                                                                            \

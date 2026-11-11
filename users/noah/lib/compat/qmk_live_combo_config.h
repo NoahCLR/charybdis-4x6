@@ -9,6 +9,10 @@
 // portable policy, so combo readback does not report it as a user hook.
 #define COMBO_KEY_RECORD_FILTER
 #define NOAH_COMBO_PARTICIPATION_HOOK
+// QMK leaves CM_ON, CM_OFF and CM_TOGG to the firmware, which switches combos
+// wherever the keys are sent: a key, a behaviour's tap or hold, a combo's
+// output (D-F66, qmk_combo_switch_contract.h).
+#define COMBO_KEYCODES_DOWNSTREAM
 
 // QMK exposes per-combo hooks for timing and matching, but its hold/tap wait
 // threshold is global. Keep that contract global in the live profile too.

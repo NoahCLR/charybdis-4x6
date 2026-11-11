@@ -26,6 +26,8 @@ static noah_profile_working_result_t       next_result = NOAH_PROFILE_WORKING_OK
 static noah_profile_owner_working_status_t fake;
 static uint8_t                             working[100];
 static bool                                behaviors_override = true;
+static bool                                auto_mouse_override = true;
+static bool                                autocorrect_override = true;
 static unsigned                            restart_requests;
 static bool                                restart_acknowledged = true;
 static bool                                combos_on          = true;
@@ -78,6 +80,12 @@ uint32_t noah_setting(uint8_t id, uint32_t fallback) {
 }
 bool noah_participation_behaviors_override(void) {
     return behaviors_override;
+}
+bool auto_mouse_switch_override(void) {
+    return auto_mouse_override;
+}
+bool autocorrect_switch_override(void) {
+    return autocorrect_override;
 }
 bool is_combo_enabled(void) {
     return combos_on;
@@ -309,9 +317,22 @@ static void test_gets(void) {
     behaviors_override = false;
     combos_on          = false;
     get(NOAH_PROFILE_WIRE_V1_VALUE_RUNTIME, 0u);
-    assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && frame[5] == 0u && frame[6] == 24u);
+    assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && frame[5] == 0u && frame[6] == 25u);
     assert(frame[7] == 1u && frame[8] == 0u && frame[9] == 0u && frame[10] == 0u);
     assert((frame[11] | frame[12] << 8) == 1600u && u32(&frame[19]) == 0x00C8FF55u);
+    // Byte 24, the auto-mouse override.
+    assert(frame[31] == 1u);
+    auto_mouse_override = false;
+    get(NOAH_PROFILE_WIRE_V1_VALUE_RUNTIME, 0u);
+    assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && frame[6] == 25u && frame[31] == 0u);
+    // Page 1: the autocorrect override, one byte, and no page after it.
+    get(NOAH_PROFILE_WIRE_V1_VALUE_RUNTIME, 1u);
+    assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && frame[5] == 0u && frame[6] == 1u && frame[7] == 1u && frame[8] == 0u);
+    autocorrect_override = false;
+    get(NOAH_PROFILE_WIRE_V1_VALUE_RUNTIME, 1u);
+    assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && frame[6] == 1u && frame[7] == 0u);
+    get(NOAH_PROFILE_WIRE_V1_VALUE_RUNTIME, 2u);
+    assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE);
 
     // The edit mode on both halves.
     get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_MODE, 0u);

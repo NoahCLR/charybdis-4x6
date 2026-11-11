@@ -18,6 +18,9 @@ typedef enum {
     MACRO_PAYLOAD_IR_OP_KEY_UP,
     MACRO_PAYLOAD_IR_OP_TAP_LIST,
     MACRO_PAYLOAD_IR_OP_UNICODE, // Three little-endian bytes, one Unicode scalar.
+    // A count: Backspace tapped that many times at the text pace. A correction
+    // plays it (D-F69); no stored macro holds it.
+    MACRO_PAYLOAD_IR_OP_ERASE,
 } macro_payload_ir_opcode_t;
 
 typedef enum {
@@ -59,6 +62,13 @@ typedef bool (*macro_payload_load_window_fn)(void *context);
 typedef enum {
     MACRO_PAYLOAD_SOURCE_DIRECT = 0,
     MACRO_PAYLOAD_SOURCE_SLOT,
+    // A correction (D-F69): its output is isolated as an uninterruptible
+    // macro's is, but presses meanwhile are held back by the typing stage and
+    // come out afterwards, never ignored.
+    MACRO_PAYLOAD_SOURCE_CORRECTION,
+    // The stored macro a correction plays in place of text (D-F69): isolated
+    // and its presses held back the same way, whatever its own protection.
+    MACRO_PAYLOAD_SOURCE_REPLACEMENT,
 } macro_payload_source_t;
 
 typedef enum {
@@ -100,6 +110,19 @@ typedef struct {
     uint32_t                      maximum_lateness_ms;
 } macro_payload_debug_snapshot_t;
 
+// The host text is typed for and read back from, as playback latches it:
+// the layout (a host_layout_t), whether an ISO Mac exchanges two of its keys,
+// and whether Caps Lock follows macOS (capitals whatever Shift does) or
+// exchanges the two cases.
+typedef struct {
+    const void *layout;
+    bool        iso;
+    bool        macos;
+} macro_payload_typing_host_t;
+
+macro_payload_typing_host_t  macro_payload_typing_host(void);
+// The host's Caps Lock, as its LED report says.
+bool                         macro_payload_unicode_caps_lock(void);
 bool                         macro_payload_validate(const char *payload);
 bool                         macro_payload_compile(const char *payload, macro_payload_ir_t *ir);
 macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir, macro_payload_text_output_t text_output, uint8_t interval, macro_payload_source_t source, uint8_t slot, macro_payload_finish_fn finish, void *context);
@@ -112,6 +135,14 @@ macro_payload_start_result_t macro_payload_start_windows(const macro_payload_ir_
 void                         macro_payload_engine_scan(void);
 bool                         macro_payload_engine_cancel(void);
 bool                         macro_payload_engine_protected(void);
+// Uninterruptible playback that ignores new presses (D-F17): a protected
+// macro a key or a client started, never a correction or the macro one plays.
+bool                         macro_payload_engine_ignores_presses(void);
+bool                         macro_payload_engine_idle(void);
+// How many of the playing macro's leases hold `usage`. False while the macro
+// is itself taking or letting go of a lease, when a change in the ledger is
+// its own and not yet in its leases.
+bool                         macro_payload_engine_leases(uint8_t usage, uint8_t *leases);
 void                         macro_payload_engine_init(void);
 void                         macro_payload_debug_snapshot(macro_payload_debug_snapshot_t *out);
 bool                         macro_payload_decode_qmk_stream(macro_payload_ir_t *ir, uint16_t length, macro_payload_read_byte_fn read_byte, void *context);

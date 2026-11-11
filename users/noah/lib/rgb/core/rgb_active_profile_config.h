@@ -42,6 +42,18 @@ typedef struct {
     uint8_t bitmap[NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE];
 } rgb_active_profile_key_group_t;
 
+typedef struct {
+    // One colour per replacement-feedback semantic, in the format's order.
+    hsv_t          colors[NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_COUNT];
+    rgb_locality_t locality;
+} rgb_active_profile_autocorrect_feedback_t;
+
+typedef struct {
+    uint8_t selector;
+    hsv_t   color;
+    uint8_t bitmap[NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE];
+} rgb_active_profile_autocorrect_group_t;
+
 noah_active_profile_rgb_result_t rgb_active_profile_config_capture_frame(noah_active_profile_rgb_frame_t *frame);
 bool                             rgb_active_profile_config_frame_current(const noah_active_profile_rgb_frame_t *frame);
 bool                             rgb_active_profile_config_layer_stage_enabled(const noah_active_profile_rgb_frame_t *frame);
@@ -62,8 +74,12 @@ bool                             rgb_active_profile_config_key_stage_enabled(con
 bool                             rgb_active_profile_config_key_feedback(const noah_active_profile_rgb_frame_t *frame, rgb_active_profile_key_feedback_t *config);
 uint8_t                          rgb_active_profile_config_key_group_count(const noah_active_profile_rgb_frame_t *frame);
 bool                             rgb_active_profile_config_key_group_at(const noah_active_profile_rgb_frame_t *frame, uint8_t index, rgb_active_profile_key_group_t *group);
+bool                             rgb_active_profile_config_autocorrect_stage_enabled(const noah_active_profile_rgb_frame_t *frame);
+bool                             rgb_active_profile_config_autocorrect_feedback(const noah_active_profile_rgb_frame_t *frame, rgb_active_profile_autocorrect_feedback_t *config);
+uint8_t                          rgb_active_profile_config_autocorrect_group_count(const noah_active_profile_rgb_frame_t *frame);
+bool                             rgb_active_profile_config_autocorrect_group_at(const noah_active_profile_rgb_frame_t *frame, uint8_t index, rgb_active_profile_autocorrect_group_t *group);
 
-// Each layer, pointing and key-feedback group row's selector, read once per
+// Each layer, pointing, behaviour-feedback and replacement-feedback group row's selector, read once per
 // lighting publication (D-F63). A stage compares a row's selector here and
 // reads the row and its group only when it matches, so an accent that is not
 // lit costs no profile read. Rows keep their table order. Combo rows have no
@@ -72,9 +88,11 @@ typedef struct {
     const uint8_t *layer;
     const uint8_t *pd;
     const uint8_t *key;
+    const uint8_t *autocorrect;
     uint8_t        layer_count;
     uint8_t        pd_count;
     uint8_t        key_count;
+    uint8_t        autocorrect_count;
 } rgb_active_profile_group_selectors_t;
 
 bool rgb_active_profile_config_group_selectors(const noah_active_profile_rgb_frame_t *frame, rgb_active_profile_group_selectors_t *selectors);
@@ -87,6 +105,7 @@ typedef struct {
     uint32_t pd_rows;
     uint32_t combo_rows;
     uint32_t key_rows;
+    uint32_t autocorrect_rows;
 } rgb_active_profile_config_test_reads_t;
 
 void                                   rgb_active_profile_config_test_reset_reads(void);

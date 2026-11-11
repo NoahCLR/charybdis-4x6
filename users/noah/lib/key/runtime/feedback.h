@@ -7,10 +7,10 @@
 // This module now exposes three distinct surfaces:
 // - preview layer display state
 // - combo RGB locality (underlay vs overlay)
-// - authored key-behavior feedback truth as packed semantic and tap-branch maps
+// - authored behaviour-feedback truth as packed semantic and tap-branch maps
 //
 // Exact per-key truth is produced on the master half. Split sync mirrors the
-// already-computed combo locality bitmaps plus packed key-feedback maps so the
+// already-computed combo locality bitmaps plus packed behaviour-feedback maps so the
 // slave renders the same scene without direct access to the key runtime.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
@@ -80,8 +80,8 @@ typedef enum {
 #define KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE ((uint8_t)KEY_FEEDBACK_BROAD_OWNER_COUNT)
 #define KEY_FEEDBACK_BROAD_OWNER_MAP_EMPTY_INIT {KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE}
 
-_Static_assert(KEY_FEEDBACK_TAP_BRANCH_BITS <= 8u, "key feedback tap branch values must fit in one byte");
-_Static_assert(KEY_BEHAVIOR_MAX_TAP_COUNT - 1u <= KEY_FEEDBACK_TAP_BRANCH_MASK, "key feedback tap branch map must represent every authored tap count");
+_Static_assert(KEY_FEEDBACK_TAP_BRANCH_BITS <= 8u, "behaviour-feedback tap branch values must fit in one byte");
+_Static_assert(KEY_BEHAVIOR_MAX_TAP_COUNT - 1u <= KEY_FEEDBACK_TAP_BRANCH_MASK, "the behaviour-feedback tap branch map must represent every authored tap count");
 
 typedef enum {
     KEY_FEEDBACK_SEMANTIC_NONE = 0,
@@ -93,7 +93,7 @@ typedef enum {
     KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED,
 } key_feedback_semantic_t;
 
-_Static_assert(KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED <= KEY_FEEDBACK_SEMANTIC_MASK, "key feedback semantic map must represent every semantic value");
+_Static_assert(KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED <= KEY_FEEDBACK_SEMANTIC_MASK, "the behaviour-feedback semantic map must represent every semantic value");
 
 static inline bool key_feedback_semantic_is_flashing(key_feedback_semantic_t semantic) {
     return semantic == KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING || semantic == KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING;

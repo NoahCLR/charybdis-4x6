@@ -55,12 +55,13 @@ sh run_pointing_mode_tests.sh
 sh run_pointing_mode_handlers_tests.sh
 sh run_pd_runtime_tests.sh
 sh run_pointer_layer_policy_tests.sh
+sh run_auto_mouse_switch_tests.sh
 sh run_split_runtime_sync_tests.sh
 sh run_profile_storage_layout_tests.sh
 sh run_profile_blob_v1_tests.sh
 sh run_key_behavior_domain_v1_tests.sh
 sh run_profile_rgb_v1_tests.sh
-sh run_profile_rgb_v4_tests.sh
+sh run_profile_rgb_v5_tests.sh
 sh run_profile_settings_v1_tests.sh
 sh run_host_detection_tests.sh
 sh run_profile_pd_v1_tests.sh
@@ -68,6 +69,7 @@ sh run_pd_profile_integration_tests.sh
 sh run_qmk_portable_editor_tests.sh
 sh run_qmk_portable_profile_tests.sh
 sh run_profile_validator_v1_tests.sh
+sh run_profile_autocorrect_v1_tests.sh
 sh run_profile_keymap_macros_runtime_tests.sh
 sh run_profile_validator_work_budget_tests.sh
 sh run_active_profile_provider_tests.sh
@@ -113,6 +115,7 @@ sh run_macro_program_size_tests.sh
 sh run_macro_payload_engine_tests.sh
 sh run_macro_output_ownership_tests.sh
 sh run_host_layout_tests.sh
+sh run_autocorrect_tests.sh
 sh run_key_runtime_release_matrix_tests.sh
 sh run_key_runtime_integration_harness_tests.sh
 sh run_key_runtime_scenario_tests.sh

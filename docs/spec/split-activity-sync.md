@@ -71,16 +71,19 @@ build's packed C struct, sent whole.
 
 | RPC | Packet |
 | --- | --- |
-| `PUT_SPLIT_RUNTIME_BASE_SYNC` | auto-mouse fade progress, active and locked pointing slot, the pointing mode's owning half and keys (when `RGB_POINTING_MODE_ACTIVE_HALF_ENABLE`), key preview layer |
+| `PUT_SPLIT_RUNTIME_BASE_SYNC` | auto-mouse fade progress, active and locked pointing slot, the pointing mode's owning half and keys (when `RGB_POINTING_MODE_ACTIVE_HALF_ENABLE`), key preview layer, the replacement feedback that shows and its keys (when `RGB_AUTOCORRECT_FEEDBACK_ENABLE`) |
 | `PUT_SPLIT_COMBO_FEEDBACK_SYNC` | combo feedback underlay and overlay key bitmaps |
-| `PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC` | key feedback flash visibility and semantic map |
-| `PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC` | key feedback owner map and tap branch map |
+| `PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC` | behaviour-feedback flash visibility and semantic map |
+| `PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC` | behaviour-feedback owner map and tap branch map |
 
 - A packet is sent when it changed, when forced, and as a heartbeat: every
   250 ms while it carries active state, every 1,000 ms otherwise. A pass
   sends at most one heartbeat; one due behind another's goes out on a
   following pass, and each packet's heartbeat counts from its own last send.
   Changed and forced packets never wait.
+- Replacement feedback is active state while a flash shows. The master half
+  times the flash and sends its end as a change; the slave half shows what
+  the last packet said and times nothing (D-F70).
 - Fade progress is active state only while the pointer layer is on, where
   both halves draw it. With the layer off the packet carries the finished
   fade, whatever the auto-mouse timer reads; with auto-mouse off, or a

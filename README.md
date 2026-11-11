@@ -170,7 +170,9 @@ layer's keys light up before the layer turns on.
 From the second tap, the half being tapped shows the colour of that tap
 count, and the colour changes again when a hold starts, so a double tap is
 visible before anything is typed. Combos and the running pointing mode light
-up as well, and the pointer layer's lights fade out before it turns off.
+up as well, and the pointer layer's lights fade out before it turns off. When
+text replacement changes a word, the half of the key that ended it flashes:
+green for text, magenta for a macro, red when Backspace puts the word back.
 After 10 minutes without input the lights go dark until a key is pressed or
 the ball moves.
 
@@ -198,8 +200,11 @@ the ball moves.
   tap and hold rules, described in [Keys](docs/guide/keys.md). Permissive
   Hold, Chordal Hold and Flow Tap aren't used, and tapping a dual-role key
   then holding it starts a new hold rather than repeating the tap. Nothing is
-  tuned for home row mods. This build has no Caps Word, Leader, key overrides
-  or autocorrect.
+  tuned for home row mods. This build has no Caps Word, Leader or key
+  overrides. Text replacement (autocorrect) is the firmware's own, not
+  QMK's: when a word ends it fixes a typo, types longer text or plays a macro
+  from the list in your profile
+  ([Text replacement](docs/guide/autocorrect.md)).
 - **Limits:** 16 layers, 128 behaviours with five tap counts each, 128 combos,
   128 custom keys, 128 macros and 32 pointing modes.
 - **Updates:** flashing never erases the saved profile, but the keyboard runs

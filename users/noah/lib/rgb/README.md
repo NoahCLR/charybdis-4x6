@@ -14,8 +14,8 @@ what they draw is [rgb-domain-v1.md](../../../../docs/spec/rgb-domain-v1.md#draw
 - `core/rgb_helpers.h`, `core/rgb_config_helpers.h`: the authoring types and
   macros `rgb_config.c` uses; `core/rgb_config_defaults.c`: weak empty group
   tables for a keymap that authors none.
-- `stages/`: layer, layer preview, pointing mode, combo feedback, key
-  feedback, one file each.
+- `stages/`: layer, layer preview, pointing mode, combo feedback, behaviour
+  feedback, replacement feedback, one file each.
 - `automouse/`: fade progress (`rgb_automouse.c`) and the fade stage, which
   blends two layer-stage renders and the captured background effect.
 
@@ -33,12 +33,15 @@ what they draw is [rgb-domain-v1.md](../../../../docs/spec/rgb-domain-v1.md#draw
   what is beneath.
 - Group bitmaps index LED `n` as bit `n % 8` of byte `n / 8`; a black group
   colour is the stage's own (`rgb_hsv_is_inherit_color`).
-- Runtime state comes from its owner's getter on the master half. On the
-  slave half combo and key-feedback sources are read once per frame through
+- Runtime state comes from its owner's getter on the master half. On the slave
+  half combo and behaviour-feedback sources are read once per frame through
   `split_runtime_sync_remote_read_*` into `rgb_runtime_render_snapshot`, held
   to 96 bytes by a static assertion; the preview layer and fade progress are
   read straight from `split_runtime_sync_remote`, and pointing from its
-  snapshot.
+  snapshot. Replacement feedback is read once per frame into a copy of its
+  own: from the typing stage on the master half, and whole from the base
+  packet on the slave half
+  (`split_runtime_sync_remote_read_autocorrect_feedback`).
 - Each stage keeps a `_render` wrapper that passes a `NULL` view, which reads
   the compiled lighting; host tests use it.
 
@@ -46,9 +49,10 @@ The scratch frames are static and LED-frame-sized (one in `rgb_runtime.c`,
 three in the fade stage); a new stage reuses the shared one. The layer stage
 also keeps, for one publication, each layer's colour, mode and solid flag and
 the mapped-only key map, so a chunk reads only its layer groups' records.
-`rgb_active_profile_config.c` keeps every layer, pointing and key-feedback
-row's selector for one publication, so a stage reads only the rows that paint
-(D-F63); `rgb_runtime_layer_stage_invalidate_maps` drops all three.
+`rgb_active_profile_config.c` keeps every layer, pointing, behaviour-feedback
+and replacement-feedback row's selector for one publication, so a stage reads
+only the rows that paint (D-F63); `rgb_runtime_layer_stage_invalidate_maps`
+drops all three.
 
 A new stage needs its compile flag, a stage bit and its records in
 `profile/schema/profile_rgb_v1`, its accessors here, its call in

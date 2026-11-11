@@ -2,9 +2,12 @@
 
 #include "send_string.h"
 
+#include <string.h>
+
 #include "../action/owned_keycode.h"
 #include "host_layout.h"
 #include "macro_payload_internal.h"
+#include "typing_stage.h"
 #include "../profile/runtime/active_profile_settings_runtime.h"
 #include "../compat/qmk_host.h"
 
@@ -29,6 +32,7 @@ typedef enum {
     MACRO_PAYLOAD_PHASE_READY,
     MACRO_PAYLOAD_PHASE_WAITING,
     MACRO_PAYLOAD_PHASE_TEXT_PRESS,
+    MACRO_PAYLOAD_PHASE_ERASE_PRESS,
     MACRO_PAYLOAD_PHASE_TRANSIENT_RELEASE,
     MACRO_PAYLOAD_PHASE_SECOND_STROKE,
     MACRO_PAYLOAD_PHASE_CLEANUP,
@@ -67,6 +71,7 @@ typedef struct {
     uint16_t                      cursor;
     uint16_t                      text_cursor;
     uint8_t                       text_remaining;
+    uint8_t                       erase_remaining;
     uint8_t                       text_interval;
     macro_payload_phase_t         phase;
     macro_payload_phase_t         wait_resume_phase;
@@ -91,6 +96,14 @@ static macro_payload_debug_snapshot_t macro_payload_diagnostics;
 // them. They never acquire a new host press edge just because playback ended.
 static uint8_t macro_suppressed_keys[32];
 static bool    macro_capture_suppressed;
+// The ledger sends a report from inside a lease change, before or after the
+// lease itself says what it holds: for that report the macro's keys cannot be
+// told from the person's.
+static bool macro_lease_changing;
+// The filters' working copies of a report's usages. They sit at the bottom of
+// the deepest reviewed stack paths, so they are static: a report is filtered
+// on the main thread only, and nothing a filter calls sends another.
+static uint8_t macro_report_keys[32], macro_report_macro_keys[32];
 
 static void macro_payload_lease_keys(const owned_keycode_lease_t *lease, uint8_t keys[32]) {
     if (lease->active && lease->has_basic && IS_BASIC_KEYCODE(lease->basic)) keys[lease->basic / 8u] |= (uint8_t)(1u << (lease->basic % 8u));
@@ -103,8 +116,64 @@ static void macro_payload_output_keys(uint8_t keys[32]) {
         macro_payload_lease_keys(&macro_payload_engine.transient_leases[i], keys);
 }
 
+static uint8_t macro_payload_lease_holds(const owned_keycode_lease_t *lease, uint8_t usage) {
+    return lease->active && lease->has_basic && lease->basic == usage ? 1u : 0u;
+}
+
+bool macro_payload_engine_leases(uint8_t usage, uint8_t *leases) {
+    uint8_t count = 0u;
+
+    if (macro_lease_changing) return false;
+    for (uint8_t i = 0u; i < macro_payload_engine.holds.balance.count; i++)
+        count = (uint8_t)(count + macro_payload_lease_holds(&macro_payload_engine.holds.leases[i], usage));
+    for (uint8_t i = 0u; i < macro_payload_engine.transient_count; i++)
+        count = (uint8_t)(count + macro_payload_lease_holds(&macro_payload_engine.transient_leases[i], usage));
+    *leases = count;
+    return true;
+}
+
+static uint8_t macro_payload_output_mods(void) {
+    uint8_t mods = 0u;
+    for (uint8_t i = 0u; i < macro_payload_engine.holds.balance.count; i++)
+        mods |= macro_payload_engine.holds.leases[i].mods;
+    for (uint8_t i = 0u; i < macro_payload_engine.transient_count; i++)
+        mods |= macro_payload_engine.transient_leases[i].mods;
+    return mods;
+}
+
+// A build or host test without the typing stage (typing_stage.h).
+__attribute__((weak)) bool noah_typing_stage_active(void) {
+    return false;
+}
+
+__attribute__((weak)) void noah_typing_stage_keys(uint8_t keys[32], const uint8_t macro_keys[32], uint8_t macro_mods) {
+    (void)keys;
+    (void)macro_keys;
+    (void)macro_mods;
+}
+
+__attribute__((weak)) bool noah_typing_stage_mods(uint8_t *mods) {
+    (void)mods;
+    return false;
+}
+
 // QMK filters a copy: physical and managed ownership keeps processing releases.
 static void macro_payload_project_keys(uint8_t keys[32]) {
+    // The typing stage reads the person's keys and answers with the ones the
+    // host is to see; the macro's own keys join them below as they always did.
+    if (noah_typing_stage_active()) {
+        uint8_t macro_mods = macro_payload_output_mods();
+        if (macro_lease_changing) {
+            // Everything counts as the macro's, so the stage reads nothing
+            // from this report; the one after the change is read as usual.
+            memset(macro_report_macro_keys, 0xFF, sizeof(macro_report_macro_keys));
+            macro_mods = 0xFFu;
+        } else {
+            memset(macro_report_macro_keys, 0, sizeof(macro_report_macro_keys));
+            macro_payload_output_keys(macro_report_macro_keys);
+        }
+        noah_typing_stage_keys(keys, macro_report_macro_keys, macro_mods);
+    }
     if (macro_capture_suppressed)
         for (uint8_t i = 0u; i < 32u; i++)
             macro_suppressed_keys[i] = keys[i];
@@ -124,7 +193,7 @@ static void macro_payload_project_keys(uint8_t keys[32]) {
 }
 
 static bool macro_payload_filter_needed(void) {
-    if (macro_payload_engine_protected() || macro_capture_suppressed) return true;
+    if (macro_payload_engine_protected() || macro_capture_suppressed || noah_typing_stage_active()) return true;
     for (uint8_t i = 0u; i < sizeof(macro_suppressed_keys); i++)
         if (macro_suppressed_keys[i]) return true;
     return false;
@@ -132,7 +201,8 @@ static bool macro_payload_filter_needed(void) {
 
 void keyboard_report_keys_filter_user(report_keyboard_t *report) {
     if (!macro_payload_filter_needed()) return;
-    uint8_t keys[32] = {0};
+    uint8_t *keys = macro_report_keys;
+    memset(keys, 0, sizeof(macro_report_keys));
     for (uint8_t i = 0u; i < sizeof(report->keys); i++)
         keys[report->keys[i] / 8u] |= (uint8_t)(1u << (report->keys[i] % 8u));
     keys[0] &= (uint8_t)~1u;
@@ -147,7 +217,8 @@ void keyboard_report_keys_filter_user(report_keyboard_t *report) {
 #ifdef NKRO_ENABLE
 void nkro_report_keys_filter_user(report_nkro_t *report) {
     if (!macro_payload_filter_needed()) return;
-    uint8_t keys[32] = {0};
+    uint8_t *keys = macro_report_keys;
+    memset(keys, 0, sizeof(macro_report_keys));
     for (uint8_t i = 0u; i < sizeof(report->bits); i++)
         keys[i] = report->bits[i];
     macro_payload_project_keys(keys);
@@ -161,17 +232,21 @@ bool keyboard_report_mods_override_user(uint8_t *mods) {
         *mods = macro_payload_engine.unicode_mods;
         return true;
     }
-    if (!macro_payload_engine_protected()) return false;
-    *mods = 0u;
-    for (uint8_t i = 0u; i < macro_payload_engine.holds.balance.count; i++)
-        *mods |= macro_payload_engine.holds.leases[i].mods;
-    for (uint8_t i = 0u; i < macro_payload_engine.transient_count; i++)
-        *mods |= macro_payload_engine.transient_leases[i].mods;
+    if (macro_payload_engine_protected()) {
+        *mods = macro_payload_output_mods();
+        return true;
+    }
+    // Keys the typing stage holds back bring their modifiers with them later;
+    // an interruptible macro's own modifiers still reach the host now.
+    if (!noah_typing_stage_mods(mods)) return false;
+    *mods |= macro_payload_output_mods();
     return true;
 }
 
 static bool macro_payload_key_acquire(uint16_t keycode, owned_keycode_lease_t *lease) {
-    bool ok = owned_keycode_acquire(keycode, lease);
+    macro_lease_changing = true;
+    bool ok              = owned_keycode_acquire(keycode, lease);
+    macro_lease_changing = false;
     // A colliding live usage may not change the ledger's aggregate report.
     // The macro's own lease still changes its projected output.
     if (macro_payload_filter_needed()) send_keyboard_report();
@@ -179,7 +254,9 @@ static bool macro_payload_key_acquire(uint16_t keycode, owned_keycode_lease_t *l
 }
 
 static bool macro_payload_key_release(owned_keycode_lease_t *lease) {
-    bool ok = owned_keycode_release(lease);
+    macro_lease_changing = true;
+    bool ok              = owned_keycode_release(lease);
+    macro_lease_changing = false;
     if (macro_payload_filter_needed()) send_keyboard_report();
     return ok;
 }
@@ -311,6 +388,10 @@ static bool macro_payload_ir_next(const uint8_t **cursor, const uint8_t *end, ma
                 return false;
             }
             step->value = *current++;
+            break;
+        case MACRO_PAYLOAD_IR_OP_ERASE:
+            if (current >= end || *current == 0u) return false;
+            step->length = *current++;
             break;
         case MACRO_PAYLOAD_IR_OP_TAP_LIST:
             if (current >= end) {
@@ -652,6 +733,13 @@ static void macro_payload_start_text_char(uint32_t now) {
     macro_payload_start_strokes(strokes, now, macro_payload_engine.text_remaining ? MACRO_PAYLOAD_PHASE_TEXT_PRESS : MACRO_PAYLOAD_PHASE_READY);
 }
 
+static void macro_payload_start_erase(uint32_t now) {
+    static const uint8_t backspace[] = {KC_BACKSPACE};
+
+    macro_payload_engine.erase_remaining--;
+    macro_payload_start_transient(backspace, 1u, now, macro_payload_engine.text_interval, macro_payload_engine.text_interval, macro_payload_engine.erase_remaining ? MACRO_PAYLOAD_PHASE_ERASE_PRESS : MACRO_PAYLOAD_PHASE_READY);
+}
+
 static void macro_payload_release_transients(uint32_t now) {
     bool ok = true;
 
@@ -721,6 +809,10 @@ static void macro_payload_execute_ready(uint32_t now) {
                 macro_payload_start_unicode(step.value, now, MACRO_PAYLOAD_PHASE_READY);
             break;
         }
+        case MACRO_PAYLOAD_IR_OP_ERASE:
+            macro_payload_engine.erase_remaining = step.length;
+            macro_payload_start_erase(now);
+            break;
         case MACRO_PAYLOAD_IR_OP_DELAY:
             macro_payload_schedule_wait(now, (uint32_t)step.value + TAP_CODE_DELAY, MACRO_PAYLOAD_PHASE_READY);
             break;
@@ -819,7 +911,7 @@ macro_payload_start_result_t macro_payload_start_windows(const macro_payload_ir_
     }
 
     macro_payload_engine = (macro_payload_engine_t){
-        .protected      = ir->protection == 1u || (ir->protection == 0u && preflight->needs_unicode),
+        .protected      = ir->protection == 1u || (ir->protection == 0u && preflight->needs_unicode) || source == MACRO_PAYLOAD_SOURCE_REPLACEMENT,
         .unicode_mode   = preflight->unicode_mode,
         .layout         = (const host_layout_t *)preflight->layout,
         .layout_iso     = preflight->iso,
@@ -871,6 +963,9 @@ void macro_payload_engine_scan(void) {
         case MACRO_PAYLOAD_PHASE_TEXT_PRESS:
             macro_payload_start_text_char(now);
             break;
+        case MACRO_PAYLOAD_PHASE_ERASE_PRESS:
+            macro_payload_start_erase(now);
+            break;
         case MACRO_PAYLOAD_PHASE_TRANSIENT_RELEASE:
             macro_payload_release_transients(now);
             break;
@@ -906,6 +1001,20 @@ bool macro_payload_engine_cancel(void) {
 
 bool macro_payload_engine_protected(void) {
     return macro_payload_engine.phase != MACRO_PAYLOAD_PHASE_IDLE && macro_payload_engine.protected;
+}
+
+bool macro_payload_engine_ignores_presses(void) {
+    return macro_payload_engine_protected() && macro_payload_engine.source != MACRO_PAYLOAD_SOURCE_CORRECTION && macro_payload_engine.source != MACRO_PAYLOAD_SOURCE_REPLACEMENT;
+}
+
+bool macro_payload_engine_idle(void) {
+    return macro_payload_engine.phase == MACRO_PAYLOAD_PHASE_IDLE;
+}
+
+macro_payload_typing_host_t macro_payload_typing_host(void) {
+    const macro_payload_host_t host = macro_payload_host_resolve();
+
+    return (macro_payload_typing_host_t){.layout = host.layout, .iso = host.iso, .macos = (host.layout->flags & HOST_LAYOUT_FLAG_MACOS) || macro_payload_host_os() == NOAH_HOST_MACOS};
 }
 
 void macro_payload_engine_init(void) {

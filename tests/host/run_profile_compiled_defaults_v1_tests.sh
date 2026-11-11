@@ -64,6 +64,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/profile_pd_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_keymap_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_macros_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_autocorrect_compiled_v1.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
@@ -79,6 +80,8 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_macros_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_autocorrect_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_autocorrect_words_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
@@ -119,6 +122,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/profile/schema/profile_pd_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_keymap_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_macros_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_autocorrect_compiled_v1.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
@@ -126,7 +130,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/profile/runtime/profile_action_runtime_v1.c"
 
 # The golden compiled PD domain is the shared "presets" vector, and its RGB
-# domain is version 4 with a colour for each of the sixteen layers and a row
+# domain is version 5 with a colour for each of the sixteen layers and a row
 # for each of the 32 slots.
 python3 - "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" "$ROOT/tests/fixtures/pd_mode_domain_v4.json" <<'PY'
 import json, struct, sys
@@ -140,7 +144,7 @@ for _ in range(blob[6]):
     offset += 6 + length
 presets = next(case for case in json.loads(Path(sys.argv[2]).read_text())["valid"] if case["name"] == "presets")
 assert domains[0x50] == (4, bytes.fromhex(presets["hex"])), "compiled PD domain differs from the presets vector"
-assert domains[0x10][0] == 4 and domains[0x10][1][0] == 4 and domains[0x10][1][5] == 16 and domains[0x10][1][7] == 32
+assert domains[0x10][0] == 5 and domains[0x10][1][0] == 5 and domains[0x10][1][5] == 16 and domains[0x10][1][7] == 32
 PY
 
 # The compiled defaults are Noah's keyboard profile, domain by domain, apart

@@ -55,7 +55,7 @@
 #    error "The idle timeout is a profile setting: its variant builds with NOAH_PORTABLE_PROFILE_ENABLE"
 #endif
 #if (RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF + RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY + RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_LEFT_HALF + RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF) > 1
-#    error "Only one key-feedback render test mode variant may be enabled at a time"
+#    error "Only one behaviour-feedback render test mode variant may be enabled at a time"
 #endif
 
 enum test_layers {
@@ -223,8 +223,25 @@ static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_
 EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(key_behavior_feedback_led_groups_data);
 #endif
 
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+const autocorrect_feedback_color_config_t autocorrect_feedback_colors = {
+    .text_color  = HSV(31, 32, 33),
+    .macro_color = HSV(34, 35, 36),
+    .undo_color  = HSV(37, 38, 39),
+    .locality    = RGB_KEYS_ONLY,
+};
+// The typing stage's answer on the master half, and how often it was asked.
+static noah_autocorrect_feedback_t fake_autocorrect_feedback;
+static uint16_t                    fake_autocorrect_feedback_reads;
+
+noah_autocorrect_feedback_t noah_autocorrect_feedback(void) {
+    fake_autocorrect_feedback_reads++;
+    return fake_autocorrect_feedback;
+}
+#endif
+
 // Room for the compiled encoding of the largest variant's lighting tables.
-EXPORT_RGB_COMPILED_CACHE(0u, 7u, 2u, 1u, 4u);
+EXPORT_RGB_COMPILED_CACHE(0u, 7u, 2u, 1u, 4u, 0u);
 const pointing_mode_def_t pointing_modes[POINTING_MODE_COUNT] = {
     [POINTING_MODE_INDEX_DRAGSCROLL] = {.mode_flag = POINTING_MODE_DRAGSCROLL}, [POINTING_MODE_INDEX_VOLUME] = {.mode_flag = POINTING_MODE_VOLUME}, [POINTING_MODE_INDEX_BRIGHTNESS] = {.mode_flag = POINTING_MODE_BRIGHTNESS}, [POINTING_MODE_INDEX_ZOOM] = {.mode_flag = POINTING_MODE_ZOOM}, [POINTING_MODE_INDEX_ARROW] = {.mode_flag = POINTING_MODE_ARROW}, [POINTING_MODE_INDEX_PINCH] = {.mode_flag = POINTING_MODE_PINCH},
 };
@@ -428,6 +445,10 @@ static void test_reset(void) {
     fake_flash_visibility_build_count = 0u;
     fake_broad_owner_build_count      = 0u;
     fake_combo_projection_build_count = 0u;
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    fake_autocorrect_feedback       = (noah_autocorrect_feedback_t){0};
+    fake_autocorrect_feedback_reads = 0u;
+#endif
 
 #if RGB_LAYER_RENDER_TEST_LAYER_GROUPS
     rgb_runtime_layer_stage_test_reset_group_scan_count();
@@ -1699,6 +1720,70 @@ static void test_render_order_base_then_preview_then_pointing_mode_then_feedback
 }
 #endif
 
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+// Replacement feedback is the last stage: its flash covers behaviour feedback on
+// the key it paints, and leaves the rest of what is beneath.
+static void test_render_order_replacement_feedback_covers_key_feedback(void) {
+    test_reset();
+    test_local_feedback_semantic_add(0, 1, KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED);
+    fake_autocorrect_feedback.kind = NOAH_AUTOCORRECT_FEEDBACK_TEXT;
+    key_origin_bitmap_add_keypos(fake_autocorrect_feedback.keys, (keypos_t){.row = 0, .col = 1});
+
+    CHECK(render_output());
+
+    check_led(1, rgb_from_hsv(autocorrect_feedback_colors.text_color));
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.tap_committed_color));
+    check_led(2, rgb_from_hsv(key_behavior_feedback_colors.tap_committed_color));
+
+    // The flash over, behaviour feedback shows on that key again.
+    fake_autocorrect_feedback = (noah_autocorrect_feedback_t){0};
+    CHECK(render_output());
+    check_led(1, rgb_from_hsv(key_behavior_feedback_colors.tap_committed_color));
+}
+
+// The slave half draws the flash the base packet mirrored, never its own
+// typing stage's, which sees no typing.
+static void test_slave_half_draws_the_mirrored_replacement_feedback(void) {
+    test_reset();
+    fake_is_master                 = false;
+    fake_autocorrect_feedback.kind = NOAH_AUTOCORRECT_FEEDBACK_TEXT;
+    key_origin_bitmap_add_keypos(fake_autocorrect_feedback.keys, (keypos_t){.row = 0, .col = 0});
+    split_runtime_sync_remote.autocorrect_feedback.kind = NOAH_AUTOCORRECT_FEEDBACK_UNDO;
+    key_origin_bitmap_add_keypos(split_runtime_sync_remote.autocorrect_feedback.keys, (keypos_t){.row = 0, .col = 2});
+
+    CHECK(render_output());
+
+    check_led(2, rgb_from_hsv(autocorrect_feedback_colors.undo_color));
+    check_led(0, (rgb_t){0});
+    CHECK(fake_autocorrect_feedback_reads == 0u);
+}
+
+// One frame shows one flash: it is read at the frame's first chunk, so a
+// flash that ends before a later chunk still paints it, and is gone at the
+// next frame.
+static void test_a_frame_reads_replacement_feedback_once(void) {
+    test_reset();
+    fake_autocorrect_feedback.kind = NOAH_AUTOCORRECT_FEEDBACK_MACRO;
+    key_origin_bitmap_add_keypos(fake_autocorrect_feedback.keys, (keypos_t){.row = 0, .col = 0});
+    key_origin_bitmap_add_keypos(fake_autocorrect_feedback.keys, (keypos_t){.row = 0, .col = 2});
+
+    CHECK(render_output());
+    check_led(0, rgb_from_hsv(autocorrect_feedback_colors.macro_color));
+    check_led(2, rgb_from_hsv(autocorrect_feedback_colors.macro_color));
+
+    fake_autocorrect_feedback = (noah_autocorrect_feedback_t){0};
+    memset(led_output, 0, sizeof(led_output));
+    CHECK(render_output_range(1u, 3u));
+    check_led(2, rgb_from_hsv(autocorrect_feedback_colors.macro_color));
+    CHECK(fake_autocorrect_feedback_reads == 1u);
+
+    memset(led_output, 0, sizeof(led_output));
+    CHECK(!render_output());
+    check_led(2, (rgb_t){0});
+    CHECK(fake_autocorrect_feedback_reads == 2u);
+}
+#endif
+
 static void test_runtime_boot_indicator_overrides_scene(void) {
     test_reset();
 
@@ -2514,7 +2599,7 @@ static void test_workload_render_contract(void) {
 
 #ifdef RGB_ACTIVE_PROFILE_CONFIG_TEST_BACKEND
 // D-F63: a profile at the ceilings, 128 LED sets and 640 group rows (255 layer,
-// 255 pointing, 130 key feedback), costs a frame profile reads only for the
+// 255 pointing, 130 behaviour feedback), costs a frame profile reads only for the
 // accents that light. Each row's selector is read once per publication.
 enum {
     CEILING_GROUPS     = NOAH_PROFILE_RGB_V1_MAX_GROUPS,
@@ -2571,6 +2656,7 @@ static void ceiling_payload(uint8_t *payload, uint8_t layer_selector, uint8_t pd
     payload[offset + 5u] = 30u;                       // hold colour
     offset += NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE;
     ceiling_rows(payload, &offset, CEILING_KEY_ROWS, key_selector);
+    offset += NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE; // replacement feedback: no colours, no rows
     CHECK(offset == CEILING_SIZE);
 }
 
@@ -2646,7 +2732,7 @@ static void test_ceiling_profile_reads_only_lit_accents(void) {
     for (uint16_t row = 0u; row < CEILING_KEY_ROWS; row++) {
         uint8_t selector = row % 5u == 4u ? NOAH_PROFILE_RGB_V1_SELECTOR_ALL : (uint8_t)(row % 5u);
 
-        named[CEILING_SIZE - 5u * (CEILING_KEY_ROWS - row)] = selector;
+        named[CEILING_SIZE - NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE - 5u * (CEILING_KEY_ROWS - row)] = selector;
         if (selector == KEY_FEEDBACK_GROUP_HOLD_ACTIVE || selector == NOAH_PROFILE_RGB_V1_SELECTOR_ALL) {
             shown_key_rows++;
         }
@@ -2769,6 +2855,11 @@ int main(int argc, char **argv) {
     test_render_order_preview_then_pointing_mode_then_pd_group();
 #if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_LEFT_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
     test_render_order_base_then_preview_then_pointing_mode_then_feedback();
+#endif
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    test_render_order_replacement_feedback_covers_key_feedback();
+    test_slave_half_draws_the_mirrored_replacement_feedback();
+    test_a_frame_reads_replacement_feedback_once();
 #endif
     test_runtime_boot_indicator_overrides_scene();
 #ifdef RGB_ACTIVE_PROFILE_CONFIG_TEST_BACKEND

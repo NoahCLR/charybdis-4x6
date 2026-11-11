@@ -18,8 +18,8 @@ Eight bytes, then the domains:
 | ---: | ---: | --- |
 | 0 | 4 | ASCII magic `NLP1` |
 | 4 | 1 | schema major, `4` |
-| 5 | 1 | schema minor, `2` |
-| 6 | 1 | domain count, `0..7` |
+| 5 | 1 | schema minor, `5` |
+| 6 | 1 | domain count, `0..8` |
 | 7 | 1 | flags: exactly `0x01` (bit 0 canonical encoding; bits 1–7 reserved) |
 
 The blob carries no length of its own. The carrier supplies it as a 32-bit
@@ -27,14 +27,14 @@ field: a candidate's BEGIN, a profile slot's record header, payload readback's
 metadata page. A blob is `8..130,048` bytes: the upper bound is one 128 KiB
 profile slot less the first kilobyte its header and commit marker take
 (D-F29, [`0029`](../../adr/0029-profile-slots-in-their-own-flash-region.md)).
-The empty profile is the eight bytes `4e 4c 50 31 04 00 00 01`.
+The empty profile is the eight bytes `4e 4c 50 31 04 05 00 01`.
 
 A header is refused, in this order: shorter than 8 bytes `TRUNCATED`; longer
 than 130,048 `CAPACITY_EXCEEDED`; wrong magic `INVALID_MAGIC`; any other
 schema `INCOMPATIBLE_SCHEMA` (no earlier schema is read, D-F10,
 [`0010`](../../adr/0010-firmware-accepts-only-current-formats.md)); a
 reserved flag bit set `RESERVED_FLAGS`; flag bit 0 clear `NONCANONICAL`; more
-than seven domains `CAPACITY_EXCEEDED`.
+than eight domains `CAPACITY_EXCEEDED`.
 
 Held by: `tests/host/run_profile_blob_v1_tests.sh` (`profile_blob_v1_test.c`), `tests/fixtures/profile_blob_v1.fixture`.
 
@@ -70,19 +70,31 @@ requested domains, a record's domain mask, capability page 1 byte 12) is
 
 | Index | Mask bit | Id | Version | Domain | Payload |
 | ---: | ---: | ---: | ---: | --- | --- |
-| 0 | `0x01` | `0x10` | 4 | Lighting | [rgb-domain-v1.md](../rgb-domain-v1.md) |
+| 0 | `0x01` | `0x10` | 5 | Lighting | [rgb-domain-v1.md](../rgb-domain-v1.md) |
 | 1 | `0x02` | `0x20` | 2 | Key behaviours | [key-behavior-domain.md](key-behavior-domain.md) |
 | 2 | `0x04` | `0x30` | 3 | Combos | [combo-domain.md](combo-domain.md) |
-| 3 | `0x08` | `0x40` | 8 | Settings: layer records, custom keys and their shortcuts, layer, macro and custom-key names, the keyboard name | [settings-domain.md](settings-domain.md) |
-| 4 | `0x10` | `0x50` | 3 | Pointing slots | [pd-mode-domain-v1.md](../pd-mode-domain-v1.md) |
+| 3 | `0x08` | `0x40` | 12 | Settings: layer records, custom keys and their shortcuts, layer, macro and custom-key names, the keyboard name | [settings-domain.md](settings-domain.md) |
+| 4 | `0x10` | `0x50` | 4 | Pointing slots | [pd-mode-domain-v1.md](../pd-mode-domain-v1.md) |
 | 5 | `0x20` | `0x60` | 1 | Keymap | [keymap-domain.md](keymap-domain.md) |
 | 6 | `0x40` | `0x70` | 1 | Macros | [macro-domain.md](macro-domain.md) |
+| 7 | `0x80` | `0x80` | 1 | Autocorrect list | [autocorrect-domain.md](autocorrect-domain.md) |
+
+Lighting version 5 and settings version 12 are both schema 4.5's (D-F70,
+[`0070`](../../adr/0070-replacement-feedback-is-a-lighting-stage.md)): the
+settings step is a share of the schema step that brought replacement
+feedback, not a schema minor of its own.
+
+The eight rows fill the one-byte mask (D-F68,
+[`0068`](../../adr/0068-the-autocorrect-list-is-a-readable-profile-domain.md)):
+every bit names a domain, so no mask is refused for a bit alone, and a ninth
+domain needs a wider mask in every place one travels.
 
 The registry is the wire vocabulary in every build. Which domains a build
 admits is separate: its supported domain mask (capability page 1 byte 12) is
 the domains its compiled defaults hold, plus combos in a build with combos
 and settings in a build that saves (`NOAH_PORTABLE_PROFILE_ENABLE`), and zero until the live-profile owner reports. The pointing domain is required
-in every profile the keyboard validates. Admission is the
+in every profile the keyboard validates. The autocorrect list is in every
+build's compiled defaults, an empty list being its header. Admission is the
 [device-resident profile](../device-resident-profile.md)'s.
 
 Held by: `tests/host/run_profile_blob_v1_tests.sh` (`profile_blob_v1_test.c`, the registry test), `tests/host/run_profile_wire_v1_tests.sh` (`qmk_profile_channel_test.c`, the supported domain mask), `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_test.c`).
@@ -165,8 +177,9 @@ output. A combo holds its output while it is held.
 | `LM()` | yes | no | no | no | yes |
 | `LT()` | yes | no | no | no | no |
 | `TG()`, `TO()`, `LOCK_LAYER()` | yes | yes | yes | yes | yes |
+| The switch keys: `CM_ON`, `CM_OFF`, `CM_TOGG`, `BH_ON`, `BH_OFF`, `BH_TOGG`, `AM_ON`, `AM_OFF`, `AM_TOGG`, `AC_ON`, `AC_OFF`, `AC_TOGG` (D-F66) | yes | yes | yes | yes | yes |
 | `DF()`, `PDF()`, and any layer keycode naming a layer at or above the layer count | no | no | no | no | no |
-| Any other keycode in QMK's user range `0x7e40..0x7fff`: the inert `0x7e40..0x7e7f` block, layer locks past the layer count, `0x7ee0..0x7eff`, and `0x7f80..0x7fff`, which only the runtime sends (`CUSTOM_KEY_LAYER_TAP(n)`, D-F26) | no | no | no | no | no |
+| Any other keycode in QMK's user range `0x7e40..0x7fff`: the inert `0x7e40..0x7e7f` block, layer locks past the layer count, `0x7ee3..0x7eef`, `0x7ef3..0x7eff`, and `0x7f80..0x7fff`, which only the runtime sends (`CUSTOM_KEY_LAYER_TAP(n)`, D-F26) | no | no | no | no | no |
 
 A refused behaviour action is `INVALID_REFERENCE` at its row, tap index and
 field; a refused combo output refuses the combo domain at its row; a refused
@@ -221,7 +234,7 @@ The FNV-1a digest of this byte stream, integers little-endian:
 | 9 | 2 each | `KC_NO`, `KC_TRNS`, `MO(0)`, `LT(0, KC_NO)`, `OSM(0)`, `MT(0, KC_NO)`, `QK_MACRO_0`, `CUSTOM_KEY_0`, the first layer lock |
 | 10 | 1 + 2 + 2 per layer | layer id, `MO(n)`, `LOCK_LAYER(n)` |
 | 11 | 1 + 4 + 2 + 2 per slot | slot id, its 32-bit mode flag, its hold keycode, its lock keycode |
-| 12 | 2 + 2 | the end of the userspace keycodes (`0x7ee0`), then `0xFFFF` |
+| 12 | 2 + 2 | the end of the userspace keycode blocks before custom keys (`0x7f00`), then `0xFFFF` |
 
 It depends on no authored row, so an empty profile and a populated one share
 it. Because it includes the firmware version and the layer count, a new

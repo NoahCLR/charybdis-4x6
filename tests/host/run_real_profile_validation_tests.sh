@@ -58,8 +58,16 @@ write_config_variant() {
 #    undef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 #endif
 
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+#    undef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+#endif
+
 #ifdef RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS
 #    undef RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS
+#endif
+
+#ifdef RGB_AUTOCORRECT_FEEDBACK_FLASH_MS
+#    undef RGB_AUTOCORRECT_FEEDBACK_FLASH_MS
 #endif
 
 #ifdef RGB_AUTOMOUSE_GRADIENT_ENABLE
@@ -124,6 +132,10 @@ run_validation_variant() {
 if [ "${NOAH_WRITE_AUTHORED_MACRO_BANK:-}" = 1 ] && [ ! -f "$KEYMAP_PATH_ABS/authored_macro_bank.h" ]; then
     printf '#pragma once\n\n#define NOAH_AUTHORED_MACRO_BANK 0\n' >"$KEYMAP_PATH_ABS/authored_macro_bank.h"
 fi
+
+# The authored autocorrect list: authored_autocorrect_list.h is what
+# autocorrect.txt encodes to, and the list is one the domain holds.
+python3 "$ROOT/tools/autocorrect/build.py" --check-authored "$KEYMAP_PATH_ABS"
 
 run_validation_variant default
 run_validation_variant no_rgb_feedback

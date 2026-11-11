@@ -132,6 +132,10 @@ record = body(action, "void process_record(keyrecord_t *record)")
 if "process_record_admit_user(record)" not in record or record.index("process_record_admit_user(record)") > record.index("process_record_quantum(record)"):
     raise SystemExit("QMK must offer every record to process_record_admit_user before any quantum feature")
 
+combo_switch = body((qmk / "quantum/process_keycode/process_combo.c").read_text(), "bool process_combo(uint16_t keycode, keyrecord_t *record)")
+if "#ifdef COMBO_KEYCODES_DOWNSTREAM" not in combo_switch or "keycode >= QK_COMBO_ON && keycode <= QK_COMBO_TOGGLE && record->event.pressed" not in combo_switch:
+    raise SystemExit("QMK must leave the combo keys to the firmware with COMBO_KEYCODES_DOWNSTREAM (D-F66)")
+
 pre = body(quantum, "bool pre_process_record_quantum(keyrecord_t *record)")
 if pre.index("pre_process_record_kb(") > pre.index("process_combo("):
     raise SystemExit("QMK pre-process hook no longer runs before process_combo")

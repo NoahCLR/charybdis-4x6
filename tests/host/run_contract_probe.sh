@@ -71,6 +71,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/profile/schema/profile_pd_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_keymap_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_macros_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_autocorrect_compiled_v1.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
@@ -86,6 +87,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_macros_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_autocorrect_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_autocorrect_words_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
     "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \

@@ -1,8 +1,8 @@
 // ────────────────────────────────────────────────────────────────────────────
-// RGB Key Feedback Stage
+// RGB Behaviour Feedback Stage
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Shared key-feedback overlay stage. It composes packed runtime semantics with
+// Shared behaviour-feedback overlay stage. It composes packed runtime semantics with
 // one captured frame of the active profile before the top-level runtime applies
 // any LEDs.
 // ────────────────────────────────────────────────────────────────────────────

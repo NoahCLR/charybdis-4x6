@@ -76,7 +76,7 @@ on any of these:
 
 | Policy | Value | What it is |
 | --- | ---: | --- |
-| SRAM0–3 `.data + .bss` | at most 204,176 bytes | a regression tripwire just above the largest build; crossing it means justify the growth and raise the line deliberately, not that the chip is full |
+| SRAM0–3 `.data + .bss` | at most 205,764 bytes | a regression tripwire just above the largest build; crossing it means justify the growth and raise the line deliberately, not that the chip is full |
 | Core-memory span at boot | at least 4,096 bytes | the safety floor for the newlib arena, about two orders of magnitude above its observed use; raise it only with evidence of a new allocator |
 | Named macro storage | at most 8,192 bytes | the playback symbols `profile_macro_slots` and `macro_slot_active_ir` (both required) plus the provider's bookkeeping symbols |
 | Reclaimed macro storage | at least 32,768 bytes below a 41,440-byte baseline | the VIA-era bank's footprint; the 8,192-byte line above always fails first |
@@ -85,7 +85,7 @@ Only the sum of `.data` and `.bss` is gated. The split between them is an
 initialisation artifact: one nonzero member moves a whole object to `.data`,
 where it also costs flash. `.bss` alone is gated only when
 `--max-static-bss` is passed, and nothing passes it; the report prints both
-sections. The script states how the 204,176 bytes are composed: a 56 KiB base
+sections. The script states how the 205,764 bytes are composed: a 56 KiB base
 plus each reviewed increment and decrement since, each named by its decision.
 A change that moves the tripwire edits that sum and its comment and says why
 in its commit.
@@ -117,16 +117,19 @@ engineering regression policies, not SRAM limits:
 | Split reconciler | 1,024 | `NOAH_PROFILE_SPLIT_RECONCILER_STATE_BUDGET_32BIT` |
 | Active-profile provider | 784 | `NOAH_ACTIVE_PROFILE_PROVIDER_STATE_BUDGET_32BIT` |
 | Active-profile key-behaviour runtime | 768 | `NOAH_ACTIVE_PROFILE_KEY_BEHAVIOR_RUNTIME_STATE_BUDGET_32BIT` |
-| Whole-profile validator | 400 | `NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET` |
+| Whole-profile validator | 416 | `NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET` |
 | Profile store | 384 | `NOAH_PROFILE_STORE_STATE_BUDGET_32BIT` |
 | Other-half store | 256 | `NOAH_PROFILE_OTHER_HALF_STORE_STATE_BUDGET_32BIT` |
 | Active-profile lighting runtime / frame | 192 / 80 | `NOAH_ACTIVE_PROFILE_RGB_RUNTIME_STATE_BUDGET_32BIT`, `NOAH_ACTIVE_PROFILE_RGB_FRAME_BUDGET_32BIT` |
 | Split authority | 128 | `NOAH_PROFILE_SPLIT_AUTHORITY_STATE_BUDGET_32BIT` |
 | Key-behaviour domain handle / its validation | 128 / 128 | `key_behavior_domain_v1.c`, `NOAH_KEY_BEHAVIOR_DOMAIN_V1_EMBEDDED_VALIDATION_BUDGET` |
-| Lighting domain view / its validation | 40 / 72 | `NOAH_PROFILE_RGB_V1_EMBEDDED_VIEW_BUDGET`, `NOAH_PROFILE_RGB_V1_EMBEDDED_VALIDATION_BUDGET` |
+| Autocorrect list handle / its validation, which holds one 128-byte correction (D-F68) | 24 / 160 | `NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_LIST_BUDGET`, `NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_VALIDATION_BUDGET` |
+| Autocorrect: the word, the keys shown and live, and the queue of 240 changes (D-F69) | 656 | `NOAH_AUTOCORRECT_EMBEDDED_STATE_BUDGET` |
+| Autocorrect: the scan's workspace for one correction of 128 bytes (D-F69) | 704 | `NOAH_AUTOCORRECT_EMBEDDED_WORK_BUDGET` |
+| Lighting domain view / its validation, with the replacement-feedback row count (D-F70) | 44 / 76 | `NOAH_PROFILE_RGB_V1_EMBEDDED_VIEW_BUDGET`, `NOAH_PROFILE_RGB_V1_EMBEDDED_VALIDATION_BUDGET` |
 | Lighting row selectors, one byte per group row (D-F63) | 656 | `rgb_active_profile_config.c` |
 | Lighting render snapshot | 96 | `rgb_runtime.c` |
-| Compiled-profile handle | 76 | `profile_compiled_defaults_v1.c` |
+| Compiled-profile handle: its metadata and eight 32-bit ranges (D-F68) | 84 | `profile_compiled_defaults_v1.c` |
 | Durable-I/O grant | 28 | `NOAH_QMK_DURABLE_IO_STATE_BUDGET_32BIT` |
 
 Held by: the firmware compile (`sh tools/build-firmware-pair.sh`). The host
@@ -146,11 +149,20 @@ inside its physical stack:
 The split slave thread's stack is QMK's serial-protocol thread, not core 1's.
 `tools/check_firmware_stack_budget.py` reads the linked disassembly for each
 function's frame and its direct calls, and walks the paths a manifest names:
-`tools/firmware_stack_budget.json` (key runtime, pointing, macros, storage
-reads) and `tools/firmware_stack_budget_live_profile_owner.json` (the
+`tools/firmware_stack_budget.json` (key runtime, pointing, macros,
+autocorrect, storage reads) and `tools/firmware_stack_budget_live_profile_owner.json` (the
 live-profile owner, Profile Wire, the split protocol, saving). Every adjacency
 on a path that is not a direct call must be a declared indirect edge; a path
 whose adjacency the linker no longer makes fails the gate.
+
+The keyboard-report filters end the deepest of these paths, so they keep
+nothing large on the stack: their working copies of a report's usages are
+static, and the typing stage only queues what changed there. The ledger
+tells the stage of a usage's owners from the same key paths, with one small
+frame that queues at most one change. Autocorrect's
+lookup and its starts each keep their workspace in a frame of their own
+below the matrix scan, and the correction being worked on, which may be 128
+bytes, in static workspace (D-F69).
 
 A PASS covers the named paths only. It is not a global or interrupt-stack
 maximum and not a measured high-water: the sums start at `main` and leave out

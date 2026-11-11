@@ -7,6 +7,7 @@
 #include "../pointing/policy/pointer_layer_policy.h"
 #include "../compat/qmk_mod_contract.h"
 #include "../state/ownership/keyboard_mod_ownership.h"
+#include "../macro/typing_stage.h"
 
 #define OWNED_KEYCODE_USAGE_CAPACITY ((uint16_t)QK_MOUSE_ACCELERATION_2 + 1u)
 
@@ -87,8 +88,23 @@ static void owned_keycode_note_underflow(void) {
     }
 }
 
+// A build or host test without the typing stage (typing_stage.h).
+__attribute__((weak)) void noah_typing_stage_note_click(void) {}
+
+__attribute__((weak)) void noah_typing_stage_note_owners(uint8_t usage, uint16_t owners) {
+    (void)usage;
+    (void)owners;
+}
+
+// A usage held twice sends no report for its second owner, so the typing
+// stage is told of every change in who holds one.
+static void owned_keycode_note_owners(uint8_t basic) {
+    noah_typing_stage_note_owners(basic, (uint16_t)(owned_keycode_state.physical_refcounts[basic] + owned_keycode_state.managed_refcounts[basic]));
+}
+
 // Precondition: the usage's managed count is below UINT8_MAX.
 static void owned_keycode_acquire_basic(uint8_t basic) {
+    if (IS_MOUSEKEY_BUTTON(basic)) noah_typing_stage_note_click();
     if (owned_keycode_state.managed_refcounts[basic]++ == 0u) {
         owned_keycode_state.managed_usage_count++;
         if (owned_keycode_state.physical_refcounts[basic] == 0u) {
@@ -96,6 +112,7 @@ static void owned_keycode_acquire_basic(uint8_t basic) {
             register_code(basic);
         }
     }
+    owned_keycode_note_owners(basic);
 }
 
 // Precondition: the usage's managed count is above zero.
@@ -109,6 +126,7 @@ static void owned_keycode_release_basic(uint8_t basic) {
             pointer_layer_policy_note_action(basic, false);
         }
     }
+    owned_keycode_note_owners(basic);
 }
 
 // Every lease takes its usages here, a literal keycode's (its modifiers and at
@@ -359,6 +377,7 @@ void owned_keycode_track_physical_event(uint16_t keycode, keyrecord_t *record) {
     }
     physical = &owned_keycode_state.physical_refcounts[components.basic];
     if (record->event.pressed) {
+        if (IS_MOUSEKEY_BUTTON(components.basic)) noah_typing_stage_note_click();
         if (*physical == UINT8_MAX) {
             owned_keycode_note_saturation();
             return;
@@ -368,7 +387,9 @@ void owned_keycode_track_physical_event(uint16_t keycode, keyrecord_t *record) {
         (*physical)--;
     } else {
         owned_keycode_note_underflow();
+        return;
     }
+    owned_keycode_note_owners(components.basic);
 }
 
 bool owned_keycode_should_suppress_default(uint16_t keycode, keyrecord_t *record) {

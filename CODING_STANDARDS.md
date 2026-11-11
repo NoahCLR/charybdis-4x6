@@ -109,6 +109,8 @@ are in [architecture](docs/architecture/README.md).
 | Every firmware build runs real-profile validation and fails with it | `users/noah/rules.mk`; `run_feature_gate_compile_tests.sh` checks `rules.mk` still calls it |
 | Authored data places only supported actions, with no raw layer actions | `noah_action_supported_at()` in `run_keymap_validation_tests.sh` and `run_real_profile_validation_tests.sh` |
 | `authored_macro_bank.h` matches the profile's `MACROS()` | `run_real_profile_validation_tests.sh` |
+| `authored_autocorrect_list.h` matches the profile's `autocorrect.txt` | `run_real_profile_validation_tests.sh` |
+| The autocorrect word table and domain fixture reproduce from the host layouts | `run_profile_autocorrect_v1_tests.sh` |
 | The weak hook defaults call their `noah_*` helpers, and a test override that chains keeps the behaviour | `run_hook_chaining_tests.sh` |
 | Any other userspace or keymap file that defines one of those hooks calls the `noah_*` helpers its default calls, or replaces it on purpose with `// Replaces noah_<helper>(): <why>` in its body ([hook overrides](docs/guide/hooks.md#replacing-a-default)) | `run_hook_override_tests.sh` |
 | The fork-only and internal QMK symbols `compat/` adapts appear nowhere else in userspace or keymap C, except allowlisted hooks QMK calls by name | `run_compat_boundary_tests.sh` |

@@ -1070,6 +1070,11 @@ bool layer_ownership_is_held(uint8_t layer) {
     return false;
 }
 
+bool layer_ownership_owns(uint8_t layer) {
+    (void)layer;
+    return false;
+}
+
 bool layer_ownership_toggle_lock_state(uint8_t layer) {
     (void)layer;
     return true;
@@ -5809,6 +5814,35 @@ static void test_qmk_keys_holding_from_the_press_hold_no_keys_back(void) {
     }
 }
 
+void combo_enable(void);
+bool is_combo_enabled(void);
+// QMK leaves the combo keys to the firmware (COMBO_KEYCODES_DOWNSTREAM): a
+// pressed CM_OFF, CM_ON or CM_TOGG switches QMK's combo flag once, and so does
+// one a behaviour taps, which QMK's pre-process never sees (D-F66).
+static void test_qmk_combo_keys_switch_combos_wherever_they_are_sent(void) {
+    const struct { uint16_t key; bool on; } pressed[] = {{QK_COMBO_OFF, false}, {QK_COMBO_OFF, false}, {QK_COMBO_TOGGLE, true}, {QK_COMBO_TOGGLE, false}, {QK_COMBO_ON, true}};
+    test_reset_state(); fake_time = 48000;
+    CHECK(is_combo_enabled());
+    for (unsigned i = 0; i < ARRAY_SIZE(pressed); i++) {
+        gesture_test_code = pressed[i].key;
+        gesture_at(3,0,true); gesture_advance(30); gesture_at(3,0,false); gesture_advance(300);
+        CHECK(is_combo_enabled() == pressed[i].on);
+    }
+
+    test_reset_state(); fake_time = 49000;
+    gesture_test_code = gesture_tap_only_row = KC_F13;
+    const uint16_t tapped[] = {QK_COMBO_OFF, QK_COMBO_TOGGLE, QK_COMBO_TOGGLE, QK_COMBO_ON};
+    const bool     after[]  = {false, true, false, true};
+    for (unsigned i = 0; i < ARRAY_SIZE(tapped); i++) {
+        gesture_tap_only_action = tapped[i];
+        gesture_at(3,0,true); gesture_advance(30); gesture_at(3,0,false); gesture_advance(300);
+        CHECK(is_combo_enabled() == after[i]);
+    }
+    gesture_assert_admission_quiescent();
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+    combo_enable();
+}
+
 // MO(), TT() and OSL() turn their layer on at the press. A key pressed while
 // one is down lands on that layer and cancels its quick tap, even a tap its
 // row authors (D-F02, D-F27); tapped alone
@@ -6017,8 +6051,33 @@ static void test_macro_protection_drops_presses_keeps_releases(void) {
     CHECK(noah_record_admission_macro_admit(&release, false, false));
 }
 
+#ifndef NOAH_TEST_QMK_GESTURES
+// Uninterruptible output alone drops nothing: while a correction, or the
+// macro one plays, is typed, the press guard lets every press through for
+// the typing stage to hold back. An admitted press goes on into the runtime,
+// so this runs where records are handed to it directly, not through QMK's
+// gesture engine.
+extern bool key_runtime_test_macro_holds_presses_back;
+static void test_a_correction_drops_no_press(void) {
+    test_reset_state();
+    noah_record_admission_reset();
+    keyrecord_t press = test_record(test_keypos(0, 1), true);
+    keyrecord_t release = test_record(test_keypos(0, 1), false);
+    key_runtime_test_macro_protected = true;
+    key_runtime_test_macro_holds_presses_back = true;
+    CHECK(noah_pre_process_record_user(KC_A, &press));
+    key_runtime_test_macro_protected = false;
+    key_runtime_test_macro_holds_presses_back = false;
+    CHECK(noah_pre_process_record_user(KC_A, &release));
+    noah_record_admission_reset();
+}
+#endif
+
 int main(int argc, char **argv) {
     test_macro_protection_drops_presses_keeps_releases();
+#ifndef NOAH_TEST_QMK_GESTURES
+    test_a_correction_drops_no_press();
+#endif
 #ifdef NOAH_TEST_QMK_GESTURES
     const char *regression = getenv("NOAH_GESTURE_REGRESSION");
     if (regression) {
@@ -6069,6 +6128,7 @@ int main(int argc, char **argv) {
         test_qmk_keys_wait_for_mode_and_modifier_holds();
         test_qmk_combo_output_outlasts_the_dual_role_term();
         test_qmk_keys_holding_from_the_press_hold_no_keys_back();
+    test_qmk_combo_keys_switch_combos_wherever_they_are_sent();
         test_qmk_interrupted_momentary_layer_row_sends_no_tap();
         test_qmk_modifier_shortcut_release_applies_to_the_next_key();
         test_qmk_combo_modifier_release_waits_for_undecided_key();
