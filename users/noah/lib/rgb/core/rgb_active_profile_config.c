@@ -429,10 +429,6 @@ uint8_t rgb_active_profile_config_key_group_count(const noah_active_profile_rgb_
     return 0u;
 }
 
-#ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-
-#endif
-
 bool rgb_active_profile_config_key_group_at(const noah_active_profile_rgb_frame_t *frame, uint8_t index, rgb_active_profile_key_group_t *group) {
 #ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
     const noah_profile_rgb_v1_view_t *view;
@@ -482,6 +478,91 @@ key_feedback_tap_commit_mode_t key_feedback_tap_commit_mode(void) {
 }
 #endif
 
+bool rgb_active_profile_config_autocorrect_stage_enabled(const noah_active_profile_rgb_frame_t *frame) {
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    const noah_profile_rgb_v1_view_t *view;
+    noah_active_profile_rgb_result_t  status = frame_status(frame, &view);
+
+    return status == NOAH_ACTIVE_PROFILE_RGB_OK && (view->stage_enable_mask & NOAH_PROFILE_RGB_V1_STAGE_AUTOCORRECT) != 0u;
+#else
+    (void)frame;
+    return false;
+#endif
+}
+
+bool rgb_active_profile_config_autocorrect_feedback(const noah_active_profile_rgb_frame_t *frame, rgb_active_profile_autocorrect_feedback_t *config) {
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    const noah_profile_rgb_v1_view_t *view;
+    noah_active_profile_rgb_result_t  status = frame_status(frame, &view);
+
+    if (!config) {
+        return false;
+    }
+
+    if (status == NOAH_ACTIVE_PROFILE_RGB_OK && (view->stage_enable_mask & NOAH_PROFILE_RGB_V1_STAGE_AUTOCORRECT) != 0u) {
+        noah_profile_rgb_v1_autocorrect_feedback_t row;
+        noah_profile_rgb_v1_error_t                error;
+
+        if (noah_profile_rgb_v1_autocorrect_feedback(view, &row, &error) == NOAH_PROFILE_RGB_V1_OK) {
+            for (uint8_t semantic = 0u; semantic < ARRAY_SIZE(config->colors); semantic++) {
+                config->colors[semantic] = native_hsv(row.colors[semantic]);
+            }
+            config->locality = (rgb_locality_t)row.locality;
+            return true;
+        }
+    }
+#else
+    (void)frame;
+    (void)config;
+#endif
+    return false;
+}
+
+uint8_t rgb_active_profile_config_autocorrect_group_count(const noah_active_profile_rgb_frame_t *frame) {
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    const noah_profile_rgb_v1_view_t *view;
+    noah_active_profile_rgb_result_t  status = frame_status(frame, &view);
+
+    if (status == NOAH_ACTIVE_PROFILE_RGB_OK && (view->stage_enable_mask & NOAH_PROFILE_RGB_V1_STAGE_AUTOCORRECT) != 0u) {
+        return view->autocorrect_group_count;
+    }
+#else
+    (void)frame;
+#endif
+    return 0u;
+}
+
+bool rgb_active_profile_config_autocorrect_group_at(const noah_active_profile_rgb_frame_t *frame, uint8_t index, rgb_active_profile_autocorrect_group_t *group) {
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    const noah_profile_rgb_v1_view_t *view;
+    noah_active_profile_rgb_result_t  status = frame_status(frame, &view);
+
+    if (!group) {
+        return false;
+    }
+
+    if (status == NOAH_ACTIVE_PROFILE_RGB_OK && (view->stage_enable_mask & NOAH_PROFILE_RGB_V1_STAGE_AUTOCORRECT) != 0u && index < view->autocorrect_group_count) {
+        noah_profile_rgb_v1_group_row_t row;
+        noah_profile_rgb_v1_group_t     dictionary_group;
+        noah_profile_rgb_v1_error_t     error;
+
+        COUNT_READ(autocorrect_rows);
+        if (noah_profile_rgb_v1_autocorrect_group_at(view, index, &row, &error) != NOAH_PROFILE_RGB_V1_OK || row.group_id >= view->group_count || noah_profile_rgb_v1_group_at(view, row.group_id, &dictionary_group, &error) != NOAH_PROFILE_RGB_V1_OK || dictionary_group.id != row.group_id) {
+            return false;
+        }
+        group->selector = row.selector;
+        group->color    = native_hsv(row.color);
+        memcpy(group->bitmap, dictionary_group.bitmap, sizeof(group->bitmap));
+        return true;
+    }
+#else
+    (void)frame;
+    (void)index;
+    (void)group;
+#endif
+    return false;
+}
+
 // The selectors of the frame's rows, keyed like the layer stage's colour cache
 // (rgb_layer_stage.c): by the frame's epoch, publication count and liveness.
 // An epoch is never reused while the runtime lives, so selectors read while a
@@ -494,6 +575,7 @@ static struct {
     uint8_t  layer_count;
     uint8_t  pd_count;
     uint8_t  key_count;
+    uint8_t  autocorrect_count;
     bool     live;
     bool     valid;
 } selector_cache;
@@ -526,13 +608,15 @@ static bool read_group_selectors(const noah_active_profile_rgb_frame_t *frame) {
     uint8_t                           layer = rgb_active_profile_config_layer_group_count(frame);
     uint8_t                           pd    = rgb_active_profile_config_pd_group_count(frame);
     uint8_t                           key   = rgb_active_profile_config_key_group_count(frame);
+    uint8_t                           autocorrect = rgb_active_profile_config_autocorrect_group_count(frame);
 
-    if ((uint16_t)layer + pd + key > NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS || !read_table_selectors(frame, noah_profile_rgb_v1_layer_group_at, layer, &next) || !read_table_selectors(frame, noah_profile_rgb_v1_pd_group_at, pd, &next) || !read_table_selectors(frame, noah_profile_rgb_v1_key_group_at, key, &next)) {
+    if ((uint16_t)layer + pd + key + autocorrect > NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS || !read_table_selectors(frame, noah_profile_rgb_v1_layer_group_at, layer, &next) || !read_table_selectors(frame, noah_profile_rgb_v1_pd_group_at, pd, &next) || !read_table_selectors(frame, noah_profile_rgb_v1_key_group_at, key, &next) || !read_table_selectors(frame, noah_profile_rgb_v1_autocorrect_group_at, autocorrect, &next)) {
         return false;
     }
-    selector_cache.layer_count = layer;
-    selector_cache.pd_count    = pd;
-    selector_cache.key_count   = key;
+    selector_cache.layer_count       = layer;
+    selector_cache.pd_count          = pd;
+    selector_cache.key_count         = key;
+    selector_cache.autocorrect_count = autocorrect;
     // A publication that landed during the reads leaves nothing to keep.
     return frame_status(frame, &view) == NOAH_ACTIVE_PROFILE_RGB_OK;
 }
@@ -562,9 +646,11 @@ bool rgb_active_profile_config_group_selectors(const noah_active_profile_rgb_fra
         .layer       = selector_cache.selectors,
         .pd          = selector_cache.selectors + selector_cache.layer_count,
         .key         = selector_cache.selectors + selector_cache.layer_count + selector_cache.pd_count,
+        .autocorrect = selector_cache.selectors + selector_cache.layer_count + selector_cache.pd_count + selector_cache.key_count,
         .layer_count = selector_cache.layer_count,
         .pd_count    = selector_cache.pd_count,
         .key_count   = selector_cache.key_count,
+        .autocorrect_count = selector_cache.autocorrect_count,
     };
     return true;
 }

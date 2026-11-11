@@ -100,7 +100,7 @@ Held by: `tests/host/run_profile_candidate_transaction_tests.sh` (`test_mailbox_
 | Offset | Size | Field |
 | ---: | ---: | --- |
 | 5 | 1 | schema major, `4` |
-| 6 | 1 | schema minor, `2` |
+| 6 | 1 | schema minor, `5` |
 | 7 | 1 | requested-domain mask: bit *n* is the *n*th domain of the registry ([blob and digests](blob-and-digests.md)): RGB, key behaviours, combos, settings, pointing, keymap, macros |
 | 8 | 4 | blob length, `8`–`130048` |
 | 12 | 4 | CRC-32 of the exact blob |
@@ -111,7 +111,7 @@ Held by: `tests/host/run_profile_candidate_transaction_tests.sh` (`test_mailbox_
 The frame is malformed when the mask sets a bit outside the registry
 (offset `7`), the length is out of range (offset `8`), or any of bytes
 24–31 is nonzero. There is no flags byte and no store-format byte: Profile
-Wire 2.0 implies store format 6 ([D-F28](../../adr/0028-new-base-32-bit-profile-lengths.md)).
+Wire 2 implies store format 6 ([D-F28](../../adr/0028-new-base-32-bit-profile-lengths.md)).
 
 Processing a begin checks, in order, the schema version
 (`INCOMPATIBLE_SCHEMA`), the mask against the domains this build supports

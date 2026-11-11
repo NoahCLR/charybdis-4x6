@@ -31,13 +31,16 @@ else reads it, projects it, mirrors it or adapts QMK to it.
 | --- | --- | --- |
 | The profile each half saves, runs and copies; the working copy | `lib/profile/` ([profile flow](profile-flow.md)) | every runtime, through the `profile/runtime/active_profile_*_runtime.c` views |
 | What an action is and how it is dispatched; literal report usages | `lib/action/` | key runtime, macros, pointing outputs |
-| A key's effective behaviour and its participation | `lib/key/behavior/` | the key runtime's planners, validation |
+| A key's effective behaviour and its participation | `lib/key/behavior/` | the key runtime's planners, validation; the switch keys in `lib/action/` set its override (D-F66) |
 | Presses, tap series, leases, pending releases | `lib/key/runtime/reducer/` ([key press](key-press.md)) | planners, projection, feedback, trace |
 | Release, scan and tap-series decisions | `lib/key/runtime/planning/` | `transition.c`, which projects them |
 | Applied held actions and repeats | `lib/key/ownership/` | projection, housekeeping |
 | Applied layers and modifiers | `lib/state/ownership/`, `lib/state/modifiers/` | QMK's layer state and reports |
 | Macro playback | `lib/macro/` ([macro playback](macro-playback.md)) | action lifecycle, input guard |
+| The word being typed, the keys held back while a correction is typed, and the autocorrect override | `lib/autocorrect/` ([corrections](macro-playback.md#corrections)) | the report filters in `lib/macro/`; the switch keys `AC_*` in `lib/action/` and the runtime page in `lib/compat/` (D-F66, D-F69) |
+| What text replacement last did, the key that ended the word and how long it shows | `lib/autocorrect/autocorrect_feedback.c` ([the lighting render](rgb-render.md#replacement-feedback-across-the-runtime)) | the replacement feedback stage in `lib/rgb/`, the base packet in `lib/split/` (D-F70) |
 | Pointing mode state and handlers | `lib/pointing/runtime/`, `lib/pointing/modes/` ([pointer report](pointer-report.md)) | key runtime bridge, lighting, split sync |
+| Auto-mouse on/off: the override beside the stored setting, and what reaches QMK | `lib/pointing/policy/auto_mouse_switch.c` | the switch keys `AM_*` in `lib/action/`, the settings push and runtime page in `lib/compat/` (D-F66) |
 | What QMK and the fork promise | `lib/compat/` ([its README](../../users/noah/lib/compat/README.md)) | everything that touches QMK |
 | The lit frame | `lib/rgb/` ([lighting render](rgb-render.md)) | nothing: it only draws |
 | Runtime state on the slave half | `lib/split/` | lighting and pointing on the slave half: it only mirrors |

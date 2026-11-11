@@ -333,6 +333,47 @@ compile_variant_must_fail() {
     fi
 }
 
+# A build without the live-profile owner (D-F35: a plain qmk compile, or
+# NOAH_LIVE_PROFILE_OWNER=no) links without NOAH_LIVE_PROFILE_OWNER_SOURCES.
+# So nothing compiled into every build may need a symbol only those sources
+# define: the owner-less objects' undefined symbols and the owner sources'
+# definitions are read from real objects and must not meet.
+check_owner_sources_stay_optional() {
+    objects="$(mktemp -d)"
+    owner_sources="$(noah_source_manifest_userspace_paths "$ROOT" NOAH_LIVE_PROFILE_OWNER_SOURCES)"
+    export ROOT objects
+    compile_objects() {
+        directory="$objects/$1"
+        mkdir "$directory"
+        extra_flags="$2"
+        export directory extra_flags
+        # Intentional word splitting for the source list and the flag list.
+        # shellcheck disable=SC2086
+        printf '%s\n' $3 | xargs -P "$COMPILE_JOBS" -I{} sh -c '
+            cc -std=c11 -w -c \
+                "-DQMK_KEYBOARD_H=\"qmk_stub.h\"" \
+                -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+                $extra_flags \
+                -I"$ROOT" \
+                -I"$ROOT/users/noah" \
+                -I"$ROOT/tests/host/include" \
+                -include "$ROOT/tests/host/include/noah_compile_config.h" \
+                "$ROOT/$1" -o "$directory/$(printf "%s" "$1" | tr / _).o"
+        ' compile {}
+    }
+    compile_objects every "-DCOMBO_ENABLE -DSPLIT_KEYBOARD $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$COMMON_SOURCES $POINTING_SOURCES $RGB_SOURCES $AUTOMOUSE_SOURCES"
+    compile_objects owner "-DCOMBO_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$owner_sources"
+    nm -u "$objects"/every/*.o | awk 'NF == 2 && $1 == "U" {print $2}' | sort -u > "$objects/needed"
+    nm -g --defined-only "$objects"/owner/*.o | awk 'NF == 3 {print $3}' | sort -u > "$objects/owned"
+    needed="$(comm -12 "$objects/needed" "$objects/owned")"
+    rm -rf "$objects"
+    if [ -n "$needed" ]; then
+        echo "a build without the live-profile owner would not link; sources in every build need these symbols of NOAH_LIVE_PROFILE_OWNER_SOURCES:" >&2
+        echo "$needed" >&2
+        exit 1
+    fi
+}
+
 compile_variant "tests/host/include/noah_compile_config.h" "" "$COMMON_SOURCES"
 compile_variant "tests/host/include/noah_compile_config.h" "-DCONSOLE_ENABLE -DNOAH_KEY_RUNTIME_TRACE_ENABLE -DNOAH_RUNTIME_TRACE_ENABLE" "$COMMON_SOURCES users/noah/lib/key/runtime/process.c users/noah/lib/key/behavior/participation.c users/noah/lib/key/runtime/preflight.c users/noah/lib/key/runtime/press.c users/noah/lib/key/runtime/release.c users/noah/lib/key/runtime/scan.c users/noah/lib/key/runtime/transition.c"
 compile_variant "tests/host/include/noah_compile_config_no_rgb_feedback.h" "$RGB_TEST_FLAGS" "$COMMON_SOURCES $RGB_SOURCES"
@@ -362,6 +403,7 @@ compile_variant_must_fail "tests/host/include/noah_compile_config.h" "-DRAW_ENAB
 compile_variant "tests/host/include/noah_compile_config.h" "-DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT" "users/noah/lib/compat/qmk_physical_half.c"
 compile_variant "tests/host/include/noah_compile_config.h" "-DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_RIGHT" "users/noah/lib/compat/qmk_physical_half.c"
 
+check_owner_sources_stay_optional
 check_header_boundaries
 check_profile_build_validation_gate
 check_dragscroll_config_surface

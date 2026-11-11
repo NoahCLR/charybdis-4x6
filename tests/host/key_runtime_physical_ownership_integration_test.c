@@ -5,6 +5,7 @@
 
 #include "key_runtime_integration_harness.h"
 #include "users/noah/noah_runtime.h"
+#include "users/noah/lib/macro/typing_stage.h"
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/action/owned_keycode.h"
@@ -471,6 +472,66 @@ static void test_handled_same_basic_hold_registers_base_key(uint16_t source_keyc
 // The original aggregate-ownership contract still has to hold: a key QMK really
 // did register must stop a managed owner of the same usage from registering it
 // a second time, or releasing it out from under the physical key.
+static bool test_noted_key_is(keypos_t key_pos) {
+    return noah_typing_stage_noted_key.row == key_pos.row && noah_typing_stage_noted_key.col == key_pos.col;
+}
+
+// The key a usage comes from is noted for the typing stage (typing_stage.h)
+// as that usage reaches the report: a plain key when the hook hands its press
+// to QMK, and a behaviour's key when its hold registers the action. A release
+// notes none.
+static void test_the_key_that_reaches_the_report_is_noted(void) {
+    keypos_t plain_pos = test_keypos(2, 1);
+    keypos_t hold_pos  = test_keypos(2, 2);
+    keypos_t none      = test_keypos(MATRIX_ROWS, MATRIX_COLS);
+
+    test_reset_state();
+    noah_typing_stage_noted_key = none;
+
+    CHECK(key_runtime_integration_process_record(TEST_PLAIN_KEY, plain_pos, true));
+    CHECK(test_noted_key_is(plain_pos));
+    noah_typing_stage_noted_key = none;
+    CHECK(key_runtime_integration_process_record(TEST_PLAIN_KEY, plain_pos, false));
+    CHECK(test_noted_key_is(none));
+
+    // A press the behaviour takes puts nothing in the report yet, so it notes
+    // no key; the hold notes its key when its action registers.
+    CHECK(!key_runtime_integration_process_record(TEST_SHIFTED_PLAIN_KEY, hold_pos, true));
+    CHECK(test_noted_key_is(none));
+    key_runtime_integration_advance(&fake_time, TEST_HOLD_TERM + 1);
+    key_runtime_integration_scan();
+    CHECK(report_key_depth[KC_A] == 1 && test_noted_key_is(hold_pos));
+
+    noah_typing_stage_noted_key = none;
+    CHECK(!key_runtime_integration_process_record(TEST_SHIFTED_PLAIN_KEY, hold_pos, false));
+    CHECK(test_noted_key_is(none));
+    test_assert_ledgers_balanced(KC_A);
+}
+
+// A plain press can settle another key first: a behaviour key whose hold came
+// due with no scan since has its action registered before the plain key's
+// own. The plain key is the one noted when the hook hands it to QMK, since
+// its usage reaches the report last.
+static void test_a_plain_press_that_settles_another_key_is_the_one_noted(void) {
+    keypos_t plain_pos = test_keypos(2, 1);
+    keypos_t hold_pos  = test_keypos(2, 2);
+
+    test_reset_state();
+    noah_typing_stage_noted_key = test_keypos(MATRIX_ROWS, MATRIX_COLS);
+
+    CHECK(!key_runtime_integration_process_record(TEST_SHIFTED_SYMBOL_KEY, hold_pos, true));
+    key_runtime_integration_advance(&fake_time, TEST_HOLD_TERM + 1);
+    CHECK(key_runtime_integration_process_record(TEST_PLAIN_KEY, plain_pos, true));
+    // The behaviour key's hold was registered by that press.
+    CHECK(test_owned_snapshot(KC_1).managed_count == 1);
+    CHECK(test_noted_key_is(plain_pos));
+
+    CHECK(key_runtime_integration_process_record(TEST_PLAIN_KEY, plain_pos, false));
+    CHECK(!key_runtime_integration_process_record(TEST_SHIFTED_SYMBOL_KEY, hold_pos, false));
+    test_assert_ledgers_balanced(KC_A);
+    test_assert_ledgers_balanced(KC_1);
+}
+
 static void test_default_processed_key_still_blocks_managed_double_register(void) {
     keypos_t plain_pos = test_keypos(2, 1);
     keypos_t hold_pos  = test_keypos(2, 2);
@@ -916,6 +977,8 @@ int main(void) {
     test_default_processed_key_still_blocks_managed_double_register();
     test_consumed_handled_modifier_does_not_block_managed_teardown();
     test_tapped_mod_tap_is_not_a_held_modifier();
+    test_the_key_that_reaches_the_report_is_noted();
+    test_a_plain_press_that_settles_another_key_is_the_one_noted();
 
     puts("key_runtime physical-ownership integration tests passed");
     return 0;

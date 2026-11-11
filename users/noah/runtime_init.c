@@ -15,6 +15,7 @@
 #include "lib/key/ownership/held_repeat.h"
 #include "lib/key/runtime/api.h"
 #include "lib/key/runtime/slot/origin_registry.h"
+#include "lib/autocorrect/autocorrect.h"
 #include "lib/macro/macro_payload.h"
 #include "lib/compat/qmk_combo_origin.h"
 #include "lib/compat/qmk_record_admission.h"
@@ -24,6 +25,7 @@
 #include "lib/compat/qmk_portable_profile.h"
 #include "lib/compat/qmk_usb_product_name.h"
 #include "lib/profile/storage/profile_store_runtime_hooks.h"
+#include "lib/profile/runtime/active_profile_autocorrect_runtime.h"
 #include "lib/profile/runtime/active_profile_pd_runtime.h"
 #include "lib/pointing/defs/pointing_modes.h"
 #include "lib/rgb/core/rgb_runtime.h"
@@ -63,6 +65,7 @@ void noah_matrix_scan_user(void) {
     noah_record_admission_task();
 
     macro_payload_engine_scan();
+    noah_autocorrect_scan();
 
     noah_runtime_diag_stage_mark(NOAH_RUNTIME_DIAG_STAGE_SPLIT_SYNC);
     // One clock read serves every scheduler on the pass: QMK's timer takes a
@@ -110,9 +113,9 @@ void noah_keyboard_post_init_user(void) {
     static const noah_runtime_init_stage_fn_t stages[] = {
         // pointing_mode_forget_applied_dpi: QMK's Charybdis post-init has just
         // written the sensor's CPI.
-        noah_runtime_shared_state_post_init, pointing_mode_forget_applied_dpi, key_origin_registry_init, noah_qmk_combo_origin_init, noah_record_admission_reset, macro_payload_engine_init, noah_qmk_portable_storage_init, noah_profile_store_runtime_init,
+        noah_runtime_shared_state_post_init, pointing_mode_forget_applied_dpi, key_origin_registry_init, noah_qmk_combo_origin_init, noah_record_admission_reset, macro_payload_engine_init, noah_autocorrect_init, noah_qmk_portable_storage_init, noah_profile_store_runtime_init,
 #if !defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
-        noah_runtime_init_compiled_pd,
+        noah_runtime_init_compiled_pd, noah_active_profile_autocorrect_load_authored,
 #endif
         noah_rgb_runtime_post_init, split_runtime_sync_init,
 #if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE)

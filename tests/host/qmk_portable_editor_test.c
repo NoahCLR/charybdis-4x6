@@ -86,7 +86,7 @@ int main(int argc, char **argv) {
     assert((metadata[6] | metadata[7] << 8) == 0x1fff);
     assert(strstr((const char *)bytes + 26 + 64, "BREATHING"));
 #else
-    assert((metadata[6] | metadata[7] << 8) == 0x0400);
+    assert((metadata[6] | metadata[7] << 8) == 0x1400);
 #endif
     for (unsigned before = 0; before < 2; before++)
         for (unsigned after = 0; after < 2; after++) {

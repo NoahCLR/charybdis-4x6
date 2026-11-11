@@ -301,6 +301,15 @@ uint8_t key_feedback_preview_layer(void) {
     return fake_key_preview_layer;
 }
 
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+// What the typing stage shows now.
+static noah_autocorrect_feedback_t fake_autocorrect_feedback;
+
+noah_autocorrect_feedback_t noah_autocorrect_feedback(void) {
+    return fake_autocorrect_feedback;
+}
+#endif
+
 void pointing_mode_apply_remote_mode_ids_with_owner_bitmap(pointing_mode_id_t active_mode_id, pointing_mode_id_t locked_mode_id, split_side_mask_t owner_sides, const uint8_t *owner_bitmap) {
     remote_snapshot_apply_count++;
     remote_snapshot_active      = pointing_mode_mask_from_id(active_mode_id);
@@ -408,6 +417,9 @@ static void test_set_idle_runtime_state(void) {
     fake_pd_owner_sides     = SPLIT_SIDE_MASK_NONE;
     key_origin_bitmap_clear(fake_pd_owner_bitmap);
     fake_key_preview_layer = UINT8_MAX;
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    fake_autocorrect_feedback = (noah_autocorrect_feedback_t){0};
+#endif
     key_origin_bitmap_clear(fake_key_feedback_flash_visibility_bitmap);
     key_origin_bitmap_clear(fake_combo_underlay_bitmap);
     key_origin_bitmap_clear(fake_combo_overlay_bitmap);
@@ -448,10 +460,16 @@ static void test_elapsed_pass(void) {
 static void test_init_registers_rpcs_and_sends_initial_packets_on_master(void) {
     test_reset_stubs();
 
-#ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
-    CHECK(sizeof(split_runtime_base_sync_packet_t) == (size_t)(6u + KEY_ORIGIN_BITMAP_SIZE));
+    // With replacement feedback the base packet also carries its kind and keys.
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    const size_t replacement_feedback = 1u + KEY_ORIGIN_BITMAP_SIZE;
 #else
-    CHECK(sizeof(split_runtime_base_sync_packet_t) == 5u);
+    const size_t replacement_feedback = 0u;
+#endif
+#ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
+    CHECK(sizeof(split_runtime_base_sync_packet_t) == (size_t)(6u + KEY_ORIGIN_BITMAP_SIZE) + replacement_feedback);
+#else
+    CHECK(sizeof(split_runtime_base_sync_packet_t) == 5u + replacement_feedback);
 #endif
     CHECK(sizeof(split_runtime_combo_feedback_packet_t) == (size_t)(2u * KEY_ORIGIN_BITMAP_SIZE));
     CHECK(sizeof(split_runtime_key_feedback_semantic_packet_t) == (size_t)(KEY_ORIGIN_BITMAP_SIZE + KEY_FEEDBACK_SEMANTIC_MAP_SIZE));
@@ -890,6 +908,69 @@ static void test_tick_sends_only_base_packet_when_only_automouse_changes(void) {
     CHECK(rpc_send_count_key_feedback_branch == 0u);
     CHECK(rpc_last_base_packet.automouse_progress == 70u);
 }
+
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+// A replacement flash travels in the base packet: sent at once when it
+// begins, kept alive as active state while it shows, and cleared at once
+// when it ends. No other packet moves.
+static void test_tick_sends_the_base_packet_when_a_replacement_flash_begins_and_ends(void) {
+    test_reset_stubs();
+    test_set_idle_runtime_state();
+
+    split_runtime_sync_init();
+    test_reset_rpc_send_counts();
+    split_runtime_sync_tick(timer_read32());
+    CHECK(rpc_send_count == 0u);
+
+    fake_autocorrect_feedback.kind = NOAH_AUTOCORRECT_FEEDBACK_UNDO;
+    key_origin_bitmap_add_keypos(fake_autocorrect_feedback.keys, (keypos_t){.row = 1u, .col = 2u});
+    split_runtime_sync_tick(timer_read32());
+    CHECK(rpc_send_count == 1u && rpc_send_count_base == 1u);
+    CHECK(memcmp(&rpc_last_base_packet.autocorrect_feedback, &fake_autocorrect_feedback, sizeof(fake_autocorrect_feedback)) == 0);
+
+    // Unchanged, it waits for the active heartbeat, not the idle one.
+    split_runtime_sync_tick(timer_read32());
+    CHECK(rpc_send_count == 1u);
+    fake_time32 += 250u;
+    split_runtime_sync_tick(timer_read32());
+    CHECK(rpc_send_count == 2u && rpc_send_count_base == 2u);
+
+    fake_autocorrect_feedback = (noah_autocorrect_feedback_t){0};
+    split_runtime_sync_tick(timer_read32());
+    CHECK(rpc_send_count == 3u && rpc_send_count_base == 3u);
+    CHECK(rpc_last_base_packet.autocorrect_feedback.kind == NOAH_AUTOCORRECT_FEEDBACK_NONE);
+    CHECK(rpc_send_count_combo == 0u && rpc_send_count_key_feedback_semantic == 0u && rpc_send_count_key_feedback_branch == 0u);
+}
+
+// The slave half keeps the base packet's flash and hands it to a reader
+// whole, or not at all while the packet is still being published.
+static void test_slave_base_rpc_applies_replacement_feedback_for_coherent_readers(void) {
+    split_runtime_base_sync_packet_t packet = {.active_mode_id = POINTING_MODE_ID_NONE, .locked_mode_id = POINTING_MODE_ID_NONE, .key_preview_layer = UINT8_MAX};
+    noah_autocorrect_feedback_t      read   = {.kind = 0xA5u};
+
+    packet.autocorrect_feedback.kind = NOAH_AUTOCORRECT_FEEDBACK_MACRO;
+    key_origin_bitmap_add_keypos(packet.autocorrect_feedback.keys, (keypos_t){.row = 0u, .col = 3u});
+
+    test_reset_stubs();
+    fake_is_master = false;
+    split_runtime_sync_init();
+    CHECK(split_runtime_sync_remote_read_autocorrect_feedback(&read) && read.kind == NOAH_AUTOCORRECT_FEEDBACK_NONE);
+
+    test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC)((uint8_t)sizeof(packet), &packet, 0u, NULL);
+    CHECK(split_runtime_sync_remote_read_autocorrect_feedback(&read));
+    CHECK(memcmp(&read, &packet.autocorrect_feedback, sizeof(read)) == 0);
+
+    // A short packet is dropped whole, its flash with it.
+    packet.autocorrect_feedback.kind = NOAH_AUTOCORRECT_FEEDBACK_TEXT;
+    test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC)((uint8_t)(sizeof(packet) - 1u), &packet, 0u, NULL);
+    CHECK(split_runtime_sync_remote_read_autocorrect_feedback(&read) && read.kind == NOAH_AUTOCORRECT_FEEDBACK_MACRO);
+
+    // Odd generation: a publication is in flight for every attempt.
+    read.kind                                 = 0xA5u;
+    split_runtime_sync_remote.base_generation = 1u;
+    CHECK(!split_runtime_sync_remote_read_autocorrect_feedback(&read) && read.kind == 0xA5u);
+}
+#endif
 
 static void test_tick_sends_only_combo_packet_when_only_combo_feedback_changes(void) {
     test_reset_stubs();
@@ -1604,6 +1685,10 @@ int main(void) {
     test_locked_pointing_mode_zeroes_automouse_progress();
     test_disabled_auto_mouse_publishes_no_fade_progress();
     test_tick_sends_only_base_packet_when_only_automouse_changes();
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    test_tick_sends_the_base_packet_when_a_replacement_flash_begins_and_ends();
+    test_slave_base_rpc_applies_replacement_feedback_for_coherent_readers();
+#endif
     test_tick_sends_only_combo_packet_when_only_combo_feedback_changes();
     test_quiet_combo_projection_clears_other_half_feedback();
     test_idle_combo_feedback_activation_sends_without_dirty_notification();

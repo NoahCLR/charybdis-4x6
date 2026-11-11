@@ -208,6 +208,8 @@
     const char        macro_names[MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE]   = {MACROS(_KEYMAP_MACRO_NAME_ENTRY)};               \
     const uint8_t     authored_macro_bank[]                                 = {NOAH_AUTHORED_MACRO_BANK};        \
     const uint16_t    authored_macro_bank_size                              = sizeof(authored_macro_bank);      \
+    const uint8_t     authored_autocorrect_list[]                           = {NOAH_AUTHORED_AUTOCORRECT_LIST};  \
+    const uint16_t    authored_autocorrect_list_size                        = sizeof(authored_autocorrect_list); \
     _KEYMAP_COMBO_DATA()                                                                                                        \
     _KEYMAP_COMBO_COUNT_DATA();                                                                                                 \
     _KEYMAP_COMBO_OUTPUT_DATA();                                                                                                \

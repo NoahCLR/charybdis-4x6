@@ -16,7 +16,7 @@
 // on another key that names a custom key sends only that key's shortcut,
 // layers included, never its behaviour.
 //
-// Stored in settings v11 as ten bytes per slot, in slot order: an 8-bit HID
+// Stored in the settings domain as ten bytes per slot, in slot order: an 8-bit HID
 // report modifier mask (bit 0 Left Ctrl, 1 Left Shift, 2 Left Alt, 3 Left GUI,
 // 4 Right Ctrl, 5 Right Shift, 6 Right Alt, 7 Right GUI), six key bytes in the
 // order they are pressed, zero after the last, the 16-bit layer mask, low byte
@@ -77,8 +77,8 @@ typedef struct {
 #define NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_SYSTEM(key_) ((key_) >= 0xa5 && (key_) <= 0xa7)
 #define NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_CONSUMER(key_) ((key_) >= 0xa8 && (key_) <= 0xc2)
 #define NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_KEY(key_) (((key_) >= 0x04 && (key_) <= 0xc2) || ((key_) >= 0xcd && (key_) <= 0xdc))
-// A shortcut's layer mask is 16 bits: layers 0-15, the bank settings v11
-// stores, of which a shortcut may name 1-15.
+// A shortcut's layer mask is 16 bits: layers 0-15, the bank the settings
+// domain stores, of which a shortcut may name 1-15.
 #define NOAH_CUSTOM_KEY_SHORTCUT_LAYERS 16
 
 // A key byte: a key, or zero for none.

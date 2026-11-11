@@ -399,6 +399,19 @@ static void test_auto_mouse_toggle_restores_auto_mouse_layer_when_dropped(void) 
     CHECK((next & ((layer_state_t)1u << 4)) != 0);
 }
 
+// With auto-mouse off, no anchor forces the pointer layer on: nothing would
+// turn it off again once the anchor let go (D-F66).
+static void test_no_anchor_forces_the_pointer_layer_with_auto_mouse_off(void) {
+    test_reset_stubs();
+    fake_auto_mouse_enabled = false;
+    fake_active_modes       = POINTING_MODE_VOLUME;
+    fake_auto_mouse_toggle  = true;
+    fake_auto_mouse_layer   = 4;
+
+    CHECK(pointer_layer_policy_apply((layer_state_t)1u << 0) == (layer_state_t)1u << 0);
+    CHECK(pointer_layer_policy_apply((layer_state_t)1u << 4) == (layer_state_t)1u << 4);
+}
+
 static void test_sniping_layer_strips_unanchored_auto_mouse_layer(void) {
     test_reset_stubs();
     fake_auto_mouse_layer = 4;
@@ -691,6 +704,7 @@ int main(void) {
     test_arrow_mode_prefers_typing_layer_over_auto_mouse_layer();
     test_anchored_pointing_mode_restores_auto_mouse_layer_when_dropped();
     test_auto_mouse_toggle_restores_auto_mouse_layer_when_dropped();
+    test_no_anchor_forces_the_pointer_layer_with_auto_mouse_off();
     test_sniping_layer_strips_unanchored_auto_mouse_layer();
     test_auto_mouse_layer_coexists_with_non_nav_layers();
     test_sniping_layer_strips_pointing_mode_anchored_auto_mouse_layer();

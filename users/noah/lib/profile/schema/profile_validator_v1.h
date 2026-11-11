@@ -14,6 +14,7 @@
 #include "profile_pd_v1.h"
 #include "profile_keymap_v1.h"
 #include "profile_macros_v1.h"
+#include "profile_autocorrect_v1.h"
 
 enum {
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB           = NOAH_PROFILE_DOMAIN_MASK_RGB,
@@ -23,15 +24,18 @@ enum {
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD            = NOAH_PROFILE_DOMAIN_MASK_PD,
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEYMAP        = NOAH_PROFILE_DOMAIN_MASK_KEYMAP,
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_MACROS        = NOAH_PROFILE_DOMAIN_MASK_MACROS,
+    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_AUTOCORRECT   = NOAH_PROFILE_DOMAIN_MASK_AUTOCORRECT,
     NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS        = NOAH_PROFILE_DOMAIN_MASK_ALL,
     NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX        = 20u,
     NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX   = NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX,
     // Regression policy for the payload-independent 32-bit scan state. This
     // is not a hardware SRAM-capacity claim; target resource gates account
-    // for the linked instance separately. D-F14's 128-byte pointing records
-    // make the PD iterator the largest domain state; D-F28's 32-bit blob
-    // lengths and offsets add 20 bytes: 392 bytes on Cortex-M0+.
-    NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET = 400u,
+    // for the linked instance separately. D-F68's 128-byte correction, held
+    // whole to order the next one against it, makes the autocorrect list's
+    // walk the largest domain state, past D-F14's 128-byte pointing records;
+    // D-F28's 32-bit blob lengths and offsets add 20 bytes: 412 bytes on
+    // Cortex-M0+.
+    NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET = 416u,
     NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8      = 0xffu,
     NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16     = 0xffffu,
 };
@@ -171,6 +175,7 @@ typedef union {
     noah_key_behavior_domain_v1_validation_t key_behaviors;
     noah_profile_keymap_v1_validation_t      keymap;
     noah_profile_macros_v1_validation_t      macros;
+    noah_profile_autocorrect_v1_validation_t autocorrect;
 } noah_profile_validator_v1_domain_validation_t;
 
 // What begin asked for: a whole profile against its declared checksum, a

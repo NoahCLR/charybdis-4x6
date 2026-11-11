@@ -450,7 +450,7 @@ static void test_every_domain_is_checked_alone(void) {
         active_bytes(actual, &length);
         assert(length == saved_length && memcmp(actual, saved_bytes, length) == 0);
     }
-    puts("each of the seven domains is checked on its own, accepted whole and refused one byte short");
+    puts("each of the eight domains is checked on its own, accepted whole and refused one byte short");
 }
 
 int main(int argc, char **argv) {

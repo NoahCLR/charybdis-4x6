@@ -1,7 +1,8 @@
 # Lighting
 
 The LEDs are feedback: they show which layer and pointing mode are on, which
-keys made a combo, which tap count a key is on and whether a hold has started.
+keys made a combo, which tap count a key is on, whether a hold has started,
+and when text replacement changed what you typed.
 Ark's
 [Lighting](https://github.com/NoahCLR/charybdis-ark/blob/dev/docs/guide/lighting.md)
 page edits all of it and paints its board the way the keyboard will.
@@ -22,9 +23,11 @@ Lighting is drawn in **stages**, each painting over the one before:
    the link's layers show their keys over the mode's colour ([linked
    layers](pointing.md#linked-layers)).
 5. **Combo feedback**: the keys of a combo you are holding.
-6. **Key feedback**: tap counts, holds and long holds.
+6. **Behaviour feedback**: tap counts, holds and long holds.
+7. **Replacement feedback**: a flash when text replacement replaces what you
+   typed, or puts it back.
 
-Stages 2 to 6 can each be switched off without losing their colours. A
+Stages 2 to 7 can each be switched off without losing their colours. A
 combo whose action is shown by the stage above it (it previews a layer or
 runs a pointing mode) paints just before the layer preview, so the preview
 and the mode colour stay on top of it; every other combo paints after the
@@ -54,8 +57,8 @@ While you hold a key whose hold turns a layer on, the keys light in that
 layer's colours before the layer comes on, but only when every outcome of
 the press lands on that layer: a thumb key that locks a layer on tap and holds
 it on hold previews; an `LT()` key, whose tap types a letter, doesn't. The
-preview is part of the layer colours: it follows that stage's switch, not key
-feedback's.
+preview is part of the layer colours: it follows that stage's switch, not
+behaviour feedback's.
 
 ## Pointing modes and combos
 
@@ -64,9 +67,9 @@ The running pointing mode paints its colour where you choose (see
 combo colour the same way, until you let go. A combo whose action holds a
 layer shows only that layer's colours while it holds it.
 
-## Key feedback
+## Behaviour feedback
 
-Key feedback shows what a key with a behaviour is doing.
+Behaviour feedback shows what a key with a behaviour is doing.
 
 - A single tap paints nothing. From the double tap on, the key takes the
   colour of the tap count it has reached until that branch fires; the colours
@@ -80,9 +83,31 @@ Key feedback shows what a key with a behaviour is doing.
 - Holding a branch that has a tap and no hold shows the tap colour once the
   multi tap window has passed, whether or not taps flash.
 
+## Replacement feedback
+
+When [text replacement](autocorrect.md) changes what you typed, the keyboard
+flashes once, for a length you set apart from the behaviour feedback flash
+interval (200 ms in my profile). The flash begins as the replacement starts
+to be typed.
+
+- An input replaced with **text** flashes one colour, one replaced by a
+  **macro** another, and a replacement you **undo** with Backspace a third:
+  green, magenta and red in my profile.
+- A colour with saturation and brightness both at 0 is off: that case does
+  not flash, and the other two still do.
+- A word that is left as you typed it never flashes, whatever the reason.
+- One flash shows at a time. An undo right after a replacement takes its
+  place.
+
+The key it follows is the one that ended the word (Space, Enter, a
+punctuation key) or, for an undo, the Backspace. If you type on while an
+earlier replacement is still being typed, a combo that ends the next word may
+flash on one of its keys only.
+
 ## Where feedback paints
 
-Pointing modes, combo feedback and key feedback each choose where they paint:
+Pointing modes, combo feedback, behaviour feedback and replacement feedback each
+choose where they paint:
 
 - **both halves**;
 - **the left half** or **the right half**;
@@ -94,14 +119,16 @@ Pointing modes, combo feedback and key feedback each choose where they paint:
 
 An **LED group** paints chosen LEDs, such as the thumb keys or the trackball
 LED, over a stage's own colour, while a given layer, pointing mode, combo
-feedback or kind of key feedback is showing (or any of them). A group colour
-with saturation and brightness at 0 takes the stage's colour; any other colour
-paints as itself. Rows paint in order, so a later row wins an LED they share.
-In key feedback, rows for any kind of feedback paint first, so rows for one
-kind paint over them.
+feedback, kind of behaviour feedback or kind of replacement feedback is
+showing (or any of them). A group colour with saturation and brightness at 0
+takes the stage's colour; any other colour paints as itself. Rows paint in
+order, so a later row wins an LED they share. In behaviour feedback and
+replacement feedback, rows for any kind of feedback paint first, so rows for
+one kind paint over them.
 
 A profile holds up to 128 different LED sets and 640 rows in all, at most 255
-for any one of layers, pointing modes, combo feedback and key feedback. Rows
+for any one of layers, pointing modes, combo feedback, behaviour feedback
+and replacement feedback. Rows
 that light the same LEDs share one set. A row that is not showing costs the
 keyboard nothing to draw.
 

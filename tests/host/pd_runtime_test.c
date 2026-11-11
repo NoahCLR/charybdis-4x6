@@ -609,6 +609,8 @@ static void test_pointing_device_task_recent_matrix_activity_delays_arm_window(v
 
 static void test_layer_state_set_restores_active_mode_dpi_and_pointer_layer_after_sniping_drops(void) {
     test_reset_stubs();
+    // An anchor restores the pointer layer only while auto-mouse is on (D-F66).
+    auto_mouse_enabled = true;
 
     CHECK(pointing_mode_handle_keycode_press(PD_MODE_1));
     pointing_mode_set_auto_sniping_layer_active(true);

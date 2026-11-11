@@ -252,7 +252,7 @@ static void test_real_authored_profile(void) {
     assert(profile.metadata.crc32 != 0u);
     assert(profile.metadata.digest != 0u);
     assert(profile.metadata.action_abi_digest != 0u);
-    assert(sizeof(profile) <= 76u); // metadata and seven 32-bit ranges (D-F28)
+    assert(sizeof(profile) <= 84u); // metadata and eight 32-bit ranges (D-F28)
     assert(!noah_profile_compiled_v1_compatibility(NULL, &runtime_compatibility));
     assert(!noah_profile_compiled_v1_compatibility(&profile, NULL));
     assert(noah_profile_compiled_v1_compatibility(&profile, &runtime_compatibility));
@@ -405,6 +405,10 @@ static void test_real_authored_profile(void) {
     assert(noah_profile_settings_default(NOAH_SETTING_DEFAULT_DPI) == CHARYBDIS_MINIMUM_DEFAULT_DPI);
     assert(noah_profile_settings_default(NOAH_SETTING_SNIPING_DPI) == CHARYBDIS_MINIMUM_SNIPING_DPI);
     assert(noah_profile_settings_default(NOAH_SETTING_KEYMAP_OPTIONS) == 0x1400);
+    // The replacement flash and the behaviour-feedback half-period are authored
+    // apart, each its own scalar (D-F70).
+    assert(noah_profile_settings_default(NOAH_SETTING_AUTOCORRECT_FEEDBACK_PERIOD) == RGB_AUTOCORRECT_FEEDBACK_FLASH_MS);
+    assert(noah_profile_settings_default(NOAH_SETTING_FEEDBACK_PERIOD) == RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS);
     validate_whole_profile(&profile);
 
     printf("compiled profile v1: %u bytes crc32=%08x fnv1a=%08x action_abi=%08x\n", profile.metadata.byte_length, (unsigned)profile.metadata.crc32, (unsigned)profile.metadata.digest, (unsigned)profile.metadata.action_abi_digest);
@@ -477,11 +481,12 @@ static void validate_portable_import(const noah_profile_compiled_v1_t *compiled,
     noah_profile_validator_v1_t        validator;
     noah_profile_validator_v1_error_t  error;
     noah_profile_validator_v1_result_t result = noah_profile_validator_v1_begin(&validator, &reader, 0, &declaration, &compatible, &error);
-    // The schema-3 maximum has 640 three-branch behaviour steps plus checksum,
-    // combo and settings scans. Give the bounded validator room to finish;
-    // this is a termination guard, not a hardware latency assertion.
+    // The maximum has 640 three-branch behaviour steps and 2,048 autocorrect
+    // rows plus checksum, combo and settings scans. Give the bounded validator
+    // room to finish; this is a termination guard, not a hardware latency
+    // assertion.
     size_t validation_steps = 0;
-    for (; result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS && validation_steps < 20000; validation_steps++)
+    for (; result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS && validation_steps < 40000; validation_steps++)
         result = noah_profile_validator_v1_step(&validator, 20, &error);
     if (!expect_valid) {
         // A profile from an earlier format (schema 2) is refused at its

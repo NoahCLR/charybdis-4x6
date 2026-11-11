@@ -204,7 +204,9 @@ layer_state_t pointer_layer_policy_apply(layer_state_t state) {
 
     // Keep the configured pointer layer alive while anchored. Outside the
     // sniping exception above, overlap with other keyboard layers is allowed.
-    if (auto_mouse_anchored) {
+    // With auto-mouse off nothing would turn a forced layer off again, so
+    // only a layer owner keeps it (D-F66).
+    if (auto_mouse_anchored && noah_qmk_contract_auto_mouse_enabled()) {
         state |= auto_mouse_mask;
     }
 

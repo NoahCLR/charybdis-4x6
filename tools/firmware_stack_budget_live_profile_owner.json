@@ -99,6 +99,11 @@
         },
         {
           "caller": "noah_profile_candidate_store_backend_activation_step",
+          "callee": "noah_active_profile_autocorrect_invalidate",
+          "reason": "Provider publication invokes the autocorrect list's invalidator through its listener table (D-F68)."
+        },
+        {
+          "caller": "noah_profile_candidate_store_backend_activation_step",
           "callee": "owner_pd_invalidate",
           "reason": "Provider publication invokes the owner's PD invalidator, which ends a layer-started mode around the validated immutable PD cache invalidator."
         },
@@ -151,6 +156,11 @@
           "caller": "noah_active_profile_provider_publish_in_place",
           "callee": "apply_plan",
           "reason": "A live edit (D-F32) rewrites the working copy through the provider's mutate callback, inside the in-place publication."
+        },
+        {
+          "caller": "noah_active_profile_provider_publish_in_place",
+          "callee": "noah_active_profile_autocorrect_invalidate",
+          "reason": "In-place publication of a live edit invokes the autocorrect list's invalidator, which finds the list's range again (D-F68)."
         },
         {
           "caller": "noah_active_profile_provider_publish_in_place",
@@ -384,6 +394,26 @@
         {
           "name": "sixteen-member combo host validation reads",
           "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_transaction_scan", "validation_step", "noah_profile_validator_v1_step", "noah_profile_combo_v1_iteration_step", "read_at", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "autocorrect list host validation reads (validation inlined into the validator step)",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_transaction_scan", "validation_step", "noah_profile_validator_v1_step", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "autocorrect list publication slot flash reads",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_active_profile_autocorrect_invalidate", "noah_profile_blob_v1_find_domain", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "autocorrect list publication header read",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_active_profile_autocorrect_invalidate", "noah_profile_autocorrect_v1_open", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "autocorrect lookup of a typed word, slot flash reads (D-F69)",
+          "functions": ["main", "matrix_scan", "autocorrect_lookup", "noah_profile_autocorrect_v1_typo_at", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "autocorrect list live-edit publication (working copy in RAM)",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "noah_active_profile_provider_publish_in_place", "noah_active_profile_autocorrect_invalidate", "noah_profile_blob_v1_find_domain", "noah_profile_reader_read"]
         },
         {
           "name": "save erase ahead in a quiet grant",

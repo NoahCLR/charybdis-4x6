@@ -21,10 +21,10 @@ enum {
     TEST_BEHAVIOR_LENGTH      = 4u + TEST_ROW_COUNT * (2u + 16u + 18u * TEST_STEPS_PER_ROW),
     TEST_PROFILE_LENGTH       = TEST_BEHAVIOR_LENGTH + NOAH_PROFILE_BLOB_V1_HEADER_SIZE + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE,
     MAX_VALIDATION_STEPS      = MAX_BEHAVIOR_DOMAIN_STEPS + TEST_PROFILE_LENGTH / 20u + 64u,
-    // 128 groups and one table's 255 rows (D-F63): a step per record and five
+    // 128 groups and one table's 255 rows (D-F63): a step per record and six
     // for the domain's framing.
-    MAX_RGB_DOMAIN_STEPS          = 393u,
-    TEST_MAXIMUM_RGB_PAYLOAD_SIZE = 2467u,
+    MAX_RGB_DOMAIN_STEPS          = 395u,
+    TEST_MAXIMUM_RGB_PAYLOAD_SIZE = 2477u,
 };
 
 typedef struct {
@@ -150,7 +150,7 @@ static void run_maximum_rgb_profile(void) {
         rgb_payload[offset + 4u] = 0u;
         offset += 5u;
     }
-    assert(offset + 4u + 4u + 11u == sizeof(rgb_payload));
+    assert(offset + 4u + 4u + 11u + 10u == sizeof(rgb_payload));
 
     const noah_profile_domain_v1_t domain = {
         .id             = NOAH_PROFILE_DOMAIN_V1_RGB,

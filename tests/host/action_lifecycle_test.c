@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "users/noah/lib/macro/typing_stage.h"
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_kind_dispatch_internal.h"
 #include "users/noah/lib/action/action_kind_internal.h"
@@ -316,6 +317,28 @@ void owned_keycode_tap_literal(uint16_t keycode) {
 
 void pointer_layer_policy_sync_layer_ownership_anchor(void) {}
 
+// The auto-mouse keys' switch; auto_mouse_switch_test.c covers what it does.
+static bool auto_mouse_override = true;
+
+void auto_mouse_switch_set_override(bool allowed) {
+    auto_mouse_override = allowed;
+}
+
+bool auto_mouse_switch_override(void) {
+    return auto_mouse_override;
+}
+
+// The autocorrect keys' switch.
+static bool autocorrect_override = true;
+
+void autocorrect_switch_set_override(bool allowed) {
+    autocorrect_override = allowed;
+}
+
+bool autocorrect_switch_override(void) {
+    return autocorrect_override;
+}
+
 void pointer_layer_policy_settle_record(void) {}
 
 void pointer_layer_policy_take_back_qmk_toggle(uint16_t keycode, const keyrecord_t *record) {
@@ -462,6 +485,19 @@ static void test_tap_handles_layer_lock_and_pd_lock(void) {
     noah_action_tap(PD_MODE_4_LOCK);
     CHECK(pd_toggle_calls == 1);
     CHECK(split_sync_calls == 0);
+}
+
+// A tap at a key notes that key for the typing stage (typing_stage.h) as it
+// is dispatched; a tap no key names notes none. Holds are noted where they
+// are registered (held_action.c), not here.
+static void test_a_tap_notes_its_key_for_the_typing_stage(void) {
+    test_reset_stubs();
+    noah_typing_stage_noted_key = test_keypos(0, 0);
+
+    noah_action_tap_at(test_keypos(1, 2), KC_A);
+    CHECK(noah_typing_stage_noted_key.row == 1 && noah_typing_stage_noted_key.col == 2);
+    noah_action_tap(KC_C);
+    CHECK(noah_typing_stage_noted_key.row >= MATRIX_ROWS && noah_typing_stage_noted_key.col >= MATRIX_COLS);
 }
 
 static void test_tap_at_preserves_pd_lock_origin_key_pos(void) {
@@ -787,7 +823,7 @@ static void test_qmk_functions_dispatch_as_synthetic_qmk_records(void) {
 
 // An unassigned userspace code sends nothing, whichever way it is dispatched.
 static void test_unassigned_userspace_codes_send_nothing(void) {
-    const uint16_t unassigned[] = {NOAH_KEYCODE_PD_HOLD_BASE + POINTING_MODE_COUNT, LAYER_LOCK_BASE + LAYER_COUNT, NOAH_KEYCODE_USERSPACE_END, QK_USER_MAX};
+    const uint16_t unassigned[] = {NOAH_KEYCODE_PD_HOLD_BASE + POINTING_MODE_COUNT, LAYER_LOCK_BASE + LAYER_COUNT, AM_TOGG + 1, QK_USER_MAX};
     keypos_t       key_pos      = {.row = 1, .col = 2};
     for (size_t index = 0; index < ARRAY_SIZE(unassigned); index++) {
         test_reset_stubs();
@@ -811,6 +847,7 @@ int main(void) {
     test_oneshot_layer_taps_arm_and_presses_hold();
     test_toggle_and_goto_layer_keycodes_act_through_layer_ownership();
     test_tap_at_preserves_pd_lock_origin_key_pos();
+    test_a_tap_notes_its_key_for_the_typing_stage();
     test_tap_routes_macro_custom_qmk_and_plain_actions();
     test_tap_ignores_raw_layer_actions();
     test_press_routes_pointing_mode_momentary_qmk_custom_and_plain();

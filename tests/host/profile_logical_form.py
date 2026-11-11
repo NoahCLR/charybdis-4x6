@@ -1,9 +1,9 @@
 """A profile's domains in a logical form two encodings of one profile share.
 
 Each domain decodes to plain JSON values, field by field, following the specs
-in docs/spec/: RGB v4 (rgb-domain-v1.md), key behaviours v2, combos v3,
-settings v11, keymap v1 and macros v1 (profile-wire-v1/), sparse PD v3
-(pd-mode-domain-v1.md). An action is written as the native keycode it stands for, so a
+in docs/spec/: RGB v5 (rgb-domain-v1.md), key behaviours v2, combos v3,
+settings v12, keymap v1, macros v1 and the autocorrect list v1
+(profile-wire-v1/), sparse PD v3 (pd-mode-domain-v1.md). An action is written as the native keycode it stands for, so a
 combo naming pointing slot 5 as a semantic action and one naming it as the keycode
 0x7e85 read the same; nonzero action flags are kept beside it.
 """
@@ -14,7 +14,7 @@ LAYERS = 16
 MATRIX_KEYS = 60
 MACRO_SLOTS = 128
 
-DOMAIN_NAMES = {0x10: "rgb", 0x20: "behaviors", 0x30: "combos", 0x40: "settings", 0x50: "pointing", 0x60: "keymap", 0x70: "macros"}
+DOMAIN_NAMES = {0x10: "rgb", 0x20: "behaviors", 0x30: "combos", 0x40: "settings", 0x50: "pointing", 0x60: "keymap", 0x70: "macros", 0x80: "autocorrect"}
 
 # users/noah/noah_keymap_ids.h and QMK's keycode blocks.
 _NATIVE_BASE = {2: 0x5220, 3: 0x7EC0, 4: 0x7E80, 5: 0x7EA0, 6: 0x7700, 7: 0x7F00}
@@ -51,8 +51,9 @@ def action(data: bytes, offset: int) -> str:
 
 
 def rgb(data: bytes) -> dict:
-    assert data[0] == 4 and data[1] == 0 and data[14:16] == b"\0\0"
+    assert data[0] == 5 and data[1] == 0 and data[15] == 0
     groups, layers, layer_groups, pd, pd_groups, combo_groups, taps, key_groups = data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11]
+    replacement_groups = data[14]
     offset = 16
 
     def take(count, size, decode):
@@ -73,6 +74,8 @@ def rgb(data: bytes) -> dict:
     value["tapBranchColors"] = take(taps, 3, lambda at: _hsv(data, at))
     value["keyFeedback"] = take(1, 11, lambda at: {"committed": _hsv(data, at), "hold": _hsv(data, at + 3), "longHold": _hsv(data, at + 6), "tapPolicy": data[at + 9], "locality": data[at + 10]})[0]
     value["keyFeedbackGroups"] = take(key_groups, 5, lambda at: {"semantic": data[at], "hsv": _hsv(data, at + 1), "group": data[at + 4]})
+    value["replacementFeedback"] = take(1, 10, lambda at: {"text": _hsv(data, at), "macro": _hsv(data, at + 3), "undo": _hsv(data, at + 6), "locality": data[at + 9]})[0]
+    value["replacementGroups"] = take(replacement_groups, 5, lambda at: {"semantic": data[at], "hsv": _hsv(data, at + 1), "group": data[at + 4]})
     assert offset == len(data), "RGB records do not end the domain"
     return value
 
@@ -120,20 +123,20 @@ SETTING_NAMES = [
     "AUTO_MOUSE_DEBOUNCE", "AUTO_SNIPING_ENABLED", "AUTO_SNIPING_LAYERS", "DRAGSCROLL_DPI", "VOLUME_DPI", "BRIGHTNESS_DPI", "ZOOM_DPI",
     "ARROW_DPI", "FEEDBACK_PERIOD", "AUTO_MOUSE_DEAD_TIME", "RGB_TIMEOUT", "DEFAULT_DPI", "SNIPING_DPI", "COMBOS_ENABLED", "RGB_MODE",
     "RGB_COLOR", "DEFAULT_LAYERS", "KEYMAP_OPTIONS", "AUTO_MOUSE_DELAY", "AUTO_MOUSE_THRESHOLD", "UNICODE_HOST_MODE", "BEHAVIORS_ENABLED",
-    "LAYER_BEHAVIORS", "LAYER_COMBOS",
+    "LAYER_BEHAVIORS", "LAYER_COMBOS", "AUTOCORRECT_FEEDBACK_PERIOD",
 ]
 
 
 def settings(data: bytes) -> dict:
-    assert list(data[:8]) == [11, 16, 31, 128, 128, data[5], 128, 0]
+    assert list(data[:8]) == [12, 16, 32, 128, 128, data[5], 128, 0]
     value = {"flags": data[5], "values": {name: _u32(data, 8 + 4 * index) for index, name in enumerate(SETTING_NAMES)}}
     value["layers"] = [{"comboReference": data[at], "bypass": data[at + 1 : at + 9].hex(), "exclusion": data[at + 9 : at + 17].hex()}
-                       for at in range(132, 404, 17)]
+                       for at in range(136, 408, 17)]
     # Each shortcut: its modifier mask, its keys in press order, its layer mask
     # and the layer kind they act as (D-F26).
-    records = {slot: data[404 + 10 * slot : 414 + 10 * slot] for slot in range(128)}
+    records = {slot: data[408 + 10 * slot : 418 + 10 * slot] for slot in range(128)}
     value["customKeyShortcuts"] = {slot: [r[0], [key for key in r[1:7] if key], r[7] | r[8] << 8, r[9]] for slot, r in records.items() if any(r)}
-    names, offset = [], 1684
+    names, offset = [], 1688
     for _ in range(16 + 128 + 128 + 1):
         names.append(data[offset + 1 : offset + 1 + data[offset]].decode("utf-8"))
         offset += 1 + data[offset]
@@ -182,7 +185,23 @@ def macros(data: bytes) -> list:
     return streams
 
 
-DECODERS = {"rgb": rgb, "behaviors": behaviors, "combos": combos, "settings": settings, "pointing": pointing, "keymap": keymap, "macros": macros}
+def autocorrect(data: bytes) -> list:
+    """Each correction, its text or the macro slot it plays, with its typos
+    and where each matches, in stored order."""
+    corrections, typos, part, text_length = struct.unpack_from("<HHHH", data, 0)
+    text = 8 + 6 * corrections + 6 * typos + 2 * part
+    assert len(data) == text + text_length
+    entries = []
+    for index in range(corrections):
+        offset, length, kind = struct.unpack_from("<HBB", data, 8 + 6 * index)
+        entries.append({"macro": offset, "typos": []} if kind else {"correction": data[text + offset : text + offset + length].decode("utf-8"), "typos": []})
+    for index in range(typos):
+        offset, length, match, correction = struct.unpack_from("<HBBH", data, 8 + 6 * corrections + 6 * index)
+        entries[correction]["typos"].append({"typo": data[text + offset : text + offset + length].decode("utf-8"), "match": match})
+    return entries
+
+
+DECODERS = {"rgb": rgb, "behaviors": behaviors, "combos": combos, "settings": settings, "pointing": pointing, "keymap": keymap, "macros": macros, "autocorrect": autocorrect}
 
 
 def logical(domains: dict) -> dict:

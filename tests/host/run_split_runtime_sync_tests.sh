@@ -30,6 +30,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
     -DRGB_POINTING_MODE_ACTIVE_HALF_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE \
+    -DRGB_AUTOCORRECT_FEEDBACK_ENABLE \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \

@@ -109,6 +109,18 @@ dual-role keys held for their layer or modifiers don't. A mode either keeps
 the pointer layer on under it or gives way to the typing layer; Arrow gives
 way, so the arrows sit on whatever you were typing on.
 
+The switch keys `AM_ON`, `AM_OFF` and `AM_TOGG` turn auto-mouse on, off or
+the other way until the keyboard is unplugged, as `CM_ON`, `CM_OFF` and
+`CM_TOGG` do for combos ([switch keys](keys.md#where-behaviours-and-combos-run)).
+They go wherever a key can go, act when pressed, and with a behaviour of
+their own do what it decides. They never change the auto-mouse setting in
+Ark or save anything, and with auto-mouse switched off there, `AM_ON` does
+not turn it on. Switching auto-mouse off while the ball has the pointer
+layer on turns that layer off; a pointer layer you hold, lock or reach with
+a one-shot stays, and a mode that keeps the pointer layer on under it does
+so only while auto-mouse is on. With auto-mouse off the pointer layer shows
+no fade.
+
 **Sniping** slows the pointer for precise work. It comes on by itself while
 any of the auto-sniping layers is on (Navigation alone, in my profile), and
 strips a separate pointer layer so those layers keep their keys. Switching

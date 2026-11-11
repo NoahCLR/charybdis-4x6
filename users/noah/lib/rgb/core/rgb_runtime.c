@@ -7,6 +7,7 @@
 #include "rgb_active_profile_config.h"
 #include "rgb_helpers.h"
 #include "../automouse/rgb_automouse_stage.h"
+#include "../stages/rgb_autocorrect_feedback_stage.h"
 #include "../stages/rgb_combo_feedback_stage.h"
 #include "../stages/rgb_key_feedback_stage.h"
 #include "../stages/rgb_layer_stage.h"
@@ -15,7 +16,7 @@
 #include "../../state/diagnostics/runtime_diag.h"
 #include "rgb_validation.h"
 
-#if defined(RGB_MATRIX_ENABLE) && (defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE) || (defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)))
+#if defined(RGB_MATRIX_ENABLE) && (defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE) || defined(RGB_AUTOCORRECT_FEEDBACK_ENABLE) || (defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)))
 #    include "../../key/runtime/feedback.h"
 #    include "../../split/runtime_sync.h"
 #endif
@@ -83,7 +84,7 @@ static void rgb_runtime_render_snapshot_ensure_combo(void) {
 
 #        ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 // Hides a combo member's tap-branch colour on both halves. The slave half's
-// mirrored key-feedback packet can lag its combo packet, so a key it now paints
+// mirrored behaviour-feedback packet can lag its combo packet, so a key it now paints
 // as part of a combo footprint may still carry a tap-branch semantic from
 // before; dropping it keeps a stale colour from stomping the live footprint.
 // The master half, whose state is never stale, does the same so the halves
@@ -127,6 +128,29 @@ static void rgb_runtime_render_snapshot_ensure_key_feedback(void) {
 #        endif
 #    else
 static void rgb_runtime_render_snapshot_invalidate(void) {}
+#    endif
+
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+// One frame shows one replacement flash: the typing stage's on the master
+// half, split sync's copy of it on the slave half, read at the frame's first
+// use so a flash cannot end between two chunks.
+static noah_autocorrect_feedback_t rgb_runtime_autocorrect_feedback;
+static bool                        rgb_runtime_autocorrect_feedback_valid;
+
+static bool rgb_runtime_render_autocorrect_feedback_stage(uint8_t led_min, uint8_t led_max) {
+    if (!rgb_runtime_autocorrect_feedback_valid) {
+        if (is_keyboard_master()) {
+            rgb_runtime_autocorrect_feedback = noah_autocorrect_feedback();
+        } else {
+            // A false read means the split worker was still publishing the
+            // base packet; the frame keeps the copy before it.
+            (void)split_runtime_sync_remote_read_autocorrect_feedback(&rgb_runtime_autocorrect_feedback);
+        }
+        rgb_runtime_autocorrect_feedback_valid = true;
+    }
+    rgb_runtime_autocorrect_feedback_stage_render_active_profile_frame(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, &rgb_runtime_autocorrect_feedback, led_min, led_max);
+    return rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
+}
 #    endif
 
 static bool rgb_runtime_range_starts_frame(uint8_t led_min, uint8_t led_max) {
@@ -276,6 +300,9 @@ void noah_rgb_runtime_post_init(void) {
     };
 
     rgb_runtime_render_snapshot_invalidate();
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    rgb_runtime_autocorrect_feedback_valid = false;
+#    endif
     (void)rgb_active_profile_config_capture_frame(&rgb_runtime_profile_frame);
 #    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND
     rgb_runtime_stage_pipeline_count = 0u;
@@ -293,6 +320,9 @@ static bool rgb_runtime_render_range(uint8_t led_min, uint8_t led_max) {
 
     if (rgb_runtime_range_starts_frame(led_min, led_max)) {
         rgb_runtime_render_snapshot_invalidate();
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+        rgb_runtime_autocorrect_feedback_valid = false;
+#    endif
         (void)rgb_active_profile_config_capture_frame(&rgb_runtime_profile_frame);
     }
 
@@ -328,6 +358,9 @@ static bool rgb_runtime_render_range(uint8_t led_min, uint8_t led_max) {
 #    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
     painted |= rgb_runtime_render_key_feedback_stage(led_min, led_max);
+#    endif
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    painted |= rgb_runtime_render_autocorrect_feedback_stage(led_min, led_max);
 #    endif
 
 #    ifdef NOAH_PORTABLE_PROFILE_ENABLE

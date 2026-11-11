@@ -6,7 +6,7 @@
 #include "profile_name_v1.h"
 #include "../../action/custom_key_shortcut.h"
 
-// Settings v11 (D-F14, D-F25, D-F26) stores, in order: an eight-byte header,
+// Settings v12 (D-F14, D-F25, D-F26, D-F70) stores, in order: an eight-byte header,
 // the scalar policy, one fixed record per layer (its combo reference layer and
 // its two placement bitmaps), one ten-byte shortcut per custom key, then every
 // name counted: a length byte and at most 32 bytes of UTF-8, the layers'
@@ -19,7 +19,7 @@ enum {
     NOAH_SETTINGS_FLAGS_OFFSET         = 5,
     NOAH_SETTINGS_FLAG_COMBO_OUTPUT_BYPASS = 1u << 0,
     NOAH_SETTINGS_KNOWN_FLAGS          = NOAH_SETTINGS_FLAG_COMBO_OUTPUT_BYPASS,
-    NOAH_SETTINGS_COUNT                = 31,
+    NOAH_SETTINGS_COUNT                = 32,
     NOAH_SETTINGS_LAYERS               = 16,
     NOAH_SETTINGS_MACRO_NAMES          = 128,
     NOAH_SETTINGS_CUSTOM_KEY_NAMES     = 128,
@@ -70,6 +70,7 @@ typedef enum {
     NOAH_SETTING_BRIGHTNESS_DPI,
     NOAH_SETTING_ZOOM_DPI,
     NOAH_SETTING_ARROW_DPI,
+    // The behaviour-feedback flash half-period, ms.
     NOAH_SETTING_FEEDBACK_PERIOD,
     NOAH_SETTING_AUTO_MOUSE_DEAD_TIME,
     NOAH_SETTING_RGB_TIMEOUT,
@@ -90,6 +91,8 @@ typedef enum {
     NOAH_SETTING_BEHAVIORS_ENABLED,
     NOAH_SETTING_LAYER_BEHAVIORS,
     NOAH_SETTING_LAYER_COMBOS,
+    // How long a replacement-feedback flash lasts, ms (D-F70).
+    NOAH_SETTING_AUTOCORRECT_FEEDBACK_PERIOD,
 } noah_setting_id_t;
 
 // The scalar encoding, the one home of the scalar layout: scalar `id` is

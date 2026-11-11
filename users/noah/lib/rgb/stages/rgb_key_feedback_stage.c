@@ -1,6 +1,6 @@
 #include "lib/profile/runtime/active_profile_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
-// RGB Key Feedback Stage
+// RGB Behaviour Feedback Stage
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "rgb_key_feedback_stage.h"

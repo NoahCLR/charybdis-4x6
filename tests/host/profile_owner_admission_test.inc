@@ -52,6 +52,12 @@ uint32_t noah_setting(uint8_t id, uint32_t fallback) {
 bool noah_participation_behaviors_override(void) {
     return true;
 }
+bool auto_mouse_switch_override(void) {
+    return true;
+}
+bool autocorrect_switch_override(void) {
+    return true;
+}
 bool noah_qmk_keyboard_restart_request(void) {
     return false;
 }

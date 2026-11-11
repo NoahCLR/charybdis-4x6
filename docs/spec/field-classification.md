@@ -79,15 +79,17 @@ Every table is lighting `0x10` profile data when its stage is compiled:
 | `combo_feedback_colors`: HSV, locality | combo feedback | `RGB_COMBO_FEEDBACK_ENABLE` |
 | combo group rows | combo group rows: HSV, group | `RGB_COMBO_FEEDBACK_ENABLE` |
 | `key_behavior_feedback_colors`: `RGB_TAP_BRANCH_COLORS` | tap-branch colours, one per tap count past the first | `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` |
-| `key_behavior_feedback_colors`: committed, hold and long-hold colours, tap-commit mode, locality | key feedback | `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` |
-| key-feedback group rows: semantic, HSV, group | key-feedback group rows | `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` |
+| `key_behavior_feedback_colors`: committed, hold and long-hold colours, tap-commit mode, locality | behaviour feedback | `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` |
+| behaviour-feedback group rows: semantic, HSV, group | behaviour-feedback group rows | `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` |
+| `autocorrect_feedback_colors`: text, macro and undo colours, locality | replacement feedback | `RGB_AUTOCORRECT_FEEDBACK_ENABLE` |
+| replacement-feedback group rows: semantic, HSV, group | replacement-feedback group rows | `RGB_AUTOCORRECT_FEEDBACK_ENABLE` |
 | which stages run | the stage-enable mask; the compiled defaults enable every compiled stage | |
 
 `RGB_LED_GROUP_*` macro names are source-only: the profile stores numeric
 group ids and LED bitmaps. A new lighting value takes effect at the frame
 after the profile holding it becomes active.
 
-Held by: `tests/host/run_real_profile_validation_tests.sh` (`real_profile_validation_test.c`, the default and `no_rgb_feedback` variants), `tests/host/run_rgb_validation_tests.sh`, `tests/host/run_profile_rgb_v4_tests.sh`, `tests/host/run_profile_compiled_defaults_v1_tests.sh` (the compiled lighting domain's shape).
+Held by: `tests/host/run_real_profile_validation_tests.sh` (`real_profile_validation_test.c`, the default and `no_rgb_feedback` variants), `tests/host/run_rgb_validation_tests.sh`, `tests/host/run_profile_rgb_v5_tests.sh`, `tests/host/run_profile_compiled_defaults_v1_tests.sh` (the compiled lighting domain's shape).
 
 ## `config.h`
 
@@ -110,8 +112,9 @@ Held by: `tests/host/run_real_profile_validation_tests.sh` (`real_profile_valida
 | `RGB_MATRIX_MAXIMUM_BRIGHTNESS` | ceiling | QMK clamps brightness to it; GET `0x08` page 1 reports it (D-F38, [ADR](../adr/0038-keyboard-reports-its-brightness-limit.md)) |
 | `RGB_MATRIX_LED_FLUSH_LIMIT` | ceiling | the shortest interval between LED updates, and the auto-mouse fade's step |
 | `NOAH_RGB_IDLE_TIMEOUT_MS` | profile data | settings scalar 17; QMK's `RGB_MATRIX_TIMEOUT` is `0` in builds that save |
-| `RGB_POINTING_MODE_FEEDBACK_ENABLE`, `RGB_COMBO_FEEDBACK_ENABLE`, `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`, `RGB_AUTOMOUSE_GRADIENT_ENABLE` | capability | the lighting stages the build compiles |
+| `RGB_POINTING_MODE_FEEDBACK_ENABLE`, `RGB_COMBO_FEEDBACK_ENABLE`, `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`, `RGB_AUTOCORRECT_FEEDBACK_ENABLE`, `RGB_AUTOMOUSE_GRADIENT_ENABLE` | capability | the lighting stages the build compiles |
 | `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS` | profile data | settings scalar 15 |
+| `RGB_AUTOCORRECT_FEEDBACK_FLASH_MS` | profile data | settings scalar 31 (D-F70) |
 | `AUTOMOUSE_RGB_DEAD_TIME` | profile data | settings scalar 16 |
 | `NOAH_DEFAULT_HOST_OS`, `NOAH_DEFAULT_HOST_LAYOUT`, `NOAH_DEFAULT_UNICODE_PLAYBACK`, `NOAH_DEFAULT_MACOS_ISO` | profile data | settings scalar 27 |
 | `NOAH_KEYBOARD_NAME` | profile data | settings `0x40`, the keyboard name (D-F25, [ADR](../adr/0025-keyboard-name-is-usb-product-string.md)) |

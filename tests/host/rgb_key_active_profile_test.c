@@ -33,7 +33,7 @@ const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups 
 const uint8_t                                  key_behavior_feedback_led_group_count = (uint8_t)ARRAY_SIZE(key_behavior_feedback_led_groups_data);
 
 // Room for the compiled encoding of this test's lighting tables.
-EXPORT_RGB_COMPILED_CACHE(0u, 0u, 0u, 0u, ARRAY_SIZE(key_behavior_feedback_led_groups_data));
+EXPORT_RGB_COMPILED_CACHE(0u, 0u, 0u, 0u, ARRAY_SIZE(key_behavior_feedback_led_groups_data), 0u);
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -345,6 +345,6 @@ int main(int argc, char **argv) {
     CHECK(argc == 2);
     test_compiled_and_live_key_rendering(argv[1]);
     test_tap_commit_policy_fails_closed_on_stale_read(argv[1]);
-    puts("rgb active-profile key-feedback host tests passed");
+    puts("rgb active-profile behaviour-feedback host tests passed");
     return 0;
 }

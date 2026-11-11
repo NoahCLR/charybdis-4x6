@@ -16,6 +16,7 @@ BIN_BASE_UNDERLAY="$BUILD_DIR/rgb_base_underlay_test"
 BIN_PD_ACTIVE_PROFILE="$BUILD_DIR/rgb_pd_active_profile_test"
 BIN_COMBO_ACTIVE_PROFILE="$BUILD_DIR/rgb_combo_active_profile_test"
 BIN_KEY_ACTIVE_PROFILE="$BUILD_DIR/rgb_key_active_profile_test"
+BIN_AUTOCORRECT_ACTIVE_PROFILE="$BUILD_DIR/rgb_autocorrect_active_profile_test"
 BIN_END_FILL_UNPAINTED="$BUILD_DIR/rgb_layer_render_test_end_fill_unpainted"
 BIN_END_OVERRIDE="$BUILD_DIR/rgb_layer_render_test_end_override"
 BIN_KEY_HALF="$BUILD_DIR/rgb_layer_render_test_key_half"
@@ -142,6 +143,33 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 "$BIN_KEY_ACTIVE_PROFILE" "$ROOT/tests/fixtures/rgb_domain_v1.fixture"
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+    -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+    -DLAYER_COUNT=3 \
+    -DMATRIX_ROWS=2 \
+    -DMATRIX_COLS=4 \
+    -DRGB_MATRIX_ENABLE \
+    -DRGB_AUTOCORRECT_FEEDBACK_ENABLE \
+    -DRGB_AUTOCORRECT_FEEDBACK_FLASH_MS=200 \
+    -DRGB_ACTIVE_PROFILE_CONFIG_TEST_BACKEND \
+    -DRGB_MATRIX_LED_COUNT=8 \
+    -DRGB_LEFT_LED_COUNT=4 \
+    -I"$ROOT" \
+    -I"$ROOT/users/noah" \
+    -I"$ROOT/tests/host/include" \
+    "$ROOT/tests/host/rgb_autocorrect_active_profile_test.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_autocorrect_feedback_stage.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_active_profile_config.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_rgb_runtime.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
+    -o "$BIN_AUTOCORRECT_ACTIVE_PROFILE"
+
+"$BIN_AUTOCORRECT_ACTIVE_PROFILE"
+
+cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DRGB_ACTIVE_PROFILE_CONFIG_TEST_BACKEND \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DNOAH_RUNTIME_DIAG_TEST_BACKEND \
@@ -156,6 +184,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DRGB_POINTING_MODE_ACTIVE_HALF_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS=200 \
+    -DRGB_AUTOCORRECT_FEEDBACK_ENABLE \
+    -DRGB_AUTOCORRECT_FEEDBACK_FLASH_MS=200 \
     -DSPLIT_TRANSACTION_IDS_USER \
     -DRGB_LEFT_LED_COUNT=4 \
     -DAUTO_MOUSE_TIME=120u \
@@ -172,6 +202,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
+    "$ROOT/users/noah/lib/rgb/stages/rgb_autocorrect_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \

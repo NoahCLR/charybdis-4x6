@@ -26,6 +26,10 @@ void macro_slot_provider_invalidate_all(const macro_slot_provider_t *provider, m
     assert(provider->slot_count == 128 && metadata);
     invalidations++;
 }
+bool macro_slot_provider_can_start(const macro_slot_provider_t *provider, macro_slot_metadata_t *metadata, uint8_t slot) {
+    (void)provider; (void)metadata; (void)slot;
+    return false;
+}
 macro_payload_start_result_t macro_slot_provider_start(const macro_slot_provider_t *provider, macro_slot_metadata_t *metadata, uint8_t slot, macro_payload_text_output_t text_output, uint8_t interval, macro_payload_source_t source) {
     (void)metadata; (void)text_output; (void)interval; (void)source;
     macro_payload_ir_t ir;
@@ -42,7 +46,7 @@ static void u32(uint8_t *bytes, uint32_t value) {
     for (unsigned i = 0; i < 4; i++) bytes[i] = (uint8_t)(value >> (8 * i));
 }
 static noah_active_profile_snapshot_t saved(void) {
-    memcpy(blob, "NLP1\4\3\2\1", 8);
+    memcpy(blob, "NLP1\4\5\2\1", 8);
     blob[8] = 0x60; blob[9] = 1; u32(blob + 10, 1920);
     blob[14] = KC_B;
     blob[14 + 1918] = KC_Y;

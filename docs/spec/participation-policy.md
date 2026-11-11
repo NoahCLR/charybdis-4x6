@@ -24,6 +24,20 @@ cannot overrule a higher one. Behaviour and combo participation are
 independent. Each override is a runtime toggle beside its stored master,
 starts allowed at boot and is never saved
 ([toggles](profile-wire-v1/live-edits.md#toggles-and-the-settings-qmk-holds)).
+The switch keys set the overrides, at their tap or press, wherever they are
+sent (D-F66, [ADR](../adr/0066-switch-keys-turn-combos-and-behaviours-on-and-off.md)):
+`CM_ON`, `CM_OFF` and `CM_TOGG` QMK's combo flag, which QMK leaves to the
+firmware (`COMBO_KEYCODES_DOWNSTREAM`), and `BH_ON`, `BH_OFF` and `BH_TOGG`
+the behaviours override. With behaviours off a behaviours key is the
+standard key, its own switch, so `BH_ON` and `BH_TOGG` always work then.
+Switching behaviours off settles no press already decided: a press keeps its
+decision through its release.
+
+Auto-mouse has the same two switches outside participation: its stored
+setting and a runtime override that the switch keys `AM_ON`, `AM_OFF` and `AM_TOGG` set
+(D-F66, [toggles](profile-wire-v1/live-edits.md#toggles-and-the-settings-qmk-holds)).
+So has autocorrect: its stored switch and the override `AC_ON`, `AC_OFF` and
+`AC_TOGG` set ([autocorrect](autocorrect-v1.md#on-and-off)).
 
 Switching something off keeps it: a disabled behaviour row keeps its branches,
 timing and layers, a disabled combo its inputs, output and window, and
@@ -32,7 +46,7 @@ switching it on again restores them unchanged.
 The compiled defaults allow everything: both masters on, every layer bit set,
 every definition enabled on every bank layer, every placement bit clear.
 
-Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_defaults_allow_everything`, `test_master_and_definition`, `test_overrides_beside_the_masters`, `test_placement`).
+Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_defaults_allow_everything`, `test_master_and_definition`, `test_overrides_beside_the_masters`, `test_placement`), `tests/host/run_key_runtime_layer_lock_integration_tests.sh` (`key_runtime_layer_lock_integration_test.c`, `test_plain_behaviors_keys_switch_the_override`, `test_behaviors_off_keeps_the_way_back`, `test_behavior_tap_switches_behaviors_off_and_a_held_one_still_releases`, `test_switch_key_held_for_its_behaviour_does_not_switch`), `tests/host/run_qmk_gesture_pipeline_tests.sh` (`pointing_mode_key_runtime_integration_test.c`, `test_qmk_combo_keys_switch_combos_wherever_they_are_sent`).
 
 ## Source layer and placement
 

@@ -511,11 +511,12 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_desc_consumes_direct_press(pd_lock));
     CHECK(!noah_action_desc_is_runtime_handled_keycode(pd_lock));
     CHECK(!noah_action_desc_uses_held_lifecycle_for_press_and_hold(pd_lock));
-    CHECK(!noah_action_desc_default_tap_uses_action_keycode(pd_lock));
+    // Where its behaviour leaves the tap empty, a lock taps itself (D-F64).
+    CHECK(noah_action_desc_default_tap_uses_action_keycode(pd_lock));
     CHECK(!noah_action_desc_source_sets_momentary_layer_flag(pd_lock));
     CHECK(!noah_action_desc_source_sets_layer_tap_flag(pd_lock));
     CHECK(!noah_action_desc_supports_fallback_hold(pd_lock));
-    CHECK(noah_action_desc_default_tap_action(pd_lock) == KC_NO);
+    CHECK(noah_action_desc_default_tap_action(pd_lock) == pd_lock.action);
 
     CHECK(macro_action.kind == NOAH_ACTION_KIND_MACRO);
     CHECK(noah_action_desc_is_press_only(macro_action));
@@ -826,7 +827,7 @@ static void test_custom_key_shortcut_is_its_native_action(void) {
 static void test_unassigned_userspace_codes_are_refused_everywhere(void) {
     // The retired custom-key block (D-F14) is unassigned: its first and last
     // codes invoke nothing, neither a custom key nor a pointing hold.
-    const uint16_t unassigned[] = {NOAH_KEYCODE_PD_HOLD_BASE + POINTING_MODE_COUNT, NOAH_KEYCODE_PD_LOCK_BASE + NOAH_KEYCODE_PD_RESERVED - 1, LAYER_LOCK_BASE + LAYER_COUNT, NOAH_KEYCODE_USERSPACE_END, NOAH_KEYCODE_CUSTOM_KEY_BASE - 1, NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE, NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE + 63};
+    const uint16_t unassigned[] = {NOAH_KEYCODE_PD_HOLD_BASE + POINTING_MODE_COUNT, NOAH_KEYCODE_PD_LOCK_BASE + NOAH_KEYCODE_PD_RESERVED - 1, LAYER_LOCK_BASE + LAYER_COUNT, AM_TOGG + 1, NOAH_KEYCODE_CUSTOM_KEY_BASE - 1, NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE, NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE + 63};
     const noah_action_placement_t placements[] = {NOAH_ACTION_PLACEMENT_KEY, NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER, NOAH_ACTION_PLACEMENT_COMBO_OUTPUT};
     for (uint8_t i = 0; i < ARRAY_SIZE(unassigned); i++) {
         CHECK(noah_action_describe(unassigned[i]).kind == NOAH_ACTION_KIND_UNASSIGNED_USER);
@@ -851,9 +852,54 @@ static void test_unassigned_userspace_codes_are_refused_everywhere(void) {
     CHECK(noah_action_describe(LOCK_LAYER(LAYER_COUNT - 1)).kind == NOAH_ACTION_KIND_LAYER_LOCK);
     CHECK(noah_action_describe(QK_USER - 1).kind != NOAH_ACTION_KIND_UNASSIGNED_USER);
 
-    const noah_profile_action_v1_t stray = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = NOAH_KEYCODE_USERSPACE_END};
+    const noah_profile_action_v1_t stray = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = AM_TOGG + 1};
     CHECK(!noah_profile_action_placement_v1_supported(&stray, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
     CHECK(!noah_profile_action_placement_v1_supported(&stray, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT));
+}
+
+// The switch keys, QMK's combo and autocorrect keys and the firmware's
+// behaviours and auto-mouse keys, go on a key, in a behaviour's tap and holds
+// and as a combo output. A saved profile stores
+// them as QMK keycodes and is held to the same rule. The rest of the
+// behaviours keys' block is inert.
+static void test_switch_keys_go_everywhere_a_key_goes(void) {
+    const uint16_t                keys[]       = {BH_ON, BH_OFF, BH_TOGG, AM_ON, AM_OFF, AM_TOGG, QK_AUTOCORRECT_ON, QK_AUTOCORRECT_OFF, QK_AUTOCORRECT_TOGGLE};
+    const uint16_t                combo_keys[] = {QK_COMBO_ON, QK_COMBO_OFF, QK_COMBO_TOGGLE, QK_COMBO_ON, QK_COMBO_OFF, QK_COMBO_TOGGLE, QK_COMBO_ON, QK_COMBO_OFF, QK_COMBO_TOGGLE};
+    const noah_action_placement_t placements[] = {NOAH_ACTION_PLACEMENT_KEY, NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER, NOAH_ACTION_PLACEMENT_COMBO_OUTPUT};
+    const noah_profile_validator_v1_placement_t stored_placements[] = {NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_KEY, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_OTHER, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT};
+
+    for (uint8_t i = 0; i < ARRAY_SIZE(keys); i++) {
+        const noah_profile_action_v1_t stored       = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = keys[i]};
+        const noah_profile_action_v1_t stored_combo = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = combo_keys[i]};
+
+        CHECK(noah_action_describe(keys[i]).kind == NOAH_ACTION_KIND_SWITCH_KEY);
+        CHECK(noah_action_describe(combo_keys[i]).kind == NOAH_ACTION_KIND_SWITCH_KEY);
+        for (uint8_t p = 0; p < ARRAY_SIZE(placements); p++) {
+            CHECK(noah_action_supported_at(keys[i], placements[p]));
+            CHECK(noah_action_supported_at(keys[i], placements[p]) == noah_action_supported_at(combo_keys[i], placements[p]));
+        }
+        for (uint8_t p = 0; p < ARRAY_SIZE(stored_placements); p++) {
+            CHECK(noah_profile_action_placement_v1_supported(&stored, stored_placements[p]));
+            CHECK(noah_profile_action_placement_v1_supported(&stored, stored_placements[p]) == noah_profile_action_placement_v1_supported(&stored_combo, stored_placements[p]));
+        }
+    }
+
+    const uint16_t inert[] = {BH_TOGG + 1, NOAH_KEYCODE_BEHAVIORS_SWITCH_BASE + NOAH_KEYCODE_BEHAVIORS_SWITCH_RESERVED - 1, AM_TOGG + 1, NOAH_KEYCODE_AUTO_MOUSE_SWITCH_BASE + NOAH_KEYCODE_AUTO_MOUSE_SWITCH_RESERVED - 1};
+    for (uint8_t i = 0; i < ARRAY_SIZE(inert); i++) {
+        CHECK(noah_action_describe(inert[i]).kind == NOAH_ACTION_KIND_UNASSIGNED_USER);
+        for (uint8_t p = 0; p < ARRAY_SIZE(placements); p++)
+            CHECK(!noah_action_supported_at(inert[i], placements[p]));
+    }
+}
+
+// A key that acts at its press and whose behaviour leaves a tap empty taps
+// itself there, the standard key's tap (D-F64): a switch key switches and a
+// pointing-mode lock locks.
+static void test_press_only_keys_tap_themselves_where_a_behaviour_leaves_the_tap_empty(void) {
+    const uint16_t keys[] = {BH_ON, BH_OFF, BH_TOGG, QK_COMBO_ON, QK_COMBO_OFF, QK_COMBO_TOGGLE, AM_ON, AM_OFF, AM_TOGG, QK_AUTOCORRECT_ON, QK_AUTOCORRECT_OFF, QK_AUTOCORRECT_TOGGLE, PD_MODE_4_LOCK};
+    for (uint8_t i = 0; i < ARRAY_SIZE(keys); i++) {
+        CHECK(noah_action_desc_default_tap_action(noah_action_describe(keys[i])) == keys[i]);
+    }
 }
 
 // The keyboard's check of a saved profile asks the same rules of a Profile
@@ -945,6 +991,8 @@ int main(void) {
     test_action_placement_rules();
     test_saved_profile_placement_matches_the_rules();
     test_unassigned_userspace_codes_are_refused_everywhere();
+    test_switch_keys_go_everywhere_a_key_goes();
+    test_press_only_keys_tap_themselves_where_a_behaviour_leaves_the_tap_empty();
     test_last_layer_actions();
     test_macro_bank_ends_at_127();
     test_custom_key_block_holds_128();

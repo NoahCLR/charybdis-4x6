@@ -39,9 +39,15 @@ fi
 # its edit, sync and save state: one reviewed 130 KiB increment. D-F63 keeps
 # each lighting group row's selector for a publication (656 bytes) and sizes
 # the compiled lighting's cache to the authored tables (256 bytes fewer): 400
-# bytes, as measured on both halves. All are policy, not capacity. See
-# docs/spec/resource-policy.md for what each policy is and how to report it.
-STATIC_RAM_POLICY=$((57344 + 3072 + 4096 + 124928 + 20480 - 106496 - 32768 + 133120 + 400))
+# bytes, as measured on both halves. D-F69 follows what is typed and holds
+# keys back: its state with the queue of 240 changes (644 bytes), the scan's
+# workspace for one 128-byte correction (704), the list's handle and
+# publication count (28, D-F68) and the report filters' two working copies
+# moved off the stack (64); with D-F66's switch keys that is 1,588 bytes, as
+# measured on both halves (203,364 to 204,952 linked). All are policy, not
+# capacity. See docs/spec/resource-policy.md for what each policy is and how
+# to report it.
+STATIC_RAM_POLICY=$((57344 + 3072 + 4096 + 124928 + 20480 - 106496 - 32768 + 133120 + 400 + 1588))
 
 "$PYTHON" "$ROOT/tools/check_firmware_memory_budget.py" \
     --elf "$ELF" \

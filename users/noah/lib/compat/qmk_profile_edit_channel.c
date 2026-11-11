@@ -13,6 +13,8 @@
 #    include "qmk_keyboard_restart.h"
 #    include "qmk_portable_profile.h"
 #    include "../key/behavior/participation.h"
+#    include "../autocorrect/autocorrect_switch.h"
+#    include "../pointing/policy/auto_mouse_switch.h"
 #    include "../profile/protocol/profile_candidate_v1.h"
 #    include "../profile/protocol/profile_wire_v1.h"
 #    include "../profile/runtime/active_profile_settings_runtime.h"
@@ -219,6 +221,12 @@ static void runtime_page(uint8_t *payload) {
     put_u32(&payload[16], noah_qmk_portable_live_setting(NOAH_SETTING_DEFAULT_LAYERS));
     put_u32(&payload[20], noah_qmk_portable_live_setting(NOAH_SETTING_KEYMAP_OPTIONS));
 #    endif
+    payload[24] = auto_mouse_switch_override() ? 1u : 0u;
+}
+
+// Page 0 is full; the overrides that came after it are a byte each here.
+static void runtime_overrides_page(uint8_t *payload) {
+    payload[0] = autocorrect_switch_override() ? 1u : 0u;
 }
 
 static bool handle_get(uint8_t *data) {
@@ -253,12 +261,15 @@ static bool handle_get(uint8_t *data) {
             get_status(data, NOAH_PROFILE_WIRE_V1_STATUS_OK, PAYLOAD_SIZE);
             return true;
         case NOAH_PROFILE_WIRE_V1_VALUE_RUNTIME:
-            if (page != 0u) {
+            if (page == 0u) {
+                runtime_page(payload);
+                get_status(data, NOAH_PROFILE_WIRE_V1_STATUS_OK, 25u);
+            } else if (page == 1u) {
+                runtime_overrides_page(payload);
+                get_status(data, NOAH_PROFILE_WIRE_V1_STATUS_OK, 1u);
+            } else {
                 get_status(data, NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE, 0u);
-                return true;
             }
-            runtime_page(payload);
-            get_status(data, NOAH_PROFILE_WIRE_V1_STATUS_OK, 24u);
             return true;
         case NOAH_PROFILE_WIRE_V1_VALUE_EDIT_MODE:
             if (page != 0u) {

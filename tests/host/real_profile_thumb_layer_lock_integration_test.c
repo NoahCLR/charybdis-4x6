@@ -491,6 +491,13 @@ int uprintf(const char *fmt, ...) {
     return 0;
 }
 
+// QMK's combo flag, which the switch keys set (D-F66); this harness has no
+// combo engine of its own.
+static bool test_combos_switched_on = true;
+void combo_enable(void) { test_combos_switched_on = true; }
+void combo_disable(void) { test_combos_switched_on = false; }
+bool is_combo_enabled(void) { return test_combos_switched_on; }
+
 uint16_t timer_read(void) {
     return fake_time;
 }
@@ -3872,7 +3879,7 @@ static void test_combo_layer_hold_is_owned(void) {
 }
 
 // Assert the public lighting projection, including both substages and every
-// member's key feedback. Layer activation must not add a confirmation pulse.
+// member's behaviour feedback. Layer activation must not add a confirmation pulse.
 static void test_assert_combo_layer_feedback_quiet(const test_layer_combo_t *combo) {
     uint8_t underlay[KEY_ORIGIN_BITMAP_SIZE];
     uint8_t overlay[KEY_ORIGIN_BITMAP_SIZE];

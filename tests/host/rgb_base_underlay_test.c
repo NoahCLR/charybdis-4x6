@@ -63,7 +63,7 @@ const layer_led_group_t *const layer_led_groups      = layer_led_groups_data;
 const uint8_t                  layer_led_group_count = (uint8_t)ARRAY_SIZE(layer_led_groups_data);
 
 // Room for the compiled encoding of this test's lighting tables.
-EXPORT_RGB_COMPILED_CACHE(0u, ARRAY_SIZE(layer_led_groups_data), 0u, 0u, 0u);
+EXPORT_RGB_COMPILED_CACHE(0u, ARRAY_SIZE(layer_led_groups_data), 0u, 0u, 0u, 0u);
 
 const automouse_fade_end_config_t automouse_fade_end_config = {
     .mode      = FOLLOW_REAL_DESTINATION,

@@ -422,7 +422,7 @@ static noah_profile_validator_v1_result_t validate_settings(noah_profile_validat
     size_t                                 offset = v->payload.offset + state->offset;
     uint32_t                               count  = v->payload.length - state->offset;
     // One read of up to a step's bytes, consumed one at a time: a maximum
-    // settings domain takes about 535 steps rather than 10,693.
+    // settings domain takes about 535 steps rather than 10,697.
     if (count > sizeof(bytes)) count = sizeof(bytes);
     if (read_blob(v, offset, bytes, count, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return v->terminal_result;
     for (uint32_t i = 0; i < count; i++)
@@ -482,6 +482,22 @@ static noah_profile_validator_v1_result_t validate_macros(noah_profile_validator
     if (state->offset < v->payload.length) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
     if (!noah_profile_macros_v1_complete(state, slots)) return reject_record(v, v->payload.offset + v->payload.length - 1u, NOAH_PROFILE_DOMAIN_V1_MACROS, 0u, state->macros, error);
     return NOAH_PROFILE_VALIDATOR_V1_VALID;
+}
+
+// A row or at most twenty bytes of text a step. A rejection names the table
+// (corrections 0, typos 1, the part index 2) and row it falls in, and its
+// field is the list's own reason (noah_profile_autocorrect_v1_result_t).
+static noah_profile_validator_v1_result_t validate_autocorrect(noah_profile_validator_v1_t *v, noah_profile_validator_v1_error_t *error) {
+    noah_profile_autocorrect_v1_error_t detail;
+
+    switch (noah_profile_autocorrect_v1_validation_step(&v->domain_validation.autocorrect, &v->reader, v->base_offset + v->payload.offset, v->payload.length, &detail)) {
+        case NOAH_PROFILE_AUTOCORRECT_V1_VALIDATING:
+            return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
+        case NOAH_PROFILE_AUTOCORRECT_V1_COMPLETE:
+            return NOAH_PROFILE_VALIDATOR_V1_VALID;
+        default:
+            return reject(v, detail.code == NOAH_PROFILE_AUTOCORRECT_V1_READ_ERROR ? NOAH_PROFILE_VALIDATOR_V1_READ_ERROR : NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, v->payload.offset + detail.offset, (uint8_t)(v->envelope.index - 1u), NOAH_PROFILE_DOMAIN_V1_AUTOCORRECT, detail.table, detail.row, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, (uint8_t)detail.code, NOAH_PROFILE_VALIDATOR_V1_DETAIL_NONE, 0u, error);
+    }
 }
 
 // Each registry row's validator, called directly so the linked stack contexts
@@ -592,3 +608,5 @@ _Static_assert(sizeof(noah_profile_validator_v1_t) <= NOAH_PROFILE_VALIDATOR_V1_
 #endif
 
 _Static_assert((unsigned)NOAH_PROFILE_PD_V1_STEP_READ_MAX <= (unsigned)NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX, "PD iterator exceeds the scan read budget");
+_Static_assert((unsigned)NOAH_PROFILE_AUTOCORRECT_V1_STEP_READ_MAX <= (unsigned)NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX, "autocorrect validation exceeds the scan read budget");
+_Static_assert((unsigned)NOAH_PROFILE_AUTOCORRECT_V1_LOCATION_NONE == (unsigned)NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, "an autocorrect header error names no row");

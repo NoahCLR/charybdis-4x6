@@ -7,6 +7,7 @@
 #include "profile_action_placement_v1.h"
 #include "active_profile_settings_runtime.h"
 #include "active_profile_keymap_macros_runtime.h"
+#include "active_profile_autocorrect_runtime.h"
 #if defined(POINTING_DEVICE_ENABLE)
 #    include "../../pointing/defs/pointing_modes.h"
 #endif
@@ -269,7 +270,7 @@ static void fail_integration(noah_profile_owner_t *owner) {
 
 // One invalidator per runtime that follows the active profile.
 enum {
-    OWNER_INVALIDATOR_COUNT = 4u
+    OWNER_INVALIDATOR_COUNT = 5u
 #ifdef COMBO_ENABLE
                               + 1u
 #endif
@@ -320,6 +321,7 @@ static __attribute__((noinline)) bool initialize_runtime_graph(noah_profile_owne
     noah_active_profile_combo_runtime_init(&owner->combos);
 #endif
     invalidators[invalidator_count++] = (noah_active_profile_invalidator_t){.callback = noah_active_profile_keymap_macros_invalidate, .context = NULL};
+    invalidators[invalidator_count++] = (noah_active_profile_invalidator_t){.callback = noah_active_profile_autocorrect_invalidate, .context = NULL};
     invalidators[invalidator_count++] = (noah_active_profile_invalidator_t){
         .callback = noah_active_profile_key_behavior_runtime_invalidate,
         .context  = &owner->key_behaviors,
@@ -347,6 +349,7 @@ static __attribute__((noinline)) bool initialize_runtime_graph(noah_profile_owne
         return false;
     }
     noah_active_profile_keymap_macros_invalidate(NULL, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
+    noah_active_profile_autocorrect_invalidate(NULL, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
     noah_active_profile_key_behavior_runtime_invalidate(&owner->key_behaviors, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
     noah_active_profile_rgb_runtime_invalidate(&owner->rgb, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
     if (!owner->rgb.banks[owner->rgb.active_index].valid) return false;

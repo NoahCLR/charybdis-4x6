@@ -34,14 +34,16 @@ enum {
     NOAH_PROFILE_RGB_V1_STAGE_POINTING_MODE   = 1u << 2,
     NOAH_PROFILE_RGB_V1_STAGE_COMBO           = 1u << 3,
     NOAH_PROFILE_RGB_V1_STAGE_KEY_BEHAVIOR    = 1u << 4,
-    NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL        = 0x1fu,
-    // Validation performs at most one reader call per step. The v1 header is
+    // Replacement feedback (D-F70).
+    NOAH_PROFILE_RGB_V1_STAGE_AUTOCORRECT     = 1u << 5,
+    NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL        = 0x3fu,
+    // Validation performs at most one reader call per step. The header is
     // the largest record; the remaining records are at most 11 bytes.
     NOAH_PROFILE_RGB_V1_VALIDATION_READ_MAX = 20u,
     // Payload-independent 32-bit representation regression policies. These
     // are not statements of RP2040 hardware capacity.
-    NOAH_PROFILE_RGB_V1_EMBEDDED_VIEW_BUDGET       = 40u,
-    NOAH_PROFILE_RGB_V1_EMBEDDED_VALIDATION_BUDGET = 72u,
+    NOAH_PROFILE_RGB_V1_EMBEDDED_VIEW_BUDGET       = 44u,
+    NOAH_PROFILE_RGB_V1_EMBEDDED_VALIDATION_BUDGET = 76u,
 };
 
 // One bit per pointing slot; 32 slots fill the word, so it is not an enum
@@ -59,7 +61,13 @@ enum {
     NOAH_PROFILE_RGB_V1_COMBO_GROUP_RECORD_SIZE = 4u,
     NOAH_PROFILE_RGB_V1_COLOR_RECORD_SIZE       = 3u,
     NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE       = 11u,
-    NOAH_PROFILE_RGB_V1_FIXED_PAYLOAD_SIZE      = NOAH_PROFILE_RGB_V1_HEADER_SIZE + NOAH_PROFILE_RGB_V1_AUTOMOUSE_RECORD_SIZE + NOAH_PROFILE_RGB_V1_COMBO_RECORD_SIZE + NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE,
+    NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE = 10u,
+    NOAH_PROFILE_RGB_V1_FIXED_PAYLOAD_SIZE      = NOAH_PROFILE_RGB_V1_HEADER_SIZE + NOAH_PROFILE_RGB_V1_AUTOMOUSE_RECORD_SIZE + NOAH_PROFILE_RGB_V1_COMBO_RECORD_SIZE + NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE + NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE,
+    // A replacement-feedback semantic: what a row's selector names, 0xff all.
+    NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_TEXT  = 0u,
+    NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_MACRO = 1u,
+    NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_UNDO  = 2u,
+    NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_COUNT = 3u,
 };
 
 typedef enum {
@@ -97,6 +105,8 @@ typedef enum {
     NOAH_PROFILE_RGB_V1_TABLE_TAP_BRANCH_COLORS,
     NOAH_PROFILE_RGB_V1_TABLE_KEY_FEEDBACK,
     NOAH_PROFILE_RGB_V1_TABLE_KEY_GROUPS,
+    NOAH_PROFILE_RGB_V1_TABLE_AUTOCORRECT_FEEDBACK,
+    NOAH_PROFILE_RGB_V1_TABLE_AUTOCORRECT_GROUPS,
 } noah_profile_rgb_v1_table_t;
 
 typedef enum {
@@ -186,6 +196,13 @@ typedef struct {
     uint8_t                   locality;
 } noah_profile_rgb_v1_key_feedback_t;
 
+// One colour per replacement-feedback semantic, in semantic order. A colour
+// of saturation and value 0 paints nothing for its semantic (D-F70).
+typedef struct {
+    noah_profile_rgb_v1_hsv_t colors[NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_COUNT];
+    uint8_t                   locality;
+} noah_profile_rgb_v1_autocorrect_feedback_t;
+
 // A validated reader-backed view. It retains no payload-sized buffer, group
 // dictionary, or row array. On a 32-bit firmware target it is bounded by
 // NOAH_PROFILE_RGB_V1_EMBEDDED_VIEW_BUDGET; host pointers are intentionally
@@ -203,6 +220,7 @@ typedef struct {
     uint8_t                      combo_group_count;
     uint8_t                      tap_branch_color_count;
     uint8_t                      key_group_count;
+    uint8_t                      autocorrect_group_count;
     noah_profile_rgb_v1_limits_t limits;
 } noah_profile_rgb_v1_view_t;
 
@@ -226,6 +244,8 @@ typedef enum {
     NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_TAP_BRANCH_COLORS,
     NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_KEY_FEEDBACK,
     NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_KEY_GROUPS,
+    NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_AUTOCORRECT_FEEDBACK,
+    NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_AUTOCORRECT_GROUPS,
     NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_COMPLETE,
     NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_REJECTED,
 } noah_profile_rgb_v1_validation_phase_t;
@@ -268,3 +288,5 @@ noah_profile_rgb_v1_result_t noah_profile_rgb_v1_combo_group_at(const noah_profi
 noah_profile_rgb_v1_result_t noah_profile_rgb_v1_tap_branch_color_at(const noah_profile_rgb_v1_view_t *view, uint8_t index, noah_profile_rgb_v1_hsv_t *color, noah_profile_rgb_v1_error_t *error);
 noah_profile_rgb_v1_result_t noah_profile_rgb_v1_key_feedback(const noah_profile_rgb_v1_view_t *view, noah_profile_rgb_v1_key_feedback_t *value, noah_profile_rgb_v1_error_t *error);
 noah_profile_rgb_v1_result_t noah_profile_rgb_v1_key_group_at(const noah_profile_rgb_v1_view_t *view, uint8_t index, noah_profile_rgb_v1_group_row_t *row, noah_profile_rgb_v1_error_t *error);
+noah_profile_rgb_v1_result_t noah_profile_rgb_v1_autocorrect_feedback(const noah_profile_rgb_v1_view_t *view, noah_profile_rgb_v1_autocorrect_feedback_t *value, noah_profile_rgb_v1_error_t *error);
+noah_profile_rgb_v1_result_t noah_profile_rgb_v1_autocorrect_group_at(const noah_profile_rgb_v1_view_t *view, uint8_t index, noah_profile_rgb_v1_group_row_t *row, noah_profile_rgb_v1_error_t *error);

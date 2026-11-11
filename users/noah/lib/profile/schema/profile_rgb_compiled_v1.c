@@ -35,6 +35,11 @@ extern const key_behavior_feedback_color_config_t     key_behavior_feedback_colo
 extern const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups;
 extern const uint8_t                                  key_behavior_feedback_led_group_count;
 #    endif
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+extern const autocorrect_feedback_color_config_t     autocorrect_feedback_colors;
+extern const autocorrect_feedback_led_group_t *const autocorrect_feedback_led_groups;
+extern const uint8_t                                 autocorrect_feedback_led_group_count;
+#    endif
 #endif
 #if defined(RGB_MATRIX_ENABLE)
 uint16_t noah_profile_rgb_compiled_v1_stage_mask(void) {
@@ -51,6 +56,9 @@ uint16_t noah_profile_rgb_compiled_v1_stage_mask(void) {
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
     mask |= NOAH_PROFILE_RGB_V1_STAGE_KEY_BEHAVIOR;
 #    endif
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    mask |= NOAH_PROFILE_RGB_V1_STAGE_AUTOCORRECT;
+#    endif
     return mask;
 }
 
@@ -65,6 +73,9 @@ static uint16_t rgb_group_row_count(void) {
 #    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
     count += key_behavior_feedback_led_group_count;
+#    endif
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    count += autocorrect_feedback_led_group_count;
 #    endif
     return count;
 }
@@ -90,6 +101,10 @@ static const rgb_led_group_t *rgb_group_row_at(uint16_t index) {
 #    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
     if (index < key_behavior_feedback_led_group_count) return &key_behavior_feedback_led_groups[index].led_group;
+    index = (uint16_t)(index - key_behavior_feedback_led_group_count);
+#    endif
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    if (index < autocorrect_feedback_led_group_count) return &autocorrect_feedback_led_groups[index].led_group;
 #    endif
     return NULL;
 }
@@ -190,6 +205,9 @@ static noah_profile_compiled_v1_result_t rgb_compiled_length(size_t *length, uin
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
     group_rows += key_behavior_feedback_led_group_count;
 #    endif
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    group_rows += autocorrect_feedback_led_group_count;
+#    endif
     if (!length || !groups || (uint32_t)LAYER_COUNT > (uint32_t)NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS || group_rows > NOAH_PROFILE_RGB_COMPILED_V1_MAX_GROUP_ROWS) return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, UINT8_MAX, UINT8_MAX);
     result = rgb_group_count(groups, error);
     if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
@@ -204,6 +222,9 @@ static noah_profile_compiled_v1_result_t rgb_compiled_length(size_t *length, uin
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
     if (key_behavior_feedback_colors.tap_branch_color_count != KEY_BEHAVIOR_MAX_TAP_COUNT - 1u) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_RGB, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, UINT8_MAX, UINT8_MAX);
     total += (size_t)key_behavior_feedback_colors.tap_branch_color_count * NOAH_PROFILE_RGB_V1_COLOR_RECORD_SIZE + (size_t)key_behavior_feedback_led_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE;
+#    endif
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    total += (size_t)autocorrect_feedback_led_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE;
 #    endif
     if (total > NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE) return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, UINT8_MAX, UINT8_MAX);
     *length = total;
@@ -240,7 +261,13 @@ noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_wr
 #    else
           && emit_u8(writer, 0u) && emit_u8(writer, 0u)
 #    endif
-          && emit_u8(writer, NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT) && emit_u8(writer, NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE) && emit_u16(writer, 0u)))
+          && emit_u8(writer, NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT) && emit_u8(writer, NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE)
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+          && emit_u8(writer, autocorrect_feedback_led_group_count)
+#    else
+          && emit_u8(writer, 0u)
+#    endif
+          && emit_u8(writer, 0u)))
         return writer->result;
 
     for (uint8_t id = 0u; id < group_count; id++) {
@@ -301,6 +328,19 @@ noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_wr
         if (!emit_u8(writer, 0u)) return writer->result;
     }
 #    endif
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    _Static_assert((int)AUTOCORRECT_FEEDBACK_GROUP_TEXT == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_TEXT && (int)AUTOCORRECT_FEEDBACK_GROUP_MACRO == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_MACRO && (int)AUTOCORRECT_FEEDBACK_GROUP_UNDO == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_UNDO, "an authored replacement-feedback semantic is its stored selector");
+    if (!(emit_hsv(writer, autocorrect_feedback_colors.text_color) && emit_hsv(writer, autocorrect_feedback_colors.macro_color) && emit_hsv(writer, autocorrect_feedback_colors.undo_color) && emit_u8(writer, autocorrect_feedback_colors.locality))) return writer->result;
+    for (uint8_t index = 0u; index < autocorrect_feedback_led_group_count; index++) {
+        uint8_t selector = autocorrect_feedback_led_groups[index].semantic == AUTOCORRECT_FEEDBACK_GROUP_ALL ? NOAH_PROFILE_RGB_V1_SELECTOR_ALL : autocorrect_feedback_led_groups[index].semantic;
+        result           = emit_group_row(writer, selector, autocorrect_feedback_led_groups[index].color, &autocorrect_feedback_led_groups[index].led_group, error);
+        if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
+    }
+#    else
+    for (uint8_t index = 0u; index < NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE; index++) {
+        if (!emit_u8(writer, 0u)) return writer->result;
+    }
+#    endif
     return writer->result;
 }
 #else
@@ -315,7 +355,7 @@ noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_wr
 #if defined(RGB_MATRIX_ENABLE)
 // The compiled lighting's bytes, kept once encoded. The keymap sizes the
 // buffer to its own tables (EXPORT_RGB_COMPILED_CACHE, rgb_config_helpers.h),
-// not to the domain's maximum, which D-F63 put at 4,639 bytes.
+// not to the domain's maximum, 4,649 bytes (D-F63, D-F70).
 extern uint8_t *const  noah_rgb_compiled_cache;
 extern const uint16_t  noah_rgb_compiled_cache_size;
 static noah_profile_rgb_v1_view_t cached_view;

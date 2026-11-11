@@ -44,7 +44,7 @@ _Avoid_: app (in specs), editor, host (for the program)
 **Profile**:
 Everything the keyboard can be told to do without a reflash, kept as one
 versioned whole: keymap, behaviours, combos, macros, custom keys, pointing
-modes, lighting, settings and the keyboard's name.
+modes, lighting, settings, the autocorrect list and the keyboard's name.
 _Avoid_: config, configuration, setup, layout, keymap (for the whole)
 
 **Domain**:
@@ -278,6 +278,13 @@ _Avoid_: chord (for this), key combination
 How close together a combo's keys must be pressed.
 _Avoid_: combo term, combo timeout
 
+**Switch key**:
+A key that turns combos (`CM_ON`, `CM_OFF`, `CM_TOGG`), behaviours
+(`BH_ON`, `BH_OFF`, `BH_TOGG`), auto-mouse (`AM_ON`, `AM_OFF`, `AM_TOGG`) or
+autocorrect (`AC_ON`, `AC_OFF`, `AC_TOGG`) on, off or the other way for the whole keyboard until it restarts, never
+saved; the stored switch stays as it is.
+_Avoid_: toggle key, combo toggle, behaviour key
+
 **Participation**:
 Whether a press uses its behaviour and whether it can join a combo, allowed
 only when the whole keyboard, the source layer, the definition and the
@@ -297,6 +304,79 @@ _Avoid_: action (for this), event, token
 A macro playing with held typing keys suspended and new presses ignored, so
 nothing the person does mixes into what it types.
 _Avoid_: protected playback, input protection
+
+## Autocorrect
+
+**Text replacement**:
+The keyboard replacing what is typed when a word ends: a typo with the right
+word, an abbreviation with longer text, a typed form with a macro. It is the
+name people see. The code, the domain, the specs, the fixtures and the keys
+(`AC_ON`, `AC_OFF`, `AC_TOGG`) were named for **autocorrect** and keep that
+name, and they call a replacement a `correction` and a typed form a `typo`.
+_Avoid_: text expansion, snippets, abbreviations (for the feature), shortcut
+(a custom key's)
+
+**Autocorrect list**:
+What the keyboard replaces and with what, kept in the profile as its own
+domain.
+_Avoid_: dictionary, autocorrect table, trie, word list
+
+**Entry**:
+One replacement with every typed form that produces it.
+_Avoid_: rule, pair, row (for this), mapping
+
+**Replacement**:
+What an entry puts in place of what was typed, stored once: text of up to 128
+bytes on one line, typed as written, or a macro slot, played. `correction` in
+code, on the wire and in fixtures.
+_Avoid_: correction (outside those names), fix, target, output, expansion
+
+**Typed form**:
+What is typed to get an entry's replacement, stored case-folded: a
+misspelling, or an abbreviation such as `pnumber`. It belongs to exactly one
+replacement. People know it as an **input**: the guide says input, as the
+app and its files do, and the specs and ADRs here say typed form for the
+same thing. `typo` in code, on the wire and in fixtures.
+_Avoid_: typo (as the term, outside those names; a misspelling is still a
+typo), trigger, pattern, source, abbreviation (as a second term)
+
+**Word**:
+What text replacement follows as it is typed: letters and digits, with
+apostrophes between them. Apostrophes before and after it stay on screen and
+are not part of what a typed form matches.
+_Avoid_: token, string (for this)
+
+**Word end**:
+The character that finishes a word: anything that is not a letter, a digit or
+an apostrophe, and Enter or Tab. A typed form is replaced only here.
+_Avoid_: delimiter, boundary, trigger key
+
+**Undo a replacement**:
+Backspace pressed right after a text replacement that a printing character
+ended: the ending character goes and the word comes back as typed. A macro
+has none.
+_Avoid_: revert (for this), rollback
+
+**Fresh start**:
+Text replacement forgetting the word because the cursor may have moved: the
+next character starts a new word.
+
+**Suspended**:
+Text replacement replacing nothing until the next word end, because it no
+longer knows where the word on screen starts.
+
+**Typing stage**:
+The step between live key ownership and the keyboard report where text
+replacement reads what is typed and holds keys back while a replacement is
+typed or its macro plays.
+_Avoid_: filter, interceptor, deferral layer
+
+**Where it matches**:
+What part of a word a typed form has to be: the whole word, the start of a
+word, the end of a word, or anywhere in a word. A stored number; a client may
+write the last three with `*` where other letters may go (`recieve*`,
+`*mnet`, `*tihng*`). A macro's typed forms match the whole word only.
+_Avoid_: boundary, anchor, mode, match type
 
 ## Pointing
 
@@ -365,9 +445,21 @@ Everything the keyboard's LEDs show, all of it feedback about state.
 _Avoid_: RGB (in prose), backlight
 
 **Stage**:
-One of the six lighting layers drawn in order, from the background effect up
-to key feedback; each can be switched off.
+One of the seven lighting layers drawn in order: the background effect, layer
+colours, the auto-mouse fade, pointing modes, combo feedback, behaviour
+feedback and replacement feedback; each can be switched off.
 _Avoid_: layer (for this), pass, overlay
+
+**Behaviour feedback**:
+The stage that shows what a key with a behaviour is doing: the tap count it
+has reached, a hold or long hold pending or running, and a tap that commits.
+_Avoid_: key feedback (the code keeps key_feedback and KEY_BEHAVIOR_FEEDBACK names)
+
+**Replacement feedback**:
+The stage that flashes when text replacement changes what was typed: a typed
+form replaced with text, replaced by its macro, or a replacement undone, each
+in its own colour (D-F70). `autocorrect feedback` in code.
+_Avoid_: autocorrect flash (in prose), correction feedback, typo light
 
 **Background effect**:
 QMK's own lighting effect, the bottom stage everything else paints over.
@@ -375,7 +467,9 @@ _Avoid_: base lighting, base RGB, RGB mode
 
 **Locality**:
 Where a feedback colour paints: both halves, one half, the half of the key
-that caused it, or only the keys themselves.
+that caused it, or only the keys themselves. For replacement feedback the key
+that caused it is the one that ended the word, or the Backspace that undid
+the replacement.
 _Avoid_: scope, target, region
 
 ## Talking to the keyboard

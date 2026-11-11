@@ -64,8 +64,9 @@ active profile's lighting domain, or the compiled view
   only once the frame has passed the check above. An epoch is never reused
   while the runtime lives, so colours read across a publication are never
   shown.
-- `rgb_active_profile_config_group_selectors` keeps every layer, pointing and
-  key-feedback group row's selector for one publication, keyed the same way
+- `rgb_active_profile_config_group_selectors` keeps every layer, pointing,
+  behaviour-feedback and replacement-feedback group row's selector for one
+  publication, keyed the same way
   (D-F63). A stage compares a row's selector there and reads the row and its
   group only when it paints, so an accent that is not lit costs no read; the
   combo rows have no selector and are read whenever a combo partition paints.
@@ -84,8 +85,9 @@ active profile's lighting domain, or the compiled view
 | 3 | layer preview | `stages/rgb_preview_stage.c` | `key_feedback_preview_layer` (`feedback.c`) | base packet's preview layer |
 | 4 | pointing mode | `stages/rgb_pointing_mode_stage.c` | `pointing_mode_snapshot_with_owner_bitmap` (`pointing/runtime/pointing_mode_snapshot.c`), local state | the same, remote display state the base packet applied |
 | 5 | combo, above | `stages/rgb_combo_feedback_stage.c` | as 2 | as 2 |
-| 6 | key feedback | `stages/rgb_key_feedback_stage.c` | the four maps from `feedback.c` | semantic and branch packets |
-| 7 | idle timeout, only under `NOAH_PORTABLE_PROFILE_ENABLE` (the write path) | `rgb_runtime_render_range` (`rgb_runtime.c`) | `last_input_activity_elapsed` against the lighting idle timeout setting | the same; QMK mirrors activity |
+| 6 | behaviour feedback | `stages/rgb_key_feedback_stage.c` | the four maps from `feedback.c` | semantic and branch packets |
+| 7 | replacement feedback | `stages/rgb_autocorrect_feedback_stage.c` | `noah_autocorrect_feedback` (`autocorrect/autocorrect_feedback.c`), once a frame | base packet's replacement feedback, read whole |
+| 8 | idle timeout, only under `NOAH_PORTABLE_PROFILE_ENABLE` (the write path) | `rgb_runtime_render_range` (`rgb_runtime.c`) | `last_input_activity_elapsed` against the lighting idle timeout setting | the same; QMK mirrors activity |
 
 - `combo_feedback_bitmaps` partitions QMK's active combos through
   `noah_qmk_combo_origin_active_bitmaps_partitioned`
@@ -99,8 +101,8 @@ active profile's lighting domain, or the compiled view
 - Both halves drop a pending tap-branch semantic on keys either combo bitmap
   covers (`rgb_runtime_render_snapshot_suppress_combo_tap_branch_semantics`),
   so a combo member's tap-branch colour is hidden on both halves: the slave
-  half's key-feedback packets can lag its combo packet, and the master half
-  does the same so the halves look alike.
+  half's behaviour-feedback packets can lag its combo packet, and the master
+  half does the same so the halves look alike.
 
 ## Who owns which fact
 
@@ -112,14 +114,32 @@ active profile's lighting domain, or the compiled view
 | Presses, tap series, leases, pulses | `key/runtime/reducer/` (`key_runtime_core_state_t`) | `feedback.c`, which derives the maps on demand |
 | Running and locked pointing mode, its owner | `pointing/runtime/pointing_mode_state.c` | `pointing_mode_snapshot_with_owner_bitmap` |
 | A pointing slot's link | the active profile's pointing slots (`profile/runtime/active_profile_pd_runtime.c`) | `pointing_mode_link_layers` |
+| What text replacement last did, its key and how long it shows | the typing stage (`autocorrect/autocorrect_feedback.c`) | `noah_autocorrect_feedback` |
 | Auto-mouse timer | QMK | `compat/qmk_auto_mouse_contract.h` |
 | Last input | QMK, mirrored by split activity | `last_input_activity_elapsed` |
 
-A new visible state is a semantic in `feedback.c` with its priority, never a
-rule in a stage; a new mirrored fact is read from its owner by the packet
-builder, never kept by split sync.
+A new visible state of a key is a semantic in `feedback.c` with its priority,
+never a rule in a stage; a new mirrored fact is read from its owner by the
+packet builder, never kept by split sync.
 
-## Key feedback across the runtime
+## Replacement feedback across the runtime
+
+The typing stage (`autocorrect/autocorrect.c`) gives
+`noah_autocorrect_feedback_key` the key that ended a word, or whose
+Backspace may undo, when it reads that key from its queue
+([macro playback](macro-playback.md), "Which key"), and calls
+`noah_autocorrect_feedback_note` when a text replacement, a macro
+replacement or an undo then begins to be typed. `autocorrect_feedback.c`
+takes the key's footprint from `key_origin_registry_get_bitmap` when it is
+given, the scan after the press unless the key waited in the queue, so a
+combo's keys are all in it though the combo is up before the lookup ends,
+and keeps the kind, the footprint and the time the flash began. Reading it ends a
+flash older than the replacement-feedback flash length (settings scalar 31),
+so the clock is read only while one shows. The render reads it once a frame;
+the base packet builder reads it every pass, which sends the flash and its
+end to the slave half as changes (D-F70).
+
+## Behaviour feedback across the runtime
 
 `feedback.c` keeps no state of its own: the preview bridge lives in
 `key_runtime_core_state_t` (`preview_display_*`). Reading feedback still
@@ -157,10 +177,11 @@ lights all its keys.
   master half's phase rather than its own clock.
 - **Newest.** Each activation takes a `feedback_sequence`; the owner map keeps
   the latest per surface, compared across wrap.
-- **Dirty.** `transition.c` marks key feedback dirty for a non-empty plan, or
-  an empty one that moved the feedback mark; `feedback_projection.c` on every
-  pulse; `qmk_combo_origin.c` marks combos dirty. One mark covers both
-  key-feedback packets, so the owner map cannot lag the semantic map.
+- **Dirty.** `transition.c` marks behaviour feedback dirty for a non-empty
+  plan, or an empty one that moved the feedback mark; `feedback_projection.c`
+  on every pulse; `qmk_combo_origin.c` marks combos dirty. One mark covers
+  both behaviour-feedback packets, so the owner map cannot lag the semantic
+  map.
 
 ## How the slave half gets it
 
@@ -168,21 +189,21 @@ lights all its keys.
    key runtime scan and then `split_runtime_sync_tick`. Its one `timer_read32`
    serves the whole pass: scheduling, every domain's last-sent time, and the
    pointer CPI refresh after the tick.
-2. The tick builds the base and combo packets every pass and the key-feedback
-   packets when dirty, forced, last sent active, or heartbeat due; it sends
-   base, combo, semantic, branch in that order, stopping at the first failure,
-   and at most one heartbeat a pass. The combo build is empty at once while no
-   combo output is held. A domain's dirty flag and last-sent copy change only
-   after it succeeds. Fade progress is read from QMK's timer whenever
-   auto-mouse is on and the pointer layer is on, not only while the pointer
-   moves, because the fade runs after movement stops; with the layer off the
-   packet carries the finished fade.
+2. The tick builds the base and combo packets every pass and the
+   behaviour-feedback packets when dirty, forced, last sent active, or
+   heartbeat due; it sends base, combo, semantic, branch in that order,
+   stopping at the first failure, and at most one heartbeat a pass. The combo
+   build is empty at once while no combo output is held. A domain's dirty flag
+   and last-sent copy change only after it succeeds. Fade progress is read
+   from QMK's timer whenever auto-mouse is on and the pointer layer is on, not
+   only while the pointer moves, because the fade runs after movement stops;
+   with the layer off the packet carries the finished fade.
 3. On the slave half the RPC callbacks run in QMK's split worker thread,
    which can preempt the main loop. Each publishes its domain into
    `split_runtime_sync_remote` between `noah_runtime_publication_begin` and
    `_end`; the base callback also hands the pointing identity to the pointing
    runtime (`pointing_mode_apply_remote_mode_ids_with_owner_bitmap`).
-4. At a frame's first use, the render copies the combo and key-feedback
+4. At a frame's first use, the render copies the combo and behaviour-feedback
    domains into `rgb_runtime_render_snapshot` through
    `split_runtime_sync_remote_read_*`; a read that meets a publication keeps
    the previous copy. Semantic and branch are separate generations, so one
@@ -201,18 +222,22 @@ timestamps (QMK's split sync, the latter coalesced).
 | Colours, groups, localities in the compiled defaults | the profile's `rgb_config.c` | stage code |
 | Stage order or what a stage draws | `rgb/core/rgb_runtime.c`, `rgb/stages/`, `rgb/automouse/`, with [rgb-domain-v1.md](../spec/rgb-domain-v1.md#drawing) | the authored tables |
 | A feedback state or its timing | `key/runtime/feedback.c`, the planners for pulses | lighting stages, split sync |
+| What a replacement flash reports or how long it shows | `autocorrect/autocorrect_feedback.c`, the typing stage's starts | lighting stages, split sync |
 | A mirrored field | the packet in `split/runtime_sync.h` (each fits `RPC_M2S_BUFFER_SIZE`), its builder, slave callback and reader, with [split-activity-sync.md](../spec/split-activity-sync.md#runtime-state-packets) | the owner's module |
 
 ## Tests that hold it
 
 - `run_rgb_layer_render_tests.sh`: the stages and their order on both halves,
   remote snapshots, localities, newest owner, auto-mouse fade, chunked frames,
-  the idle timeout.
+  the idle timeout; replacement feedback's colours, localities and accents
+  (`rgb_autocorrect_active_profile_test.c`).
+- `run_autocorrect_tests.sh`: what the typing stage reports for lighting and
+  which key it names.
 - `run_active_profile_rgb_runtime_tests.sh`: the double bank, stale frames.
 - `run_rgb_validation_tests.sh`, `run_profile_rgb_v1_tests.sh`,
-  `run_profile_rgb_v4_tests.sh`: the lighting domain and authored tables.
+  `run_profile_rgb_v5_tests.sh`: the lighting domain and authored tables.
 - `run_runtime_debug_tests.sh`, `run_tap_depth_eight_tests.sh`: the
-  key-feedback maps against the reducer, pulses, the preview bridge.
+  behaviour-feedback maps against the reducer, pulses, the preview bridge.
 - `run_qmk_combo_origin_tests.sh`: combo partitioning and the left-out
   momentary-layer owner.
 - `run_split_runtime_sync_tests.sh`: packet building, dirty gating,
