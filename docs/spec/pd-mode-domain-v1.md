@@ -354,7 +354,9 @@ Held by: `tests/host/run_pd_runtime_tests.sh` (`pd_runtime_test.c`, `test_layer_
 
 ## Lighting of a running mode
 
-A running mode paints its colour, in its locality, and its rows. A mode whose
+A running mode paints its colour, in its locality, and its rows; a
+passthrough colour (saturation and value `0`) paints nothing, so only its
+coloured rows show (D-F74). A mode whose
 link names a live layer that is on (in either of its sets),
 whichever source runs it, paints in the lighting domain's layer stage directly
 beneath the lowest such layer: the layers below, then the mode, then that

@@ -10,7 +10,8 @@
 #include "lib/profile/schema/profile_rgb_compiled_v1.h"
 
 #define HSV(h_, s_, v_) {.h = (h_), .s = (s_), .v = (v_)}
-#define RGB_TAP_BRANCH_COLORS(...) .tap_branch_colors = (const hsv_t[]){__VA_ARGS__}, .tap_branch_color_count = (uint8_t)ARRAY_SIZE(((const hsv_t[]){__VA_ARGS__}))
+// The tap branches pending, from tap count 2, each {.color, .locality}.
+#define RGB_TAP_BRANCHES(...) .tap_branches = (const key_behavior_feedback_tap_branch_t[]){__VA_ARGS__}, .tap_branch_count = (uint8_t)ARRAY_SIZE(((const key_behavior_feedback_tap_branch_t[]){__VA_ARGS__}))
 #define RGB_LED_GROUP(...) {.leds = {__VA_ARGS__}, .count = (uint8_t)ARRAY_SIZE(((const uint8_t[]){__VA_ARGS__}))}
 #define _RGB_LED_GROUP_TABLE_END {.led_group = {.count = 0}}
 #define RGB_LED_GROUP_TABLE(...) {__VA_ARGS__ _RGB_LED_GROUP_TABLE_END}
@@ -89,7 +90,7 @@
 #    define _RGB_COMPILED_COMBO_BYTES(rows_) 0u
 #endif
 #ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-#    define _RGB_COMPILED_KEY_BYTES(rows_) (NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS * NOAH_PROFILE_RGB_V1_COLOR_RECORD_SIZE + (rows_) * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE)
+#    define _RGB_COMPILED_KEY_BYTES(rows_) (NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS * NOAH_PROFILE_RGB_V1_TAP_BRANCH_RECORD_SIZE + (rows_) * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE)
 #else
 #    define _RGB_COMPILED_KEY_BYTES(rows_) 0u
 #endif

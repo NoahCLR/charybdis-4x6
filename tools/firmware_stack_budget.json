@@ -476,6 +476,22 @@
         {
           "name": "matrix scan leader send macro start",
           "functions": ["main", "matrix_scan", "autocorrect_lead_match", "profile_macro_start_from", "macro_slot_provider_compile", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_active_profile_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "lighting behaviour feedback area by the newest key",
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_key_feedback_stage_paint_area.isra.0", "rgb_runtime_key_feedback_stage_owner_case.lto_priv.0", "rgb_runtime_key_feedback_stage_key_case.lto_priv.0", "key_feedback_tap_branch_map_get.lto_priv.0"]
+        },
+        {
+          "name": "lighting behaviour feedback accent row read",
+          "functions": ["main", "rgb_matrix_task", "noah_profile_rgb_v1_key_group_at", "group_row_at", "accessor_read.lto_priv.0", "read_bytes.lto_priv.1", "noah_profile_reader_read"]
+        },
+        {
+          "name": "lighting behaviour feedback accent paint",
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_key_feedback_stage_paint_group.isra.0", "memcpy"]
+        },
+        {
+          "name": "lighting view validation step",
+          "functions": ["main", "rgb_matrix_task", "rgb_active_profile_config_group_selectors.constprop.0", "read_table_selectors.constprop.0", "frame_status.lto_priv.0", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_v1_validation_step", "validation_reject_captured.isra.0", "validation_reject.isra.0", "clear_error.lto_priv.2", "memset"]
         }
       ]
     },

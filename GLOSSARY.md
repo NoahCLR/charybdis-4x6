@@ -491,13 +491,31 @@ does (D-F71). It also holds a colour of its own, not a flash, while the
 keyboard is leading (D-F72). `autocorrect feedback` in code.
 _Avoid_: autocorrect flash (in prose), correction feedback, typo light
 
+**Case**:
+One thing a feedback stage shows, with its own colour, locality and accents
+(D-F73): for behaviour feedback the tap branch pending for each tap count
+from 2, tap committed, hold and long hold; for replacement feedback text
+replaced, macro replaced, undone and leading. A stored row names a case by
+its semantic, every tap branch at once by semantic `7` (D-F75), or every
+case by `0xff`. When a stage's cases share one setting it says when, not where.
+_Avoid_: kind, state (for this), mode
+
+**Passthrough**:
+A colour of saturation and value `0`, at any hue, owned by a layer, pointing
+slot, the combo feedback or a feedback case: it paints nothing and what is
+beneath shows, while the owner's coloured accents still paint (D-F74).
+Value `0` with saturation turns the LEDs **off**: they go dark, covering what
+is beneath. In a group row `0, 0, 0` is the owner's colour instead.
+_Avoid_: off (for this), transparent, clear
+
 **Background effect**:
 QMK's own lighting effect, the bottom stage everything else paints over.
 _Avoid_: base lighting, base RGB, RGB mode
 
 **Locality**:
 Where a feedback colour paints: both halves, one half, the half of the key
-that caused it, or only the keys themselves. For replacement feedback the key
+that caused it, or only the keys themselves. Each pointing slot and each
+feedback case has its own (D-F73). For replacement feedback the key
 that caused it is the one that ended the word, the Backspace that undid the
 replacement, or the key that ended leading; leading's, and that of what the
 leader timeout sends, is the Leader key that began it.

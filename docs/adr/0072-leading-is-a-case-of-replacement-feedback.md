@@ -49,7 +49,8 @@ paints as a flash whose key is not known does: every key of both halves
 under `0`, `3` and `4`. At first leading named no key, so the half of the
 key, the default, lit both halves while leading, as Noah chose (2026-11-10);
 trying it, he found the two key localities did nothing for leading, and
-chose the Leader key as its key (2026-11-12). The stage keeps one locality,
+chose the Leader key as its key (2026-11-12). The stage keeps one locality
+(each case has its own since D-F73),
 so the half of the key, the default, follows the key that caused each case,
 the Leader key for leading and the key that ended it for a leader's send. A
 send at the timeout has no key that ended it, so it flashes on the Leader key

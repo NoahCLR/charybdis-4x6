@@ -18,11 +18,14 @@ const uint8_t                  layer_led_group_count     = 0u;
 // The compiled lighting: an undo that paints nothing by itself, an accent
 // that follows every semantic and one of the undo's own.
 const autocorrect_feedback_color_config_t autocorrect_feedback_colors = {
-    .text_color    = HSV(11, 12, 13),
-    .macro_color   = HSV(21, 22, 23),
-    .undo_color    = HSV(0, 0, 0),
-    .leading_color = HSV(91, 92, 93),
-    .locality      = RGB_KEYS_ONLY,
+    .text_color       = HSV(11, 12, 13),
+    .text_locality    = RGB_KEYS_ONLY,
+    .macro_color      = HSV(21, 22, 23),
+    .macro_locality   = RGB_KEYS_ONLY,
+    .undo_color       = HSV(0, 0, 0),
+    .undo_locality    = RGB_KEYS_ONLY,
+    .leading_color    = HSV(91, 92, 93),
+    .leading_locality = RGB_KEYS_ONLY,
 };
 
 static const autocorrect_feedback_led_group_t autocorrect_feedback_led_groups_data[] = {
@@ -101,9 +104,18 @@ typedef struct {
 
 enum { LIVE_PAYLOAD_MAX = 256 };
 
+// A case's locality, in semantic order.
+typedef struct {
+    uint8_t of[NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_COUNT];
+} live_localities_t;
+
+static live_localities_t every_case(uint8_t locality) {
+    return (live_localities_t){.of = {locality, locality, locality, locality}};
+}
+
 // A lighting domain with the layer stage and this one: one LED set per
-// distinct row mask, the four colours, a locality and the rows.
-static size_t live_payload(uint8_t *payload, uint16_t stage_mask, hsv_t text, hsv_t macro, hsv_t undo, hsv_t lead, uint8_t locality, const live_row_t *rows, uint8_t row_count) {
+// distinct row mask, the four colours, their localities and the rows.
+static size_t live_payload(uint8_t *payload, uint16_t stage_mask, hsv_t text, hsv_t macro, hsv_t undo, hsv_t lead, live_localities_t localities, const live_row_t *rows, uint8_t row_count) {
     uint8_t masks[8];
     uint8_t groups = 0u;
     size_t  offset;
@@ -133,7 +145,7 @@ static size_t live_payload(uint8_t *payload, uint16_t stage_mask, hsv_t text, hs
         offset += NOAH_PROFILE_RGB_V1_LAYER_COLOR_RECORD_SIZE;
     }
     offset += NOAH_PROFILE_RGB_V1_AUTOMOUSE_RECORD_SIZE + NOAH_PROFILE_RGB_V1_COMBO_RECORD_SIZE + NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE;
-    memcpy(&payload[offset], (const uint8_t[]){text.h, text.s, text.v, macro.h, macro.s, macro.v, undo.h, undo.s, undo.v, lead.h, lead.s, lead.v, locality}, NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE);
+    memcpy(&payload[offset], (const uint8_t[]){text.h, text.s, text.v, macro.h, macro.s, macro.v, undo.h, undo.s, undo.v, lead.h, lead.s, lead.v, localities.of[0], localities.of[1], localities.of[2], localities.of[3]}, NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE);
     offset += NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE;
     for (uint8_t row = 0u; row < row_count; row++) {
         uint8_t group = 0u;
@@ -169,8 +181,12 @@ static noah_active_profile_rgb_frame_t live_frame(size_t length) {
     return frame;
 }
 
+static noah_active_profile_rgb_frame_t live_profile_with(uint16_t stage_mask, live_localities_t localities, const live_row_t *rows, uint8_t row_count) {
+    return live_frame(live_payload(live_bytes, stage_mask, (hsv_t){31u, 32u, 33u}, (hsv_t){41u, 42u, 43u}, (hsv_t){51u, 52u, 53u}, (hsv_t){101u, 102u, 103u}, localities, rows, row_count));
+}
+
 static noah_active_profile_rgb_frame_t live_profile(uint16_t stage_mask, uint8_t locality, const live_row_t *rows, uint8_t row_count) {
-    return live_frame(live_payload(live_bytes, stage_mask, (hsv_t){31u, 32u, 33u}, (hsv_t){41u, 42u, 43u}, (hsv_t){51u, 52u, 53u}, (hsv_t){101u, 102u, 103u}, locality, rows, row_count));
+    return live_profile_with(stage_mask, every_case(locality), rows, row_count);
 }
 
 enum { STAGES_ON = NOAH_PROFILE_RGB_V1_STAGE_LAYER | NOAH_PROFILE_RGB_V1_STAGE_AUTOCORRECT };
@@ -254,6 +270,52 @@ static void test_each_locality(void) {
     }
 }
 
+// Each case paints by its own locality, one at a time (D-F73): text on the
+// right half, a macro on its key alone, an undo on the left half and leading
+// on both halves, each from a key on the right half.
+static void test_each_case_paints_by_its_own_locality(void) {
+    noah_active_profile_rgb_frame_t profile = live_profile_with(STAGES_ON, (live_localities_t){.of = {RGB_RIGHT_HALF, RGB_KEYS_ONLY, RGB_LEFT_HALF, RGB_BOTH_HALVES}}, NULL, 0u);
+    rgb_runtime_frame_t             frame;
+
+    CHECK(render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_TEXT, 1u << 6u)));
+    check_frame(&frame, 0xf0u, text_rgb);
+    CHECK(render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_MACRO, 1u << 6u)));
+    check_frame(&frame, 1u << 6u, macro_rgb);
+    CHECK(render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_UNDO, 1u << 6u)));
+    check_frame(&frame, 0x0fu, undo_rgb);
+    CHECK(render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_LEADING, 1u << 6u)));
+    check_frame(&frame, 0xffu, lead_rgb);
+
+    // The left half renders its own LEDs alone: text on the right half paints
+    // none of them, leading on both halves all of them.
+    for (uint8_t kind = NOAH_AUTOCORRECT_FEEDBACK_TEXT; kind <= NOAH_AUTOCORRECT_FEEDBACK_LEADING; kind += NOAH_AUTOCORRECT_FEEDBACK_LEADING - NOAH_AUTOCORRECT_FEEDBACK_TEXT) {
+        noah_autocorrect_feedback_t feedback = feedback_on((noah_autocorrect_feedback_kind_t)kind, 1u << 6u);
+        bool                        leading  = kind == NOAH_AUTOCORRECT_FEEDBACK_LEADING;
+
+        memset(&frame, 0x5a, sizeof(frame));
+        CHECK(rgb_runtime_autocorrect_feedback_stage_render_active_profile_frame(&frame, &profile, &feedback, 0u, RGB_LEFT_LED_COUNT) == leading);
+        for (uint8_t led = 0u; led < RGB_MATRIX_LED_COUNT; led++) {
+            if (led >= RGB_LEFT_LED_COUNT) {
+                CHECK(frame.colors[led].r == 0x5au);
+            } else {
+                CHECK(frame.painted[led] == leading);
+                CHECK(!leading || frame.colors[led].r == lead_rgb.r);
+            }
+        }
+    }
+
+    // The half of the key and the keys alone follow the case's key.
+    profile = live_profile_with(STAGES_ON, (live_localities_t){.of = {RGB_KEY_HALF, RGB_BOTH_HALVES, RGB_KEYS_ONLY, RGB_RIGHT_HALF}}, NULL, 0u);
+    CHECK(render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_TEXT, 1u << 1u)));
+    check_frame(&frame, 0x0fu, text_rgb);
+    CHECK(render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_MACRO, 1u << 1u)));
+    check_frame(&frame, 0xffu, macro_rgb);
+    CHECK(render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_UNDO, 1u << 1u)));
+    check_frame(&frame, 1u << 1u, undo_rgb);
+    CHECK(render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_LEADING, 1u << 1u)));
+    check_frame(&frame, 0xf0u, lead_rgb);
+}
+
 // Accents paint over the flash: every all-semantics row first, then the rows
 // naming the semantic that shows, whatever their order in the table; rows of
 // another semantic do not paint and are not read.
@@ -291,7 +353,7 @@ static void test_accents_follow_their_semantic(void) {
 // nothing by itself or through a black accent; the other semantics still do.
 static void test_a_colour_that_is_off_paints_nothing(void) {
     static const live_row_t         rows[]  = {{.selector = NOAH_PROFILE_RGB_V1_SELECTOR_ALL, .color = {0u, 0u, 0u}, .led_mask = 1u << 7u}};
-    noah_active_profile_rgb_frame_t profile = live_frame(live_payload(live_bytes, STAGES_ON, (hsv_t){31u, 32u, 33u}, (hsv_t){90u, 0u, 0u}, (hsv_t){51u, 52u, 53u}, (hsv_t){7u, 0u, 0u}, RGB_BOTH_HALVES, rows, ARRAY_SIZE(rows)));
+    noah_active_profile_rgb_frame_t profile = live_frame(live_payload(live_bytes, STAGES_ON, (hsv_t){31u, 32u, 33u}, (hsv_t){90u, 0u, 0u}, (hsv_t){51u, 52u, 53u}, (hsv_t){7u, 0u, 0u}, every_case(RGB_BOTH_HALVES), rows, ARRAY_SIZE(rows)));
     rgb_runtime_frame_t             frame;
 
     CHECK(!render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_MACRO, 1u)));
@@ -306,7 +368,7 @@ static void test_a_colour_that_is_off_paints_nothing(void) {
 // can show on a few LEDs alone (D-F72).
 static void test_leading_can_show_on_its_accent_alone(void) {
     static const live_row_t         rows[]  = {{.selector = NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_LEADING, .color = {121u, 122u, 123u}, .led_mask = 1u << 6u}};
-    noah_active_profile_rgb_frame_t profile = live_frame(live_payload(live_bytes, STAGES_ON, (hsv_t){31u, 32u, 33u}, (hsv_t){41u, 42u, 43u}, (hsv_t){51u, 52u, 53u}, (hsv_t){7u, 0u, 0u}, RGB_BOTH_HALVES, rows, ARRAY_SIZE(rows)));
+    noah_active_profile_rgb_frame_t profile = live_frame(live_payload(live_bytes, STAGES_ON, (hsv_t){31u, 32u, 33u}, (hsv_t){41u, 42u, 43u}, (hsv_t){51u, 52u, 53u}, (hsv_t){7u, 0u, 0u}, every_case(RGB_BOTH_HALVES), rows, ARRAY_SIZE(rows)));
     rgb_runtime_frame_t             frame;
 
     CHECK(render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_LEADING, 0u)));
@@ -351,6 +413,7 @@ int main(void) {
     noah_active_profile_rgb_runtime_init(&live_runtime);
     CHECK(noah_active_profile_rgb_runtime_install(&live_runtime));
     test_each_locality();
+    test_each_case_paints_by_its_own_locality();
     test_accents_follow_their_semantic();
     test_a_colour_that_is_off_paints_nothing();
     test_leading_can_show_on_its_accent_alone();

@@ -194,42 +194,50 @@ const combo_feedback_color_config_t combo_feedback_colors = {
 static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(3)}, );
 EXPORT_COMBO_FEEDBACK_LED_GROUP_TABLE(combo_feedback_led_groups_data);
 #endif
-// One colour per tap past the first: four at depth five, seven at depth eight.
-#if KEY_BEHAVIOR_MAX_TAP_COUNT == 8u
-#    define TEST_TAP_BRANCH_COLORS RGB_TAP_BRANCH_COLORS(HSV(13, 14, 15), HSV(16, 17, 18), HSV(19, 20, 21), HSV(19, 20, 21), HSV(22, 23, 24), HSV(25, 26, 27), HSV(28, 29, 30))
+// Each variant gives every case the one locality it tests.
+#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
+#    define TEST_KEY_FEEDBACK_LOCALITY RGB_KEYS_ONLY
+#elif RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF
+#    define TEST_KEY_FEEDBACK_LOCALITY RGB_KEY_HALF
+#elif RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_LEFT_HALF
+#    define TEST_KEY_FEEDBACK_LOCALITY RGB_LEFT_HALF
+#elif RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
+#    define TEST_KEY_FEEDBACK_LOCALITY RGB_RIGHT_HALF
 #else
-#    define TEST_TAP_BRANCH_COLORS RGB_TAP_BRANCH_COLORS(HSV(13, 14, 15), HSV(16, 17, 18), HSV(19, 20, 21), HSV(19, 20, 21))
+#    define TEST_KEY_FEEDBACK_LOCALITY RGB_BOTH_HALVES
+#endif
+#define TEST_TAP_BRANCH(h_, s_, v_) {.color = HSV(h_, s_, v_), .locality = TEST_KEY_FEEDBACK_LOCALITY}
+// One branch per tap past the first: four at depth five, seven at depth eight.
+#if KEY_BEHAVIOR_MAX_TAP_COUNT == 8u
+#    define TEST_TAP_BRANCHES RGB_TAP_BRANCHES(TEST_TAP_BRANCH(13, 14, 15), TEST_TAP_BRANCH(16, 17, 18), TEST_TAP_BRANCH(19, 20, 21), TEST_TAP_BRANCH(19, 20, 21), TEST_TAP_BRANCH(22, 23, 24), TEST_TAP_BRANCH(25, 26, 27), TEST_TAP_BRANCH(28, 29, 30))
+#else
+#    define TEST_TAP_BRANCHES RGB_TAP_BRANCHES(TEST_TAP_BRANCH(13, 14, 15), TEST_TAP_BRANCH(16, 17, 18), TEST_TAP_BRANCH(19, 20, 21), TEST_TAP_BRANCH(19, 20, 21))
 #endif
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
-    TEST_TAP_BRANCH_COLORS,
-    .tap_committed_color    = HSV(4, 5, 6),
-    .hold_active_color      = HSV(7, 8, 9),
-    .long_hold_active_color = HSV(10, 11, 12),
-    .tap_commit_mode        = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,
-#if RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY
-    .locality = RGB_KEYS_ONLY,
-#elif RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF
-    .locality = RGB_KEY_HALF,
-#elif RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_LEFT_HALF
-    .locality = RGB_LEFT_HALF,
-#elif RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
-    .locality = RGB_RIGHT_HALF,
-#else
-    .locality = RGB_BOTH_HALVES,
-#endif
+    TEST_TAP_BRANCHES,
+    .tap_committed_color       = HSV(4, 5, 6),
+    .tap_committed_locality    = TEST_KEY_FEEDBACK_LOCALITY,
+    .hold_active_color         = HSV(7, 8, 9),
+    .hold_active_locality      = TEST_KEY_FEEDBACK_LOCALITY,
+    .long_hold_active_color    = HSV(10, 11, 12),
+    .long_hold_active_locality = TEST_KEY_FEEDBACK_LOCALITY,
+    .tap_commit_mode           = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,
 };
 #if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
-static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.semantic = KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING, .color = HSV(11, 12, 13), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(17, 18, 19), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(20, 21, 22), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(5, 6)}, );
+static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.semantic = KEY_FEEDBACK_GROUP_TAP_COUNT_2, .color = HSV(11, 12, 13), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(17, 18, 19), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(20, 21, 22), .led_group = RGB_LED_GROUP(5)}, {.semantic = KEY_FEEDBACK_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(5, 6)}, );
 EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(key_behavior_feedback_led_groups_data);
 #endif
 
 #ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
 const autocorrect_feedback_color_config_t autocorrect_feedback_colors = {
-    .text_color    = HSV(31, 32, 33),
-    .macro_color   = HSV(34, 35, 36),
-    .undo_color    = HSV(37, 38, 39),
-    .leading_color = HSV(40, 41, 42),
-    .locality      = RGB_KEYS_ONLY,
+    .text_color       = HSV(31, 32, 33),
+    .text_locality    = RGB_KEYS_ONLY,
+    .macro_color      = HSV(34, 35, 36),
+    .macro_locality   = RGB_KEYS_ONLY,
+    .undo_color       = HSV(37, 38, 39),
+    .undo_locality    = RGB_KEYS_ONLY,
+    .leading_color    = HSV(40, 41, 42),
+    .leading_locality = RGB_KEYS_ONLY,
 };
 // The typing stage's answer on the master half, and how often it was asked.
 static noah_autocorrect_feedback_t fake_autocorrect_feedback;
@@ -272,7 +280,7 @@ static rgb_t rgb_from_combo_feedback(void) {
 }
 
 static rgb_t rgb_from_tap_branch_color(uint8_t index) {
-    return rgb_from_hsv(key_behavior_feedback_colors.tap_branch_colors[index]);
+    return rgb_from_hsv(key_behavior_feedback_colors.tap_branches[index].color);
 }
 
 #if RGB_LAYER_RENDER_TEST_FEEDBACK_GROUPS
@@ -284,8 +292,8 @@ static rgb_t rgb_from_feedback_semantic(key_feedback_semantic_t semantic, uint8_
     switch (semantic) {
         case KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING: {
             uint8_t index = tap_branch <= 2u ? 0u : (uint8_t)(tap_branch - 2u);
-            if (index >= key_behavior_feedback_colors.tap_branch_color_count) {
-                index = (uint8_t)(key_behavior_feedback_colors.tap_branch_color_count - 1u);
+            if (index >= key_behavior_feedback_colors.tap_branch_count) {
+                index = (uint8_t)(key_behavior_feedback_colors.tap_branch_count - 1u);
             }
             return rgb_from_tap_branch_color(index);
         }
@@ -2649,7 +2657,7 @@ enum {
     CEILING_LAYER_ROWS = NOAH_PROFILE_RGB_V1_MAX_TABLE_GROUP_ROWS,
     CEILING_PD_ROWS    = NOAH_PROFILE_RGB_V1_MAX_TABLE_GROUP_ROWS,
     CEILING_KEY_ROWS   = NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS - CEILING_LAYER_ROWS - CEILING_PD_ROWS,
-    CEILING_SIZE       = NOAH_PROFILE_RGB_V1_FIXED_PAYLOAD_SIZE + 9u * CEILING_GROUPS + 5u * LAYER_COUNT + 5u * CEILING_LAYER_ROWS + 5u * NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES + 5u * CEILING_PD_ROWS + 3u * NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS + 5u * CEILING_KEY_ROWS,
+    CEILING_SIZE       = NOAH_PROFILE_RGB_V1_FIXED_PAYLOAD_SIZE + 9u * CEILING_GROUPS + 5u * LAYER_COUNT + 5u * CEILING_LAYER_ROWS + 5u * NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES + 5u * CEILING_PD_ROWS + NOAH_PROFILE_RGB_V1_TAP_BRANCH_RECORD_SIZE * NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS + 5u * CEILING_KEY_ROWS,
 };
 
 static void ceiling_rows(uint8_t *payload, size_t *offset, uint16_t rows, uint8_t selector) {
@@ -2695,7 +2703,7 @@ static void ceiling_payload(uint8_t *payload, uint8_t layer_selector, uint8_t pd
     }
     ceiling_rows(payload, &offset, CEILING_PD_ROWS, pd_selector);
     offset += 4u;                                     // combo feedback
-    offset += 3u * NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS; // tap-branch colours
+    offset += NOAH_PROFILE_RGB_V1_TAP_BRANCH_RECORD_SIZE * NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS; // tap branches
     payload[offset + 5u] = 30u;                       // hold colour
     offset += NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE;
     ceiling_rows(payload, &offset, CEILING_KEY_ROWS, key_selector);

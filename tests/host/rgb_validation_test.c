@@ -62,13 +62,20 @@ const pointing_mode_color_t pointing_mode_colors[] = {
 };
 const uint8_t                              pointing_mode_color_count    = (uint8_t)ARRAY_SIZE(pointing_mode_colors);
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
-    RGB_TAP_BRANCH_COLORS(HSV(0, 0, 1)), .tap_committed_color = HSV(0, 0, 2), .hold_active_color = HSV(0, 0, 3), .long_hold_active_color = HSV(0, 0, 4), .tap_commit_mode = (key_feedback_tap_commit_mode_t)0xFFu, .locality = (rgb_locality_t)0xFFu,
+    RGB_TAP_BRANCHES({.color = HSV(0, 0, 1), .locality = (rgb_locality_t)0xFFu}),
+    .tap_committed_color       = HSV(0, 0, 2),
+    .tap_committed_locality    = (rgb_locality_t)0xFFu,
+    .hold_active_color         = HSV(0, 0, 3),
+    .hold_active_locality      = (rgb_locality_t)0xFFu,
+    .long_hold_active_color    = HSV(0, 0, 4),
+    .long_hold_active_locality = (rgb_locality_t)0xFFu,
+    .tap_commit_mode           = (key_feedback_tap_commit_mode_t)0xFFu,
 };
 
 static const autocorrect_feedback_led_group_t autocorrect_feedback_groups[] = {
     {.semantic = (autocorrect_feedback_group_semantic_t)0xFFu, .color = HSV(6, 6, 6), .led_group = RGB_LED_GROUP(RGB_MATRIX_LED_COUNT)},
 };
-const autocorrect_feedback_color_config_t     autocorrect_feedback_colors          = {.text_color = HSV(0, 0, 5), .macro_color = HSV(0, 0, 6), .undo_color = HSV(0, 0, 7), .locality = (rgb_locality_t)0xFFu};
+const autocorrect_feedback_color_config_t     autocorrect_feedback_colors          = {.text_color = HSV(0, 0, 5), .text_locality = (rgb_locality_t)0xFFu, .macro_color = HSV(0, 0, 6), .macro_locality = (rgb_locality_t)0xFFu, .undo_color = HSV(0, 0, 7), .undo_locality = (rgb_locality_t)0xFFu, .leading_locality = (rgb_locality_t)0xFFu};
 const autocorrect_feedback_led_group_t *const autocorrect_feedback_led_groups      = autocorrect_feedback_groups;
 const uint8_t                                 autocorrect_feedback_led_group_count = (uint8_t)ARRAY_SIZE(autocorrect_feedback_groups);
 
@@ -115,11 +122,18 @@ int main(void) {
     CHECK(strstr(log_buffer, "Invalid pointing_mode_led_groups") != NULL);
     CHECK(strstr(log_buffer, "Invalid combo_feedback_colors.locality") != NULL);
     CHECK(strstr(log_buffer, "Invalid combo_feedback_led_groups") != NULL);
-    CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_colors.locality") != NULL);
+    // Each case's locality is checked on its own (D-F73).
+    CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_colors.tap_branches[0].locality") != NULL);
+    CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_colors.tap_committed_locality") != NULL);
+    CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_colors.hold_active_locality") != NULL);
+    CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_colors.long_hold_active_locality") != NULL);
     CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_colors.tap_commit_mode") != NULL);
     CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_led_groups[0].semantic") != NULL);
     CHECK(strstr(log_buffer, "Invalid key_behavior_feedback_led_groups") != NULL);
-    CHECK(strstr(log_buffer, "Invalid autocorrect_feedback_colors.locality") != NULL);
+    CHECK(strstr(log_buffer, "Invalid autocorrect_feedback_colors.text_locality") != NULL);
+    CHECK(strstr(log_buffer, "Invalid autocorrect_feedback_colors.macro_locality") != NULL);
+    CHECK(strstr(log_buffer, "Invalid autocorrect_feedback_colors.undo_locality") != NULL);
+    CHECK(strstr(log_buffer, "Invalid autocorrect_feedback_colors.leading_locality") != NULL);
     CHECK(strstr(log_buffer, "Invalid autocorrect_feedback_led_groups[0].semantic") != NULL);
     CHECK(strstr(log_buffer, "Invalid autocorrect_feedback_led_groups[0].led_group.leds[0]") != NULL);
 

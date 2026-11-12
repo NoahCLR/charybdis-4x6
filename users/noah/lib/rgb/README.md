@@ -33,6 +33,9 @@ what they draw is [rgb-domain-v1.md](../../../../docs/spec/rgb-domain-v1.md#draw
   what is beneath.
 - Group bitmaps index LED `n` as bit `n % 8` of byte `n / 8`; a black group
   colour is the stage's own (`rgb_hsv_is_inherit_color`).
+- A layer, slot, combo or case colour of saturation and value 0 is
+  passthrough and paints nothing, nor do black rows for it
+  (`rgb_hsv_is_passthrough`, D-F74).
 - Runtime state comes from its owner's getter on the master half. On the slave
   half combo and behaviour-feedback sources are read once per frame through
   `split_runtime_sync_remote_read_*` into `rgb_runtime_render_snapshot`, held

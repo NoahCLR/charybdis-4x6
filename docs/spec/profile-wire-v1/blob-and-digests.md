@@ -18,7 +18,7 @@ Eight bytes, then the domains:
 | ---: | ---: | --- |
 | 0 | 4 | ASCII magic `NLP1` |
 | 4 | 1 | schema major, `4` |
-| 5 | 1 | schema minor, `7` |
+| 5 | 1 | schema minor, `8` |
 | 6 | 1 | domain count, `0..8` |
 | 7 | 1 | flags: exactly `0x01` (bit 0 canonical encoding; bits 1–7 reserved) |
 
@@ -70,7 +70,7 @@ requested domains, a record's domain mask, capability page 1 byte 12) is
 
 | Index | Mask bit | Id | Version | Domain | Payload |
 | ---: | ---: | ---: | ---: | --- | --- |
-| 0 | `0x01` | `0x10` | 6 | Lighting | [rgb-domain-v1.md](../rgb-domain-v1.md) |
+| 0 | `0x01` | `0x10` | 7 | Lighting | [rgb-domain-v1.md](../rgb-domain-v1.md) |
 | 1 | `0x02` | `0x20` | 2 | Key behaviours | [key-behavior-domain.md](key-behavior-domain.md) |
 | 2 | `0x04` | `0x30` | 3 | Combos | [combo-domain.md](combo-domain.md) |
 | 3 | `0x08` | `0x40` | 13 | Settings: layer records, custom keys and their shortcuts, layer, macro and custom-key names, the keyboard name | [settings-domain.md](settings-domain.md) |
@@ -86,7 +86,10 @@ that brought the leader (D-F71,
 [`0071`](../../adr/0071-the-leader-is-part-of-the-typing-stage.md)), not
 schema minors of their own. Lighting version 6 is schema 4.7's, the step
 that lights leading (D-F72,
-[`0072`](../../adr/0072-leading-is-a-case-of-replacement-feedback.md)).
+[`0072`](../../adr/0072-leading-is-a-case-of-replacement-feedback.md)), and
+lighting version 7 schema 4.8's, the step that gives each feedback case its
+own locality (D-F73,
+[`0073`](../../adr/0073-each-feedback-case-has-its-own-locality.md)).
 
 The eight rows fill the one-byte mask (D-F68,
 [`0068`](../../adr/0068-the-autocorrect-list-is-a-readable-profile-domain.md)):

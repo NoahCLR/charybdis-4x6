@@ -78,10 +78,10 @@ Every table is lighting `0x10` profile data when its stage is compiled:
 | pointing group rows | pointing group rows: selector, HSV, group | `RGB_POINTING_MODE_FEEDBACK_ENABLE` |
 | `combo_feedback_colors`: HSV, locality | combo feedback | `RGB_COMBO_FEEDBACK_ENABLE` |
 | combo group rows | combo group rows: HSV, group | `RGB_COMBO_FEEDBACK_ENABLE` |
-| `key_behavior_feedback_colors`: `RGB_TAP_BRANCH_COLORS` | tap-branch colours, one per tap count past the first | `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` |
-| `key_behavior_feedback_colors`: committed, hold and long-hold colours, tap-commit mode, locality | behaviour feedback | `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` |
+| `key_behavior_feedback_colors`: `RGB_TAP_BRANCHES`, a colour and locality each | tap-branch colours, one per tap count past the first, each with its locality | `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` |
+| `key_behavior_feedback_colors`: committed, hold and long-hold colours, each with its locality, tap-commit mode | behaviour feedback | `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` |
 | behaviour-feedback group rows: semantic, HSV, group | behaviour-feedback group rows | `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` |
-| `autocorrect_feedback_colors`: text, macro and undo colours, locality | replacement feedback | `RGB_AUTOCORRECT_FEEDBACK_ENABLE` |
+| `autocorrect_feedback_colors`: text, macro, undo and leading colours, each with its locality | replacement feedback | `RGB_AUTOCORRECT_FEEDBACK_ENABLE` |
 | replacement-feedback group rows: semantic, HSV, group | replacement-feedback group rows | `RGB_AUTOCORRECT_FEEDBACK_ENABLE` |
 | which stages run | the stage-enable mask; the compiled defaults enable every compiled stage | |
 
@@ -89,7 +89,7 @@ Every table is lighting `0x10` profile data when its stage is compiled:
 group ids and LED bitmaps. A new lighting value takes effect at the frame
 after the profile holding it becomes active.
 
-Held by: `tests/host/run_real_profile_validation_tests.sh` (`real_profile_validation_test.c`, the default and `no_rgb_feedback` variants), `tests/host/run_rgb_validation_tests.sh`, `tests/host/run_profile_rgb_v6_tests.sh`, `tests/host/run_profile_compiled_defaults_v1_tests.sh` (the compiled lighting domain's shape).
+Held by: `tests/host/run_real_profile_validation_tests.sh` (`real_profile_validation_test.c`, the default and `no_rgb_feedback` variants), `tests/host/run_rgb_validation_tests.sh`, `tests/host/run_profile_rgb_v7_tests.sh`, `tests/host/run_profile_compiled_defaults_v1_tests.sh` (the compiled lighting domain's shape).
 
 ## `config.h`
 

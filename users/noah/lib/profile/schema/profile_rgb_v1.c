@@ -24,6 +24,9 @@ _Static_assert((unsigned)NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE <= (unsigned)NOAH
 // A validation step reads a record into a buffer the header sizes.
 _Static_assert((unsigned)NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE <= (unsigned)NOAH_PROFILE_RGB_V1_HEADER_SIZE, "the replacement-feedback record outgrew the validation step's buffer");
 
+// A locality: both halves 0, left 1, right 2, the key's half 3, the keys 4.
+enum { RGB_LOCALITY_MAX = 4u };
+
 typedef enum {
     RGB_SECTION_GROUPS = 0u,
     RGB_SECTION_LAYER_COLORS,
@@ -116,7 +119,7 @@ static size_t section_offset(const noah_profile_rgb_v1_view_t *view, rgb_section
     if (section == RGB_SECTION_COMBO_GROUPS) return offset;
     offset += (size_t)view->combo_group_count * NOAH_PROFILE_RGB_V1_COMBO_GROUP_RECORD_SIZE;
     if (section == RGB_SECTION_TAP_BRANCH_COLORS) return offset;
-    offset += (size_t)view->tap_branch_color_count * NOAH_PROFILE_RGB_V1_COLOR_RECORD_SIZE;
+    offset += (size_t)view->tap_branch_color_count * NOAH_PROFILE_RGB_V1_TAP_BRANCH_RECORD_SIZE;
     if (section == RGB_SECTION_KEY_FEEDBACK) return offset;
     offset += NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE;
     if (section == RGB_SECTION_KEY_GROUPS) return offset;
@@ -159,7 +162,7 @@ static noah_profile_rgb_v1_result_t validate_group_row(const noah_profile_rgb_v1
     if (selector_kind == NOAH_PROFILE_RGB_V1_TABLE_PD_GROUPS && bytes[0] != NOAH_PROFILE_RGB_V1_SELECTOR_ALL && (bytes[0] >= NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES || (view->limits.supported_pointing_mode_mask & (UINT32_C(1) << bytes[0])) == 0u)) {
         return fail(error, NOAH_PROFILE_RGB_V1_INVALID_SELECTOR, offset, table, row, NOAH_PROFILE_RGB_V1_FIELD_SELECTOR);
     }
-    if (selector_kind == NOAH_PROFILE_RGB_V1_TABLE_KEY_GROUPS && bytes[0] != NOAH_PROFILE_RGB_V1_SELECTOR_ALL && bytes[0] > 3u) {
+    if (selector_kind == NOAH_PROFILE_RGB_V1_TABLE_KEY_GROUPS && bytes[0] != NOAH_PROFILE_RGB_V1_SELECTOR_ALL && bytes[0] >= NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_COUNT) {
         return fail(error, NOAH_PROFILE_RGB_V1_INVALID_SELECTOR, offset, table, row, NOAH_PROFILE_RGB_V1_FIELD_SEMANTIC);
     }
     if (selector_kind == NOAH_PROFILE_RGB_V1_TABLE_AUTOCORRECT_GROUPS && bytes[0] != NOAH_PROFILE_RGB_V1_SELECTOR_ALL && bytes[0] >= NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_COUNT) {
@@ -276,7 +279,7 @@ noah_profile_rgb_v1_validation_result_t noah_profile_rgb_v1_validation_step(noah
             candidate->key_group_count        = bytes[11];
             candidate->autocorrect_group_count = bytes[14];
             if (candidate->group_count > NOAH_PROFILE_RGB_V1_MAX_GROUPS || candidate->layer_color_count > candidate->limits.max_logical_layers || candidate->pd_color_count > NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES || candidate->tap_branch_color_count > NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS || (uint16_t)candidate->layer_group_count + candidate->pd_group_count + candidate->combo_group_count + candidate->key_group_count + candidate->autocorrect_group_count > NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED, 4u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
-            expected_length = NOAH_PROFILE_RGB_V1_FIXED_PAYLOAD_SIZE + (size_t)candidate->group_count * NOAH_PROFILE_RGB_V1_GROUP_RECORD_SIZE + (size_t)candidate->layer_color_count * NOAH_PROFILE_RGB_V1_LAYER_COLOR_RECORD_SIZE + (size_t)candidate->layer_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE + (size_t)candidate->pd_color_count * NOAH_PROFILE_RGB_V1_PD_COLOR_RECORD_SIZE + (size_t)candidate->pd_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE + (size_t)candidate->combo_group_count * NOAH_PROFILE_RGB_V1_COMBO_GROUP_RECORD_SIZE + (size_t)candidate->tap_branch_color_count * NOAH_PROFILE_RGB_V1_COLOR_RECORD_SIZE + (size_t)candidate->key_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE + (size_t)candidate->autocorrect_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE;
+            expected_length = NOAH_PROFILE_RGB_V1_FIXED_PAYLOAD_SIZE + (size_t)candidate->group_count * NOAH_PROFILE_RGB_V1_GROUP_RECORD_SIZE + (size_t)candidate->layer_color_count * NOAH_PROFILE_RGB_V1_LAYER_COLOR_RECORD_SIZE + (size_t)candidate->layer_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE + (size_t)candidate->pd_color_count * NOAH_PROFILE_RGB_V1_PD_COLOR_RECORD_SIZE + (size_t)candidate->pd_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE + (size_t)candidate->combo_group_count * NOAH_PROFILE_RGB_V1_COMBO_GROUP_RECORD_SIZE + (size_t)candidate->tap_branch_color_count * NOAH_PROFILE_RGB_V1_TAP_BRANCH_RECORD_SIZE + (size_t)candidate->key_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE + (size_t)candidate->autocorrect_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE;
             if (candidate->byte_length < expected_length) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_TRUNCATED, candidate->byte_length, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
             if (candidate->byte_length > expected_length) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_TRAILING_BYTES, expected_length, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
             return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_GROUPS);
@@ -351,7 +354,7 @@ noah_profile_rgb_v1_validation_result_t noah_profile_rgb_v1_validation_step(noah
                 validation->previous_pd_id   = (int8_t)pd_id;
                 result                       = validate_hsv(candidate, &bytes[1], offset + 1u, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, validation->row, &captured);
                 if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
-                if (bytes[4] > 4u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + 4u, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_LOCALITY);
+                if (bytes[4] > RGB_LOCALITY_MAX) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + 4u, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_LOCALITY);
                 validation->row++;
                 if (validation->row < candidate->pd_color_count) return NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS;
             }
@@ -377,7 +380,7 @@ noah_profile_rgb_v1_validation_result_t noah_profile_rgb_v1_validation_step(noah
             if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
             result = validate_hsv(candidate, bytes, offset, NOAH_PROFILE_RGB_V1_TABLE_COMBO, 0u, &captured);
             if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
-            if (bytes[3] > 4u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + 3u, NOAH_PROFILE_RGB_V1_TABLE_COMBO, 0u, NOAH_PROFILE_RGB_V1_FIELD_LOCALITY);
+            if (bytes[3] > RGB_LOCALITY_MAX) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + 3u, NOAH_PROFILE_RGB_V1_TABLE_COMBO, 0u, NOAH_PROFILE_RGB_V1_FIELD_LOCALITY);
             if ((candidate->limits.compiled_stage_mask & NOAH_PROFILE_RGB_V1_STAGE_COMBO) == 0u && (candidate->combo_group_count != 0u || bytes[3] != 0u || !hsv_is_black(bytes))) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA, offset, NOAH_PROFILE_RGB_V1_TABLE_COMBO, 0u, NOAH_PROFILE_RGB_V1_FIELD_COLOR);
             return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_COMBO_GROUPS);
 
@@ -395,17 +398,19 @@ noah_profile_rgb_v1_validation_result_t noah_profile_rgb_v1_validation_step(noah
 
         case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_TAP_BRANCH_COLORS:
             if (validation->row >= candidate->tap_branch_color_count) return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_KEY_FEEDBACK);
-            offset = section_offset(candidate, RGB_SECTION_TAP_BRANCH_COLORS) + (size_t)validation->row * NOAH_PROFILE_RGB_V1_COLOR_RECORD_SIZE;
-            result = read_bytes(candidate, offset, bytes, NOAH_PROFILE_RGB_V1_COLOR_RECORD_SIZE, NOAH_PROFILE_RGB_V1_TABLE_TAP_BRANCH_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_COLOR, &captured);
+            offset = section_offset(candidate, RGB_SECTION_TAP_BRANCH_COLORS) + (size_t)validation->row * NOAH_PROFILE_RGB_V1_TAP_BRANCH_RECORD_SIZE;
+            result = read_bytes(candidate, offset, bytes, NOAH_PROFILE_RGB_V1_TAP_BRANCH_RECORD_SIZE, NOAH_PROFILE_RGB_V1_TABLE_TAP_BRANCH_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_COLOR, &captured);
             if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
             result = validate_hsv(candidate, bytes, offset, NOAH_PROFILE_RGB_V1_TABLE_TAP_BRANCH_COLORS, validation->row, &captured);
             if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+            if (bytes[3] > RGB_LOCALITY_MAX) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + 3u, NOAH_PROFILE_RGB_V1_TABLE_TAP_BRANCH_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_LOCALITY);
             validation->row++;
             if (validation->row == candidate->tap_branch_color_count) return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_KEY_FEEDBACK);
             return NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS;
 
-        case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_KEY_FEEDBACK:
-            offset = section_offset(candidate, RGB_SECTION_KEY_FEEDBACK);
+        case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_KEY_FEEDBACK: {
+            bool localities_zero = true;
+            offset               = section_offset(candidate, RGB_SECTION_KEY_FEEDBACK);
             result = read_bytes(candidate, offset, bytes, NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE, NOAH_PROFILE_RGB_V1_TABLE_KEY_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_COLOR, &captured);
             if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
             for (uint8_t color_index = 0u; color_index < 3u; color_index++) {
@@ -413,13 +418,17 @@ noah_profile_rgb_v1_validation_result_t noah_profile_rgb_v1_validation_step(noah
                 if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
             }
             if (bytes[9] > 1u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + 9u, NOAH_PROFILE_RGB_V1_TABLE_KEY_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_MODE);
-            if (bytes[10] > 4u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + 10u, NOAH_PROFILE_RGB_V1_TABLE_KEY_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_LOCALITY);
+            for (uint8_t at = NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_LOCALITY_OFFSET; at < NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE; at++) {
+                if (bytes[at] > RGB_LOCALITY_MAX) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + at, NOAH_PROFILE_RGB_V1_TABLE_KEY_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_LOCALITY);
+                localities_zero = localities_zero && bytes[at] == 0u;
+            }
             if ((candidate->limits.compiled_stage_mask & NOAH_PROFILE_RGB_V1_STAGE_KEY_BEHAVIOR) != 0u) {
                 if (candidate->tap_branch_color_count != candidate->limits.tap_branch_color_count) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INCOMPLETE_SURFACE, 10u, NOAH_PROFILE_RGB_V1_TABLE_TAP_BRANCH_COLORS, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
-            } else if (candidate->tap_branch_color_count != 0u || candidate->key_group_count != 0u || bytes[9] != 0u || bytes[10] != 0u || !hsv_is_black(&bytes[0]) || !hsv_is_black(&bytes[3]) || !hsv_is_black(&bytes[6])) {
+            } else if (candidate->tap_branch_color_count != 0u || candidate->key_group_count != 0u || bytes[9] != 0u || !localities_zero || !hsv_is_black(&bytes[0]) || !hsv_is_black(&bytes[3]) || !hsv_is_black(&bytes[6])) {
                 return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA, offset, NOAH_PROFILE_RGB_V1_TABLE_KEY_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_COLOR);
             }
             return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_KEY_GROUPS);
+        }
 
         case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_KEY_GROUPS:
             if (validation->row < candidate->key_group_count) {
@@ -432,17 +441,20 @@ noah_profile_rgb_v1_validation_result_t noah_profile_rgb_v1_validation_step(noah
             return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_AUTOCORRECT_FEEDBACK);
 
         case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_AUTOCORRECT_FEEDBACK: {
-            bool colours_black = true;
+            bool record_zero = true;
             offset = section_offset(candidate, RGB_SECTION_AUTOCORRECT_FEEDBACK);
             result = read_bytes(candidate, offset, bytes, NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE, NOAH_PROFILE_RGB_V1_TABLE_AUTOCORRECT_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_COLOR, &captured);
             if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
             for (uint8_t color_index = 0u; color_index < NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_COUNT; color_index++) {
                 result = validate_hsv(candidate, &bytes[color_index * 3u], offset + color_index * 3u, NOAH_PROFILE_RGB_V1_TABLE_AUTOCORRECT_FEEDBACK, 0u, &captured);
                 if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
-                colours_black = colours_black && hsv_is_black(&bytes[color_index * 3u]);
+                record_zero = record_zero && hsv_is_black(&bytes[color_index * 3u]);
             }
-            if (bytes[NOAH_PROFILE_RGB_V1_AUTOCORRECT_LOCALITY_OFFSET] > 4u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + NOAH_PROFILE_RGB_V1_AUTOCORRECT_LOCALITY_OFFSET, NOAH_PROFILE_RGB_V1_TABLE_AUTOCORRECT_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_LOCALITY);
-            if ((candidate->limits.compiled_stage_mask & NOAH_PROFILE_RGB_V1_STAGE_AUTOCORRECT) == 0u && (candidate->autocorrect_group_count != 0u || bytes[NOAH_PROFILE_RGB_V1_AUTOCORRECT_LOCALITY_OFFSET] != 0u || !colours_black)) {
+            for (uint8_t at = NOAH_PROFILE_RGB_V1_AUTOCORRECT_LOCALITY_OFFSET; at < NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE; at++) {
+                if (bytes[at] > RGB_LOCALITY_MAX) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + at, NOAH_PROFILE_RGB_V1_TABLE_AUTOCORRECT_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_LOCALITY);
+                record_zero = record_zero && bytes[at] == 0u;
+            }
+            if ((candidate->limits.compiled_stage_mask & NOAH_PROFILE_RGB_V1_STAGE_AUTOCORRECT) == 0u && (candidate->autocorrect_group_count != 0u || !record_zero)) {
                 return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA, offset, NOAH_PROFILE_RGB_V1_TABLE_AUTOCORRECT_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_COLOR);
             }
             return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_AUTOCORRECT_GROUPS);
@@ -614,12 +626,15 @@ noah_profile_rgb_v1_result_t noah_profile_rgb_v1_combo_group_at(const noah_profi
     return result;
 }
 
-noah_profile_rgb_v1_result_t noah_profile_rgb_v1_tap_branch_color_at(const noah_profile_rgb_v1_view_t *view, uint8_t index, noah_profile_rgb_v1_hsv_t *color, noah_profile_rgb_v1_error_t *error) {
-    uint8_t                      bytes[NOAH_PROFILE_RGB_V1_COLOR_RECORD_SIZE];
+noah_profile_rgb_v1_result_t noah_profile_rgb_v1_tap_branch_at(const noah_profile_rgb_v1_view_t *view, uint8_t index, noah_profile_rgb_v1_feedback_t *branch, noah_profile_rgb_v1_error_t *error) {
+    uint8_t                      bytes[NOAH_PROFILE_RGB_V1_TAP_BRANCH_RECORD_SIZE];
     noah_profile_rgb_v1_result_t result;
-    if (!color) return fail(error, NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT, 0u, NOAH_PROFILE_RGB_V1_TABLE_TAP_BRANCH_COLORS, index, NOAH_PROFILE_RGB_V1_FIELD_HEADER);
+    if (!branch) return fail(error, NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT, 0u, NOAH_PROFILE_RGB_V1_TABLE_TAP_BRANCH_COLORS, index, NOAH_PROFILE_RGB_V1_FIELD_HEADER);
     result = accessor_read(view, RGB_SECTION_TAP_BRANCH_COLORS, index, view ? view->tap_branch_color_count : 0u, sizeof(bytes), NOAH_PROFILE_RGB_V1_TABLE_TAP_BRANCH_COLORS, bytes, error);
-    if (result == NOAH_PROFILE_RGB_V1_OK) *color = hsv_from_bytes(bytes);
+    if (result == NOAH_PROFILE_RGB_V1_OK) {
+        branch->color    = hsv_from_bytes(bytes);
+        branch->locality = bytes[3];
+    }
     return result;
 }
 
@@ -632,8 +647,10 @@ noah_profile_rgb_v1_result_t noah_profile_rgb_v1_key_feedback(const noah_profile
         value->tap_committed_color    = hsv_from_bytes(&bytes[0]);
         value->hold_active_color      = hsv_from_bytes(&bytes[3]);
         value->long_hold_active_color = hsv_from_bytes(&bytes[6]);
-        value->tap_commit_mode        = bytes[9];
-        value->locality               = bytes[10];
+        value->tap_commit_mode           = bytes[9];
+        value->tap_committed_locality    = bytes[10];
+        value->hold_active_locality      = bytes[11];
+        value->long_hold_active_locality = bytes[12];
     }
     return result;
 }
@@ -648,9 +665,10 @@ noah_profile_rgb_v1_result_t noah_profile_rgb_v1_autocorrect_feedback(const noah
     if (!value) return fail(error, NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT, 0u, NOAH_PROFILE_RGB_V1_TABLE_AUTOCORRECT_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_HEADER);
     result = accessor_read(view, RGB_SECTION_AUTOCORRECT_FEEDBACK, 0u, 1u, sizeof(bytes), NOAH_PROFILE_RGB_V1_TABLE_AUTOCORRECT_FEEDBACK, bytes, error);
     if (result == NOAH_PROFILE_RGB_V1_OK) {
-        for (uint8_t semantic = 0u; semantic < NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_COUNT; semantic++)
-            value->colors[semantic] = hsv_from_bytes(&bytes[semantic * 3u]);
-        value->locality = bytes[NOAH_PROFILE_RGB_V1_AUTOCORRECT_LOCALITY_OFFSET];
+        for (uint8_t semantic = 0u; semantic < NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_COUNT; semantic++) {
+            value->colors[semantic]     = hsv_from_bytes(&bytes[semantic * 3u]);
+            value->localities[semantic] = bytes[NOAH_PROFILE_RGB_V1_AUTOCORRECT_LOCALITY_OFFSET + semantic];
+        }
     }
     return result;
 }

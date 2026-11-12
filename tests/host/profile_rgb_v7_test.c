@@ -1,6 +1,6 @@
-// RGB domain version 6: sixteen layer colours, 32 PD rows and the replacement
-// feedback record, with its leading colour, and rows, the golden vectors
-// shared with the app.
+// RGB domain version 7: sixteen layer colours, 32 PD rows, a locality for
+// every behaviour and replacement feedback case (D-F73), the replacement
+// feedback record and rows, the golden vectors shared with the app.
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -24,7 +24,7 @@ static uint8_t hex_nibble(char c) {
 // argv[1]: limits line "stage layers brightness tap_branches pd_mask", then
 // one line per vector: expected code, payload-relative offset, name, hex.
 int main(int argc, char **argv) {
-    // Room for the largest domain's vectors, 4,652 bytes (D-F63).
+    // Room for the largest domain's vectors, 4,661 bytes (D-F63, D-F73).
     static char    hex[16384];
     static uint8_t payload[8192];
     char           code[32], name[64];
@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
     size_t         offset, cases = 0, rejected = 0;
 
     assert(argc == 2);
-    assert(NOAH_PROFILE_RGB_V1_FORMAT_VERSION == 6 && NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES == 32);
+    assert(NOAH_PROFILE_RGB_V1_FORMAT_VERSION == 7 && NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES == 32);
     assert(NOAH_PROFILE_RGB_V1_POINTING_MODE_MASK_ALL == UINT32_MAX);
     FILE *file = fopen(argv[1], "r");
     assert(file);
@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
         noah_profile_rgb_v1_error_t  error;
         noah_profile_rgb_v1_result_t result = noah_profile_rgb_v1_decode(payload, length, &limits, &view, &error);
         if (strcmp(result_names[result], code) != 0 || (result != NOAH_PROFILE_RGB_V1_OK && error.offset != offset)) {
-            fprintf(stderr, "RGB v6 vector %s: expected %s at %zu, got %s at %zu\n", name, code, offset, result_names[result], error.offset);
+            fprintf(stderr, "RGB v7 vector %s: expected %s at %zu, got %s at %zu\n", name, code, offset, result_names[result], error.offset);
             return 1;
         }
         if (result == NOAH_PROFILE_RGB_V1_OK) {
@@ -70,8 +70,22 @@ int main(int argc, char **argv) {
             assert(noah_profile_rgb_v1_autocorrect_feedback(&view, &feedback, &error) == NOAH_PROFILE_RGB_V1_OK);
             for (uint8_t semantic = 0; semantic < NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_COUNT; semantic++) {
                 assert(feedback.colors[semantic].h == record[3 * semantic] && feedback.colors[semantic].s == record[3 * semantic + 1] && feedback.colors[semantic].v == record[3 * semantic + 2]);
+                assert(feedback.localities[semantic] == record[NOAH_PROFILE_RGB_V1_AUTOCORRECT_LOCALITY_OFFSET + semantic]);
             }
-            assert(feedback.locality == record[NOAH_PROFILE_RGB_V1_AUTOCORRECT_LOCALITY_OFFSET]);
+            // Each tap branch and the behaviour record before the behaviour
+            // rows read back as their bytes, a locality for each case.
+            const uint8_t                     *key_record = record - (size_t)view.key_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE - NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE;
+            const uint8_t                     *branches   = key_record - (size_t)view.tap_branch_color_count * NOAH_PROFILE_RGB_V1_TAP_BRANCH_RECORD_SIZE;
+            noah_profile_rgb_v1_key_feedback_t key;
+            assert(noah_profile_rgb_v1_key_feedback(&view, &key, &error) == NOAH_PROFILE_RGB_V1_OK);
+            assert(key.tap_committed_color.h == key_record[0] && key.long_hold_active_color.v == key_record[8] && key.tap_commit_mode == key_record[9]);
+            assert(key.tap_committed_locality == key_record[10] && key.hold_active_locality == key_record[11] && key.long_hold_active_locality == key_record[12]);
+            for (uint8_t index = 0; index < view.tap_branch_color_count; index++) {
+                noah_profile_rgb_v1_feedback_t branch;
+                const uint8_t                 *bytes = &branches[(size_t)index * NOAH_PROFILE_RGB_V1_TAP_BRANCH_RECORD_SIZE];
+                assert(noah_profile_rgb_v1_tap_branch_at(&view, index, &branch, &error) == NOAH_PROFILE_RGB_V1_OK);
+                assert(branch.color.h == bytes[0] && branch.color.s == bytes[1] && branch.color.v == bytes[2] && branch.locality == bytes[3]);
+            }
             for (uint8_t index = 0; index < view.autocorrect_group_count; index++) {
                 const uint8_t                  *bytes = &record[NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE + (size_t)index * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE];
                 noah_profile_rgb_v1_group_row_t row;
@@ -85,7 +99,7 @@ int main(int argc, char **argv) {
     }
     assert(feof(file));
     fclose(file);
-    assert(cases >= 32 && rejected >= 21);
-    printf("RGB domain v6: %zu vectors (%zu rejected) passed\n", cases, rejected);
+    assert(cases >= 48 && rejected >= 34);
+    printf("RGB domain v7: %zu vectors (%zu rejected) passed\n", cases, rejected);
     return 0;
 }

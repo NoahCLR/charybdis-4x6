@@ -191,6 +191,64 @@ static bool invalidating_reader_read(void *context_value, size_t offset, uint8_t
     return true;
 }
 
+// The fixture payload with one colour, which it holds exactly once, replaced.
+static void replace_colour(uint8_t *payload, size_t length, hsv_t from, hsv_t to) {
+    size_t found = SIZE_MAX;
+
+    for (size_t index = 0u; index + 2u < length; index++) {
+        if (payload[index] == from.h && payload[index + 1u] == from.s && payload[index + 2u] == from.v) {
+            CHECK(found == SIZE_MAX);
+            found = index;
+        }
+    }
+    CHECK(found != SIZE_MAX);
+    payload[found]      = to.h;
+    payload[found + 1u] = to.s;
+    payload[found + 2u] = to.v;
+}
+
+// Publishes a payload as the active profile and captures a frame of it.
+static noah_active_profile_rgb_frame_t publish(noah_active_profile_rgb_runtime_t *runtime, const uint8_t *payload, size_t length, uint32_t generation) {
+    noah_profile_rgb_v1_limits_t    limits   = noah_profile_rgb_v1_default_limits();
+    noah_active_profile_snapshot_t  snapshot = {0};
+    noah_profile_rgb_v1_error_t     error;
+    noah_active_profile_rgb_frame_t frame;
+
+    limits.supported_pointing_mode_mask = 0x3fu;
+    limits.logical_layer_count          = LAYER_COUNT;
+    limits.maximum_brightness           = 200u;
+    limits.tap_branch_color_count       = 4u;
+    snapshot.identity                   = test_identity(generation);
+    snapshot.profile.domain_mask        = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
+    CHECK(noah_profile_rgb_v1_decode(payload, length, &limits, &snapshot.profile.rgb, &error) == NOAH_PROFILE_RGB_V1_OK);
+    noah_active_profile_rgb_runtime_invalidate(runtime, generation, (noah_active_profile_identity_t){0}, snapshot.identity, &snapshot);
+    CHECK(rgb_active_profile_config_capture_frame(&frame) == NOAH_ACTIVE_PROFILE_RGB_OK);
+    return frame;
+}
+
+static bool same_rgb(rgb_t left, rgb_t right) {
+    return left.r == right.r && left.g == right.g && left.b == right.b;
+}
+
+// Against the frame drawn with the stage's colour lit: what it painted in that
+// colour (its locality, its black rows) is unpainted when the colour is
+// passthrough and black when it is black; the rest is unchanged (D-F74).
+static void check_against_lit(const rgb_runtime_frame_t *lit, rgb_t lit_rgb, const rgb_runtime_frame_t *frame, bool passthrough, rgb_t black_rgb) {
+    uint8_t in_colour = 0u;
+
+    for (uint8_t led = 0u; led < RGB_MATRIX_LED_COUNT; led++) {
+        if (lit->painted[led] && same_rgb(lit->colors[led], lit_rgb)) {
+            in_colour++;
+            CHECK(frame->painted[led] == !passthrough);
+            if (!passthrough) CHECK(same_rgb(frame->colors[led], black_rgb));
+            continue;
+        }
+        CHECK(frame->painted[led] == lit->painted[led]);
+        if (lit->painted[led]) CHECK(same_rgb(frame->colors[led], lit->colors[led]));
+    }
+    CHECK(in_colour > 0u);
+}
+
 static void test_compiled_and_live_pd_rendering(const char *fixture_path) {
     uint8_t                           payload[TEST_RGB_PAYLOAD_SIZE];
     size_t                            length = fixture_payload(fixture_path, payload, sizeof(payload));
@@ -279,9 +337,52 @@ static void test_compiled_and_live_pd_rendering(const char *fixture_path) {
     noah_active_profile_rgb_runtime_uninstall(&runtime);
 }
 
+// A slot whose colour has saturation and value 0 is passthrough: its locality
+// and its black rows paint nothing, and a coloured row still paints. Value 0
+// with saturation is black. The compiled slots past the named ones start
+// passthrough, so running one paints nothing (D-F74).
+static void test_a_passthrough_slot_paints_nothing(const char *fixture_path) {
+    uint8_t                           payload[TEST_RGB_PAYLOAD_SIZE];
+    size_t                            length = fixture_payload(fixture_path, payload, sizeof(payload));
+    noah_active_profile_rgb_runtime_t runtime;
+    noah_active_profile_rgb_frame_t   profile;
+    rgb_runtime_frame_t               lit;
+    rgb_runtime_frame_t               frame;
+    const hsv_t                       live        = {.h = 21u, .s = 22u, .v = 23u};
+    const hsv_t                       passthrough = {.h = 90u, .s = 0u, .v = 0u};
+    const hsv_t                       black       = {.h = 90u, .s = 255u, .v = 0u};
+
+    memset(&fake_snapshot, 0, sizeof(fake_snapshot));
+    fake_snapshot.display.active_index = 6u;
+    fake_snapshot.display.active_mode  = POINTING_MODE_6;
+    CHECK(!rgb_runtime_pointing_mode_stage_render_frame(&frame, 0u, RGB_MATRIX_LED_COUNT));
+    for (uint8_t led = 0u; led < RGB_MATRIX_LED_COUNT; led++) {
+        check_unpainted(&frame, led);
+    }
+
+    fake_snapshot.display.active_index = POINTING_MODE_INDEX_VOLUME;
+    fake_snapshot.display.active_mode  = POINTING_MODE_VOLUME;
+    noah_active_profile_rgb_runtime_init(&runtime);
+    CHECK(noah_active_profile_rgb_runtime_install(&runtime));
+    profile = publish(&runtime, payload, length, 1u);
+    CHECK(rgb_runtime_pointing_mode_stage_render_active_profile_frame(&lit, &profile, 0u, RGB_MATRIX_LED_COUNT));
+
+    replace_colour(payload, length, live, passthrough);
+    profile = publish(&runtime, payload, length, 2u);
+    (void)rgb_runtime_pointing_mode_stage_render_active_profile_frame(&frame, &profile, 0u, RGB_MATRIX_LED_COUNT);
+    check_against_lit(&lit, hsv_to_rgb(live), &frame, true, (rgb_t){0});
+
+    replace_colour(payload, length, passthrough, black);
+    profile = publish(&runtime, payload, length, 3u);
+    CHECK(rgb_runtime_pointing_mode_stage_render_active_profile_frame(&frame, &profile, 0u, RGB_MATRIX_LED_COUNT));
+    check_against_lit(&lit, hsv_to_rgb(live), &frame, false, hsv_to_rgb(black));
+    noah_active_profile_rgb_runtime_uninstall(&runtime);
+}
+
 int main(int argc, char **argv) {
     CHECK(argc == 2);
     test_compiled_and_live_pd_rendering(argv[1]);
+    test_a_passthrough_slot_paints_nothing(argv[1]);
     puts("rgb active-profile pointing-mode host tests passed");
     return 0;
 }

@@ -61,7 +61,7 @@ sh run_profile_storage_layout_tests.sh
 sh run_profile_blob_v1_tests.sh
 sh run_key_behavior_domain_v1_tests.sh
 sh run_profile_rgb_v1_tests.sh
-sh run_profile_rgb_v6_tests.sh
+sh run_profile_rgb_v7_tests.sh
 sh run_profile_settings_v1_tests.sh
 sh run_host_detection_tests.sh
 sh run_profile_pd_v1_tests.sh

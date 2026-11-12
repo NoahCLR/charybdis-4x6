@@ -12,10 +12,10 @@
 
 _Static_assert((int)NOAH_AUTOCORRECT_FEEDBACK_TEXT == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_TEXT + 1 && (int)NOAH_AUTOCORRECT_FEEDBACK_MACRO == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_MACRO + 1 && (int)NOAH_AUTOCORRECT_FEEDBACK_UNDO == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_UNDO + 1 && (int)NOAH_AUTOCORRECT_FEEDBACK_LEADING == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_LEADING + 1, "a feedback kind is its lighting semantic plus one");
 
-// A semantic's colour of saturation and value 0 paints nothing, so each of
-// the four can be off by itself (D-F70, D-F72).
+// A passthrough semantic paints nothing, so each of the four can be off by
+// itself (D-F70, D-F72, D-F74).
 static bool rgb_runtime_autocorrect_feedback_stage_color_paints(hsv_t color) {
-    return !(color.s == 0u && color.v == 0u);
+    return !rgb_hsv_is_passthrough(color);
 }
 
 static bool rgb_runtime_autocorrect_feedback_stage_paint_range(rgb_runtime_frame_t *frame, rgb_t color, uint8_t from, uint8_t to, uint8_t led_min, uint8_t led_max) {
@@ -129,7 +129,8 @@ bool rgb_runtime_autocorrect_feedback_stage_render_active_profile_frame(rgb_runt
     semantic    = (uint8_t)(feedback->kind - 1u);
     stage_color = config.colors[semantic];
     if (rgb_runtime_autocorrect_feedback_stage_color_paints(stage_color)) {
-        painted |= rgb_runtime_autocorrect_feedback_stage_paint_locality(frame, hsv_to_rgb(stage_color), config.locality, feedback->keys, led_min, led_max);
+        // One case shows at a time, so it paints by its own locality (D-F73).
+        painted |= rgb_runtime_autocorrect_feedback_stage_paint_locality(frame, hsv_to_rgb(stage_color), config.localities[semantic], feedback->keys, led_min, led_max);
     }
 
     if (!rgb_active_profile_config_group_selectors(profile_frame, &selectors)) {
