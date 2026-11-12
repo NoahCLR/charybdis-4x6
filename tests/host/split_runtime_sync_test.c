@@ -942,6 +942,37 @@ static void test_tick_sends_the_base_packet_when_a_replacement_flash_begins_and_
     CHECK(rpc_send_count_combo == 0u && rpc_send_count_key_feedback_semantic == 0u && rpc_send_count_key_feedback_branch == 0u);
 }
 
+// Leading is held, not timed: it goes in the base packet when the leader
+// starts waiting, keeps going at the active heartbeat however long it waits,
+// and is cleared at once when the wait ends. (Other packets keep their own
+// idle heartbeats meanwhile, so only base packets are counted.)
+static void test_tick_keeps_sending_leading_while_the_leader_waits(void) {
+    test_reset_stubs();
+    test_set_idle_runtime_state();
+
+    split_runtime_sync_init();
+    test_reset_rpc_send_counts();
+    split_runtime_sync_tick(timer_read32());
+    CHECK(rpc_send_count == 0u);
+
+    fake_autocorrect_feedback.kind = NOAH_AUTOCORRECT_FEEDBACK_LEADING;
+    split_runtime_sync_tick(timer_read32());
+    CHECK(rpc_send_count == 1u && rpc_send_count_base == 1u);
+    CHECK(rpc_last_base_packet.autocorrect_feedback.kind == NOAH_AUTOCORRECT_FEEDBACK_LEADING);
+    CHECK(!key_origin_bitmap_has_any(rpc_last_base_packet.autocorrect_feedback.keys));
+
+    // Two seconds of waiting, far past any flash: one base packet a beat.
+    for (uint8_t beat = 2u; beat <= 9u; beat++) {
+        fake_time32 += 250u;
+        split_runtime_sync_tick(timer_read32());
+        CHECK(rpc_send_count_base == beat && rpc_last_base_packet.autocorrect_feedback.kind == NOAH_AUTOCORRECT_FEEDBACK_LEADING);
+    }
+
+    fake_autocorrect_feedback = (noah_autocorrect_feedback_t){0};
+    split_runtime_sync_tick(timer_read32());
+    CHECK(rpc_send_count_base == 10u && rpc_last_base_packet.autocorrect_feedback.kind == NOAH_AUTOCORRECT_FEEDBACK_NONE);
+}
+
 // The slave half keeps the base packet's flash and hands it to a reader
 // whole, or not at all while the packet is still being published.
 static void test_slave_base_rpc_applies_replacement_feedback_for_coherent_readers(void) {
@@ -969,6 +1000,30 @@ static void test_slave_base_rpc_applies_replacement_feedback_for_coherent_reader
     read.kind                                 = 0xA5u;
     split_runtime_sync_remote.base_generation = 1u;
     CHECK(!split_runtime_sync_remote_read_autocorrect_feedback(&read) && read.kind == 0xA5u);
+}
+
+// The slave half takes leading from the base packet that carries it, on the
+// Leader key the packet names, and drops it with the packet that ends it.
+static void test_slave_base_rpc_applies_leading_until_a_packet_ends_it(void) {
+    split_runtime_base_sync_packet_t packet = {.active_mode_id = POINTING_MODE_ID_NONE, .locked_mode_id = POINTING_MODE_ID_NONE, .key_preview_layer = UINT8_MAX};
+    noah_autocorrect_feedback_t      read   = {.kind = 0xA5u};
+
+    test_reset_stubs();
+    fake_is_master = false;
+    split_runtime_sync_init();
+
+    packet.autocorrect_feedback.kind = NOAH_AUTOCORRECT_FEEDBACK_LEADING;
+    key_origin_bitmap_add_keypos(packet.autocorrect_feedback.keys, (keypos_t){.row = 1, .col = 2});
+    test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC)((uint8_t)sizeof(packet), &packet, 0u, NULL);
+    CHECK(split_runtime_sync_remote_read_autocorrect_feedback(&read) && read.kind == NOAH_AUTOCORRECT_FEEDBACK_LEADING);
+    CHECK(memcmp(read.keys, packet.autocorrect_feedback.keys, sizeof(read.keys)) == 0 && key_origin_bitmap_has_any(read.keys));
+    // It times nothing: long after any flash, it still shows.
+    fake_time32 += 5000u;
+    CHECK(split_runtime_sync_remote_read_autocorrect_feedback(&read) && read.kind == NOAH_AUTOCORRECT_FEEDBACK_LEADING);
+
+    packet.autocorrect_feedback.kind = NOAH_AUTOCORRECT_FEEDBACK_NONE;
+    test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC)((uint8_t)sizeof(packet), &packet, 0u, NULL);
+    CHECK(split_runtime_sync_remote_read_autocorrect_feedback(&read) && read.kind == NOAH_AUTOCORRECT_FEEDBACK_NONE);
 }
 #endif
 
@@ -1687,7 +1742,9 @@ int main(void) {
     test_tick_sends_only_base_packet_when_only_automouse_changes();
 #ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
     test_tick_sends_the_base_packet_when_a_replacement_flash_begins_and_ends();
+    test_tick_keeps_sending_leading_while_the_leader_waits();
     test_slave_base_rpc_applies_replacement_feedback_for_coherent_readers();
+    test_slave_base_rpc_applies_leading_until_a_packet_ends_it();
 #endif
     test_tick_sends_only_combo_packet_when_only_combo_feedback_changes();
     test_quiet_combo_projection_clears_other_half_feedback();

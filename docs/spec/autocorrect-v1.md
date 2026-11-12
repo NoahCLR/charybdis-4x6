@@ -417,9 +417,15 @@ reported for a word left as typed.
 What [the leader](#the-leader) sends is reported the same way (D-F71): a text
 replacement or a macro replacement, at the moment its typing begins or its
 macro starts, with the key that ended leading, the character that made the
-match or Enter, and no key when the timeout sent it. Nothing is reported for
-a leader that sends nothing. Leading itself is the engine's state
-(`noah_autocorrect_leading`), for lighting to read.
+match or Enter, and the Leader key that began leading when the timeout sent
+it. Nothing is reported for
+a leader that sends nothing. Leading itself is reported too, on the Leader
+key, which its action hands the engine with it (no key for an action no key
+names), from the moment the engine reads Leader until leading ends by any
+ending, Leader
+again and a Backspace that leaves characters held keeping it (D-F72); it is
+not timed, and a send's report takes its place with nothing reported
+between them.
 
 The engine reads usages in reports, so the key is noted for it by whatever
 puts a key in a report: a key QMK registers as the hook hands its press on,
@@ -434,7 +440,7 @@ queue: the scan after its press, or later when the key waited there behind
 a replacement being typed, by when a combo that has been released names its
 owner key alone.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (`autocorrect_test.c`, the tests under "What lighting is told" and `test_a_leader_send_shows_on_the_key_that_ended_leading`; `test_a_full_queue_stops_a_macro_correction`; the `switched-off` case), `tests/host/run_action_lifecycle_tests.sh` (`test_a_tap_notes_its_key_for_the_typing_stage`), `tests/host/run_key_runtime_physical_ownership_integration_tests.sh` (`test_the_key_that_reaches_the_report_is_noted`, `test_a_plain_press_that_settles_another_key_is_the_one_noted`). No test reads a combo's output through the key runtime to the note, or a key noted after a report that did not fit the queue.
+Held by: `tests/host/run_autocorrect_tests.sh` (`autocorrect_test.c`, the tests under "What lighting is told", `test_a_leader_send_shows_on_the_key_that_ended_leading` and `test_leading_holds_until_leading_ends`; `test_a_full_queue_stops_a_macro_correction`; the `switched-off` case), `tests/host/run_action_lifecycle_tests.sh` (`test_a_tap_notes_its_key_for_the_typing_stage`), `tests/host/run_key_runtime_physical_ownership_integration_tests.sh` (`test_the_key_that_reaches_the_report_is_noted`, `test_a_plain_press_that_settles_another_key_is_the_one_noted`). No test reads a combo's output through the key runtime to the note, or a key noted after a report that did not fit the queue.
 
 ## The fixture
 

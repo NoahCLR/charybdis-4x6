@@ -930,8 +930,10 @@ static void test_plain_autocorrect_keys_switch_the_override(void) {
 
 // The typing stage's leader, as the Leader key's action calls it (D-F71).
 static unsigned leader_presses;
-void noah_typing_stage_leader(void) {
+static keypos_t leader_key_pos;
+void noah_typing_stage_leader(keypos_t key_pos) {
     leader_presses++;
+    leader_key_pos = key_pos;
 }
 
 // QMK's Leader keycode is the firmware's: it acts at its press, once, and
@@ -943,6 +945,8 @@ static void test_a_plain_leader_key_acts_at_its_press(void) {
     leader_presses = 0u;
     CHECK(!test_plain_key_tap(QK_LEADER, key_pos));
     CHECK(leader_presses == 1u);
+    // With its key, for leading to show on (D-F72).
+    CHECK(leader_key_pos.row == key_pos.row && leader_key_pos.col == key_pos.col);
     CHECK(!test_plain_key_tap(QK_LEADER, key_pos));
     CHECK(leader_presses == 2u);
     CHECK(autocorrect_switch_override());

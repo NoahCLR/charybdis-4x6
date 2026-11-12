@@ -440,21 +440,25 @@ static keypos_t autocorrect_key_at(uint8_t key) {
     return key != AUTOCORRECT_NO_KEY ? (keypos_t){.row = (uint8_t)((key - 1u) / MATRIX_COLS), .col = (uint8_t)((key - 1u) % MATRIX_COLS)} : autocorrect_no_key;
 }
 
-// Leading ends: what was held goes, and the next word starts fresh.
+// Leading ends: what was held goes, leading's colour with it, and the next
+// word starts fresh.
 static void autocorrect_lead_end(void) {
     autocorrect.leading = false;
+    noah_autocorrect_feedback_lead_end();
     autocorrect_forget(false);
 }
 
 // The Leader key's turn (D-F71): what is typed from now is held. Leader again
 // starts over. A list with nothing that fires after the leader has nothing to wait
-// for, so then it does nothing.
-static void autocorrect_lead_begin(void) {
+// for, so then it does nothing. Leading shows on the Leader key, `key`
+// (D-F72).
+static void autocorrect_lead_begin(uint8_t key) {
     if (!autocorrect_has_leader()) return;
     autocorrect_lead_end();
     autocorrect.leading   = true;
     autocorrect.watched   = 0u;
     autocorrect.leader_at = timer_read32();
+    noah_autocorrect_feedback_lead_begin(autocorrect_key_at(key));
 }
 
 // A key the leader acts on: lighting is given it, since what is held may be
@@ -575,7 +579,7 @@ static __attribute__((noinline)) bool autocorrect_pump(void) {
                 break;
             case AUTOCORRECT_EDGE_LEADER:
                 autocorrect.leaders--;
-                autocorrect_lead_begin();
+                autocorrect_lead_begin(edge.value);
                 break;
             case AUTOCORRECT_EDGE_CLICK:
                 autocorrect_lead_end();
@@ -735,15 +739,14 @@ void noah_typing_stage_note_click(void) {
 // it has missed now, from the Leader key's action: keys already down are read
 // before Leader and only what follows it is held. The key runtime hands a tap
 // on before the press that decided it, so no later key gets ahead of it.
-void noah_typing_stage_leader(void) {
+void noah_typing_stage_leader(keypos_t key_pos) {
+    // Its key goes with it, as a key going down carries its own.
+    uint8_t key = key_pos.row < MATRIX_ROWS && key_pos.col < MATRIX_COLS ? (uint8_t)(key_pos.row * MATRIX_COLS + key_pos.col + 1u) : AUTOCORRECT_NO_KEY;
+
     if (!autocorrect_has_leader()) return;
     autocorrect.leaders++;
     if (!autocorrect.synced) send_keyboard_report();
-    if (!autocorrect_push(AUTOCORRECT_EDGE_LEADER, 0u)) autocorrect.leaders--;
-}
-
-bool noah_autocorrect_leading(void) {
-    return autocorrect.leading;
+    if (!autocorrect_push(AUTOCORRECT_EDGE_LEADER, key)) autocorrect.leaders--;
 }
 
 // While a macro holds a usage, the person's own hold of it is frozen in the
@@ -1201,9 +1204,10 @@ void noah_autocorrect_scan(void) {
     }
     if (autocorrect.state != AUTOCORRECT_IDLE) return;
     // The leader's timeout, from its last key once nothing waits: what is
-    // held is sent if it is a typed form that fires after the leader, by no key.
+    // held is sent if it is a typed form that fires after the leader, on the
+    // Leader key that began leading, since no key ended it (D-F72).
     if (autocorrect.leading && !autocorrect.count && timer_elapsed32(autocorrect.leader_at) >= noah_setting(NOAH_SETTING_LEADER_TIMEOUT, AUTOCORRECT_LEADER_TIMEOUT_MS)) {
-        noah_autocorrect_feedback_key(autocorrect_no_key);
+        noah_autocorrect_feedback_key_of_leading();
         autocorrect_lead_match(true);
         if (autocorrect.state != AUTOCORRECT_IDLE) return;
     }

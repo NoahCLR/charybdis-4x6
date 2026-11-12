@@ -114,7 +114,7 @@ active profile's lighting domain, or the compiled view
 | Presses, tap series, leases, pulses | `key/runtime/reducer/` (`key_runtime_core_state_t`) | `feedback.c`, which derives the maps on demand |
 | Running and locked pointing mode, its owner | `pointing/runtime/pointing_mode_state.c` | `pointing_mode_snapshot_with_owner_bitmap` |
 | A pointing slot's link | the active profile's pointing slots (`profile/runtime/active_profile_pd_runtime.c`) | `pointing_mode_link_layers` |
-| What text replacement last did, its key and how long it shows | the typing stage (`autocorrect/autocorrect_feedback.c`) | `noah_autocorrect_feedback` |
+| What text replacement last did, its key and how long it shows, and leading's colour while the leader waits | the typing stage (`autocorrect/autocorrect_feedback.c`) | `noah_autocorrect_feedback` |
 | Auto-mouse timer | QMK | `compat/qmk_auto_mouse_contract.h` |
 | Last input | QMK, mirrored by split activity | `last_input_activity_elapsed` |
 
@@ -135,9 +135,11 @@ given, the scan after the press unless the key waited in the queue, so a
 combo's keys are all in it though the combo is up before the lookup ends,
 and keeps the kind, the footprint and the time the flash began. Reading it ends a
 flash older than the replacement-feedback flash length (settings scalar 31),
-so the clock is read only while one shows. The render reads it once a frame;
-the base packet builder reads it every pass, which sends the flash and its
-end to the slave half as changes (D-F70).
+so the clock is read only while one shows. Leading is held instead: the
+stage calls `noah_autocorrect_feedback_lead_begin` and `_end` when leading
+begins and ends, and reading never ends it (D-F72). The render reads it once a
+frame; the base packet builder reads it every pass, which sends the flash,
+leading and their ends to the slave half as changes (D-F70).
 
 ## Behaviour feedback across the runtime
 
@@ -235,7 +237,7 @@ timestamps (QMK's split sync, the latter coalesced).
   which key it names.
 - `run_active_profile_rgb_runtime_tests.sh`: the double bank, stale frames.
 - `run_rgb_validation_tests.sh`, `run_profile_rgb_v1_tests.sh`,
-  `run_profile_rgb_v5_tests.sh`: the lighting domain and authored tables.
+  `run_profile_rgb_v6_tests.sh`: the lighting domain and authored tables.
 - `run_runtime_debug_tests.sh`, `run_tap_depth_eight_tests.sh`: the
   behaviour-feedback maps against the reducer, pulses, the preview bridge.
 - `run_qmk_combo_origin_tests.sh`: combo partitioning and the left-out

@@ -90,13 +90,13 @@ so there is nothing to put back. The next word starts fresh.
 **Its state.** The held characters are kept where the word is: leading has
 no word, since Leader starts the next one fresh, and the stage's state had
 twelve bytes left under its regression line. The leader adds a flag and the
-time of its last key. Leading is engine state (`noah_autocorrect_leading`),
-for lighting to read (D-F57) and send to the other half (D-F58). What the
-leader sends flashes as the replacement it is, text replaced or macro
-replaced, on the key that ended leading, the character that made the match
-or Enter, and on no key when the timeout sent it (D-F70): the leader shares
-text replacement's confirmation (Noah, 2026-11-11). A leader that sends
-nothing flashes nothing.
+time of its last key. Leading is engine state, which lighting shows as a
+case of replacement feedback held until it ends (D-F72), and the other half
+learns as it learns the rest (D-F58). What the leader sends flashes as the
+replacement it is, text replaced or macro replaced, on the key that ended
+leading, the character that made the match or Enter, and on the Leader key
+that began leading when the timeout sent it (D-F70, D-F72): the leader shares text replacement's confirmation
+(Noah, 2026-11-11). A leader that sends nothing flashes nothing.
 
 **The format.** Profile schema 4.6, a step of its own after 4.5 (D-F70's
 precedent): settings version 13 and autocorrect version 2 are its shares. The

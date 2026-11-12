@@ -2,7 +2,8 @@
 
 The LEDs are feedback: they show which layer and pointing mode are on, which
 keys made a combo, which tap count a key is on, whether a hold has started,
-and when text replacement changed what you typed.
+when text replacement changed what you typed, and when the leader is waiting
+for what you type after it.
 Ark's
 [Lighting](https://github.com/NoahCLR/charybdis-ark/blob/dev/docs/guide/lighting.md)
 page edits all of it and paints its board the way the keyboard will.
@@ -25,7 +26,7 @@ Lighting is drawn in **stages**, each painting over the one before:
 5. **Combo feedback**: the keys of a combo you are holding.
 6. **Behaviour feedback**: tap counts, holds and long holds.
 7. **Replacement feedback**: a flash when text replacement replaces what you
-   typed, or puts it back.
+   typed, or puts it back, and a colour while the leader waits.
 
 Stages 2 to 7 can each be switched off without losing their colours. A
 combo whose action is shown by the stage above it (it previews a layer or
@@ -103,6 +104,22 @@ The key it follows is the one that ended the word (Space, Enter, a
 punctuation key) or, for an undo, the Backspace. If you type on while an
 earlier replacement is still being typed, a combo that ends the next word may
 flash on one of its keys only.
+
+While [the leader](autocorrect.md#the-leader) waits for what you type after
+it, a fourth colour, **leading**, shows and stays, blue in my profile:
+
+- It shows from the Leader key until the leader is done, however long that
+  takes. Pressing Leader again or taking a character back keeps it.
+- When the leader sends, the text or macro flash takes its place at once;
+  when it sends nothing, the colour just goes.
+- Its key is the Leader key you pressed: it paints the Leader key's half
+  under the half of the key, the Leader key alone under only the key, and
+  otherwise the whole keyboard or the half you chose.
+- With its colour off it paints nothing, but an LED group for it still
+  paints, so leading can show on a few LEDs alone.
+- It shows with text replacement switched off too, since the leader works
+  then. A lighting idle timeout shorter than the leader timeout can turn it
+  dark.
 
 ## Where feedback paints
 

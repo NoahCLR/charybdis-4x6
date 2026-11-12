@@ -21,6 +21,8 @@ _Static_assert(NOAH_PROFILE_RGB_V1_MAX_TABLE_GROUP_ROWS <= UINT8_MAX && NOAH_PRO
 
 _Static_assert((unsigned)NOAH_PROFILE_RGB_V1_HEADER_SIZE <= (unsigned)NOAH_PROFILE_RGB_V1_VALIDATION_READ_MAX, "RGB header exceeded the incremental validation read budget");
 _Static_assert((unsigned)NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE <= (unsigned)NOAH_PROFILE_RGB_V1_VALIDATION_READ_MAX, "RGB record exceeded the incremental validation read budget");
+// A validation step reads a record into a buffer the header sizes.
+_Static_assert((unsigned)NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE <= (unsigned)NOAH_PROFILE_RGB_V1_HEADER_SIZE, "the replacement-feedback record outgrew the validation step's buffer");
 
 typedef enum {
     RGB_SECTION_GROUPS = 0u,
@@ -429,19 +431,22 @@ noah_profile_rgb_v1_validation_result_t noah_profile_rgb_v1_validation_step(noah
             }
             return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_AUTOCORRECT_FEEDBACK);
 
-        case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_AUTOCORRECT_FEEDBACK:
+        case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_AUTOCORRECT_FEEDBACK: {
+            bool colours_black = true;
             offset = section_offset(candidate, RGB_SECTION_AUTOCORRECT_FEEDBACK);
             result = read_bytes(candidate, offset, bytes, NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE, NOAH_PROFILE_RGB_V1_TABLE_AUTOCORRECT_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_COLOR, &captured);
             if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
             for (uint8_t color_index = 0u; color_index < NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_COUNT; color_index++) {
                 result = validate_hsv(candidate, &bytes[color_index * 3u], offset + color_index * 3u, NOAH_PROFILE_RGB_V1_TABLE_AUTOCORRECT_FEEDBACK, 0u, &captured);
                 if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
+                colours_black = colours_black && hsv_is_black(&bytes[color_index * 3u]);
             }
-            if (bytes[9] > 4u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + 9u, NOAH_PROFILE_RGB_V1_TABLE_AUTOCORRECT_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_LOCALITY);
-            if ((candidate->limits.compiled_stage_mask & NOAH_PROFILE_RGB_V1_STAGE_AUTOCORRECT) == 0u && (candidate->autocorrect_group_count != 0u || bytes[9] != 0u || !hsv_is_black(&bytes[0]) || !hsv_is_black(&bytes[3]) || !hsv_is_black(&bytes[6]))) {
+            if (bytes[NOAH_PROFILE_RGB_V1_AUTOCORRECT_LOCALITY_OFFSET] > 4u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ENUM, offset + NOAH_PROFILE_RGB_V1_AUTOCORRECT_LOCALITY_OFFSET, NOAH_PROFILE_RGB_V1_TABLE_AUTOCORRECT_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_LOCALITY);
+            if ((candidate->limits.compiled_stage_mask & NOAH_PROFILE_RGB_V1_STAGE_AUTOCORRECT) == 0u && (candidate->autocorrect_group_count != 0u || bytes[NOAH_PROFILE_RGB_V1_AUTOCORRECT_LOCALITY_OFFSET] != 0u || !colours_black)) {
                 return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA, offset, NOAH_PROFILE_RGB_V1_TABLE_AUTOCORRECT_FEEDBACK, 0u, NOAH_PROFILE_RGB_V1_FIELD_COLOR);
             }
             return validation_progress(validation, NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_AUTOCORRECT_GROUPS);
+        }
 
         case NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_AUTOCORRECT_GROUPS:
             if (validation->row < candidate->autocorrect_group_count) {
@@ -645,7 +650,7 @@ noah_profile_rgb_v1_result_t noah_profile_rgb_v1_autocorrect_feedback(const noah
     if (result == NOAH_PROFILE_RGB_V1_OK) {
         for (uint8_t semantic = 0u; semantic < NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_COUNT; semantic++)
             value->colors[semantic] = hsv_from_bytes(&bytes[semantic * 3u]);
-        value->locality = bytes[9];
+        value->locality = bytes[NOAH_PROFILE_RGB_V1_AUTOCORRECT_LOCALITY_OFFSET];
     }
     return result;
 }

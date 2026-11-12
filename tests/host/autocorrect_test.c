@@ -295,22 +295,34 @@ static void macro_key(void) {
 
 // ── Driving a case ──────────────────────────────────────────────────────────
 
-// A bit for every kind of feedback lighting was shown since the case began.
+// A bit for every kind of feedback lighting was shown since the case began,
+// and how often leading went with nothing shown after it.
 static unsigned feedback_seen;
+static uint8_t  feedback_last;
+static unsigned leading_cleared;
 
 static void scan(unsigned milliseconds) {
     for (unsigned i = 0; i < milliseconds; i++) {
+        uint8_t kind;
+
         now++;
         macro_payload_engine_scan();
         noah_autocorrect_scan();
-        feedback_seen |= 1u << noah_autocorrect_feedback().kind;
+        kind = noah_autocorrect_feedback().kind;
+        feedback_seen |= 1u << kind;
+        if (feedback_last == NOAH_AUTOCORRECT_FEEDBACK_LEADING && kind == NOAH_AUTOCORRECT_FEEDBACK_NONE) leading_cleared++;
+        feedback_last = kind;
     }
 }
 
-// The Leader key's tap: it acts at its press, as the action kind sends it, and
-// puts nothing in a report (D-F71).
+// Where the Leader key sits: the matrix position of a usage no test types.
+#define LEADER_POSITION KC_F13
+static keypos_t key_of(uint8_t usage);
+
+// The Leader key's tap: it acts at its press, as the action kind sends it,
+// with its key, and puts nothing in a report (D-F71).
 static void leader_key(void) {
-    noah_typing_stage_leader();
+    noah_typing_stage_leader(key_of(LEADER_POSITION));
     scan(25u);
 }
 
@@ -371,8 +383,10 @@ static void tap(uint8_t usage, uint8_t mods, bool fast) {
 }
 
 static void reset(void) {
-    keys_are_noted = true;
-    feedback_seen  = 0u;
+    keys_are_noted  = true;
+    feedback_seen   = 0u;
+    feedback_last   = NOAH_AUTOCORRECT_FEEDBACK_NONE;
+    leading_cleared = 0u;
     key_origin_registry_init();
     macro_payload_engine_init();
     noah_autocorrect_init();
@@ -1152,6 +1166,14 @@ static void test_a_combo_that_ends_the_word_shows_on_all_its_keys(void) {
 
 // ── The leader ──────────────────────────────────────────────────────────────
 
+// The leader timeout this build compiles (settings scalar 32, D-F71).
+#define LEADER_TIMEOUT_MS 2000u
+
+// Leading, as the typing stage reports it to lighting (D-F72).
+static bool leading(void) {
+    return noah_autocorrect_feedback().kind == NOAH_AUTOCORRECT_FEEDBACK_LEADING;
+}
+
 // With text replacement off the stage is out of the report path, a list with
 // replacements that fire after the leader or not, until Leader brings it in
 // (D-F71); it
@@ -1164,11 +1186,11 @@ static void test_the_stage_joins_the_report_path_for_the_leader(void) {
     expect_screen("pn ", false);
     CHECK(!noah_typing_stage_active());
     leader_key();
-    CHECK(noah_typing_stage_active() && noah_autocorrect_leading());
+    CHECK(noah_typing_stage_active() && leading());
     type("p", false);
-    CHECK(noah_autocorrect_leading());
+    CHECK(leading());
     type("n", false);
-    CHECK(!noah_autocorrect_leading());
+    CHECK(!leading());
     expect_screen("pn +31 6 1234 5678", false);
     CHECK(!noah_typing_stage_active());
     // A list with words to replace keeps it in the path, as without a leader.
@@ -1190,7 +1212,7 @@ static void test_a_click_while_leading_keeps_its_place(void) {
     CHECK(owned_keycode_release(&click));
     key(KC_A, false);
     settle();
-    CHECK(!noah_autocorrect_leading());
+    CHECK(!leading());
     type("z", false);
     expect_screen("z", false);
 }
@@ -1205,9 +1227,9 @@ static void test_keys_after_a_dead_key_while_leading(void) {
     leader_key();
     tap(KC_QUOTE, 0u, false);
     tap(KC_CAPS_LOCK, 0u, false);
-    CHECK(locks_sent == 1u && noah_autocorrect_leading());
+    CHECK(locks_sent == 1u && leading());
     tap(KC_LEFT, 0u, false);
-    CHECK(!noah_autocorrect_leading());
+    CHECK(!leading());
     type("X", false);
     expect_screen("hXi", false);
 }
@@ -1253,15 +1275,19 @@ static void test_a_key_held_when_leading_begins(void) {
     expect_screen("a+31 6 1234 5678", false);
 }
 
-// What the leader sends flashes as the replacement it is, on the key that
-// ended leading: the last character, or Enter; the timeout names no key. An
-// ending that sends nothing shows nothing.
+// Leading shows, held and on the Leader key, from Leader until it ends
+// (D-F72); a Leader no key names shows on no key. What the leader sends
+// flashes as the replacement it is, on the key that ended leading: the last
+// character, or Enter; the timeout's on the Leader key. An ending that sends
+// nothing only ends leading's colour.
 static void test_a_leader_send_shows_on_the_key_that_ended_leading(void) {
     begin_named("a leader send shows on the key that ended leading", "leader");
     snprintf(stored_macros[5], sizeof(stored_macros[5]), "%s", "Kind regards, Sam");
     leader_key();
+    expect_feedback(NOAH_AUTOCORRECT_FEEDBACK_LEADING, LEADER_POSITION);
     type("p", false);
-    expect_feedback(NOAH_AUTOCORRECT_FEEDBACK_NONE, 0u);
+    scan(AUTOCORRECT_FEEDBACK_FLASH_MS + 1u);
+    expect_feedback(NOAH_AUTOCORRECT_FEEDBACK_LEADING, LEADER_POSITION);
     key(KC_N, true);
     scan(2u);
     expect_feedback(NOAH_AUTOCORRECT_FEEDBACK_TEXT, KC_N);
@@ -1271,17 +1297,24 @@ static void test_a_leader_send_shows_on_the_key_that_ended_leading(void) {
 
     leader_key();
     type("abc", false);
-    expect_feedback(NOAH_AUTOCORRECT_FEEDBACK_NONE, 0u);
+    expect_feedback(NOAH_AUTOCORRECT_FEEDBACK_LEADING, LEADER_POSITION);
     end_the_word_with(KC_ENTER);
     scan(2u);
     expect_feedback(NOAH_AUTOCORRECT_FEEDBACK_TEXT, KC_ENTER);
     settle();
     scan(AUTOCORRECT_FEEDBACK_FLASH_MS);
 
+    noah_typing_stage_leader((keypos_t){.row = UINT8_MAX, .col = UINT8_MAX});
+    scan(25u);
+    expect_feedback(NOAH_AUTOCORRECT_FEEDBACK_LEADING, 0u);
+    end_the_word_with(KC_ESCAPE);
+    settle();
+    expect_feedback(NOAH_AUTOCORRECT_FEEDBACK_NONE, 0u);
+
     leader_key();
     type("abc", false);
-    scan(2000u);
-    expect_feedback(NOAH_AUTOCORRECT_FEEDBACK_TEXT, 0u);
+    scan(LEADER_TIMEOUT_MS);
+    expect_feedback(NOAH_AUTOCORRECT_FEEDBACK_TEXT, LEADER_POSITION);
     settle();
     scan(AUTOCORRECT_FEEDBACK_FLASH_MS);
 
@@ -1308,13 +1341,92 @@ static void test_a_leader_send_shows_on_the_key_that_ended_leading(void) {
     end_the_word_with(KC_ENTER);
     leader_key();
     type("ab", false);
-    scan(2100u);
+    scan(LEADER_TIMEOUT_MS + 100u);
     settle();
-    CHECK(feedback_seen == 1u << NOAH_AUTOCORRECT_FEEDBACK_NONE);
-    CHECK(!noah_autocorrect_leading());
+    CHECK(feedback_seen == (1u << NOAH_AUTOCORRECT_FEEDBACK_NONE | 1u << NOAH_AUTOCORRECT_FEEDBACK_LEADING));
+    CHECK(!leading());
+    expect_feedback(NOAH_AUTOCORRECT_FEEDBACK_NONE, 0u);
     // Escape that ends no leading reaches the computer.
     tap(KC_ESCAPE, 0u, false);
     CHECK(escapes_sent == 1u);
+}
+
+// Leading holds from Leader until leading ends (D-F72): Leader again and a
+// Backspace that leaves characters held keep it, with either switch off too.
+// A send's flash takes its place with nothing between them; every ending that
+// sends nothing clears it at once, with no flash.
+static void test_leading_holds_until_leading_ends(void) {
+    begin_named("leading holds until leading ends", "leader");
+    leader_key();
+    type("ab", false);
+    leader_key();
+    CHECK(leading());
+    type("ab", false);
+    tap(KC_BACKSPACE, 0u, false);
+    CHECK(leading());
+    scan(LEADER_TIMEOUT_MS - 100u);
+    CHECK(leading());
+    // Sent on its last character, on Enter and at the timeout: no gap.
+    type("bc", false);
+    key(KC_D, true);
+    scan(2u);
+    expect_feedback(NOAH_AUTOCORRECT_FEEDBACK_TEXT, KC_D);
+    key(KC_D, false);
+    settle();
+    leader_key();
+    type("abc", false);
+    end_the_word_with(KC_ENTER);
+    settle();
+    leader_key();
+    type("abc", false);
+    scan(LEADER_TIMEOUT_MS + 10u);
+    settle();
+    CHECK(leading_cleared == 0u && (feedback_seen & 1u << NOAH_AUTOCORRECT_FEEDBACK_TEXT));
+    expect_screen("deltaalphaalpha", false);
+
+    // The switches leave the leader, and its colour, alone.
+    keymap_config.autocorrect_enable = false;
+    leader_key();
+    CHECK(leading());
+    tap(KC_ESCAPE, 0u, false);
+    keymap_config.autocorrect_enable = true;
+    autocorrect_switch_set_override(false);
+    leader_key();
+    CHECK(leading());
+    tap(KC_ESCAPE, 0u, false);
+    autocorrect_switch_set_override(true);
+    CHECK(leading_cleared == 2u);
+
+    // Each ending that sends nothing: early exit, Escape, Enter and the
+    // timeout on no exact input, Backspace with nothing held, a key that
+    // types no character, a macro that cannot play, a text no layout types.
+    feedback_seen   = 0u;
+    leading_cleared = 0u;
+    leader_key();
+    type("ax", false);
+    CHECK(!leading());
+    leader_key();
+    tap(KC_ESCAPE, 0u, false);
+    leader_key();
+    type("ab", false);
+    end_the_word_with(KC_ENTER);
+    settle();
+    leader_key();
+    type("ab", false);
+    scan(LEADER_TIMEOUT_MS + 10u);
+    leader_key();
+    tap(KC_BACKSPACE, 0u, false);
+    leader_key();
+    tap(KC_LEFT, 0u, false);
+    leader_key();
+    type("sig", false);
+    leader_key();
+    type("sn", false);
+    settle();
+    CHECK(leading_cleared == 8u && !leading());
+    CHECK(feedback_seen == (1u << NOAH_AUTOCORRECT_FEEDBACK_NONE | 1u << NOAH_AUTOCORRECT_FEEDBACK_LEADING));
+    CHECK(macros_started == 0u);
+    expect_screen("deltaalphaalpha", false);
 }
 
 int main(int argc, char **argv) {
@@ -1351,6 +1463,7 @@ int main(int argc, char **argv) {
     test_a_key_down_when_the_list_gains_a_leader_input();
     test_a_key_held_when_leading_begins();
     test_a_leader_send_shows_on_the_key_that_ended_leading();
+    test_leading_holds_until_leading_ends();
     printf("autocorrect host tests passed: %u fixture cases\n", cases);
     return 0;
 }

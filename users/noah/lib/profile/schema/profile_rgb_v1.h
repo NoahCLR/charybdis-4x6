@@ -38,7 +38,7 @@ enum {
     NOAH_PROFILE_RGB_V1_STAGE_AUTOCORRECT     = 1u << 5,
     NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL        = 0x3fu,
     // Validation performs at most one reader call per step. The header is
-    // the largest record; the remaining records are at most 11 bytes.
+    // the largest record; the remaining records are at most 13 bytes.
     NOAH_PROFILE_RGB_V1_VALIDATION_READ_MAX = 20u,
     // Payload-independent 32-bit representation regression policies. These
     // are not statements of RP2040 hardware capacity.
@@ -61,13 +61,18 @@ enum {
     NOAH_PROFILE_RGB_V1_COMBO_GROUP_RECORD_SIZE = 4u,
     NOAH_PROFILE_RGB_V1_COLOR_RECORD_SIZE       = 3u,
     NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE       = 11u,
-    NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE = 10u,
-    NOAH_PROFILE_RGB_V1_FIXED_PAYLOAD_SIZE      = NOAH_PROFILE_RGB_V1_HEADER_SIZE + NOAH_PROFILE_RGB_V1_AUTOMOUSE_RECORD_SIZE + NOAH_PROFILE_RGB_V1_COMBO_RECORD_SIZE + NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE + NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE,
     // A replacement-feedback semantic: what a row's selector names, 0xff all.
     NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_TEXT  = 0u,
     NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_MACRO = 1u,
     NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_UNDO  = 2u,
-    NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_COUNT = 3u,
+    // Held while the keyboard is leading (D-F72).
+    NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_LEADING = 3u,
+    NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_COUNT = 4u,
+    // A colour per replacement-feedback semantic, in semantic order, then the
+    // locality.
+    NOAH_PROFILE_RGB_V1_AUTOCORRECT_LOCALITY_OFFSET = NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_COUNT * NOAH_PROFILE_RGB_V1_COLOR_RECORD_SIZE,
+    NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE = NOAH_PROFILE_RGB_V1_AUTOCORRECT_LOCALITY_OFFSET + 1u,
+    NOAH_PROFILE_RGB_V1_FIXED_PAYLOAD_SIZE      = NOAH_PROFILE_RGB_V1_HEADER_SIZE + NOAH_PROFILE_RGB_V1_AUTOMOUSE_RECORD_SIZE + NOAH_PROFILE_RGB_V1_COMBO_RECORD_SIZE + NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE + NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE,
 };
 
 typedef enum {
@@ -197,7 +202,7 @@ typedef struct {
 } noah_profile_rgb_v1_key_feedback_t;
 
 // One colour per replacement-feedback semantic, in semantic order. A colour
-// of saturation and value 0 paints nothing for its semantic (D-F70).
+// of saturation and value 0 paints nothing for its semantic (D-F70, D-F72).
 typedef struct {
     noah_profile_rgb_v1_hsv_t colors[NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_COUNT];
     uint8_t                   locality;

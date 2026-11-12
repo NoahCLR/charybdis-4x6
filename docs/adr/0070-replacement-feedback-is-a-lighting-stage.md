@@ -39,7 +39,8 @@ does, so each case can be left off by itself; a literal black flash was not
 worth a policy byte. Group rows name one semantic or all three, the
 all-semantics rows painting first, as behaviour feedback's do. A word that
 ends and is left as typed shows nothing: the stage reports what the keyboard
-did.
+did. Leading joined them later as a fourth case, held rather than flashed
+(D-F72).
 
 **Localities.** Both halves, the left half and the right half are as
 everywhere. "The half of the key that caused it" and "only the keys that

@@ -217,7 +217,9 @@ before the macro's own projection.
   pass (`noah_profile_autocorrect_v1_leader`). A match plays through
   `macro_slot_provider_start_correction` with nothing to erase, or as a
   replacement's macro, the queue waiting behind it as it does for a
-  correction. `noah_autocorrect_leading` is the state lighting reads.
+  correction. Leading's colour begins and ends in `autocorrect_feedback.c`,
+  the record lighting reads (`noah_autocorrect_feedback_lead_begin` and
+  `_end`, D-F72).
 - **Which key.** Whatever is about to put a key in a report stores its matrix
   position for the stage first (`noah_typing_stage_noted_key`): a key QMK
   registers as the hook hands its press on (`key/runtime/process.c`), a tap
