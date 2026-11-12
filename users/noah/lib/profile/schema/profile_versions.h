@@ -13,8 +13,9 @@
 // 4.4 adds the autocorrect list (domain 0x80, D-F68); 4.5 adds replacement
 // feedback to lighting and its flash length to settings (lighting v5,
 // settings v12, D-F70); 4.6 adds the leader to text replacement (autocorrect
-// v2, settings v13, D-F71).
-#define NOAH_PROFILE_SCHEMA_MINOR 6u
+// v2, settings v13, D-F71); 4.7 lights it while it waits (lighting v6,
+// D-F72).
+#define NOAH_PROFILE_SCHEMA_MINOR 7u
 // A 128 KiB profile slot less the first kilobyte its header and commit
 // marker take on flash (D-F29).
 #define NOAH_PROFILE_PAYLOAD_MAX 130048u

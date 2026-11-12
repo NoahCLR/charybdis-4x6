@@ -161,7 +161,7 @@ static void rgb_validation_log_invalid_autocorrect_feedback_locality(uint8_t loc
 
 static void rgb_validation_log_invalid_autocorrect_feedback_group_semantic(uint8_t group_index, uint8_t semantic) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Invalid autocorrect_feedback_led_groups[%u].semantic %u; expected AUTOCORRECT_FEEDBACK_GROUP_TEXT (0), AUTOCORRECT_FEEDBACK_GROUP_MACRO (1), AUTOCORRECT_FEEDBACK_GROUP_UNDO (2), or AUTOCORRECT_FEEDBACK_GROUP_ALL (3)\n", (unsigned int)group_index, (unsigned int)semantic);
+    uprintf("Invalid autocorrect_feedback_led_groups[%u].semantic %u; expected AUTOCORRECT_FEEDBACK_GROUP_TEXT (0), AUTOCORRECT_FEEDBACK_GROUP_MACRO (1), AUTOCORRECT_FEEDBACK_GROUP_UNDO (2), AUTOCORRECT_FEEDBACK_GROUP_LEADING (3), or AUTOCORRECT_FEEDBACK_GROUP_ALL (4)\n", (unsigned int)group_index, (unsigned int)semantic);
 #        else
     (void)group_index;
     (void)semantic;

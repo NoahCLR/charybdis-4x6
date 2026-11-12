@@ -89,7 +89,7 @@ Every table is lighting `0x10` profile data when its stage is compiled:
 group ids and LED bitmaps. A new lighting value takes effect at the frame
 after the profile holding it becomes active.
 
-Held by: `tests/host/run_real_profile_validation_tests.sh` (`real_profile_validation_test.c`, the default and `no_rgb_feedback` variants), `tests/host/run_rgb_validation_tests.sh`, `tests/host/run_profile_rgb_v5_tests.sh`, `tests/host/run_profile_compiled_defaults_v1_tests.sh` (the compiled lighting domain's shape).
+Held by: `tests/host/run_real_profile_validation_tests.sh` (`real_profile_validation_test.c`, the default and `no_rgb_feedback` variants), `tests/host/run_rgb_validation_tests.sh`, `tests/host/run_profile_rgb_v6_tests.sh`, `tests/host/run_profile_compiled_defaults_v1_tests.sh` (the compiled lighting domain's shape).
 
 ## `config.h`
 

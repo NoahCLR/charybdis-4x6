@@ -121,8 +121,9 @@ lists = {
     "forty": [entry(f"ab{n:02}", f"aq{n:02}", "anywhere") for n in range(1, 41)],
     "other": [entry("WRONG", "zq", "anywhere")],
     # Replacements that fire after the leader (D-F71) beside one that fires as
-    # a word ends, and a macro; and a list with nothing else.
-    "leader": [entry("+31 6 1234 5678", "pn", trigger="after the leader"), entry("alpha", "abc", trigger="after the leader"), entry("delta", "abcd", trigger="after the leader"), entry("the", "teh"), {"macro": 5, "trigger": "after the leader", "typos": [{"typo": "sig", "match": "whole word"}]}],
+    # a word ends, a macro and a text no host layout types; and a list with
+    # nothing else.
+    "leader": [entry("+31 6 1234 5678", "pn", trigger="after the leader"), entry("alpha", "abc", trigger="after the leader"), entry("delta", "abcd", trigger="after the leader"), entry("the", "teh"), {"macro": 5, "trigger": "after the leader", "typos": [{"typo": "sig", "match": "whole word"}]}, entry("\u2603", "sn", trigger="after the leader")],
     "leader-only": [entry("+31 6 1234 5678", "pn", trigger="after the leader")],
 }
 pathlib.Path(sys.argv[3]).write_text("".join(f"{name} {autocorrect.encode(entries).hex()}\n" for name, entries in lists.items()), encoding="utf-8")

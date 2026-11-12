@@ -143,7 +143,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/profile/runtime/profile_action_runtime_v1.c"
 
 # The golden compiled PD domain is the shared "presets" vector, and its RGB
-# domain is version 5 with a colour for each of the sixteen layers and a row
+# domain is version 6 with a colour for each of the sixteen layers and a row
 # for each of the 32 slots.
 python3 - "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" "$ROOT/tests/fixtures/pd_mode_domain_v4.json" <<'PY'
 import json, struct, sys
@@ -157,7 +157,7 @@ for _ in range(blob[6]):
     offset += 6 + length
 presets = next(case for case in json.loads(Path(sys.argv[2]).read_text())["valid"] if case["name"] == "presets")
 assert domains[0x50] == (4, bytes.fromhex(presets["hex"])), "compiled PD domain differs from the presets vector"
-assert domains[0x10][0] == 5 and domains[0x10][1][0] == 5 and domains[0x10][1][5] == 16 and domains[0x10][1][7] == 32
+assert domains[0x10][0] == 6 and domains[0x10][1][0] == 6 and domains[0x10][1][5] == 16 and domains[0x10][1][7] == 32
 PY
 
 # The compiled defaults are Noah's keyboard profile, domain by domain, apart

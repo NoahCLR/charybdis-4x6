@@ -374,34 +374,39 @@ static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_
 //
 // ─── Replacement feedback ───────────────────────────────────────────────────
 //
-// A flash when text replacement (autocorrect) changes what was typed. It
-// lasts RGB_AUTOCORRECT_FEEDBACK_FLASH_MS (config.h) and paints above every
-// other stage.
+// A flash when text replacement (autocorrect) changes what was typed, or what
+// the leader sends. It lasts RGB_AUTOCORRECT_FEEDBACK_FLASH_MS (config.h) and
+// paints above every other stage. While the leader waits its colour is held.
 //
 //   - .text_color = an input was replaced with text
 //   - .macro_color = an input was replaced by its macro
 //   - .undo_color = Backspace right after a replacement put the word back
+//   - .leading_color = held while the leader waits for what is typed after it
 //
 // Here a color of saturation 0 and value 0, such as HSV(0, 0, 0), paints
-// nothing for its case, so each of the three can be left off by itself.
+// nothing for its case, so each of the four can be left off by itself.
 //
 // Locality decides where the flash paints:
 //   - RGB_BOTH_HALVES, RGB_LEFT_HALF, RGB_RIGHT_HALF = those halves
-//   - RGB_KEY_HALF = the half of the key that ended the word, or of the
-//     Backspace that undid the replacement
+//   - RGB_KEY_HALF = the half of the key that ended the word, of the
+//     Backspace that undid the replacement, or of the key that ended leading;
+//     for leading, and for what the leader's timeout sends, the Leader key
 //   - RGB_KEYS_ONLY = that key alone; a combo's output paints every combo key
+// A Leader no key sent (an action outside the matrix) paints both halves
+// under RGB_KEY_HALF and every key under RGB_KEYS_ONLY.
 #    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
 const autocorrect_feedback_color_config_t autocorrect_feedback_colors = {
-    .text_color  = HSV(106, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-    .macro_color = HSV(234, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-    .undo_color  = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-    .locality    = RGB_KEY_HALF,
+    .text_color    = HSV(106, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .macro_color   = HSV(234, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .undo_color    = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .leading_color = HSV(170, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .locality      = RGB_KEY_HALF,
 };
 
 // ─── Replacement Feedback LED Groups ────────────────────────────────────────
 //
-// Paint specific LEDs a different color while a replacement flash shows.
-// These groups repaint after the flash's locality render.
+// Paint specific LEDs a different color while a replacement flash or leading
+// shows. These groups repaint after the stage's locality render.
 //
 // In LED group rows, HSV(0, 0, 0) inherits the color of the case that shows.
 //
@@ -409,6 +414,7 @@ const autocorrect_feedback_color_config_t autocorrect_feedback_colors = {
 //   - AUTOCORRECT_FEEDBACK_GROUP_TEXT = a text replacement
 //   - AUTOCORRECT_FEEDBACK_GROUP_MACRO = a macro replacement
 //   - AUTOCORRECT_FEEDBACK_GROUP_UNDO = an undone replacement
+//   - AUTOCORRECT_FEEDBACK_GROUP_LEADING = the leader waiting
 //   - AUTOCORRECT_FEEDBACK_GROUP_ALL = any of them; rendered before the rows
 //     naming one case so narrower rows can override it
 static const autocorrect_feedback_led_group_t autocorrect_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(

@@ -18,10 +18,11 @@ const uint8_t                  layer_led_group_count     = 0u;
 // The compiled lighting: an undo that paints nothing by itself, an accent
 // that follows every semantic and one of the undo's own.
 const autocorrect_feedback_color_config_t autocorrect_feedback_colors = {
-    .text_color  = HSV(11, 12, 13),
-    .macro_color = HSV(21, 22, 23),
-    .undo_color  = HSV(0, 0, 0),
-    .locality    = RGB_KEYS_ONLY,
+    .text_color    = HSV(11, 12, 13),
+    .macro_color   = HSV(21, 22, 23),
+    .undo_color    = HSV(0, 0, 0),
+    .leading_color = HSV(91, 92, 93),
+    .locality      = RGB_KEYS_ONLY,
 };
 
 static const autocorrect_feedback_led_group_t autocorrect_feedback_led_groups_data[] = {
@@ -67,6 +68,7 @@ void rgb_runtime_frame_clear(rgb_runtime_frame_t *frame, uint8_t led_min, uint8_
 static const rgb_t text_rgb  = {.r = 31u, .g = 32u, .b = 33u};
 static const rgb_t macro_rgb = {.r = 41u, .g = 42u, .b = 43u};
 static const rgb_t undo_rgb  = {.r = 51u, .g = 52u, .b = 53u};
+static const rgb_t lead_rgb  = {.r = 101u, .g = 102u, .b = 103u};
 
 // What a frame shows: `mask` has a bit for each painted LED, all in `color`.
 static void check_frame(const rgb_runtime_frame_t *frame, uint8_t mask, rgb_t color) {
@@ -100,8 +102,8 @@ typedef struct {
 enum { LIVE_PAYLOAD_MAX = 256 };
 
 // A lighting domain with the layer stage and this one: one LED set per
-// distinct row mask, the three colours, a locality and the rows.
-static size_t live_payload(uint8_t *payload, uint16_t stage_mask, hsv_t text, hsv_t macro, hsv_t undo, uint8_t locality, const live_row_t *rows, uint8_t row_count) {
+// distinct row mask, the four colours, a locality and the rows.
+static size_t live_payload(uint8_t *payload, uint16_t stage_mask, hsv_t text, hsv_t macro, hsv_t undo, hsv_t lead, uint8_t locality, const live_row_t *rows, uint8_t row_count) {
     uint8_t masks[8];
     uint8_t groups = 0u;
     size_t  offset;
@@ -131,7 +133,7 @@ static size_t live_payload(uint8_t *payload, uint16_t stage_mask, hsv_t text, hs
         offset += NOAH_PROFILE_RGB_V1_LAYER_COLOR_RECORD_SIZE;
     }
     offset += NOAH_PROFILE_RGB_V1_AUTOMOUSE_RECORD_SIZE + NOAH_PROFILE_RGB_V1_COMBO_RECORD_SIZE + NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE;
-    memcpy(&payload[offset], (const uint8_t[]){text.h, text.s, text.v, macro.h, macro.s, macro.v, undo.h, undo.s, undo.v, locality}, NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE);
+    memcpy(&payload[offset], (const uint8_t[]){text.h, text.s, text.v, macro.h, macro.s, macro.v, undo.h, undo.s, undo.v, lead.h, lead.s, lead.v, locality}, NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE);
     offset += NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE;
     for (uint8_t row = 0u; row < row_count; row++) {
         uint8_t group = 0u;
@@ -168,7 +170,7 @@ static noah_active_profile_rgb_frame_t live_frame(size_t length) {
 }
 
 static noah_active_profile_rgb_frame_t live_profile(uint16_t stage_mask, uint8_t locality, const live_row_t *rows, uint8_t row_count) {
-    return live_frame(live_payload(live_bytes, stage_mask, (hsv_t){31u, 32u, 33u}, (hsv_t){41u, 42u, 43u}, (hsv_t){51u, 52u, 53u}, locality, rows, row_count));
+    return live_frame(live_payload(live_bytes, stage_mask, (hsv_t){31u, 32u, 33u}, (hsv_t){41u, 42u, 43u}, (hsv_t){51u, 52u, 53u}, (hsv_t){101u, 102u, 103u}, locality, rows, row_count));
 }
 
 enum { STAGES_ON = NOAH_PROFILE_RGB_V1_STAGE_LAYER | NOAH_PROFILE_RGB_V1_STAGE_AUTOCORRECT };
@@ -192,6 +194,12 @@ static void test_the_compiled_lighting_paints_each_semantic(void) {
     check_frame(&frame, (1u << 2u) | (1u << 7u), (rgb_t){.r = 21u, .g = 22u, .b = 23u});
     CHECK(render(&frame, NULL, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_UNDO, 1u << 2u)));
     check_frame(&frame, 1u << 6u, (rgb_t){.r = 201u, .g = 202u, .b = 203u});
+    // Leading paints on the Leader key that began it, and a Leader no key
+    // names as a flash whose key is not known: every key.
+    CHECK(render(&frame, NULL, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_LEADING, 1u << 3u)));
+    check_frame(&frame, (1u << 3u) | (1u << 7u), (rgb_t){.r = 91u, .g = 92u, .b = 93u});
+    CHECK(render(&frame, NULL, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_LEADING, 0u)));
+    check_frame(&frame, 0xffu, (rgb_t){.r = 91u, .g = 92u, .b = 93u});
 }
 
 // Nothing shows without a flash, and a kind the build does not know, as the
@@ -203,7 +211,7 @@ static void test_no_flash_paints_nothing(void) {
     memset(&frame, 0xff, sizeof(frame));
     CHECK(!render(&frame, NULL, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_NONE, 1u)));
     check_frame(&frame, 0u, (rgb_t){0});
-    unknown.kind = (uint8_t)(NOAH_AUTOCORRECT_FEEDBACK_UNDO + 1u);
+    unknown.kind = (uint8_t)(NOAH_AUTOCORRECT_FEEDBACK_LEADING + 1u);
     CHECK(!render(&frame, NULL, unknown));
     check_frame(&frame, 0u, (rgb_t){0});
     CHECK(!rgb_runtime_autocorrect_feedback_stage_render_active_profile_frame(&frame, NULL, NULL, 0u, RGB_MATRIX_LED_COUNT));
@@ -229,6 +237,12 @@ static void test_each_locality(void) {
         check_frame(&frame, cases[index].across, macro_rgb);
         CHECK(render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_UNDO, 0u)));
         check_frame(&frame, cases[index].unknown, undo_rgb);
+        // Leading paints on the Leader key as a flash does on its key, and a
+        // Leader no key names as a flash whose key is not known.
+        CHECK(render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_LEADING, 1u << 6u)));
+        check_frame(&frame, cases[index].right_key, lead_rgb);
+        CHECK(render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_LEADING, 0u)));
+        check_frame(&frame, cases[index].unknown, lead_rgb);
     }
     // A key on the left half lights the left half.
     {
@@ -249,6 +263,7 @@ static void test_accents_follow_their_semantic(void) {
         {.selector = NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_TEXT, .color = {71u, 72u, 73u}, .led_mask = 1u << 5u},
         {.selector = NOAH_PROFILE_RGB_V1_SELECTOR_ALL, .color = {81u, 82u, 83u}, .led_mask = (1u << 5u) | (1u << 4u)},
         {.selector = NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_UNDO, .color = {0u, 0u, 0u}, .led_mask = 1u << 3u},
+        {.selector = NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_LEADING, .color = {111u, 112u, 113u}, .led_mask = 1u << 2u},
     };
     noah_active_profile_rgb_frame_t profile = live_profile(STAGES_ON, RGB_KEYS_ONLY, rows, ARRAY_SIZE(rows));
     rgb_runtime_frame_t             frame;
@@ -258,7 +273,7 @@ static void test_accents_follow_their_semantic(void) {
     CHECK(frame.painted[0] && frame.colors[0].r == text_rgb.r);
     CHECK(frame.painted[4] && frame.colors[4].r == 81u);
     CHECK(frame.painted[5] && frame.colors[5].r == 71u);
-    CHECK(!frame.painted[3] && !frame.painted[1] && !frame.painted[6]);
+    CHECK(!frame.painted[3] && !frame.painted[1] && !frame.painted[6] && !frame.painted[2]);
     CHECK(rgb_active_profile_config_test_reads().autocorrect_rows == 2u);
 
     CHECK(render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_MACRO, 1u << 0u)));
@@ -267,19 +282,35 @@ static void test_accents_follow_their_semantic(void) {
     CHECK(render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_UNDO, 1u << 0u)));
     CHECK(frame.painted[3] && frame.colors[3].r == undo_rgb.r && frame.colors[3].b == undo_rgb.b);
     CHECK(frame.painted[5] && frame.colors[5].r == 81u);
+    // Leading's own accent over its colour on every key.
+    CHECK(render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_LEADING, 0u)));
+    CHECK(frame.painted[0] && frame.colors[0].r == lead_rgb.r && frame.painted[2] && frame.colors[2].r == 111u && frame.painted[4] && frame.colors[4].r == 81u);
 }
 
 // A semantic whose colour has saturation and value 0, at any hue, paints
 // nothing by itself or through a black accent; the other semantics still do.
 static void test_a_colour_that_is_off_paints_nothing(void) {
     static const live_row_t         rows[]  = {{.selector = NOAH_PROFILE_RGB_V1_SELECTOR_ALL, .color = {0u, 0u, 0u}, .led_mask = 1u << 7u}};
-    noah_active_profile_rgb_frame_t profile = live_frame(live_payload(live_bytes, STAGES_ON, (hsv_t){31u, 32u, 33u}, (hsv_t){90u, 0u, 0u}, (hsv_t){51u, 52u, 53u}, RGB_BOTH_HALVES, rows, ARRAY_SIZE(rows)));
+    noah_active_profile_rgb_frame_t profile = live_frame(live_payload(live_bytes, STAGES_ON, (hsv_t){31u, 32u, 33u}, (hsv_t){90u, 0u, 0u}, (hsv_t){51u, 52u, 53u}, (hsv_t){7u, 0u, 0u}, RGB_BOTH_HALVES, rows, ARRAY_SIZE(rows)));
     rgb_runtime_frame_t             frame;
 
     CHECK(!render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_MACRO, 1u)));
     check_frame(&frame, 0u, (rgb_t){0});
+    CHECK(!render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_LEADING, 0u)));
+    check_frame(&frame, 0u, (rgb_t){0});
     CHECK(render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_TEXT, 1u)));
     check_frame(&frame, 0xffu, text_rgb);
+}
+
+// With leading's colour off, a coloured accent for it still paints: leading
+// can show on a few LEDs alone (D-F72).
+static void test_leading_can_show_on_its_accent_alone(void) {
+    static const live_row_t         rows[]  = {{.selector = NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_LEADING, .color = {121u, 122u, 123u}, .led_mask = 1u << 6u}};
+    noah_active_profile_rgb_frame_t profile = live_frame(live_payload(live_bytes, STAGES_ON, (hsv_t){31u, 32u, 33u}, (hsv_t){41u, 42u, 43u}, (hsv_t){51u, 52u, 53u}, (hsv_t){7u, 0u, 0u}, RGB_BOTH_HALVES, rows, ARRAY_SIZE(rows)));
+    rgb_runtime_frame_t             frame;
+
+    CHECK(render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_LEADING, 0u)));
+    check_frame(&frame, 1u << 6u, (rgb_t){.r = 121u, .g = 122u, .b = 123u});
 }
 
 // A stage switched off keeps its data and draws nothing.
@@ -289,6 +320,8 @@ static void test_the_stage_bit_switches_it_off(void) {
     rgb_runtime_frame_t             frame;
 
     CHECK(!render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_TEXT, 1u)));
+    check_frame(&frame, 0u, (rgb_t){0});
+    CHECK(!render(&frame, &profile, feedback_on(NOAH_AUTOCORRECT_FEEDBACK_LEADING, 0u)));
     check_frame(&frame, 0u, (rgb_t){0});
 }
 
@@ -320,6 +353,7 @@ int main(void) {
     test_each_locality();
     test_accents_follow_their_semantic();
     test_a_colour_that_is_off_paints_nothing();
+    test_leading_can_show_on_its_accent_alone();
     test_the_stage_bit_switches_it_off();
     test_a_chunk_paints_only_its_leds();
     test_a_stale_frame_paints_nothing();

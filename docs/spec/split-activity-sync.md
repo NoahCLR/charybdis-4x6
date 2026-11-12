@@ -81,9 +81,10 @@ build's packed C struct, sent whole.
   sends at most one heartbeat; one due behind another's goes out on a
   following pass, and each packet's heartbeat counts from its own last send.
   Changed and forced packets never wait.
-- Replacement feedback is active state while a flash shows. The master half
-  times the flash and sends its end as a change; the slave half shows what
-  the last packet said and times nothing (D-F70).
+- Replacement feedback is active state while a flash shows, and while the
+  keyboard is leading, however long that lasts. The master half times the
+  flash and ends leading, and sends either end as a change; the slave half
+  shows what the last packet said and times nothing (D-F70, D-F72).
 - Fade progress is active state only while the pointer layer is on, where
   both halves draw it. With the layer off the packet carries the finished
   fade, whatever the auto-mouse timer reads; with auto-mouse off, or a

@@ -11,7 +11,7 @@
 // the enum below, and its mask bit is 1 << index. Eight rows fill the one-byte
 // domain mask: a ninth domain needs a wider mask everywhere one travels.
 #define NOAH_PROFILE_DOMAIN_ROWS(X) \
-    X(RGB,           rgb,           0x10u, 5u) \
+    X(RGB,           rgb,           0x10u, 6u) \
     X(KEY_BEHAVIORS, key_behaviors, 0x20u, 2u) \
     X(COMBOS,        combos,        0x30u, 3u) \
     X(SETTINGS,      settings,      0x40u, 13u) \

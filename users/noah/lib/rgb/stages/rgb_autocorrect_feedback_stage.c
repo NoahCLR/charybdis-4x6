@@ -10,10 +10,10 @@
 #        error "RGB_AUTOCORRECT_FEEDBACK_FLASH_MS must be greater than zero"
 #    endif
 
-_Static_assert((int)NOAH_AUTOCORRECT_FEEDBACK_TEXT == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_TEXT + 1 && (int)NOAH_AUTOCORRECT_FEEDBACK_MACRO == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_MACRO + 1 && (int)NOAH_AUTOCORRECT_FEEDBACK_UNDO == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_UNDO + 1, "a feedback kind is its lighting semantic plus one");
+_Static_assert((int)NOAH_AUTOCORRECT_FEEDBACK_TEXT == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_TEXT + 1 && (int)NOAH_AUTOCORRECT_FEEDBACK_MACRO == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_MACRO + 1 && (int)NOAH_AUTOCORRECT_FEEDBACK_UNDO == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_UNDO + 1 && (int)NOAH_AUTOCORRECT_FEEDBACK_LEADING == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_LEADING + 1, "a feedback kind is its lighting semantic plus one");
 
 // A semantic's colour of saturation and value 0 paints nothing, so each of
-// the three can be off by itself (D-F70).
+// the four can be off by itself (D-F70, D-F72).
 static bool rgb_runtime_autocorrect_feedback_stage_color_paints(hsv_t color) {
     return !(color.s == 0u && color.v == 0u);
 }
@@ -122,7 +122,7 @@ bool rgb_runtime_autocorrect_feedback_stage_render_active_profile_frame(rgb_runt
     rgb_runtime_frame_clear(frame, led_min, led_max);
     // The slave half's kind came over the link: one this build does not know
     // paints nothing.
-    if (!feedback || feedback->kind == NOAH_AUTOCORRECT_FEEDBACK_NONE || feedback->kind > NOAH_AUTOCORRECT_FEEDBACK_UNDO || !rgb_active_profile_config_autocorrect_stage_enabled(profile_frame) || !rgb_active_profile_config_autocorrect_feedback(profile_frame, &config)) {
+    if (!feedback || feedback->kind == NOAH_AUTOCORRECT_FEEDBACK_NONE || feedback->kind > NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_COUNT || !rgb_active_profile_config_autocorrect_stage_enabled(profile_frame) || !rgb_active_profile_config_autocorrect_feedback(profile_frame, &config)) {
         return false;
     }
 

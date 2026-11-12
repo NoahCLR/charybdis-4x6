@@ -329,8 +329,8 @@ noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_wr
     }
 #    endif
 #    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
-    _Static_assert((int)AUTOCORRECT_FEEDBACK_GROUP_TEXT == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_TEXT && (int)AUTOCORRECT_FEEDBACK_GROUP_MACRO == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_MACRO && (int)AUTOCORRECT_FEEDBACK_GROUP_UNDO == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_UNDO, "an authored replacement-feedback semantic is its stored selector");
-    if (!(emit_hsv(writer, autocorrect_feedback_colors.text_color) && emit_hsv(writer, autocorrect_feedback_colors.macro_color) && emit_hsv(writer, autocorrect_feedback_colors.undo_color) && emit_u8(writer, autocorrect_feedback_colors.locality))) return writer->result;
+    _Static_assert((int)AUTOCORRECT_FEEDBACK_GROUP_TEXT == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_TEXT && (int)AUTOCORRECT_FEEDBACK_GROUP_MACRO == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_MACRO && (int)AUTOCORRECT_FEEDBACK_GROUP_UNDO == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_UNDO && (int)AUTOCORRECT_FEEDBACK_GROUP_LEADING == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_LEADING, "an authored replacement-feedback semantic is its stored selector");
+    if (!(emit_hsv(writer, autocorrect_feedback_colors.text_color) && emit_hsv(writer, autocorrect_feedback_colors.macro_color) && emit_hsv(writer, autocorrect_feedback_colors.undo_color) && emit_hsv(writer, autocorrect_feedback_colors.leading_color) && emit_u8(writer, autocorrect_feedback_colors.locality))) return writer->result;
     for (uint8_t index = 0u; index < autocorrect_feedback_led_group_count; index++) {
         uint8_t selector = autocorrect_feedback_led_groups[index].semantic == AUTOCORRECT_FEEDBACK_GROUP_ALL ? NOAH_PROFILE_RGB_V1_SELECTOR_ALL : autocorrect_feedback_led_groups[index].semantic;
         result           = emit_group_row(writer, selector, autocorrect_feedback_led_groups[index].color, &autocorrect_feedback_led_groups[index].led_group, error);

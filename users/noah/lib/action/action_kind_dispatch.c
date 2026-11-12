@@ -201,14 +201,16 @@ static void noah_action_switch_key(noah_action_desc_t desc, keypos_t key_pos) {
 }
 
 // A build or host test without the typing stage (macro/typing_stage.h).
-__attribute__((weak)) void noah_typing_stage_leader(void) {}
+__attribute__((weak)) void noah_typing_stage_leader(keypos_t key_pos) {
+    (void)key_pos;
+}
 
 // The leader acts at its tap or press, as a switch key does, and sends
-// nothing itself: the typing stage holds what is typed after it (D-F71).
+// nothing itself: the typing stage holds what is typed after it (D-F71), and
+// leading shows on the key that sent it (D-F72).
 static void noah_action_leader(noah_action_desc_t desc, keypos_t key_pos) {
     (void)desc;
-    (void)key_pos;
-    noah_typing_stage_leader();
+    noah_typing_stage_leader(key_pos);
 }
 
 static void noah_action_press_owned_momentary_layer(noah_action_desc_t desc, keypos_t key_pos) {

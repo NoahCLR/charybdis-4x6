@@ -348,7 +348,8 @@ _Avoid_: leader sequence (for the key), QMK Leader
 
 **Leading**:
 The keyboard holding what is typed after the Leader key, showing the computer
-none of it, until it sends a replacement or drops what it holds.
+none of it, until it sends a replacement or drops what it holds. Lighting shows
+it as replacement feedback's leading colour (D-F72).
 _Avoid_: leader mode, waiting (alone)
 
 **How it fires** (a replacement's trigger):
@@ -486,7 +487,8 @@ _Avoid_: key feedback (the code keeps key_feedback and KEY_BEHAVIOR_FEEDBACK nam
 The stage that flashes when text replacement changes what was typed: a typed
 form replaced with text, replaced by its macro, or a replacement undone, each
 in its own colour (D-F70). What the leader sends flashes as a replacement
-does (D-F71). `autocorrect feedback` in code.
+does (D-F71). It also holds a colour of its own, not a flash, while the
+keyboard is leading (D-F72). `autocorrect feedback` in code.
 _Avoid_: autocorrect flash (in prose), correction feedback, typo light
 
 **Background effect**:
@@ -497,7 +499,8 @@ _Avoid_: base lighting, base RGB, RGB mode
 Where a feedback colour paints: both halves, one half, the half of the key
 that caused it, or only the keys themselves. For replacement feedback the key
 that caused it is the one that ended the word, the Backspace that undid the
-replacement, or the key that ended leading, none when the leader timeout did.
+replacement, or the key that ended leading; leading's, and that of what the
+leader timeout sends, is the Leader key that began it.
 _Avoid_: scope, target, region
 
 ## Talking to the keyboard

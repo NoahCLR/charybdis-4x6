@@ -1,7 +1,7 @@
 """A profile's domains in a logical form two encodings of one profile share.
 
 Each domain decodes to plain JSON values, field by field, following the specs
-in docs/spec/: RGB v5 (rgb-domain-v1.md), key behaviours v2, combos v3,
+in docs/spec/: RGB v6 (rgb-domain-v1.md), key behaviours v2, combos v3,
 settings v13, keymap v1, macros v1 and the autocorrect list v2
 (profile-wire-v1/), sparse PD v3 (pd-mode-domain-v1.md). An action is written as the native keycode it stands for, so a
 combo naming pointing slot 5 as a semantic action and one naming it as the keycode
@@ -51,7 +51,7 @@ def action(data: bytes, offset: int) -> str:
 
 
 def rgb(data: bytes) -> dict:
-    assert data[0] == 5 and data[1] == 0 and data[15] == 0
+    assert data[0] == 6 and data[1] == 0 and data[15] == 0
     groups, layers, layer_groups, pd, pd_groups, combo_groups, taps, key_groups = data[4], data[5], data[6], data[7], data[8], data[9], data[10], data[11]
     replacement_groups = data[14]
     offset = 16
@@ -74,7 +74,7 @@ def rgb(data: bytes) -> dict:
     value["tapBranchColors"] = take(taps, 3, lambda at: _hsv(data, at))
     value["keyFeedback"] = take(1, 11, lambda at: {"committed": _hsv(data, at), "hold": _hsv(data, at + 3), "longHold": _hsv(data, at + 6), "tapPolicy": data[at + 9], "locality": data[at + 10]})[0]
     value["keyFeedbackGroups"] = take(key_groups, 5, lambda at: {"semantic": data[at], "hsv": _hsv(data, at + 1), "group": data[at + 4]})
-    value["replacementFeedback"] = take(1, 10, lambda at: {"text": _hsv(data, at), "macro": _hsv(data, at + 3), "undo": _hsv(data, at + 6), "locality": data[at + 9]})[0]
+    value["replacementFeedback"] = take(1, 13, lambda at: {"text": _hsv(data, at), "macro": _hsv(data, at + 3), "undo": _hsv(data, at + 6), "leading": _hsv(data, at + 9), "locality": data[at + 12]})[0]
     value["replacementGroups"] = take(replacement_groups, 5, lambda at: {"semantic": data[at], "hsv": _hsv(data, at + 1), "group": data[at + 4]})
     assert offset == len(data), "RGB records do not end the domain"
     return value

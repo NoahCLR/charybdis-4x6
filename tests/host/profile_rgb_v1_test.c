@@ -141,7 +141,7 @@ static void test_shared_golden_and_accessors(const char *fixture_path) {
     noah_profile_rgb_v1_hsv_t             color;
     noah_profile_rgb_v1_key_feedback_t    key;
 
-    assert(length == 163u);
+    assert(length == 166u);
     expect_result(noah_profile_rgb_v1_decode(payload, length, &limits, &view, &error), NOAH_PROFILE_RGB_V1_OK);
     assert(view.stage_enable_mask == 31u && view.group_count == 3u && view.layer_color_count == 3u);
     assert(view.layer_group_count == 2u && view.pd_color_count == 6u && view.pd_group_count == 2u);
@@ -454,7 +454,7 @@ static void test_fields_features_and_surfaces(const char *fixture_path) {
 }
 
 static void test_canonical_empty_forms(void) {
-    uint8_t                      payload[50] = {0};
+    uint8_t                      payload[53] = {0};
     noah_profile_rgb_v1_limits_t limits      = noah_profile_rgb_v1_default_limits();
 
     payload[0]                          = NOAH_PROFILE_RGB_V1_FORMAT_VERSION;
@@ -478,7 +478,7 @@ static void test_canonical_empty_forms(void) {
 
 static void test_maximum_dictionary_and_rows(void) {
     // 128 groups and one table's 255 rows (D-F63).
-    uint8_t                                 payload[2477] = {0};
+    uint8_t                                 payload[2480] = {0};
     size_t                                  offset;
     noah_profile_rgb_v1_limits_t            limits = noah_profile_rgb_v1_default_limits();
     noah_profile_rgb_v1_view_t              view;
@@ -508,7 +508,7 @@ static void test_maximum_dictionary_and_rows(void) {
         payload[offset + 4u] = (uint8_t)(row % NOAH_PROFILE_RGB_V1_MAX_GROUPS);
         offset += 5u;
     }
-    assert(offset + 4u + 4u + 11u + 10u == sizeof(payload));
+    assert(offset + 4u + 4u + 11u + 13u == sizeof(payload));
     limits.compiled_stage_mask          = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
     limits.logical_layer_count          = 1u;
     limits.supported_pointing_mode_mask = 0u;
@@ -578,7 +578,7 @@ static void test_total_rows_at_ceiling(void) {
     for (uint16_t row = 0u; row < KEY_ROWS; row++, offset += 5u) {
         payload[offset] = (uint8_t)(row % 5u == 4u ? NOAH_PROFILE_RGB_V1_SELECTOR_ALL : row % 5u);
     }
-    offset += 10u; // replacement feedback
+    offset += 13u; // replacement feedback
     assert(offset == SIZE);
     limits.logical_layer_count = 1u;
     expect_result(noah_profile_rgb_v1_decode(payload, SIZE, &limits, &view, &error), NOAH_PROFILE_RGB_V1_OK);
@@ -596,7 +596,7 @@ static void test_total_rows_at_ceiling(void) {
 // Replacement feedback: its record and rows read back as written, and each
 // fault is refused where it is, with the table and field ids the spec lists.
 static void test_replacement_feedback_records_and_refusals(void) {
-    enum { RECORD = 49, ROW_0 = 59, ROW_1 = 64, SIZE = 69 };
+    enum { RECORD = 49, LOCALITY = RECORD + NOAH_PROFILE_RGB_V1_AUTOCORRECT_LOCALITY_OFFSET, ROW_0 = 62, ROW_1 = 67, SIZE = 72 };
     uint8_t                                    valid[SIZE] = {0};
     uint8_t                                    payload[SIZE];
     noah_profile_rgb_v1_limits_t               limits = noah_profile_rgb_v1_default_limits();
@@ -615,7 +615,7 @@ static void test_replacement_feedback_records_and_refusals(void) {
     valid[13] = NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE;
     valid[14] = 2u; // two replacement rows
     valid[17] = 0x01u;
-    memcpy(&valid[RECORD], (const uint8_t[]){1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u, 9u, 4u}, NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE);
+    memcpy(&valid[RECORD], (const uint8_t[]){1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u, 9u, 13u, 14u, 15u, 4u}, NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE);
     memcpy(&valid[ROW_0], (const uint8_t[]){0xffu, 0u, 0u, 0u, 0u}, NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE);
     memcpy(&valid[ROW_1], (const uint8_t[]){2u, 10u, 11u, 12u, 0u}, NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE);
     limits.compiled_stage_mask          = NOAH_PROFILE_RGB_V1_STAGE_LAYER | NOAH_PROFILE_RGB_V1_STAGE_AUTOCORRECT;
@@ -628,7 +628,8 @@ static void test_replacement_feedback_records_and_refusals(void) {
     expect_result(noah_profile_rgb_v1_autocorrect_feedback(&view, &record, &error), NOAH_PROFILE_RGB_V1_OK);
     assert(record.colors[NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_TEXT].h == 1u && record.colors[NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_TEXT].v == 3u);
     assert(record.colors[NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_MACRO].h == 4u && record.colors[NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_MACRO].s == 5u);
-    assert(record.colors[NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_UNDO].h == 7u && record.colors[NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_UNDO].v == 9u && record.locality == 4u);
+    assert(record.colors[NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_UNDO].h == 7u && record.colors[NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_UNDO].v == 9u);
+    assert(record.colors[NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_LEADING].h == 13u && record.colors[NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_LEADING].s == 14u && record.colors[NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_LEADING].v == 15u && record.locality == 4u);
     expect_result(noah_profile_rgb_v1_autocorrect_group_at(&view, 0u, &row, &error), NOAH_PROFILE_RGB_V1_OK);
     assert(row.selector == NOAH_PROFILE_RGB_V1_SELECTOR_ALL && row.color.v == 0u && row.group_id == 0u);
     expect_result(noah_profile_rgb_v1_autocorrect_group_at(&view, 1u, &row, &error), NOAH_PROFILE_RGB_V1_OK);
@@ -641,14 +642,27 @@ static void test_replacement_feedback_records_and_refusals(void) {
     expect_decode(payload, SIZE, &limits, NOAH_PROFILE_RGB_V1_OK);
 
     memcpy(payload, valid, SIZE);
-    payload[RECORD + 9u] = 5u;
+    payload[LOCALITY] = 5u;
     expect_result(noah_profile_rgb_v1_decode(payload, SIZE, &limits, &view, &error), NOAH_PROFILE_RGB_V1_INVALID_ENUM);
-    assert(error.offset == RECORD + 9u && error.table == NOAH_PROFILE_RGB_V1_TABLE_AUTOCORRECT_FEEDBACK && error.row == 0u && error.field == NOAH_PROFILE_RGB_V1_FIELD_LOCALITY);
+    assert(error.offset == LOCALITY && error.table == NOAH_PROFILE_RGB_V1_TABLE_AUTOCORRECT_FEEDBACK && error.row == 0u && error.field == NOAH_PROFILE_RGB_V1_FIELD_LOCALITY);
 
     memcpy(payload, valid, SIZE);
     payload[RECORD + 5u] = 201u;
     expect_result(noah_profile_rgb_v1_decode(payload, SIZE, &limits, &view, &error), NOAH_PROFILE_RGB_V1_BRIGHTNESS_EXCEEDED);
     assert(error.offset == RECORD + 5u && error.table == NOAH_PROFILE_RGB_V1_TABLE_AUTOCORRECT_FEEDBACK && error.field == NOAH_PROFILE_RGB_V1_FIELD_COLOR);
+
+    // The leading colour is checked as the others are (D-F72).
+    memcpy(payload, valid, SIZE);
+    payload[RECORD + 11u] = 201u;
+    expect_result(noah_profile_rgb_v1_decode(payload, SIZE, &limits, &view, &error), NOAH_PROFILE_RGB_V1_BRIGHTNESS_EXCEEDED);
+    assert(error.offset == RECORD + 11u && error.table == NOAH_PROFILE_RGB_V1_TABLE_AUTOCORRECT_FEEDBACK && error.field == NOAH_PROFILE_RGB_V1_FIELD_COLOR);
+
+    // A row may name the leading semantic; the next value is refused.
+    memcpy(payload, valid, SIZE);
+    payload[ROW_1] = NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_LEADING;
+    expect_result(noah_profile_rgb_v1_decode(payload, SIZE, &limits, &view, &error), NOAH_PROFILE_RGB_V1_OK);
+    expect_result(noah_profile_rgb_v1_autocorrect_group_at(&view, 1u, &row, &error), NOAH_PROFILE_RGB_V1_OK);
+    assert(row.selector == NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_LEADING);
 
     memcpy(payload, valid, SIZE);
     payload[ROW_1] = NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_COUNT;
@@ -679,10 +693,13 @@ static void test_replacement_feedback_records_and_refusals(void) {
     expect_decode(payload, SIZE, &without, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA);
     payload[14] = 0u;
     expect_decode(payload, RECORD + NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE, &without, NOAH_PROFILE_RGB_V1_OK);
-    payload[RECORD + 9u] = 1u;
+    payload[LOCALITY] = 1u;
     expect_decode(payload, RECORD + NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE, &without, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA);
-    payload[RECORD + 9u] = 0u;
+    payload[LOCALITY] = 0u;
     payload[RECORD + 7u] = 1u;
+    expect_decode(payload, RECORD + NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE, &without, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA);
+    payload[RECORD + 7u] = 0u;
+    payload[RECORD + 10u] = 1u; // the leading colour
     expect_decode(payload, RECORD + NOAH_PROFILE_RGB_V1_AUTOCORRECT_FEEDBACK_SIZE, &without, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA);
 }
 

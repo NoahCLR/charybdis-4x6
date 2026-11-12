@@ -1,6 +1,6 @@
 # Lighting domain `0x10`
 
-Domain `0x10`, version 5, holds the profile's lighting above the background
+Domain `0x10`, version 6, holds the profile's lighting above the background
 effect: which stages run, reusable LED groups, a colour per layer, the
 auto-mouse fade, a colour per pointing slot, combo feedback, behaviour
 feedback and replacement feedback.
@@ -65,7 +65,7 @@ nothing from it. A bit may be set only for a stage the build compiles. A
 build with RGB Matrix compiles the layer stage and, by its options, the
 others; its compiled defaults set every compiled stage's bit.
 
-Held by: `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`, `test_headers_lengths_and_dictionary`, `test_fields_features_and_surfaces`, `test_total_rows_at_ceiling`), `tests/fixtures/rgb_domain_v5.json`.
+Held by: `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`, `test_headers_lengths_and_dictionary`, `test_fields_features_and_surfaces`, `test_total_rows_at_ceiling`), `tests/fixtures/rgb_domain_v6.json`.
 
 ## Sections
 
@@ -84,12 +84,12 @@ Records follow the header with no padding, in this order:
 | tap-branch colours | 3 | `h s v` |
 | behaviour feedback | 11, once | below |
 | behaviour-feedback group rows | 5 | `semantic`, `h s v`, `group` |
-| replacement feedback | 10, once | below |
+| replacement feedback | 13, once | below |
 | replacement-feedback group rows | 5 | `semantic`, `h s v`, `group` |
 
 The payload is exactly
-`45 + 9G + 5L + 5LG + 5P + 5PG + 4CG + 3T + 5KG + 5RG` bytes; the counts'
-ceilings make the largest 4,649 bytes. Shorter is
+`48 + 9G + 5L + 5LG + 5P + 5PG + 4CG + 3T + 5KG + 5RG` bytes; the counts'
+ceilings make the largest 4,652 bytes. Shorter is
 `TRUNCATED`, longer `TRAILING_BYTES`, both refusing the whole domain.
 
 Behaviour feedback:
@@ -103,16 +103,19 @@ Behaviour feedback:
 | 10 | 1 | locality |
 
 Replacement feedback (D-F70,
-[ADR](../adr/0070-replacement-feedback-is-a-lighting-stage.md)):
+[ADR](../adr/0070-replacement-feedback-is-a-lighting-stage.md); leading D-F72,
+[ADR](../adr/0072-leading-is-a-case-of-replacement-feedback.md)), a colour
+per semantic in semantic order, then the locality:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
 | 0 | 3 | text replaced colour |
 | 3 | 3 | macro replaced colour |
 | 6 | 3 | undone colour |
-| 9 | 1 | locality |
+| 9 | 3 | leading colour |
+| 12 | 1 | locality |
 
-Held by: `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`, `test_shared_golden_and_accessors`, `test_maximum_dictionary_and_rows`, `test_replacement_feedback_records_and_refusals`), `tests/fixtures/rgb_domain_v1.fixture`, `tests/fixtures/rgb_domain_v5.json` (`replacement-rows-every-semantic`).
+Held by: `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`, `test_shared_golden_and_accessors`, `test_maximum_dictionary_and_rows`, `test_replacement_feedback_records_and_refusals`), `tests/fixtures/rgb_domain_v1.fixture`, `tests/fixtures/rgb_domain_v6.json` (`replacement-rows-every-semantic`, `replacement-row-leading`).
 
 ## Values
 
@@ -124,11 +127,12 @@ Held by: `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`, `tes
 | tap-commit policy | `0` off; `1` a committed tap of tap count 2 or more pulses, unless it is a layer or pointing action |
 | layer and pointing selector | a layer below the layer-colour count, a slot below 32, or `0xff` all |
 | behaviour-feedback semantic | `0` tap branch pending, `1` tap committed, `2` hold, `3` long hold, `0xff` all |
-| replacement-feedback semantic | `0` text replaced, `1` macro replaced, `2` undone, `0xff` all |
+| replacement-feedback semantic | `0` text replaced, `1` macro replaced, `2` undone, `3` leading, `0xff` all |
 
 Locality `3` paints both halves for a combo whose keys span them; a pointing
 mode with no known owner key paints every key under localities `3` and `4`,
-and so does a replacement flash whose key is not known. The
+and so does a replacement flash whose key is not known, leading's among them
+when its Leader no key named. The
 key runtime reads the tap-commit policy, so it changes, like every profile
 change, only at the safe boundary. Tap-branch colour `n` is the pending colour
 for tap count `n + 2`; a deeper tap count takes the last one.
@@ -178,7 +182,7 @@ Held by: `tests/host/run_rgb_layer_render_tests.sh` (`rgb_layer_render_test.c`, 
   behaviour-feedback record and no behaviour-feedback rows; a zero
   replacement-feedback record and no replacement-feedback rows.
 
-Held by: `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`, `test_canonical_empty_forms`, `test_fields_features_and_surfaces`, `test_replacement_feedback_records_and_refusals`), `tests/host/run_profile_rgb_v5_tests.sh` (`profile_rgb_v5_test.c`), `tests/fixtures/rgb_domain_v5.json` (`missing-pd-row`, `pd-group-selector-slot-31`).
+Held by: `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`, `test_canonical_empty_forms`, `test_fields_features_and_surfaces`, `test_replacement_feedback_records_and_refusals`), `tests/host/run_profile_rgb_v6_tests.sh` (`profile_rgb_v6_test.c`), `tests/fixtures/rgb_domain_v6.json` (`missing-pd-row`, `pd-group-selector-slot-31`).
 
 ## Refusals
 
@@ -229,10 +233,10 @@ offset, and these table and field ids
 | 13 | replacement-feedback group rows | | 13 | semantic |
 
 Validation reads the header in one 16-byte step and every record in one step
-of at most 11 bytes, holding the counts and the previous bitmap, never the
+of at most 13 bytes, holding the counts and the previous bitmap, never the
 payload.
 
-Held by: `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`, `test_incremental_error_locations`, `test_reader_is_bounded`, `test_incremental_reader_budget_and_failures`, `test_replacement_feedback_records_and_refusals`), `tests/host/run_profile_rgb_v5_tests.sh` (`profile_rgb_v5_test.c`), `tests/fixtures/rgb_domain_v5.json` (`invalid`).
+Held by: `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`, `test_incremental_error_locations`, `test_reader_is_bounded`, `test_incremental_reader_budget_and_failures`, `test_replacement_feedback_records_and_refusals`), `tests/host/run_profile_rgb_v6_tests.sh` (`profile_rgb_v6_test.c`), `tests/fixtures/rgb_domain_v6.json` (`invalid`).
 
 ## Drawing
 
@@ -301,29 +305,39 @@ every key that produced it (all of a combo's keys):
   state. A group row follows the newest feedback of its semantic.
 
 Replacement feedback is a flash for what text replacement
-([`autocorrect-v1.md`](autocorrect-v1.md)) has just done (D-F70):
+([`autocorrect-v1.md`](autocorrect-v1.md)) has just done (D-F70), and a
+colour held while [the leader](autocorrect-v1.md#the-leader) waits (D-F72):
 
 | Semantic | Shown from | Colour |
 | --- | --- | --- |
 | text replaced | the replacement of a typed form, or the text [the leader](autocorrect-v1.md#the-leader) sends, begins to be typed | text replaced |
 | macro replaced | a typed form begins to be erased for its macro, or the macro the leader sends begins to play | macro replaced |
 | undone | Backspace right after a replacement begins to put the word back | undone |
+| leading | Leader is read, until leading ends by any ending | leading |
 
 - A flash lasts the replacement-feedback flash length, settings scalar 31
   ([settings](profile-wire-v1/settings-domain.md#scalars)), whatever the
   replacement goes on to do; it is set apart from the behaviour-feedback
   flash half-period, scalar 15. One shows at a time: a newer one takes the place
   of the one showing.
+- Leading is held, not timed: it shows from the moment Leader is read until
+  leading ends, however long the leader waits, through Leader again and a
+  Backspace that leaves characters held. It takes the place of a flash still
+  showing; a send's flash takes its place with nothing between them, and an
+  ending that sends nothing clears it at once. Its key is the Leader key that
+  began it, as the next item says of a flash's key; a Leader no key names
+  leaves it unknown. The leader holds whatever the switches say, and so does
+  its colour.
 - Its key is the key that ended the word, or the Backspace that undid the
-  replacement, or for what the leader sends the key that ended leading, none
-  when its timeout did (D-F71); a combo's output is every key of the combo, as they are when
+  replacement, or for what the leader sends the key that ended leading, or
+  the Leader key that began leading when its timeout did (D-F72); a combo's output is every key of the combo, as they are when
   the typing stage reads the key. Locality `3` paints that key's half and
   `4` that key alone. The key is not known when what ended the word reached
   the report by no key's press or action, or in a report read after one
   whose changes did not fit the queue of held-back changes; the flash then
   paints as [values](#values) say.
-- The master half times the flash. The slave half shows it from the packet
-  that carries it to the packet that ends it
+- The master half times the flash and ends leading. The slave half shows
+  either from the packet that carries it to the packet that ends it
   ([runtime state packets](split-activity-sync.md#runtime-state-packets)), so
   a failed send moves either edge there by the retry delay.
 - A semantic whose colour has saturation and value `0` paints nothing, and
@@ -331,10 +345,14 @@ Replacement feedback is a flash for what text replacement
 - A word that ends and is left as typed shows nothing: a word not on the
   list, one that already reads as its replacement, one the layout cannot
   type, one passed over or suspended, and any word while text replacement is
-  switched off. So does a leader that sends nothing; what the leader sends
-  shows whatever the switches say.
+  switched off. A leader that sends nothing shows no flash, only the end of
+  leading's colour; what the leader sends shows whatever the switches say.
+- The lighting idle timeout counts from the last input as ever. The leader
+  timeout, at most 10 seconds, ends leading long before the compiled 15
+  minutes; an idle timeout set shorter than the leader's can turn leading
+  dark.
 
-Held by: `tests/host/run_rgb_layer_render_tests.sh` (`rgb_layer_render_test.c`, `test_render_order_*`, `test_combo_*_stays_*`, `test_runtime_boot_indicator_overrides_scene`, the `*automouse*` and `*timeout*` tests, `test_newest_global_feedback_owner_wins_over_older_higher_priority`, `test_key_half_feedback_follows_newest_owner_without_visible_fallback`, `test_render_order_replacement_feedback_covers_key_feedback`, `test_a_frame_reads_replacement_feedback_once`; `rgb_base_underlay_test.c`; `rgb_autocorrect_active_profile_test.c`), `tests/host/run_autocorrect_tests.sh` (`autocorrect_test.c`, the tests under "What lighting is told"), `tests/host/run_runtime_debug_tests.sh` (`runtime_debug_test.c`, the `test_key_feedback_*` and `test_display_preview_*` tests, `test_split_term_branch_names_its_tap_at_the_accept_window`, `test_long_hold_only_branch_keeps_branch_color_until_long_hold`), `tests/host/run_qmk_combo_origin_tests.sh` (`qmk_combo_origin_test.c`, `test_active_combo_partition_*`).
+Held by: `tests/host/run_rgb_layer_render_tests.sh` (`rgb_layer_render_test.c`, `test_render_order_*`, `test_combo_*_stays_*`, `test_runtime_boot_indicator_overrides_scene`, the `*automouse*` and `*timeout*` tests, `test_newest_global_feedback_owner_wins_over_older_higher_priority`, `test_key_half_feedback_follows_newest_owner_without_visible_fallback`, `test_render_order_replacement_feedback_covers_key_feedback`, `test_slave_half_draws_the_mirrored_leading_on_the_leader_key`, `test_a_frame_reads_replacement_feedback_once`; `rgb_base_underlay_test.c`; `rgb_autocorrect_active_profile_test.c`), `tests/host/run_autocorrect_tests.sh` (`autocorrect_test.c`, the tests under "What lighting is told", `test_leading_holds_until_leading_ends`), `tests/host/run_runtime_debug_tests.sh` (`runtime_debug_test.c`, the `test_key_feedback_*` and `test_display_preview_*` tests, `test_split_term_branch_names_its_tap_at_the_accept_window`, `test_long_hold_only_branch_keeps_branch_color_until_long_hold`), `tests/host/run_qmk_combo_origin_tests.sh` (`qmk_combo_origin_test.c`, `test_active_combo_partition_*`).
 
 ## Compiled lighting and the running view
 
@@ -357,14 +375,16 @@ Held by: `tests/host/run_active_profile_rgb_runtime_tests.sh` (`active_profile_r
 
 ## Compatibility
 
-The firmware reads only version 5 (D-F10,
-[ADR](../adr/0010-firmware-accepts-only-current-formats.md)); version 4 and
+The firmware reads only version 6 (D-F10,
+[ADR](../adr/0010-firmware-accepts-only-current-formats.md)); version 5 and
 earlier are `INVALID_VERSION` and are not translated. Version 5 added
 replacement feedback: stage bit 5, the row count in header byte 14 and the
 two sections at the end (D-F70); how long its flash lasts is settings scalar
-31, settings version 12, in the same profile schema 4.5. D-F63 raised the
-group and row ceilings within version 4, and version 5 keeps them. The 32
+31, settings version 12, in the same profile schema 4.5. Version 6 adds
+leading: its colour in the record, before the locality, and semantic `3`
+(D-F72), profile schema 4.7. D-F63 raised the group and row ceilings within
+version 4, and versions 5 and 6 keep them. The 32
 pointing-colour rows are D-F09's ([ADR](../adr/0009-thirty-two-pointing-slots-stored-sparsely.md));
 the sixteen layer colours D-F14's ([ADR](../adr/0014-bigger-profiles.md)).
 
-Held by: `tests/host/run_profile_rgb_v5_tests.sh` (`profile_rgb_v5_test.c`), `tests/fixtures/rgb_domain_v5.json` (`groups-128`, `groups-129`, `rows-255-in-one-table`, `rows-640-in-all`, `rows-641-in-all`, `rows-640-with-replacement`, `rows-641-with-replacement`, `replacement-rows-255`, `version-4`, `version-3`, `version-2`).
+Held by: `tests/host/run_profile_rgb_v6_tests.sh` (`profile_rgb_v6_test.c`), `tests/fixtures/rgb_domain_v6.json` (`groups-128`, `groups-129`, `rows-255-in-one-table`, `rows-640-in-all`, `rows-641-in-all`, `rows-640-with-replacement`, `rows-641-with-replacement`, `replacement-rows-255`, `replacement-leading-value-over-limit`, `replacement-row-semantic-4`, `version-5`, `version-4`, `version-3`, `version-2`).

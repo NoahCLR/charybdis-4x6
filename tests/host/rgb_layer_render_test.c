@@ -225,10 +225,11 @@ EXPORT_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_TABLE(key_behavior_feedback_led_groups_da
 
 #ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
 const autocorrect_feedback_color_config_t autocorrect_feedback_colors = {
-    .text_color  = HSV(31, 32, 33),
-    .macro_color = HSV(34, 35, 36),
-    .undo_color  = HSV(37, 38, 39),
-    .locality    = RGB_KEYS_ONLY,
+    .text_color    = HSV(31, 32, 33),
+    .macro_color   = HSV(34, 35, 36),
+    .undo_color    = HSV(37, 38, 39),
+    .leading_color = HSV(40, 41, 42),
+    .locality      = RGB_KEYS_ONLY,
 };
 // The typing stage's answer on the master half, and how often it was asked.
 static noah_autocorrect_feedback_t fake_autocorrect_feedback;
@@ -1741,6 +1742,25 @@ static void test_render_order_replacement_feedback_covers_key_feedback(void) {
     check_led(1, rgb_from_hsv(key_behavior_feedback_colors.tap_committed_color));
 }
 
+// Leading paints last too, over behaviour feedback, on the Leader key that
+// began it, and leaves the rest of what is beneath; when it ends, what is
+// beneath shows again.
+static void test_render_order_leading_covers_key_feedback(void) {
+    test_reset();
+    test_local_feedback_semantic_add(0, 1, KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED);
+    fake_autocorrect_feedback.kind = NOAH_AUTOCORRECT_FEEDBACK_LEADING;
+    key_origin_bitmap_add_keypos(fake_autocorrect_feedback.keys, (keypos_t){.row = 0, .col = 1});
+
+    CHECK(render_output());
+    check_led(1, rgb_from_hsv(autocorrect_feedback_colors.leading_color));
+    check_led(0, rgb_from_hsv(key_behavior_feedback_colors.tap_committed_color));
+    check_led(2, rgb_from_hsv(key_behavior_feedback_colors.tap_committed_color));
+
+    fake_autocorrect_feedback = (noah_autocorrect_feedback_t){0};
+    CHECK(render_output());
+    check_led(1, rgb_from_hsv(key_behavior_feedback_colors.tap_committed_color));
+}
+
 // The slave half draws the flash the base packet mirrored, never its own
 // typing stage's, which sees no typing.
 static void test_slave_half_draws_the_mirrored_replacement_feedback(void) {
@@ -1754,6 +1774,29 @@ static void test_slave_half_draws_the_mirrored_replacement_feedback(void) {
     CHECK(render_output());
 
     check_led(2, rgb_from_hsv(autocorrect_feedback_colors.undo_color));
+    check_led(0, (rgb_t){0});
+    CHECK(fake_autocorrect_feedback_reads == 0u);
+}
+
+// While the leader waits the slave half draws leading as the base packet
+// mirrored it, on the Leader key the packet names, frame after frame, until
+// the packet clears it.
+static void test_slave_half_draws_the_mirrored_leading_on_the_leader_key(void) {
+    test_reset();
+    fake_is_master                                      = false;
+    split_runtime_sync_remote.autocorrect_feedback.kind = NOAH_AUTOCORRECT_FEEDBACK_LEADING;
+    key_origin_bitmap_add_keypos(split_runtime_sync_remote.autocorrect_feedback.keys, (keypos_t){.row = 0, .col = 2});
+
+    for (uint8_t frame = 0u; frame < 3u; frame++) {
+        memset(led_output, 0, sizeof(led_output));
+        CHECK(render_output());
+        check_led(2, rgb_from_hsv(autocorrect_feedback_colors.leading_color));
+        check_led(0, (rgb_t){0});
+    }
+
+    split_runtime_sync_remote.autocorrect_feedback = (noah_autocorrect_feedback_t){0};
+    memset(led_output, 0, sizeof(led_output));
+    CHECK(!render_output());
     check_led(0, (rgb_t){0});
     CHECK(fake_autocorrect_feedback_reads == 0u);
 }
@@ -2858,7 +2901,9 @@ int main(int argc, char **argv) {
 #endif
 #ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
     test_render_order_replacement_feedback_covers_key_feedback();
+    test_render_order_leading_covers_key_feedback();
     test_slave_half_draws_the_mirrored_replacement_feedback();
+    test_slave_half_draws_the_mirrored_leading_on_the_leader_key();
     test_a_frame_reads_replacement_feedback_once();
 #endif
     test_runtime_boot_indicator_overrides_scene();
