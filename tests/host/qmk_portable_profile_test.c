@@ -239,7 +239,7 @@ int main(int argc, char **argv) {
     if (named) assert(fclose(named) == 0);
     assert(length == NOAH_SETTINGS_MIN_SIZE + 4 + 5 + 32 + 15 + 32 + 11 + 4);
     const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
-    assert(NOAH_SETTINGS_VERSION == 12u && NOAH_SETTINGS_LAYERS == LAYER_COUNT && !memcmp(bytes, header, sizeof(header)));
+    assert(NOAH_SETTINGS_VERSION == 13u && NOAH_SETTINGS_LAYERS == LAYER_COUNT && !memcmp(bytes, header, sizeof(header)));
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_TAPPING_TERM * 4) == TAPPING_TERM);
     keyrecord_t record = {0};
     assert(get_tapping_term(0, &record) == TAPPING_TERM && get_quick_tap_term(0, &record) == TAPPING_TERM);
@@ -255,6 +255,8 @@ int main(int argc, char **argv) {
     // behaviour-feedback half-period (D-F70).
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_AUTOCORRECT_FEEDBACK_PERIOD * 4) == RGB_AUTOCORRECT_FEEDBACK_FLASH_MS);
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_FEEDBACK_PERIOD * 4) == RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS);
+    // The leader waits as long as the keymap authors (D-F71).
+    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_LEADER_TIMEOUT * 4) == NOAH_LEADER_TIMEOUT_MS);
     // Each layer refers combos to itself and bypasses or excludes nothing.
     uint8_t expected[NOAH_SETTINGS_MAX_SIZE] = {0};
     for (uint8_t layer = 0; layer < NOAH_SETTINGS_LAYERS; layer++) {
@@ -290,7 +292,7 @@ int main(int argc, char **argv) {
 
     // A live current domain reads back exactly as stored (D-F32), and
     // without a second copy held for the read.
-    const uint32_t values[NOAH_SETTINGS_COUNT] = {180, 150, 400, 150, 1, 4, 1200, 25, 1, 3, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0, 1, 0xffff, 0x7fff, 250};
+    const uint32_t values[NOAH_SETTINGS_COUNT] = {180, 150, 400, 150, 1, 4, 1200, 25, 1, 3, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0, 1, 0xffff, 0x7fff, 250, 3000};
     const uint8_t  current_header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
     memcpy(stored, current_header, sizeof(current_header));
     for (uint8_t id = 0; id < NOAH_SETTINGS_COUNT; id++)
@@ -364,6 +366,7 @@ int main(int argc, char **argv) {
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_LAYER_COMBOS * 4) == 0x7fff);
     // The replacement flash reads back as stored and runs as stored.
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_AUTOCORRECT_FEEDBACK_PERIOD * 4) == 250 && noah_setting(NOAH_SETTING_AUTOCORRECT_FEEDBACK_PERIOD, 0u) == 250);
+    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_LEADER_TIMEOUT * 4) == 3000 && noah_setting(NOAH_SETTING_LEADER_TIMEOUT, 0u) == 3000);
     assert(!memcmp(bytes + NOAH_SETTINGS_LAYER_RECORDS_OFFSET, stored + NOAH_SETTINGS_LAYER_RECORDS_OFFSET, names - NOAH_SETTINGS_LAYER_RECORDS_OFFSET));
     assert(combo_ref_from_layer(15) == 2 && combo_ref_from_layer(14) == 14 && combo_ref_from_layer(16) == 16);
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE

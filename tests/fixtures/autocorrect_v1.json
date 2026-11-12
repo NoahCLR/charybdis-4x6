@@ -1,7 +1,7 @@
 {
-  "description": "Autocorrect behaviour version 1: what the computer ends with when the keyboard corrects a list while keys are typed. Rules: docs/spec/autocorrect-v1.md; each case names the rule it holds. A case has a list (entries as in autocorrect_domain_v1.json), macros when a correction plays one (the text each stored macro types, by slot; a slot left out is empty), a host layout (a slug of host_layouts_v1.json), the host's Caps Lock at its start, and events. Events: {type: text} presses the keys that show those characters on that layout under that Caps Lock, one after another ('\\n' is Enter, '\\t' Tab); {fast: text} the same with no pause, so later keys arrive while a correction is typed; {key, mods} taps a named key; {stroke} taps a layout stroke; {tap} taps a key by its QMK name with whatever modifiers are held; {press} and {release} hold a modifier; {click}; {hold, ms, repeats} holds a key that long while the computer repeats it; {macro: text, fast} presses a macro key that types the text; {mash, count} taps a key that many times with no pause. result is the text the computer ends with; resultEndsWith holds only its end where the rest depends on timing. screen, when present, is the same input as the characters the computer would show with autocorrect off ('\\b' is Backspace): a client's text matcher run over it with the case's list, layout and Caps Lock must produce result. A case with keyboardOnly has no screen form and says why. The case folding and capitals are wordCharacters in autocorrect_domain_v1.json: a small letter's capital is the one character that folds to it. Test evidence, never a migration source.",
+  "description": "Autocorrect behaviour version 2: what the computer ends with when the keyboard corrects a list while keys are typed. Rules: docs/spec/autocorrect-v1.md; each case names the rule it holds. A case has a list (entries as in autocorrect_domain_v2.json, each with how it fires), macros when a correction plays one (the text each stored macro types, by slot; a slot left out is empty), a host layout (a slug of host_layouts_v1.json), the host's Caps Lock at its start, and events. Events: {type: text} presses the keys that show those characters on that layout under that Caps Lock, one after another ('\\n' is Enter, '\\t' Tab); {fast: text} the same with no pause, so later keys arrive while a correction is typed; {key, mods} taps a named key; {stroke} taps a layout stroke; {tap} taps a key by its QMK name with whatever modifiers are held; {press} and {release} hold a modifier; {click}; {hold, ms, repeats} holds a key that long while the computer repeats it; {macro: text, fast} presses a macro key that types the text; {mash, count} taps a key that many times with no pause; {leader: true} presses the Leader key (D-F71); {wait: ms} lets that much time pass with no key; {override: bool} sets the autocorrect override, as AC_ON and AC_OFF do. result is the text the computer ends with; resultEndsWith holds only its end where the rest depends on timing. screen, when present, is the same input as the characters the computer would show with autocorrect off ('\\b' is Backspace, U+0010 the Leader key): a client's text matcher run over it with the case's list, layout and Caps Lock must produce result. A case with keyboardOnly has no screen form and says why. The case folding and capitals are wordCharacters in autocorrect_domain_v2.json: a small letter's capital is the one character that folds to it. Test evidence, never a migration source.",
   "spec": "docs/spec/autocorrect-v1.md",
-  "version": 1,
+  "version": 2,
   "cases": [
     {
       "name": "word-end-space",
@@ -5622,6 +5622,1630 @@
       ],
       "screen": "sigs design ",
       "result": "sigs design "
+    },
+    {
+      "name": "leader-sends-at-once",
+      "rule": 11,
+      "description": "After the Leader key nothing typed reaches the computer; a typed form after the leader that no longer one begins with is sent on its last character.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "call "
+        },
+        {
+          "leader": true
+        },
+        {
+          "type": "pn"
+        },
+        {
+          "type": " now"
+        }
+      ],
+      "screen": "call \u0010pn now",
+      "result": "call +31 6 1234 5678 now"
+    },
+    {
+      "name": "leader-longest-sends-at-once",
+      "rule": 11,
+      "description": "abcd is the longest that begins with abcd, so it is sent on its last character.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "leader": true
+        },
+        {
+          "type": "abcd"
+        }
+      ],
+      "screen": "\u0010abcd",
+      "result": "delta"
+    },
+    {
+      "name": "leader-enter-sends-the-shorter",
+      "rule": 11,
+      "description": "abc begins abcd, so it waits; Enter sends abc and never reaches the computer.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "x "
+        },
+        {
+          "leader": true
+        },
+        {
+          "type": "abc"
+        },
+        {
+          "key": "Enter"
+        }
+      ],
+      "screen": "x \u0010abc\n",
+      "result": "x alpha"
+    },
+    {
+      "name": "leader-enter-on-no-typed-form",
+      "rule": 11,
+      "description": "Enter with what is held no typed form ends leading with nothing sent, Enter included.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "leader": true
+        },
+        {
+          "type": "ab"
+        },
+        {
+          "key": "Enter"
+        },
+        {
+          "type": "z"
+        }
+      ],
+      "screen": "\u0010ab\nz",
+      "result": "z"
+    },
+    {
+      "name": "leader-timeout-sends-the-shorter",
+      "rule": 11,
+      "description": "The leader's timeout, counted from the last key, sends a typed form a longer one begins with.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "leader": true
+        },
+        {
+          "type": "abc"
+        },
+        {
+          "wait": 2100
+        }
+      ],
+      "keyboardOnly": "the leader's timeout",
+      "result": "alpha"
+    },
+    {
+      "name": "leader-timeout-on-no-typed-form",
+      "rule": 11,
+      "description": "The timeout with what is held no typed form ends leading with nothing sent.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "leader": true
+        },
+        {
+          "type": "ab"
+        },
+        {
+          "wait": 2100
+        },
+        {
+          "type": "z"
+        }
+      ],
+      "keyboardOnly": "the leader's timeout",
+      "result": "z"
+    },
+    {
+      "name": "leader-early-exit",
+      "rule": 11,
+      "description": "A character that leaves what is held the start of no typed form ends leading at once, that character dropped too.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "a "
+        },
+        {
+          "leader": true
+        },
+        {
+          "type": "ax"
+        },
+        {
+          "type": "y"
+        }
+      ],
+      "screen": "a \u0010axy",
+      "result": "a y"
+    },
+    {
+      "name": "leader-escape",
+      "rule": 11,
+      "description": "Escape ends leading with nothing sent and never reaches the computer.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "x "
+        },
+        {
+          "leader": true
+        },
+        {
+          "type": "ab"
+        },
+        {
+          "key": "Escape"
+        },
+        {
+          "type": "z"
+        }
+      ],
+      "keyboardOnly": "Escape",
+      "result": "x z"
+    },
+    {
+      "name": "leader-backspace",
+      "rule": 11,
+      "description": "Backspace takes back the last character held, and with none held ends leading; neither reaches the computer.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "leader": true
+        },
+        {
+          "type": "ab"
+        },
+        {
+          "key": "Backspace"
+        },
+        {
+          "type": "bcd "
+        },
+        {
+          "leader": true
+        },
+        {
+          "key": "Backspace"
+        },
+        {
+          "type": "q"
+        }
+      ],
+      "screen": "\u0010ab\bbcd \u0010\bq",
+      "result": "delta q"
+    },
+    {
+      "name": "leader-again-starts-over",
+      "rule": 11,
+      "description": "Leader again drops what is held and starts over.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "leader": true
+        },
+        {
+          "type": "ab"
+        },
+        {
+          "leader": true
+        },
+        {
+          "type": "pn"
+        }
+      ],
+      "screen": "\u0010ab\u0010pn",
+      "result": "+31 6 1234 5678"
+    },
+    {
+      "name": "leader-tab-is-itself",
+      "rule": 11,
+      "description": "Tab ends leading with nothing sent and reaches the computer as itself.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "a"
+        },
+        {
+          "leader": true
+        },
+        {
+          "type": "ab"
+        },
+        {
+          "key": "Tab"
+        }
+      ],
+      "screen": "a\u0010ab\t",
+      "result": "a\t"
+    },
+    {
+      "name": "leader-cursor-key-is-itself",
+      "rule": 11,
+      "description": "A key that types no character ends leading with nothing sent and acts as itself: Left moves the cursor.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "hi"
+        },
+        {
+          "leader": true
+        },
+        {
+          "type": "ab"
+        },
+        {
+          "key": "Left"
+        },
+        {
+          "type": "X"
+        }
+      ],
+      "keyboardOnly": "a cursor key",
+      "result": "hXi"
+    },
+    {
+      "name": "leader-click",
+      "rule": 11,
+      "description": "A mouse click ends leading with nothing sent.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "hi "
+        },
+        {
+          "leader": true
+        },
+        {
+          "type": "ab"
+        },
+        {
+          "click": true
+        },
+        {
+          "type": "z"
+        }
+      ],
+      "keyboardOnly": "a mouse click",
+      "result": "hi z"
+    },
+    {
+      "name": "leader-macro-key",
+      "rule": 11,
+      "description": "A macro key ends leading with nothing sent and plays.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "leader": true
+        },
+        {
+          "type": "ab"
+        },
+        {
+          "macro": "Hi"
+        }
+      ],
+      "keyboardOnly": "a macro",
+      "result": "Hi"
+    },
+    {
+      "name": "leader-stored-switch-off",
+      "rule": 11,
+      "description": "With text replacement off in the profile the leader still sends; the word before it is left as typed.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "on": false,
+      "events": [
+        {
+          "type": "teh "
+        },
+        {
+          "leader": true
+        },
+        {
+          "type": "pn"
+        }
+      ],
+      "keyboardOnly": "the stored switch",
+      "result": "teh +31 6 1234 5678"
+    },
+    {
+      "name": "leader-override-off",
+      "rule": 11,
+      "description": "With text replacement switched off by key the leader still sends.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "override": false
+        },
+        {
+          "type": "teh "
+        },
+        {
+          "leader": true
+        },
+        {
+          "type": "pn"
+        }
+      ],
+      "keyboardOnly": "a switch key",
+      "result": "teh +31 6 1234 5678"
+    },
+    {
+      "name": "leader-macro",
+      "rule": 11,
+      "description": "A typed form after the leader may name a macro, which plays with nothing to erase.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "macro": 5,
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "sig",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "macros": {
+        "5": "Kind regards, Sam"
+      },
+      "events": [
+        {
+          "type": "Best, "
+        },
+        {
+          "leader": true
+        },
+        {
+          "type": "sig"
+        }
+      ],
+      "screen": "Best, \u0010sig",
+      "result": "Best, Kind regards, Sam"
+    },
+    {
+      "name": "leader-keys-during-a-send",
+      "rule": 11,
+      "description": "Keys typed while what the leader matched is typed come out after it, in order.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "leader": true
+        },
+        {
+          "type": "p"
+        },
+        {
+          "fast": "n is mine"
+        }
+      ],
+      "screen": "\u0010pn is mine",
+      "result": "+31 6 1234 5678 is mine"
+    },
+    {
+      "name": "leader-whatever-the-case",
+      "rule": 11,
+      "description": "What is held matches whatever its case: Shift and Caps Lock do not matter, and the replacement is typed as written.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "leader": true
+        },
+        {
+          "type": "PN"
+        },
+        {
+          "type": " "
+        },
+        {
+          "leader": true
+        },
+        {
+          "type": "Abcd"
+        }
+      ],
+      "screen": "\u0010PN \u0010Abcd",
+      "result": "+31 6 1234 5678 delta"
+    },
+    {
+      "name": "leader-under-caps-lock",
+      "rule": 11,
+      "description": "Under Caps Lock the replacement still shows as written.",
+      "layout": "us",
+      "capsLock": true,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "leader": true
+        },
+        {
+          "type": "abcd"
+        }
+      ],
+      "screen": "\u0010abcd",
+      "result": "delta"
+    },
+    {
+      "name": "leader-no-undo",
+      "rule": 11,
+      "description": "There is no undo: Backspace after what the leader sent is Backspace.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "leader": true
+        },
+        {
+          "type": "pn"
+        },
+        {
+          "key": "Backspace"
+        }
+      ],
+      "screen": "\u0010pn\b",
+      "result": "+31 6 1234 567"
+    },
+    {
+      "name": "leader-without-leader-inputs",
+      "rule": 11,
+      "description": "With no typed form after the leader in the list the Leader key does nothing.",
+      "layout": "us",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "leader": true
+        },
+        {
+          "type": "pn "
+        }
+      ],
+      "screen": "\u0010pn ",
+      "result": "pn "
+    },
+    {
+      "name": "leader-dead-key",
+      "rule": 11,
+      "description": "A dead key and the key it composes with are held as the one character they make.",
+      "layout": "windows-us-international",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "café",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "éa",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "leader": true
+        },
+        {
+          "type": "éa"
+        }
+      ],
+      "screen": "\u0010éa",
+      "result": "café"
+    },
+    {
+      "name": "leader-dutch-space-drops",
+      "rule": 11,
+      "description": "Every leader input is a word, on any layout: a space leaves what is held the start of none and drops it, the space too.",
+      "layout": "macos-dutch",
+      "capsLock": false,
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "alpha",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abc",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "delta",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "abcd",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "Kind regards",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "kr",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "leader": true
+        },
+        {
+          "type": "k r "
+        },
+        {
+          "leader": true
+        },
+        {
+          "type": "kr"
+        }
+      ],
+      "screen": "\u0010k r \u0010kr",
+      "result": "r Kind regards"
+    },
+    {
+      "name": "leader-only-never-as-you-type",
+      "rule": 11,
+      "layout": "us",
+      "capsLock": false,
+      "description": "A replacement that fires only after the Leader key leaves its input as typed when a word ends, while one that fires as a word ends still does; after the Leader key it sends.",
+      "list": [
+        {
+          "correction": "+31 6 1234 5678",
+          "trigger": "after the leader",
+          "typos": [
+            {
+              "typo": "pn",
+              "match": "whole word"
+            }
+          ]
+        },
+        {
+          "correction": "the",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "pn teh "
+        },
+        {
+          "leader": true
+        },
+        {
+          "type": "pn"
+        }
+      ],
+      "screen": "pn teh \u0010pn",
+      "result": "pn the +31 6 1234 5678"
+    },
+    {
+      "name": "leader-both-ways",
+      "rule": 11,
+      "layout": "us",
+      "capsLock": false,
+      "description": "A replacement that fires both ways replaces its input as a word ends and sends it after the Leader key.",
+      "list": [
+        {
+          "correction": "the",
+          "trigger": "both",
+          "typos": [
+            {
+              "typo": "teh",
+              "match": "whole word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "teh "
+        },
+        {
+          "leader": true
+        },
+        {
+          "type": "teh"
+        }
+      ],
+      "screen": "teh \u0010teh",
+      "result": "the the"
+    },
+    {
+      "name": "leader-both-ways-part-of-word",
+      "rule": 11,
+      "layout": "us",
+      "capsLock": false,
+      "description": "An input that matches part of a word, of a replacement that fires both ways: in a word as you type, and whole after the Leader key.",
+      "list": [
+        {
+          "correction": "receive",
+          "trigger": "both",
+          "typos": [
+            {
+              "typo": "recieve",
+              "match": "start of word"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "type": "recieved "
+        },
+        {
+          "leader": true
+        },
+        {
+          "type": "recieve"
+        }
+      ],
+      "screen": "recieved \u0010recieve",
+      "result": "received receive"
     }
   ]
 }

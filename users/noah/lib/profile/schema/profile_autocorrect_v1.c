@@ -16,7 +16,9 @@ enum {
     PHASE_TYPO_TEXT,
     PHASE_TYPO_CORRECTION,
     PHASE_TYPO_CORRECTION_TEXT,
+    PHASE_TYPO_INDEXES, // between steps never: where the typo's index rows are is decided at once
     PHASE_TYPO_PART,
+    PHASE_TYPO_LEADER,
     PHASE_COMPLETE,
 };
 
@@ -30,7 +32,7 @@ _Static_assert(NOAH_PROFILE_AUTOCORRECT_V1_MAX_TEXT_BYTES <= UINT16_MAX && NOAH_
 #if UINTPTR_MAX == UINT32_MAX
 // Regression policies for the 32-bit target, not SRAM limits: the validation
 // state stays well inside the whole-profile validator's domain union, and
-// the list handle is its range and counts.
+// the list handle is its range and its five counts.
 _Static_assert(sizeof(noah_profile_autocorrect_v1_validation_t) <= NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_VALIDATION_BUDGET, "autocorrect validation state exceeded its firmware regression policy");
 _Static_assert(sizeof(noah_profile_autocorrect_v1_list_t) <= NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_LIST_BUDGET, "autocorrect list handle exceeded its firmware regression policy");
 #endif
@@ -83,14 +85,19 @@ uint8_t noah_profile_autocorrect_v1_character(const uint8_t *bytes, uint8_t coun
     return size;
 }
 
-// A correction is any text; a typo is folded word characters, with
-// apostrophes only between them.
-static noah_profile_autocorrect_v1_result_t check_text(const uint8_t *text, uint8_t length, bool typo) {
+// What a text may hold: a correction any text; a typo folded word
+// characters, with apostrophes only between them.
+typedef enum {
+    TEXT_CORRECTION = 0u,
+    TEXT_WORD,
+} text_kind_t;
+
+static noah_profile_autocorrect_v1_result_t check_text(const uint8_t *text, uint8_t length, text_kind_t kind) {
     for (uint8_t i = 0u; i < length;) {
         uint32_t character, folded;
         uint8_t  size = noah_profile_autocorrect_v1_character(&text[i], (uint8_t)(length - i), &character);
         if (size == 0u) return NOAH_PROFILE_AUTOCORRECT_V1_INVALID_TEXT;
-        if (typo && !(character == NOAH_PROFILE_AUTOCORRECT_V1_APOSTROPHE && i != 0u && i + size != length)) {
+        if (kind == TEXT_WORD && !(character == NOAH_PROFILE_AUTOCORRECT_V1_APOSTROPHE && i != 0u && i + size != length)) {
             if (!noah_profile_autocorrect_v1_fold(character, &folded)) return NOAH_PROFILE_AUTOCORRECT_V1_NOT_A_WORD;
             if (folded != character) return NOAH_PROFILE_AUTOCORRECT_V1_NOT_FOLDED;
         }
@@ -99,8 +106,8 @@ static noah_profile_autocorrect_v1_result_t check_text(const uint8_t *text, uint
     return NOAH_PROFILE_AUTOCORRECT_V1_OK;
 }
 
-static bool counts_fit(uint16_t corrections, uint16_t typos, uint16_t part_typos, uint16_t text_bytes) {
-    return corrections <= NOAH_PROFILE_AUTOCORRECT_V1_MAX_CORRECTIONS && typos <= NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS && part_typos <= typos && text_bytes <= NOAH_PROFILE_AUTOCORRECT_V1_MAX_TEXT_BYTES;
+static bool counts_fit(uint16_t corrections, uint16_t typos, uint16_t part_typos, uint16_t leader_typos, uint16_t text_bytes) {
+    return corrections <= NOAH_PROFILE_AUTOCORRECT_V1_MAX_CORRECTIONS && typos <= NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS && part_typos <= typos && leader_typos <= typos && text_bytes <= NOAH_PROFILE_AUTOCORRECT_V1_MAX_TEXT_BYTES;
 }
 
 static size_t typo_rows_offset(uint16_t corrections) {
@@ -111,8 +118,12 @@ static size_t part_index_offset(uint16_t corrections, uint16_t typos) {
     return typo_rows_offset(corrections) + (size_t)ROW_SIZE * typos;
 }
 
-static size_t text_area_offset(uint16_t corrections, uint16_t typos, uint16_t part_typos) {
-    return part_index_offset(corrections, typos) + (size_t)NOAH_PROFILE_AUTOCORRECT_V1_PART_ROW_SIZE * part_typos;
+static size_t leader_index_offset(uint16_t corrections, uint16_t typos, uint16_t part_typos) {
+    return part_index_offset(corrections, typos) + (size_t)NOAH_PROFILE_AUTOCORRECT_V1_INDEX_ROW_SIZE * part_typos;
+}
+
+static size_t text_area_offset(uint16_t corrections, uint16_t typos, uint16_t part_typos, uint16_t leader_typos) {
+    return leader_index_offset(corrections, typos, part_typos) + (size_t)NOAH_PROFILE_AUTOCORRECT_V1_INDEX_ROW_SIZE * leader_typos;
 }
 
 // ── Validation ──────────────────────────────────────────────────────────────
@@ -125,7 +136,7 @@ static noah_profile_autocorrect_v1_validation_step_t reject(noah_profile_autocor
 }
 
 static size_t text_area(const validation_t *state) {
-    return text_area_offset(state->corrections, state->typos, state->part_typos);
+    return text_area_offset(state->corrections, state->typos, state->part_typos, state->leader_typos);
 }
 
 static bool walking_typos(const validation_t *state) {
@@ -179,8 +190,35 @@ static noah_profile_autocorrect_v1_result_t take_text(validation_t *state, const
     if (!*complete) return NOAH_PROFILE_AUTOCORRECT_V1_OK;
     // Equal as far as the row before it goes: above only when longer.
     if (!state->above && state->length <= state->previous_length) return NOAH_PROFILE_AUTOCORRECT_V1_ORDER;
-    state->text_offset += state->length;
-    return check_text(state->text, state->length, walking_typos(state));
+    state->text_offset = (uint16_t)(state->text_offset + state->length);
+    return check_text(state->text, state->length, walking_typos(state) ? TEXT_WORD : TEXT_CORRECTION);
+}
+
+// A correction row's kind byte, read: false for a kind, trigger or bit there
+// is not.
+static bool kind_byte(uint8_t byte, uint8_t *kind, uint8_t *trigger) {
+    *kind    = byte & NOAH_PROFILE_AUTOCORRECT_V1_KIND_BIT;
+    *trigger = (uint8_t)(byte >> NOAH_PROFILE_AUTOCORRECT_V1_TRIGGER_SHIFT);
+    return *trigger <= NOAH_PROFILE_AUTOCORRECT_V1_TRIGGER_BOTH;
+}
+
+// Where a typo's walk goes once its own row is checked: its part-index row
+// when it matches part of a word and its correction fires as a word ends,
+// then its leader-index row when its correction fires after the leader,
+// then the next typo. One past an index's end is one the index leaves out.
+static noah_profile_autocorrect_v1_result_t to_indexes(validation_t *state, bool part_done) {
+    if (!part_done && state->match != NOAH_PROFILE_AUTOCORRECT_V1_MATCH_WHOLE_WORD && state->trigger != NOAH_PROFILE_AUTOCORRECT_V1_TRIGGER_LEADER) {
+        if (state->part >= state->part_typos) return NOAH_PROFILE_AUTOCORRECT_V1_PART_INDEX;
+        state->phase = PHASE_TYPO_PART;
+        return NOAH_PROFILE_AUTOCORRECT_V1_OK;
+    }
+    if (state->trigger != NOAH_PROFILE_AUTOCORRECT_V1_TRIGGER_WORD) {
+        if (state->leader >= state->leader_typos) return NOAH_PROFILE_AUTOCORRECT_V1_LEADER_INDEX;
+        state->phase = PHASE_TYPO_LEADER;
+        return NOAH_PROFILE_AUTOCORRECT_V1_OK;
+    }
+    next_row(state);
+    return NOAH_PROFILE_AUTOCORRECT_V1_OK;
 }
 
 noah_profile_autocorrect_v1_validation_step_t noah_profile_autocorrect_v1_validation_step(noah_profile_autocorrect_v1_validation_t *state, const noah_profile_reader_t *reader, size_t base, size_t length, noah_profile_autocorrect_v1_error_t *error) {
@@ -225,8 +263,12 @@ noah_profile_autocorrect_v1_validation_step_t noah_profile_autocorrect_v1_valida
             count  = (uint8_t)(state->length - state->have);
             break;
         case PHASE_TYPO_PART:
-            offset = part_index_offset(state->corrections, state->typos) + (size_t)NOAH_PROFILE_AUTOCORRECT_V1_PART_ROW_SIZE * state->part;
-            count  = NOAH_PROFILE_AUTOCORRECT_V1_PART_ROW_SIZE;
+            offset = part_index_offset(state->corrections, state->typos) + (size_t)NOAH_PROFILE_AUTOCORRECT_V1_INDEX_ROW_SIZE * state->part;
+            count  = NOAH_PROFILE_AUTOCORRECT_V1_INDEX_ROW_SIZE;
+            break;
+        case PHASE_TYPO_LEADER:
+            offset = leader_index_offset(state->corrections, state->typos, state->part_typos) + (size_t)NOAH_PROFILE_AUTOCORRECT_V1_INDEX_ROW_SIZE * state->leader;
+            count  = NOAH_PROFILE_AUTOCORRECT_V1_INDEX_ROW_SIZE;
             break;
         default:
             return NOAH_PROFILE_AUTOCORRECT_V1_COMPLETE;
@@ -236,20 +278,24 @@ noah_profile_autocorrect_v1_validation_step_t noah_profile_autocorrect_v1_valida
 
     switch (state->phase) {
         case PHASE_HEADER: {
-            uint16_t corrections = read_u16(&bytes[0]), typos = read_u16(&bytes[2]), part_typos = read_u16(&bytes[4]), text_bytes = read_u16(&bytes[6]);
-            if (!counts_fit(corrections, typos, part_typos, text_bytes)) return reject(error, NOAH_PROFILE_AUTOCORRECT_V1_CAPACITY_EXCEEDED, 0u, NO_TABLE, NOAH_PROFILE_AUTOCORRECT_V1_LOCATION_NONE);
-            if (text_area_offset(corrections, typos, part_typos) + text_bytes != length) return reject(error, NOAH_PROFILE_AUTOCORRECT_V1_INVALID_LENGTH, 0u, NO_TABLE, NOAH_PROFILE_AUTOCORRECT_V1_LOCATION_NONE);
+            uint16_t corrections = read_u16(&bytes[0]), typos = read_u16(&bytes[2]), part_typos = read_u16(&bytes[4]), leader_typos = read_u16(&bytes[6]), text_bytes = read_u16(&bytes[8]);
+            if (!counts_fit(corrections, typos, part_typos, leader_typos, text_bytes)) return reject(error, NOAH_PROFILE_AUTOCORRECT_V1_CAPACITY_EXCEEDED, 0u, NO_TABLE, NOAH_PROFILE_AUTOCORRECT_V1_LOCATION_NONE);
+            if (text_area_offset(corrections, typos, part_typos, leader_typos) + text_bytes != length) return reject(error, NOAH_PROFILE_AUTOCORRECT_V1_INVALID_LENGTH, 0u, NO_TABLE, NOAH_PROFILE_AUTOCORRECT_V1_LOCATION_NONE);
             if (typos != 0u && corrections == 0u) return reject(error, NOAH_PROFILE_AUTOCORRECT_V1_INVALID_REFERENCE, 0u, NO_TABLE, NOAH_PROFILE_AUTOCORRECT_V1_LOCATION_NONE);
-            state->corrections = corrections;
-            state->typos       = typos;
-            state->part_typos  = part_typos;
-            state->text_bytes  = text_bytes;
-            state->phase       = corrections != 0u ? PHASE_CORRECTION_ROW : typos != 0u ? PHASE_TYPO_ROW : PHASE_COMPLETE;
+            state->corrections  = corrections;
+            state->typos        = typos;
+            state->part_typos   = part_typos;
+            state->leader_typos = leader_typos;
+            state->text_bytes   = text_bytes;
+            state->phase        = corrections != 0u ? PHASE_CORRECTION_ROW : typos != 0u ? PHASE_TYPO_ROW : PHASE_COMPLETE;
             break;
         }
-        case PHASE_CORRECTION_ROW:
+        case PHASE_CORRECTION_ROW: {
+            uint8_t kind, trigger;
             state->link = read_u16(&bytes[4]);
-            if (bytes[3] == NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO) {
+            if (!kind_byte(bytes[3], &kind, &trigger)) {
+                result = NOAH_PROFILE_AUTOCORRECT_V1_INVALID_KIND;
+            } else if (kind == NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO) {
                 // A macro correction has no text: its slot stands where the
                 // offset would, and the slots ascend after every text one.
                 uint16_t macro = read_u16(bytes);
@@ -261,11 +307,9 @@ noah_profile_autocorrect_v1_validation_step_t noah_profile_autocorrect_v1_valida
                     result = NOAH_PROFILE_AUTOCORRECT_V1_ORDER;
                 }
                 state->macros = true;
-                state->macro  = macro;
+                state->macro  = (uint8_t)macro;
                 state->length = 0u;
                 state->phase  = PHASE_CORRECTION_FIRST_TYPO;
-            } else if (bytes[3] != NOAH_PROFILE_AUTOCORRECT_V1_KIND_TEXT) {
-                result = NOAH_PROFILE_AUTOCORRECT_V1_INVALID_KIND;
             } else {
                 result = begin_text(state, bytes, NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX);
                 if (result == NOAH_PROFILE_AUTOCORRECT_V1_OK && state->macros) result = NOAH_PROFILE_AUTOCORRECT_V1_ORDER;
@@ -273,6 +317,7 @@ noah_profile_autocorrect_v1_validation_step_t noah_profile_autocorrect_v1_valida
             }
             if (result == NOAH_PROFILE_AUTOCORRECT_V1_OK && state->link >= state->typos) result = NOAH_PROFILE_AUTOCORRECT_V1_INVALID_REFERENCE;
             break;
+        }
         case PHASE_TYPO_ROW:
             result       = begin_text(state, bytes, NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX);
             state->match = bytes[3];
@@ -299,19 +344,22 @@ noah_profile_autocorrect_v1_validation_step_t noah_profile_autocorrect_v1_valida
             }
             next_row(state);
             break;
-        case PHASE_TYPO_CORRECTION:
+        case PHASE_TYPO_CORRECTION: {
+            uint8_t kind;
             offset = typo_rows_offset(state->corrections) + (size_t)ROW_SIZE * state->row;
             if (read_u16(&bytes[4]) > state->row) {
                 result = NOAH_PROFILE_AUTOCORRECT_V1_FIRST_TYPO;
                 break;
             }
-            // A macro plays for the whole word only.
-            if (bytes[3] == NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO) {
+            // Its row was checked in the corrections' walk.
+            (void)kind_byte(bytes[3], &kind, &state->trigger);
+            // A macro plays for the whole word.
+            if (kind == NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO) {
                 if (state->match != NOAH_PROFILE_AUTOCORRECT_V1_MATCH_WHOLE_WORD) {
                     result = NOAH_PROFILE_AUTOCORRECT_V1_INVALID_MATCH;
                     break;
                 }
-                state->phase = PHASE_TYPO_PART;
+                state->phase = PHASE_TYPO_INDEXES;
                 break;
             }
             // Only a correction of the typo's length can equal it. Its row was
@@ -322,11 +370,12 @@ noah_profile_autocorrect_v1_validation_step_t noah_profile_autocorrect_v1_valida
                 state->phase = PHASE_TYPO_CORRECTION_TEXT;
                 break;
             }
-            state->phase = PHASE_TYPO_PART;
+            state->phase = PHASE_TYPO_INDEXES;
             break;
+        }
         case PHASE_TYPO_CORRECTION_TEXT:
             if (memcmp(bytes, &state->text[state->have], count) != 0) {
-                state->phase = PHASE_TYPO_PART;
+                state->phase = PHASE_TYPO_INDEXES;
                 break;
             }
             state->have = (uint8_t)(state->have + count);
@@ -341,6 +390,15 @@ noah_profile_autocorrect_v1_validation_step_t noah_profile_autocorrect_v1_valida
                 break;
             }
             state->part++;
+            result = to_indexes(state, true);
+            if (result != NOAH_PROFILE_AUTOCORRECT_V1_OK) offset = typo_rows_offset(state->corrections) + (size_t)ROW_SIZE * state->row;
+            break;
+        case PHASE_TYPO_LEADER:
+            if (read_u16(bytes) != state->row) {
+                result = NOAH_PROFILE_AUTOCORRECT_V1_LEADER_INDEX;
+                break;
+            }
+            state->leader++;
             next_row(state);
             break;
         default:
@@ -348,18 +406,15 @@ noah_profile_autocorrect_v1_validation_step_t noah_profile_autocorrect_v1_valida
     }
     if (result != NOAH_PROFILE_AUTOCORRECT_V1_OK) return reject(error, result, offset, table_of(state), state->row);
 
-    // A whole-word typo has no part-index row to read; a part-of-word typo
-    // past the index's end is one the index leaves out.
-    if (state->phase == PHASE_TYPO_PART) {
-        if (state->match == NOAH_PROFILE_AUTOCORRECT_V1_MATCH_WHOLE_WORD) {
-            next_row(state);
-        } else if (state->part >= state->part_typos) {
-            return reject(error, NOAH_PROFILE_AUTOCORRECT_V1_PART_INDEX, typo_rows_offset(state->corrections) + (size_t)ROW_SIZE * state->row, NOAH_PROFILE_AUTOCORRECT_V1_TABLE_TYPOS, state->row);
-        }
+    // The typo's own row is checked: on to its index rows, if it has any.
+    if (state->phase == PHASE_TYPO_INDEXES) {
+        result = to_indexes(state, false);
+        if (result != NOAH_PROFILE_AUTOCORRECT_V1_OK) return reject(error, result, typo_rows_offset(state->corrections) + (size_t)ROW_SIZE * state->row, NOAH_PROFILE_AUTOCORRECT_V1_TABLE_TYPOS, state->row);
     }
     if (state->phase != PHASE_COMPLETE) return NOAH_PROFILE_AUTOCORRECT_V1_VALIDATING;
-    // Every part-index row and every text byte belongs to a row.
-    if (state->part != state->part_typos) return reject(error, NOAH_PROFILE_AUTOCORRECT_V1_PART_INDEX, part_index_offset(state->corrections, state->typos) + (size_t)NOAH_PROFILE_AUTOCORRECT_V1_PART_ROW_SIZE * state->part, NOAH_PROFILE_AUTOCORRECT_V1_TABLE_PART_INDEX, state->part);
+    // Every index row and every text byte belongs to a row.
+    if (state->part != state->part_typos) return reject(error, NOAH_PROFILE_AUTOCORRECT_V1_PART_INDEX, part_index_offset(state->corrections, state->typos) + (size_t)NOAH_PROFILE_AUTOCORRECT_V1_INDEX_ROW_SIZE * state->part, NOAH_PROFILE_AUTOCORRECT_V1_TABLE_PART_INDEX, state->part);
+    if (state->leader != state->leader_typos) return reject(error, NOAH_PROFILE_AUTOCORRECT_V1_LEADER_INDEX, leader_index_offset(state->corrections, state->typos, state->part_typos) + (size_t)NOAH_PROFILE_AUTOCORRECT_V1_INDEX_ROW_SIZE * state->leader, NOAH_PROFILE_AUTOCORRECT_V1_TABLE_LEADER_INDEX, state->leader);
     if (state->text_offset != state->text_bytes) return reject(error, NOAH_PROFILE_AUTOCORRECT_V1_INVALID_LENGTH, text_area(state) + state->text_offset, NO_TABLE, NOAH_PROFILE_AUTOCORRECT_V1_LOCATION_NONE);
     return NOAH_PROFILE_AUTOCORRECT_V1_COMPLETE;
 }
@@ -382,7 +437,7 @@ static bool row_text(const list_t *list, const uint8_t row[ROW_SIZE], uint8_t mo
     // correction in as many reads as it needs.
     for (uint8_t have = 0u; text && have < *length;) {
         uint8_t count = (uint8_t)(*length - have) > NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX ? NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX : (uint8_t)(*length - have);
-        if (!list_read(list, text_area_offset(list->corrections, list->typos, list->part_typos) + offset + have, &text[have], count)) return false;
+        if (!list_read(list, text_area_offset(list->corrections, list->typos, list->part_typos, list->leader_typos) + offset + have, &text[have], count)) return false;
         have = (uint8_t)(have + count);
     }
     return true;
@@ -393,9 +448,9 @@ bool noah_profile_autocorrect_v1_open(noah_profile_autocorrect_v1_list_t *list, 
     if (!list) return false;
     memset(list, 0, sizeof(*list));
     if (!reader || length < sizeof(header) || base > SIZE_MAX - length || !noah_profile_reader_read(reader, base, header, sizeof(header))) return false;
-    uint16_t corrections = read_u16(&header[0]), typos = read_u16(&header[2]), part_typos = read_u16(&header[4]), text_bytes = read_u16(&header[6]);
-    if (!counts_fit(corrections, typos, part_typos, text_bytes) || text_area_offset(corrections, typos, part_typos) + text_bytes != length) return false;
-    *list = (noah_profile_autocorrect_v1_list_t){.reader = *reader, .base = base, .corrections = corrections, .typos = typos, .part_typos = part_typos, .text_bytes = text_bytes};
+    uint16_t corrections = read_u16(&header[0]), typos = read_u16(&header[2]), part_typos = read_u16(&header[4]), leader_typos = read_u16(&header[6]), text_bytes = read_u16(&header[8]);
+    if (!counts_fit(corrections, typos, part_typos, leader_typos, text_bytes) || text_area_offset(corrections, typos, part_typos, leader_typos) + text_bytes != length) return false;
+    *list = (noah_profile_autocorrect_v1_list_t){.reader = *reader, .base = base, .corrections = corrections, .typos = typos, .part_typos = part_typos, .leader_typos = leader_typos, .text_bytes = text_bytes};
     return true;
 }
 
@@ -429,20 +484,75 @@ bool noah_profile_autocorrect_v1_find(const noah_profile_autocorrect_v1_list_t *
 }
 
 bool noah_profile_autocorrect_v1_part_at(const noah_profile_autocorrect_v1_list_t *list, uint16_t position, noah_profile_autocorrect_v1_typo_t *typo, uint8_t text[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX]) {
-    uint8_t row[NOAH_PROFILE_AUTOCORRECT_V1_PART_ROW_SIZE];
+    uint8_t row[NOAH_PROFILE_AUTOCORRECT_V1_INDEX_ROW_SIZE];
     if (!list || position >= list->part_typos || !list_read(list, part_index_offset(list->corrections, list->typos) + (size_t)sizeof(row) * position, row, sizeof(row))) return false;
     return noah_profile_autocorrect_v1_typo_at(list, read_u16(row), typo, text) && typo->match != NOAH_PROFILE_AUTOCORRECT_V1_MATCH_WHOLE_WORD;
 }
 
+bool noah_profile_autocorrect_v1_leader_at(const noah_profile_autocorrect_v1_list_t *list, uint16_t position, noah_profile_autocorrect_v1_typo_t *typo, uint8_t text[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX]) {
+    uint8_t row[NOAH_PROFILE_AUTOCORRECT_V1_INDEX_ROW_SIZE];
+    if (!list || position >= list->leader_typos || !list_read(list, leader_index_offset(list->corrections, list->typos, list->part_typos) + (size_t)sizeof(row) * position, row, sizeof(row))) return false;
+    return noah_profile_autocorrect_v1_typo_at(list, read_u16(row), typo, text);
+}
+
+// Whether `text` begins with all of `held`.
+static bool begins_with(const uint8_t *text, uint8_t length, const uint8_t *held, uint8_t held_length) {
+    return length >= held_length && memcmp(text, held, held_length) == 0;
+}
+
+bool noah_profile_autocorrect_v1_leader(const noah_profile_autocorrect_v1_list_t *list, const uint8_t *folded, uint8_t length, noah_profile_autocorrect_v1_leader_t *found) {
+    noah_profile_autocorrect_v1_typo_t typo;
+    uint8_t                            text[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX];
+    uint16_t                           low = 0u, high;
+    if (!list || !folded || !found || length == 0u || length > NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX) return false;
+    *found = (noah_profile_autocorrect_v1_leader_t){0};
+    high   = list->leader_typos;
+    // The first position not below `folded`, a text before any longer one
+    // it begins: there `folded` is, if it is a typo, and after it whatever
+    // begins with it. The interval halves every pass, so a malformed list
+    // ends it as soon.
+    while (low < high) {
+        uint16_t middle = (uint16_t)(low + (high - low) / 2u);
+        if (!noah_profile_autocorrect_v1_leader_at(list, middle, &typo, text)) return false;
+        uint8_t shared = typo.length < length ? typo.length : length;
+        int     order  = memcmp(text, folded, shared);
+        if (order < 0 || (order == 0 && typo.length < length)) {
+            low = (uint16_t)(middle + 1u);
+        } else {
+            high = middle;
+        }
+    }
+    if (low < list->leader_typos) {
+        if (!noah_profile_autocorrect_v1_leader_at(list, low, &typo, text)) return false;
+        if (typo.length == length && memcmp(text, folded, length) == 0) {
+            found->typo  = typo;
+            found->exact = true;
+            low++;
+            if (low < list->leader_typos && !noah_profile_autocorrect_v1_leader_at(list, low, &typo, text)) return false;
+        }
+        found->longer = low < list->leader_typos && typo.length > length && begins_with(text, typo.length, folded, length);
+    }
+    return true;
+}
+
 bool noah_profile_autocorrect_v1_correction(const noah_profile_autocorrect_v1_list_t *list, uint16_t index, noah_profile_autocorrect_v1_correction_t *correction, uint8_t text[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX]) {
-    uint8_t row[ROW_SIZE], length = 0u;
-    if (!list || !correction || index >= list->corrections || !list_read(list, NOAH_PROFILE_AUTOCORRECT_V1_HEADER_SIZE + (size_t)ROW_SIZE * index, row, sizeof(row))) return false;
-    if (row[3] == NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO) {
+    uint8_t row[ROW_SIZE], length = 0u, kind, trigger;
+    if (!list || !correction || index >= list->corrections || !list_read(list, NOAH_PROFILE_AUTOCORRECT_V1_HEADER_SIZE + (size_t)ROW_SIZE * index, row, sizeof(row)) || !kind_byte(row[3], &kind, &trigger)) return false;
+    if (kind == NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO) {
         if (row[2] != 0u || read_u16(row) >= NOAH_PROFILE_AUTOCORRECT_V1_MACRO_SLOTS) return false;
-        *correction = (noah_profile_autocorrect_v1_correction_t){.kind = NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO, .macro = read_u16(row)};
+        *correction = (noah_profile_autocorrect_v1_correction_t){.kind = NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO, .trigger = trigger, .macro = read_u16(row)};
         return true;
     }
-    if (row[3] != NOAH_PROFILE_AUTOCORRECT_V1_KIND_TEXT || !row_text(list, row, NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX, text, &length)) return false;
-    *correction = (noah_profile_autocorrect_v1_correction_t){.kind = NOAH_PROFILE_AUTOCORRECT_V1_KIND_TEXT, .length = length};
+    if (!row_text(list, row, NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX, text, &length)) return false;
+    *correction = (noah_profile_autocorrect_v1_correction_t){.kind = NOAH_PROFILE_AUTOCORRECT_V1_KIND_TEXT, .trigger = trigger, .length = length};
     return true;
+}
+
+bool noah_profile_autocorrect_v1_fires_as_typed(const noah_profile_autocorrect_v1_list_t *list) {
+    noah_profile_autocorrect_v1_correction_t correction;
+    if (!list) return false;
+    for (uint16_t index = 0u; index < list->corrections; index++) {
+        if (noah_profile_autocorrect_v1_correction(list, index, &correction, NULL) && correction.trigger != NOAH_PROFILE_AUTOCORRECT_V1_TRIGGER_LEADER) return true;
+    }
+    return false;
 }

@@ -46,9 +46,10 @@ enum {
     NOAH_PROFILE_WIRE_V1_PAYLOAD_METADATA_PAGE = 0u,
     // Profile Wire 2.0 opens the new base (D-F28): 32-bit profile lengths
     // and offsets everywhere, a feature word of build differences only.
-    // 2.1 adds the behaviours and auto-mouse switch keys (D-F66).
+    // 2.1 adds the behaviours, auto-mouse and autocorrect switch keys
+    // (D-F66); 2.2 the Leader key (D-F71).
     NOAH_PROFILE_WIRE_V1_PROTOCOL_MAJOR = 2u,
-    NOAH_PROFILE_WIRE_V1_PROTOCOL_MINOR = 1u,
+    NOAH_PROFILE_WIRE_V1_PROTOCOL_MINOR = 2u,
     // Capability layout 3 (D-F28): page 1 the byte-wide ceilings, page 2 the
     // wider ones, payload capacities 32 bits; page 3 the autocorrect list's
     // ceilings (D-F68).

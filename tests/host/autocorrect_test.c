@@ -38,7 +38,7 @@ static uint32_t now;
 static uint8_t  raw_keys[32], physical_mods, modifier_owners[8], oneshot_mods;
 static uint8_t  layout_id;
 static bool     layout_macos, caps_lock;
-static unsigned reports_sent, backspaces_sent, characters_sent, taps_sent;
+static unsigned reports_sent, backspaces_sent, characters_sent, taps_sent, escapes_sent, locks_sent;
 static uint32_t last_report_at;
 
 bool keyboard_report_mods_override_user(uint8_t *mods);
@@ -180,6 +180,12 @@ static void host_key(uint8_t usage, uint8_t mods) {
         case KC_END:
             cursor = screen_length;
             return;
+        case KC_ESCAPE:
+            escapes_sent++;
+            return;
+        case KC_CAPS_LOCK:
+            locks_sent++;
+            return;
         case KC_ENTER:
             host_insert('\n');
             return;
@@ -301,6 +307,13 @@ static void scan(unsigned milliseconds) {
     }
 }
 
+// The Leader key's tap: it acts at its press, as the action kind sends it, and
+// puts nothing in a report (D-F71).
+static void leader_key(void) {
+    noah_typing_stage_leader();
+    scan(25u);
+}
+
 // Until the macro engine is idle and no report has gone out for a while.
 static void settle(void) {
     scan(12u);
@@ -374,7 +387,7 @@ static void reset(void) {
     physical_mods = seen_mods = oneshot_mods = 0u;
     screen_length = cursor = 0u;
     host_dead              = 0u;
-    reports_sent = backspaces_sent = characters_sent = taps_sent = 0u;
+    reports_sent = backspaces_sent = characters_sent = taps_sent = escapes_sent = locks_sent = 0u;
     caps_lock                                        = false;
     layout_id                                        = 0u;
     layout_macos                                     = false;
@@ -506,6 +519,15 @@ static unsigned run_fixture(const char *path) {
             macro_key();
             if (a) scan(2u);
             else settle();
+        } else if (strcmp(word, "LEADER") == 0) {
+            leader_key();
+        } else if (strcmp(word, "WAIT") == 0) {
+            CHECK(sscanf(line, "WAIT %u", &a) == 1);
+            scan(a);
+        } else if (strcmp(word, "OVERRIDE") == 0) {
+            CHECK(sscanf(line, "OVERRIDE %u", &a) == 1);
+            autocorrect_switch_set_override(a != 0u);
+            settle();
         } else if (strcmp(word, "STROKES") == 0) {
             CHECK(sscanf(line, "STROKES %u %u", &a, &b) == 2);
             settle();
@@ -530,8 +552,8 @@ static unsigned run_fixture(const char *path) {
 
 // ── What the fixture cannot say ─────────────────────────────────────────────
 
-static const uint8_t the_list[] = {0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x03, 0x00, 0x03, 0x00, 0x00, 0x00, 't', 'h', 'e', 't', 'e', 'h'};
-static const uint8_t no_list[]  = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+static const uint8_t the_list[] = {0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x03, 0x00, 0x03, 0x00, 0x00, 0x00, 't', 'h', 'e', 't', 'e', 'h'};
+static const uint8_t no_list[]  = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 static void begin(const char *name, const uint8_t *bytes, size_t length) {
     reset();
@@ -596,7 +618,7 @@ static void test_a_list_published_during_a_lookup(void) {
     size_t         other_length;
 
     use_named_list("other");
-    other_length = list.text_bytes + (size_t)NOAH_PROFILE_AUTOCORRECT_V1_HEADER_SIZE + NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_ROW_SIZE + NOAH_PROFILE_AUTOCORRECT_V1_TYPO_ROW_SIZE + NOAH_PROFILE_AUTOCORRECT_V1_PART_ROW_SIZE;
+    other_length = list.text_bytes + (size_t)NOAH_PROFILE_AUTOCORRECT_V1_HEADER_SIZE + NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_ROW_SIZE + NOAH_PROFILE_AUTOCORRECT_V1_TYPO_ROW_SIZE + NOAH_PROFILE_AUTOCORRECT_V1_INDEX_ROW_SIZE;
     CHECK(other_length <= sizeof(other));
     memcpy(other, list_bytes, other_length);
 
@@ -869,13 +891,13 @@ static void test_no_correction_starts_behind_a_long_queue(void) {
 // The longest correction: 128 characters after "teh". They are digits, so
 // no letter typed behind it is a key the correction is holding.
 enum { LONGEST = NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX };
-static uint8_t longest_list[8 + 6 + 6 + LONGEST + 3];
+static uint8_t longest_list[10 + 6 + 6 + LONGEST + 3];
 
 static void begin_longest(const char *name) {
-    memcpy(longest_list, (uint8_t[]){1, 0, 1, 0, 0, 0, LONGEST + 3, 0, /* correction */ 0, 0, LONGEST, 0, 0, 0, /* typo */ LONGEST, 0, 3, 0, 0, 0}, 20);
+    memcpy(longest_list, (uint8_t[]){1, 0, 1, 0, 0, 0, 0, 0, LONGEST + 3, 0, /* correction */ 0, 0, LONGEST, 0, 0, 0, /* typo */ LONGEST, 0, 3, 0, 0, 0}, 22);
     for (unsigned i = 0; i < LONGEST; i++)
-        longest_list[20u + i] = (uint8_t)('0' + i % 10u);
-    memcpy(&longest_list[20 + LONGEST], "teh", 3);
+        longest_list[22u + i] = (uint8_t)('0' + i % 10u);
+    memcpy(&longest_list[22 + LONGEST], "teh", 3);
     begin(name, longest_list, sizeof(longest_list));
     type("teh", false);
     key(KC_SPACE, true);
@@ -921,14 +943,14 @@ static void test_typing_through_the_longest_correction(void) {
 
     begin_longest("typing through the longest correction");
     type_behind(behind, 40u, 40u);
-    memcpy(expected, &longest_list[20], LONGEST);
+    memcpy(expected, &longest_list[22], LONGEST);
     expected[LONGEST] = ' ';
     memcpy(&expected[LONGEST + 1u], behind, 41u);
     expect_screen(expected, false);
 }
 
 // sig -> macro 5, a whole word.
-static const uint8_t macro_list[] = {1, 0, 1, 0, 0, 0, 3, 0, /* correction */ 5, 0, 0, 1, 0, 0, /* typo */ 0, 0, 3, 0, 0, 0, 's', 'i', 'g'};
+static const uint8_t macro_list[] = {1, 0, 1, 0, 0, 0, 0, 0, 3, 0, /* correction */ 5, 0, 0, 1, 0, 0, /* typo */ 0, 0, 3, 0, 0, 0, 's', 'i', 'g'};
 
 // A correction's macro stored uninterruptible still loses no key: what is
 // typed while it plays is held back and comes out after it, where a macro a
@@ -1128,6 +1150,173 @@ static void test_a_combo_that_ends_the_word_shows_on_all_its_keys(void) {
     settle();
 }
 
+// ── The leader ──────────────────────────────────────────────────────────────
+
+// With text replacement off the stage is out of the report path, a list with
+// replacements that fire after the leader or not, until Leader brings it in
+// (D-F71); it
+// leaves again once leading is over and nothing waits.
+static void test_the_stage_joins_the_report_path_for_the_leader(void) {
+    begin_named("the stage joins the report path for the leader", "leader-only");
+    keymap_config.autocorrect_enable = false;
+    CHECK(!noah_typing_stage_active());
+    type("pn ", false);
+    expect_screen("pn ", false);
+    CHECK(!noah_typing_stage_active());
+    leader_key();
+    CHECK(noah_typing_stage_active() && noah_autocorrect_leading());
+    type("p", false);
+    CHECK(noah_autocorrect_leading());
+    type("n", false);
+    CHECK(!noah_autocorrect_leading());
+    expect_screen("pn +31 6 1234 5678", false);
+    CHECK(!noah_typing_stage_active());
+    // A list with words to replace keeps it in the path, as without a leader.
+    keymap_config.autocorrect_enable = true;
+    use_named_list("leader");
+    CHECK(noah_typing_stage_active());
+}
+
+// A click while leading takes its place behind the keys held back: one typed
+// after Leader and not yet read is held, and dropped with what was held.
+static void test_a_click_while_leading_keeps_its_place(void) {
+    owned_keycode_lease_t click = {0};
+
+    begin_named("a click while leading keeps its place", "leader");
+    leader_key();
+    key(KC_A, true);
+    CHECK(owned_keycode_acquire(QK_MOUSE_BUTTON_1, &click));
+    scan(20u);
+    CHECK(owned_keycode_release(&click));
+    key(KC_A, false);
+    settle();
+    CHECK(!noah_autocorrect_leading());
+    type("z", false);
+    expect_screen("z", false);
+}
+
+// After a dead key that is still waiting, a lock key reaches the computer and
+// leaves the dead key waiting, and a key that types no character acts as
+// itself.
+static void test_keys_after_a_dead_key_while_leading(void) {
+    begin_named("keys after a dead key while leading", "leader");
+    layout_id = 7u; // US-International: the quote is a dead key.
+    type("hi", false);
+    leader_key();
+    tap(KC_QUOTE, 0u, false);
+    tap(KC_CAPS_LOCK, 0u, false);
+    CHECK(locks_sent == 1u && noah_autocorrect_leading());
+    tap(KC_LEFT, 0u, false);
+    CHECK(!noah_autocorrect_leading());
+    type("X", false);
+    expect_screen("hXi", false);
+}
+
+// Leader pressed while a replacement is typed takes its turn behind what was
+// pressed before it: those keys come out, and only what follows Leader is
+// held.
+static void test_the_leader_takes_its_turn_behind_a_replacement(void) {
+    begin_named("the leader takes its turn behind a replacement", "leader");
+    type("teh", false);
+    end_the_word_with(KC_SPACE);
+    tap(KC_X, 0u, true);
+    leader_key();
+    type("pn", true);
+    expect_screen("the x+31 6 1234 5678", false);
+}
+
+// A list that gains a replacement that fires after the leader brings the stage into the
+// report path: the report it missed is read before Leader takes its turn, so a
+// key already down is not taken for what is typed after the leader, and what
+// is typed while it stays down is held.
+static void test_a_key_down_when_the_list_gains_a_leader_input(void) {
+    begin("a key down when the list gains a leader input", no_list, sizeof(no_list));
+    key(KC_B, true);
+    scan(5u);
+    use_named_list("leader-only");
+    leader_key();
+    type("pn", false);
+    key(KC_B, false);
+    expect_screen("b+31 6 1234 5678", false);
+}
+
+// A key held when leading begins and let go during it is sent once.
+static void test_a_key_held_when_leading_begins(void) {
+    begin_named("a key held when leading begins", "leader-only");
+    key(KC_A, true);
+    scan(25u);
+    leader_key();
+    type("p", false);
+    key(KC_A, false);
+    scan(5u);
+    type("n", false);
+    expect_screen("a+31 6 1234 5678", false);
+}
+
+// What the leader sends flashes as the replacement it is, on the key that
+// ended leading: the last character, or Enter; the timeout names no key. An
+// ending that sends nothing shows nothing.
+static void test_a_leader_send_shows_on_the_key_that_ended_leading(void) {
+    begin_named("a leader send shows on the key that ended leading", "leader");
+    snprintf(stored_macros[5], sizeof(stored_macros[5]), "%s", "Kind regards, Sam");
+    leader_key();
+    type("p", false);
+    expect_feedback(NOAH_AUTOCORRECT_FEEDBACK_NONE, 0u);
+    key(KC_N, true);
+    scan(2u);
+    expect_feedback(NOAH_AUTOCORRECT_FEEDBACK_TEXT, KC_N);
+    key(KC_N, false);
+    settle();
+    scan(AUTOCORRECT_FEEDBACK_FLASH_MS);
+
+    leader_key();
+    type("abc", false);
+    expect_feedback(NOAH_AUTOCORRECT_FEEDBACK_NONE, 0u);
+    end_the_word_with(KC_ENTER);
+    scan(2u);
+    expect_feedback(NOAH_AUTOCORRECT_FEEDBACK_TEXT, KC_ENTER);
+    settle();
+    scan(AUTOCORRECT_FEEDBACK_FLASH_MS);
+
+    leader_key();
+    type("abc", false);
+    scan(2000u);
+    expect_feedback(NOAH_AUTOCORRECT_FEEDBACK_TEXT, 0u);
+    settle();
+    scan(AUTOCORRECT_FEEDBACK_FLASH_MS);
+
+    leader_key();
+    type("si", false);
+    key(KC_G, true);
+    scan(2u);
+    expect_feedback(NOAH_AUTOCORRECT_FEEDBACK_MACRO, KC_G);
+    key(KC_G, false);
+    settle();
+    CHECK(macros_started == 1u);
+    scan(AUTOCORRECT_FEEDBACK_FLASH_MS);
+    expect_screen("+31 6 1234 5678alphaalphaKind regards, Sam", false);
+
+    feedback_seen = 0u;
+    leader_key();
+    type("ax", false);
+    leader_key();
+    type("ab", false);
+    tap(KC_ESCAPE, 0u, false);
+    CHECK(escapes_sent == 0u);
+    leader_key();
+    type("ab", false);
+    end_the_word_with(KC_ENTER);
+    leader_key();
+    type("ab", false);
+    scan(2100u);
+    settle();
+    CHECK(feedback_seen == 1u << NOAH_AUTOCORRECT_FEEDBACK_NONE);
+    CHECK(!noah_autocorrect_leading());
+    // Escape that ends no leading reaches the computer.
+    tap(KC_ESCAPE, 0u, false);
+    CHECK(escapes_sent == 1u);
+}
+
 int main(int argc, char **argv) {
     assert(argc == 3);
     lists_path     = argv[2];
@@ -1155,6 +1344,13 @@ int main(int argc, char **argv) {
     test_a_macro_replacement_shows_on_the_key_that_ended_the_word();
     test_a_replacement_from_no_known_key_shows_without_one();
     test_a_combo_that_ends_the_word_shows_on_all_its_keys();
+    test_the_stage_joins_the_report_path_for_the_leader();
+    test_a_click_while_leading_keeps_its_place();
+    test_keys_after_a_dead_key_while_leading();
+    test_the_leader_takes_its_turn_behind_a_replacement();
+    test_a_key_down_when_the_list_gains_a_leader_input();
+    test_a_key_held_when_leading_begins();
+    test_a_leader_send_shows_on_the_key_that_ended_leading();
     printf("autocorrect host tests passed: %u fixture cases\n", cases);
     return 0;
 }

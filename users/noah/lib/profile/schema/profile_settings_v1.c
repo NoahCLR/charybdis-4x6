@@ -12,6 +12,8 @@ bool noah_profile_setting_v1_valid(uint8_t id, uint32_t v, uint8_t layers) {
         case NOAH_SETTING_FEEDBACK_PERIOD:
         case NOAH_SETTING_AUTOCORRECT_FEEDBACK_PERIOD:
             return v > 0 && v <= 65535;
+        case NOAH_SETTING_LEADER_TIMEOUT:
+            return v >= 1000 && v <= 10000;
         case NOAH_SETTING_AUTO_MOUSE_ENABLED:
         case NOAH_SETTING_AUTO_SNIPING_ENABLED:
         case NOAH_SETTING_COMBOS_ENABLED:

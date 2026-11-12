@@ -1,6 +1,6 @@
 # Settings domain `0x40` and its readback
 
-Domain `0x40`, version 12, holds the keyboard-wide settings: 32 scalar
+Domain `0x40`, version 13, holds the keyboard-wide settings: 33 scalar
 settings, a record per layer, each custom key's shortcut, and the names of the
 layers, macros, custom keys and the keyboard. GET `0x07` reads the active
 settings back and GET `0x08` reports the lighting and key-option metadata a
@@ -16,12 +16,12 @@ a toggle changes these values, and how they reach QMK, is
 | Offset | Size | Contents |
 | ---: | ---: | --- |
 | 0 | 8 | header |
-| 8 | 128 | 32 scalars, `u32` each, scalar 0 first |
-| 136 | 272 | 16 layer records of 17 bytes, layer 0 first |
-| 408 | 1,280 | 128 custom-key shortcuts of 10 bytes, custom key 0 first |
-| 1,688 | 273 to 9,009 | 273 counted names |
+| 8 | 132 | 33 scalars, `u32` each, scalar 0 first |
+| 140 | 272 | 16 layer records of 17 bytes, layer 0 first |
+| 412 | 1,280 | 128 custom-key shortcuts of 10 bytes, custom key 0 first |
+| 1,692 | 273 to 9,009 | 273 counted names |
 
-The domain is 1,961 bytes with every name empty and 10,697 with every name 32
+The domain is 1,965 bytes with every name empty and 10,701 with every name 32
 bytes; any other length is refused. The fixed part comes first so every field
 before the names sits at a known offset. Validation consumes one byte at a
 time from reads of at most 20 bytes; any refusal is `INVALID_DOMAIN`.
@@ -32,20 +32,21 @@ Held by: `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_tes
 
 | Offset | Value |
 | ---: | --- |
-| 0 | version, `12`; equal to the envelope's domain version |
+| 0 | version, `13`; equal to the envelope's domain version |
 | 1 | layer count, `16` |
-| 2 | scalar count, `32` |
+| 2 | scalar count, `33` |
 | 3 | macro-name count, `128` |
 | 4 | custom-key-name count, `128` |
 | 5 | flags: bit 0 bypasses every combo output's behaviour ([encoding](combo-domain.md#combo-output-behaviour-permission-encoding)); other bits zero |
 | 6 | custom-key-shortcut count, `128` |
 | 7 | reserved, zero |
 
-Every byte but 5 must be exactly its value. Firmware accepts only version 12
+Every byte but 5 must be exactly its value. Firmware accepts only version 13
 and refuses every earlier one (D-F10,
-[ADR](../../adr/0010-firmware-accepts-only-current-formats.md)). Version 12
-appends scalar 31 (D-F70); it is part of profile schema 4.5, the step that
-brought lighting version 5, not a schema step of its own.
+[ADR](../../adr/0010-firmware-accepts-only-current-formats.md)). Version 13
+appends scalar 32, the leader timeout (D-F71); it is part of profile schema
+4.6, the step that brought the leader and autocorrect version 2, not a schema
+step of its own.
 
 Held by: `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_test.c`).
 
@@ -85,6 +86,7 @@ Unless the table says otherwise a scalar is at most 65,535.
 | 29 | layers whose behaviours run | layer mask, may be empty | `0xffff` |
 | 30 | layers whose combos run | layer mask, may be empty | `0xffff` |
 | 31 | replacement-feedback flash, ms: how long one flash lasts (D-F70, [lighting](../rgb-domain-v1.md#drawing)) | nonzero | `RGB_AUTOCORRECT_FEEDBACK_FLASH_MS` |
+| 32 | leader timeout, ms: how long text replacement's leader waits after its last key (D-F71, [the leader](../autocorrect-v1.md#the-leader)) | 1,000–10,000 | `NOAH_LEADER_TIMEOUT_MS`, else 2,000 |
 
 The fade delay is checked against the timeout in the same domain, so both
 halves refuse a profile whose fade delay is not shorter than its timeout.
@@ -240,8 +242,9 @@ keymap's `CUSTOM_KEYS` rows, and the keymap's names: `layer_names[]`, each
 `NOAH_KEYBOARD_NAME` (empty unless the keymap's `config.h` sets it). The
 keymap's `config.h` may also author `NOAH_RGB_IDLE_TIMEOUT_MS`, the two flash
 lengths `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS` and
-`RGB_AUTOCORRECT_FEEDBACK_FLASH_MS` (both 200 in the keymap), and the host
-settings `NOAH_DEFAULT_HOST_OS`, `NOAH_DEFAULT_HOST_LAYOUT`,
+`RGB_AUTOCORRECT_FEEDBACK_FLASH_MS` (both 200 in the keymap), the leader
+timeout `NOAH_LEADER_TIMEOUT_MS`, and the host settings
+`NOAH_DEFAULT_HOST_OS`, `NOAH_DEFAULT_HOST_LAYOUT`,
 `NOAH_DEFAULT_UNICODE_PLAYBACK` and `NOAH_DEFAULT_MACOS_ISO`.
 
 When a profile becomes active the firmware copies its settings domain, in
@@ -270,7 +273,7 @@ byte 5; bytes 6 onward are zero. Page 0's 12-byte payload:
 | 8 | 4 | FNV-1a 32-bit digest of the domain |
 
 Page `p ≥ 1` returns domain bytes `25 × (p − 1)` onward, 25 at a time with an
-exact short final chunk; the largest domain needs 428 chunk pages. Page 0
+exact short final chunk; the largest domain needs 429 chunk pages. Page 0
 computes its checksums over the bytes as they are at that moment, and chunks
 stream from the active copy rather than a snapshot, so a consistent read is
 page 0, every chunk, then page 0 again with equal bytes and checksums matching

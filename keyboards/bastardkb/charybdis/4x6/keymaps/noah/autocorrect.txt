@@ -9,10 +9,15 @@
 #   tihng -> thing                "tihng" anywhere in a word
 #   :pnumber: -> +31 6 1234 5678  text of up to 128 bytes, on one line
 #   :sig: => 12                   plays macro slot 12, for the whole word
+#   leader pn -> +31 6 1234 5678  "pn" after the Leader key only
+#   leader kr => 12               "kr" after the Leader key plays slot 12
+#   both :adn: -> and             as you type and after the Leader key
 #
 # Several inputs may name one replacement; each names only one. An input
 # is letters and digits, with apostrophes only between them, and is
-# matched whatever its case. After a change, regenerate authored_autocorrect_list.h:
+# matched whatever its case. A line that begins `leader` takes its input
+# whole, without colons; every line of one replacement fires the same way.
+# After a change, regenerate authored_autocorrect_list.h:
 #
 #   python3 tools/autocorrect/build.py --write-authored keyboards/bastardkb/charybdis/4x6/keymaps/noah
 #

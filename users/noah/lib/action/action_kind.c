@@ -217,6 +217,17 @@ bool noah_action_kind_match_switch_key(uint16_t action, pointing_mode_mask_t poi
     return true;
 }
 
+bool noah_action_kind_match_leader(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
+    (void)pointing_mode;
+
+    if (!(out && noah_action_keycode_is_leader(action))) {
+        return false;
+    }
+
+    *out = noah_action_desc_build(NOAH_ACTION_KIND_LEADER, action, 0, 0);
+    return true;
+}
+
 bool noah_action_kind_match_layer_oneshot(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
     (void)pointing_mode;
 

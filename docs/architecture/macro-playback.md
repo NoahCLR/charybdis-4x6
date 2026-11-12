@@ -207,7 +207,17 @@ before the macro's own projection.
   `noah_profile_macro_try_play`) starts when its turn comes, and the queue
   waits until it has played.
 - **Clicks.** The ledger tells the stage when a mouse button goes down
-  (`noah_typing_stage_note_click`), which starts the next word fresh.
+  (`noah_typing_stage_note_click`), which starts the next word fresh and
+  ends leading.
+- **The leader.** D-F71. The Leader key's action
+  (`action/action_kind_dispatch.c`) calls `noah_typing_stage_leader`, which
+  queues a leader change behind whatever waits. When its turn comes the scan
+  starts leading: each key-down is then read but not shown, its character
+  held in the word's place, and looked up in the leader index from the next
+  pass (`noah_profile_autocorrect_v1_leader`). A match plays through
+  `macro_slot_provider_start_correction` with nothing to erase, or as a
+  replacement's macro, the queue waiting behind it as it does for a
+  correction. `noah_autocorrect_leading` is the state lighting reads.
 - **Which key.** Whatever is about to put a key in a report stores its matrix
   position for the stage first (`noah_typing_stage_noted_key`): a key QMK
   registers as the hook hands its press on (`key/runtime/process.c`), a tap
@@ -221,8 +231,11 @@ before the macro's own projection.
   person's own press or release, so the stage queues it from there. The
   macro's own lease changes are not read.
 
-With autocorrect off in the profile or an empty list
-`noah_typing_stage_active` is false and none of this runs.
+With autocorrect off in the profile or no typed form matched in a word,
+`noah_typing_stage_active` is false and none of this runs, except from a
+Leader press, which reads the report the stage has missed (a direct
+`send_keyboard_report` from its action), until leading is over and nothing
+waits.
 
 ## The report
 

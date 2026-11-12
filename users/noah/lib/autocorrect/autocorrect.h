@@ -41,6 +41,9 @@ enum {
 };
 
 void noah_autocorrect_init(void);
+// While the keyboard holds what is typed after the Leader key (D-F71): the
+// state lighting reads.
+bool noah_autocorrect_leading(void);
 // Looks a finished word up, starts what the stage decided and lets held-back
 // keys out, in bounded steps. The master half's scan.
 void noah_autocorrect_scan(void);

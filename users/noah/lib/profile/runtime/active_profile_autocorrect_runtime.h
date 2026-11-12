@@ -6,7 +6,7 @@
 // from the generation the provider keeps immutable: a saved slot in flash or
 // the working copy. The compiled defaults, and a profile without the domain,
 // read the authored list. Nothing is copied or indexed in RAM; the handle
-// holds the list's range and its four counts. Publication is scan-owned.
+// holds the list's range and its five counts. Publication is scan-owned.
 void noah_active_profile_autocorrect_invalidate(void *context, uint32_t publication, noah_active_profile_identity_t previous, noah_active_profile_identity_t active, const noah_active_profile_snapshot_t *view);
 
 // The authored list, for an image without a live-profile owner to publish

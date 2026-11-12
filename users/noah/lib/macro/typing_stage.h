@@ -33,6 +33,11 @@ bool noah_typing_stage_defer_macro(uint8_t slot);
 // A mouse button went down (action/owned_keycode.c).
 void noah_typing_stage_note_click(void);
 
+// The Leader key acted (action/action_kind_dispatch.c): what is typed next is
+// held, never shown, until it matches a typed form that fires after the
+// leader or is dropped (D-F71). It takes its place among the keys the stage holds back.
+void noah_typing_stage_leader(void);
+
 // The key whose press or action is about to put keys in a report; a position
 // outside the matrix is an action no key names. A key QMK registers is noted
 // as the hook hands its press on (key/runtime/process.c), a tap where it is

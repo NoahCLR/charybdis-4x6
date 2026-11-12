@@ -17,6 +17,15 @@
 #include "../macro/typing_stage.h"
 #include "autocorrect_feedback.h"
 #include "../profile/runtime/active_profile_autocorrect_runtime.h"
+#include "../profile/runtime/active_profile_settings_runtime.h"
+
+// How long the leader waits after its last key until settings are live, and
+// the compiled default (D-F71).
+#ifdef NOAH_LEADER_TIMEOUT_MS
+#    define AUTOCORRECT_LEADER_TIMEOUT_MS NOAH_LEADER_TIMEOUT_MS
+#else
+#    define AUTOCORRECT_LEADER_TIMEOUT_MS 2000
+#endif
 
 // What the stage is waiting for. Anything but idle holds every later key back.
 typedef enum {
@@ -29,7 +38,10 @@ typedef enum {
     AUTOCORRECT_ERASING,             // A typo is being erased for its macro.
     AUTOCORRECT_REPLACEMENT_START,   // The typo is erased; its macro comes next.
     AUTOCORRECT_REPLACEMENT_PLAYING, // That macro is playing.
-    AUTOCORRECT_MACRO_PLAYING        // The macro whose turn came is playing.
+    AUTOCORRECT_MACRO_PLAYING,       // The macro whose turn came is playing.
+    AUTOCORRECT_LEADER_MATCH,        // A character joined what the leader holds.
+    AUTOCORRECT_LEADER_ENTER,        // Enter asks the leader to send what it holds.
+    AUTOCORRECT_LEADER_SENDING       // What the leader matched is being typed.
 } autocorrect_state_t;
 
 // What the keyboard knows of the word on screen. A correction can be undone
@@ -52,6 +64,8 @@ typedef enum {
     AUTOCORRECT_EDGE_UP = 0,
     AUTOCORRECT_EDGE_MODS,
     AUTOCORRECT_EDGE_MACRO,
+    AUTOCORRECT_EDGE_LEADER,
+    AUTOCORRECT_EDGE_CLICK,
     AUTOCORRECT_EDGE_DOWN,
 } autocorrect_edge_kind_t;
 
@@ -114,7 +128,9 @@ typedef struct {
     autocorrect_choice_t choice;
     uint8_t  kept, typed;     // Of the corrected word: characters unchanged, characters typed.
     uint8_t  watched;         // The usage whose hold is timed, zero for none.
+    uint8_t  leaders;         // Leader presses queued and not yet read.
     uint32_t watched_at;
+    uint32_t leader_at;       // The leader's last key: its timeout counts from here.
     bool     synced : 1;      // live and shown describe the reports since the stage last ran.
     bool     resumed : 1;     // The stage has just started reading reports again.
     bool     on : 1;
@@ -124,6 +140,10 @@ typedef struct {
     bool     watch_started : 1;
     bool     watched_end : 1;    // The watched key ended a word.
     bool     ending_enter : 1;   // The key that ended the word prints nothing.
+    // Leading (D-F71): what is typed is held in `word`, never shown, until
+    // it is a typed form that fires after the leader or is dropped. There is no word
+    // meanwhile.
+    bool     leading : 1;
 } autocorrect_t;
 
 static autocorrect_t autocorrect;
@@ -205,6 +225,8 @@ static uint8_t autocorrect_strokes_for(const macro_payload_typing_host_t *host, 
 // ── The word ────────────────────────────────────────────────────────────────
 
 static void autocorrect_forget(bool suspend) {
+    // While leading there is no word: what is held is the leader's.
+    if (autocorrect.leading) return;
     autocorrect.length = 0u;
     autocorrect.dead   = 0u;
     autocorrect.known  = suspend ? AUTOCORRECT_WORD_SUSPENDED : AUTOCORRECT_WORD_FOLLOWED;
@@ -221,8 +243,49 @@ static uint8_t autocorrect_core(uint8_t *start) {
     return (uint8_t)(end - first);
 }
 
+// Whether the list has a correction that fires as a word ends, read once a
+// publication (D-F71): a list of replacements that fire only after the leader
+// leaves typing alone until Leader.
+static struct {
+    uint32_t publication;
+    bool     read, fires;
+} autocorrect_words;
+
 static bool autocorrect_has_list(void) {
-    return noah_active_profile_autocorrect_list()->typos != 0u;
+    uint32_t publication = noah_active_profile_autocorrect_publication();
+    if (!autocorrect_words.read || autocorrect_words.publication != publication) {
+        autocorrect_words.fires       = noah_profile_autocorrect_v1_fires_as_typed(noah_active_profile_autocorrect_list());
+        autocorrect_words.publication = publication;
+        autocorrect_words.read        = true;
+    }
+    return autocorrect_words.fires;
+}
+
+static bool autocorrect_has_leader(void) {
+    return noah_active_profile_autocorrect_list()->leader_typos != 0u;
+}
+
+// Characters as the list's folded UTF-8: their length in bytes, or zero when
+// they are more than a typed form can be.
+static uint8_t autocorrect_folded_bytes(const uint16_t *characters, uint8_t count, uint8_t bytes[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX]) {
+    uint8_t size = 0u;
+
+    for (uint8_t index = 0u; index < count; index++) {
+        uint16_t character = autocorrect_folded(characters[index]);
+        uint8_t  width     = character < 0x80u ? 1u : character < 0x800u ? 2u : 3u;
+        if (size + width > NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX) return 0u;
+        if (width == 1u) {
+            bytes[size++] = (uint8_t)character;
+        } else if (width == 2u) {
+            bytes[size++] = (uint8_t)(0xC0u | (character >> 6u));
+            bytes[size++] = (uint8_t)(0x80u | (character & 0x3Fu));
+        } else {
+            bytes[size++] = (uint8_t)(0xE0u | (character >> 12u));
+            bytes[size++] = (uint8_t)(0x80u | ((character >> 6u) & 0x3Fu));
+            bytes[size++] = (uint8_t)(0x80u | (character & 0x3Fu));
+        }
+    }
+    return size;
 }
 
 // ── Reading keys ────────────────────────────────────────────────────────────
@@ -370,6 +433,112 @@ static bool autocorrect_key_down(uint8_t usage) {
     return true;
 }
 
+// ── The leader ──────────────────────────────────────────────────────────────
+
+// A queued key as a matrix position, or no key the stage knows of.
+static keypos_t autocorrect_key_at(uint8_t key) {
+    return key != AUTOCORRECT_NO_KEY ? (keypos_t){.row = (uint8_t)((key - 1u) / MATRIX_COLS), .col = (uint8_t)((key - 1u) % MATRIX_COLS)} : autocorrect_no_key;
+}
+
+// Leading ends: what was held goes, and the next word starts fresh.
+static void autocorrect_lead_end(void) {
+    autocorrect.leading = false;
+    autocorrect_forget(false);
+}
+
+// The Leader key's turn (D-F71): what is typed from now is held. Leader again
+// starts over. A list with nothing that fires after the leader has nothing to wait
+// for, so then it does nothing.
+static void autocorrect_lead_begin(void) {
+    if (!autocorrect_has_leader()) return;
+    autocorrect_lead_end();
+    autocorrect.leading   = true;
+    autocorrect.watched   = 0u;
+    autocorrect.leader_at = timer_read32();
+}
+
+// A key the leader acts on: lighting is given it, since what is held may be
+// sent on it (D-F70), and the timeout counts from it.
+static void autocorrect_lead_note(uint8_t key) {
+    noah_autocorrect_feedback_key(autocorrect_key_at(key));
+    autocorrect.leader_at = timer_read32();
+}
+
+// A key going down while leading, as the host is about to see it. False keeps
+// it from the host: a character joins what is held, and Enter, Escape and
+// Backspace act on what is held. True lets a key that types no character end
+// leading, with nothing sent, and act as itself.
+static bool autocorrect_lead_key(uint8_t usage, uint8_t key) {
+    uint16_t          character = 0u, dead = autocorrect.dead;
+    autocorrect_key_t kind;
+
+    // A lock key is itself and leaves a dead key waiting. Escape ends leading;
+    // Tab ends it and is itself.
+    if (usage == KC_CAPS_LOCK || usage == KC_NUM_LOCK || usage == KC_SCROLL_LOCK) return true;
+    if (usage == KC_ESCAPE || usage == KC_TAB) {
+        autocorrect_lead_end();
+        return usage == KC_TAB;
+    }
+    kind = autocorrect_read_key(usage, autocorrect.shown_mods, &character);
+    if (dead && kind == AUTOCORRECT_KEY_SUSPEND) {
+        // After a dead key still waiting: Backspace takes the dead key back
+        // and Enter is Enter. Any other key is read again on its own: one
+        // that types no character acts as itself, and a character the layout
+        // composes nothing with was meant for what is held, and drops it.
+        if (usage == KC_BACKSPACE) {
+            autocorrect.leader_at = timer_read32();
+            return false;
+        }
+        if (usage == KC_ENTER || usage == KC_KP_ENTER) {
+            kind = AUTOCORRECT_KEY_ENTER;
+        } else {
+            kind = autocorrect_read_key(usage, autocorrect.shown_mods, &character);
+            if (kind == AUTOCORRECT_KEY_CHARACTER || kind == AUTOCORRECT_KEY_NOTHING) {
+                autocorrect_lead_end();
+                return false;
+            }
+        }
+    }
+    switch (kind) {
+        case AUTOCORRECT_KEY_CHARACTER:
+            // No typed form is longer than the word the keyboard follows.
+            if (autocorrect.length == NOAH_AUTOCORRECT_WORD_MAX) {
+                autocorrect_lead_end();
+                return false;
+            }
+            autocorrect.word[autocorrect.length++] = character;
+            autocorrect_lead_note(key);
+            autocorrect.state = AUTOCORRECT_LEADER_MATCH;
+            return false;
+        case AUTOCORRECT_KEY_BACKSPACE:
+            if (!autocorrect.length) {
+                autocorrect_lead_end();
+                return false;
+            }
+            autocorrect.length--;
+            autocorrect.leader_at = timer_read32();
+            return false;
+        case AUTOCORRECT_KEY_ENTER:
+            autocorrect_lead_note(key);
+            autocorrect.state = AUTOCORRECT_LEADER_ENTER;
+            return false;
+        case AUTOCORRECT_KEY_NOTHING:
+            // A dead key waits for its second stroke, held as what it will
+            // compose is.
+            autocorrect.leader_at = timer_read32();
+            return false;
+        case AUTOCORRECT_KEY_SUSPEND:
+            // A keypad character: the keyboard does not follow what it types.
+            autocorrect_lead_end();
+            autocorrect_forget(true);
+            return true;
+        default:
+            // A shortcut, or a key that moves the cursor or deletes.
+            autocorrect_lead_end();
+            return true;
+    }
+}
+
 // ── The queue ───────────────────────────────────────────────────────────────
 
 static bool autocorrect_push(uint8_t kind, uint8_t value) {
@@ -404,7 +573,20 @@ static __attribute__((noinline)) bool autocorrect_pump(void) {
             case AUTOCORRECT_EDGE_UP:
                 autocorrect_set_bit(autocorrect.shown, edge.value, false);
                 break;
+            case AUTOCORRECT_EDGE_LEADER:
+                autocorrect.leaders--;
+                autocorrect_lead_begin();
+                break;
+            case AUTOCORRECT_EDGE_CLICK:
+                autocorrect_lead_end();
+                break;
             case AUTOCORRECT_EDGE_DOWN:
+                if (autocorrect.leading) {
+                    // Held, never shown, unless it ends leading and acts as
+                    // itself.
+                    if (autocorrect_lead_key(edge.value, (uint8_t)(edge.kind - AUTOCORRECT_EDGE_DOWN))) autocorrect_set_bit(autocorrect.shown, edge.value, true);
+                    break;
+                }
                 if (autocorrect.head_decided) {
                     // The key that ended a word, read when it reached the
                     // head: the word has had its lookup, and the key is not
@@ -414,14 +596,14 @@ static __attribute__((noinline)) bool autocorrect_pump(void) {
                 } else if (!autocorrect_key_down(edge.value)) {
                     // It ended a word that may be replaced, or may undo one:
                     // lighting is given its key now, and told if either begins.
-                    uint8_t key = (uint8_t)(edge.kind - AUTOCORRECT_EDGE_DOWN);
-
-                    noah_autocorrect_feedback_key(key != AUTOCORRECT_NO_KEY ? (keypos_t){.row = (uint8_t)((key - 1u) / MATRIX_COLS), .col = (uint8_t)((key - 1u) % MATRIX_COLS)} : autocorrect_no_key);
+                    noah_autocorrect_feedback_key(autocorrect_key_at((uint8_t)(edge.kind - AUTOCORRECT_EDGE_DOWN)));
                     return changed;
                 }
                 autocorrect_set_bit(autocorrect.shown, edge.value, true);
                 break;
             default:
+                // A macro key ends leading with nothing sent, and plays.
+                if (autocorrect.leading) autocorrect_lead_end();
                 autocorrect.state = AUTOCORRECT_MACRO_START;
                 return changed;
         }
@@ -451,8 +633,15 @@ static bool autocorrect_wanted(void) {
     return noah_qmk_autocorrect_stored() && autocorrect_has_list();
 }
 
+// The stage is in the report path while it follows words, and from a Leader
+// press, whatever the switches say: the leader ignores them (D-F71). Leading
+// and what waits behind it keep it there until they are done.
+static bool autocorrect_in_path(void) {
+    return autocorrect_wanted() || autocorrect.leaders != 0u;
+}
+
 static bool autocorrect_holding(void) {
-    return autocorrect.state != AUTOCORRECT_IDLE || autocorrect.count != 0u;
+    return autocorrect.state != AUTOCORRECT_IDLE || autocorrect.count != 0u || autocorrect.leading;
 }
 
 static bool autocorrect_settled(void) {
@@ -461,11 +650,11 @@ static bool autocorrect_settled(void) {
 
 // The reports since the stage last ran have all been read, and still are.
 static bool autocorrect_reading(void) {
-    return autocorrect.synced && (autocorrect_wanted() || !autocorrect_settled());
+    return autocorrect.synced && (autocorrect_in_path() || !autocorrect_settled());
 }
 
 bool noah_typing_stage_active(void) {
-    if (autocorrect_wanted() || (autocorrect.synced && !autocorrect_settled())) return true;
+    if (autocorrect_in_path() || (autocorrect.synced && !autocorrect_settled())) return true;
     // This is asked for every report: one is passing unread, so what the
     // stage holds no longer describes what the host sees.
     autocorrect.synced = false;
@@ -534,8 +723,27 @@ bool noah_typing_stage_defer_macro(uint8_t slot) {
     return autocorrect.synced && autocorrect_holding() && autocorrect_push(AUTOCORRECT_EDGE_MACRO, slot);
 }
 
+// A click starts the next word fresh, and ends leading with nothing sent:
+// while leading, or with a Leader press queued, in its place among the keys
+// held back, so none typed after Leader comes out on its account.
 void noah_typing_stage_note_click(void) {
-    autocorrect_forget(false);
+    if ((autocorrect.leading || autocorrect.leaders) && autocorrect_push(AUTOCORRECT_EDGE_CLICK, 0u)) return;
+    autocorrect_lead_end();
+}
+
+// The stage joins the report path, if it is out of it, by reading the report
+// it has missed now, from the Leader key's action: keys already down are read
+// before Leader and only what follows it is held. The key runtime hands a tap
+// on before the press that decided it, so no later key gets ahead of it.
+void noah_typing_stage_leader(void) {
+    if (!autocorrect_has_leader()) return;
+    autocorrect.leaders++;
+    if (!autocorrect.synced) send_keyboard_report();
+    if (!autocorrect_push(AUTOCORRECT_EDGE_LEADER, 0u)) autocorrect.leaders--;
+}
+
+bool noah_autocorrect_leading(void) {
+    return autocorrect.leading;
 }
 
 // While a macro holds a usage, the person's own hold of it is frozen in the
@@ -577,6 +785,9 @@ static void autocorrect_playback_finished(macro_payload_finish_result_t result, 
         case AUTOCORRECT_UNDOING:
             // The word is on screen as it was typed, and stays that way.
             if (autocorrect.known == AUTOCORRECT_WORD_RESTORING) autocorrect.known = AUTOCORRECT_WORD_LEFT_ALONE;
+            break;
+        case AUTOCORRECT_LEADER_SENDING:
+            // No key waits at the head: the one that sent it was the leader's.
             break;
         default:
             autocorrect.head_decided = true;
@@ -731,7 +942,9 @@ static void autocorrect_consider(uint16_t correction, uint8_t start, uint8_t len
     noah_profile_autocorrect_v1_correction_t stored;
     uint8_t                                  count, kept;
 
-    if (!noah_profile_autocorrect_v1_correction(noah_active_profile_autocorrect_list(), correction, &stored, NULL)) return;
+    // A correction that fires only after the leader never fires as a word
+    // ends (D-F71).
+    if (!noah_profile_autocorrect_v1_correction(noah_active_profile_autocorrect_list(), correction, &stored, NULL) || stored.trigger == NOAH_PROFILE_AUTOCORRECT_V1_TRIGGER_LEADER) return;
     if (stored.kind == NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO) {
         if (!whole_word || start + length != autocorrect.length || !noah_profile_macro_can_play((uint16_t)(QK_MACRO + stored.macro))) return;
         candidate.plays    = true;
@@ -773,26 +986,8 @@ static __attribute__((noinline)) void autocorrect_lookup(void) {
         folded[index] = autocorrect_folded(autocorrect.word[start + index]);
 
     if (autocorrect.lookup_position == 0u) {
-        uint8_t size = 0u;
-        for (uint8_t index = 0u; index < length && size <= sizeof(bytes); index++) {
-            uint16_t character = folded[index];
-            uint8_t  width     = character < 0x80u ? 1u : character < 0x800u ? 2u : 3u;
-            if (size + width > sizeof(bytes)) {
-                size = sizeof(bytes) + 1u;
-                break;
-            }
-            if (width == 1u) {
-                bytes[size++] = (uint8_t)character;
-            } else if (width == 2u) {
-                bytes[size++] = (uint8_t)(0xC0u | (character >> 6u));
-                bytes[size++] = (uint8_t)(0x80u | (character & 0x3Fu));
-            } else {
-                bytes[size++] = (uint8_t)(0xE0u | (character >> 12u));
-                bytes[size++] = (uint8_t)(0x80u | ((character >> 6u) & 0x3Fu));
-                bytes[size++] = (uint8_t)(0x80u | (character & 0x3Fu));
-            }
-        }
-        if (size <= sizeof(bytes) && noah_profile_autocorrect_v1_find(list, bytes, size, &typo) && typo.match == NOAH_PROFILE_AUTOCORRECT_V1_MATCH_WHOLE_WORD) {
+        uint8_t size = autocorrect_folded_bytes(folded, length, bytes);
+        if (size && noah_profile_autocorrect_v1_find(list, bytes, size, &typo) && typo.match == NOAH_PROFILE_AUTOCORRECT_V1_MATCH_WHOLE_WORD) {
             autocorrect_consider(typo.correction, start, length, true);
             if (autocorrect.choice.found) {
                 autocorrect_start_correction();
@@ -862,6 +1057,55 @@ static void autocorrect_start_replacement(void) {
     else autocorrect_release();
 }
 
+// Sends what the leader matched (D-F71): text typed as written, through the
+// host layout, with nothing to erase since nothing reached the host, or the
+// macro it names, played as a replacement's is. One this host cannot type,
+// or a macro that cannot play, is passed over and nothing is sent, as is
+// anything with more than a replacement may start behind waiting.
+static void autocorrect_lead_send(uint16_t correction) {
+    const macro_payload_typing_host_t        host      = macro_payload_typing_host();
+    bool                                     caps_lock = macro_payload_unicode_caps_lock();
+    noah_profile_autocorrect_v1_correction_t stored;
+    uint16_t                                *text    = autocorrect_work.text;
+    uint16_t                                 strokes = 0u;
+    uint8_t                                  count;
+
+    autocorrect_lead_end();
+    if (autocorrect.count > NOAH_AUTOCORRECT_QUEUE_START_MAX || !noah_profile_autocorrect_v1_correction(noah_active_profile_autocorrect_list(), correction, &stored, autocorrect_work.bytes)) return;
+    if (stored.kind == NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO) {
+        if (noah_profile_macro_can_play((uint16_t)(QK_MACRO + stored.macro)) && noah_profile_macro_start_replacement((uint16_t)(QK_MACRO + stored.macro))) {
+            autocorrect.state = AUTOCORRECT_REPLACEMENT_PLAYING;
+            noah_autocorrect_feedback_note(NOAH_AUTOCORRECT_FEEDBACK_MACRO);
+        }
+        return;
+    }
+    count = autocorrect_decode(autocorrect_work.bytes, stored.length, text);
+    for (uint8_t index = 0u; index < count; index++) {
+        uint8_t needed = autocorrect_strokes_for(&host, caps_lock, text[index], &text[index]);
+        if (!needed || strokes + needed > NOAH_AUTOCORRECT_STROKES_MAX) return;
+        strokes = (uint16_t)(strokes + needed);
+    }
+    if (autocorrect_play(AUTOCORRECT_LEADER_SENDING, 0u, text, count)) noah_autocorrect_feedback_note(NOAH_AUTOCORRECT_FEEDBACK_TEXT);
+}
+
+// What the leader holds against the typed forms that fire after the leader. One it is
+// exactly is sent at once when no longer one begins with it, and on Enter or
+// the timeout (`finishing`) whatever begins with it. Held characters that
+// begin none end leading with nothing sent; anything else waits for more.
+static __attribute__((noinline)) void autocorrect_lead_match(bool finishing) {
+    noah_profile_autocorrect_v1_leader_t found = {0};
+    uint8_t                              bytes[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX];
+    uint8_t                              size = autocorrect_folded_bytes(autocorrect.word, autocorrect.length, bytes);
+
+    autocorrect_release();
+    if (size && !noah_profile_autocorrect_v1_leader(noah_active_profile_autocorrect_list(), bytes, size, &found)) found = (noah_profile_autocorrect_v1_leader_t){0};
+    if (found.exact && (finishing || !found.longer)) {
+        autocorrect_lead_send(found.typo.correction);
+    } else if (finishing || !found.longer) {
+        autocorrect_lead_end();
+    }
+}
+
 // A key held until the host repeats it types characters the keyboard does not
 // see. After a word end that only costs the undo; inside a word, the word.
 static void autocorrect_watch_hold(uint32_t now) {
@@ -912,6 +1156,7 @@ static void autocorrect_stop_before_full(void) {
         case AUTOCORRECT_UNDOING:
         case AUTOCORRECT_ERASING:
         case AUTOCORRECT_REPLACEMENT_PLAYING:
+        case AUTOCORRECT_LEADER_SENDING:
             (void)macro_payload_engine_cancel();
             break;
         default:
@@ -941,6 +1186,12 @@ void noah_autocorrect_scan(void) {
         case AUTOCORRECT_REPLACEMENT_START:
             autocorrect_start_replacement();
             break;
+        case AUTOCORRECT_LEADER_MATCH:
+            autocorrect_lead_match(false);
+            break;
+        case AUTOCORRECT_LEADER_ENTER:
+            autocorrect_lead_match(true);
+            break;
         case AUTOCORRECT_REPLACEMENT_PLAYING:
         case AUTOCORRECT_MACRO_PLAYING:
             if (macro_payload_engine_idle()) autocorrect_release();
@@ -949,6 +1200,13 @@ void noah_autocorrect_scan(void) {
             break;
     }
     if (autocorrect.state != AUTOCORRECT_IDLE) return;
+    // The leader's timeout, from its last key once nothing waits: what is
+    // held is sent if it is a typed form that fires after the leader, by no key.
+    if (autocorrect.leading && !autocorrect.count && timer_elapsed32(autocorrect.leader_at) >= noah_setting(NOAH_SETTING_LEADER_TIMEOUT, AUTOCORRECT_LEADER_TIMEOUT_MS)) {
+        noah_autocorrect_feedback_key(autocorrect_no_key);
+        autocorrect_lead_match(true);
+        if (autocorrect.state != AUTOCORRECT_IDLE) return;
+    }
     if (autocorrect.watched) autocorrect_watch_hold(timer_read32());
     changed = autocorrect_pump();
     // A change waiting for room in the queue is read again from the report.

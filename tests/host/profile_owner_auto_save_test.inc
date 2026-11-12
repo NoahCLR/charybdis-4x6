@@ -57,7 +57,7 @@ static bool auto_keyboard_quiet(void *context) {
 
 static void auto_settings(uint8_t bytes[NOAH_SETTINGS_MIN_SIZE]) {
     memset(bytes, 0, NOAH_SETTINGS_MIN_SIZE);
-    const uint8_t header[] = {NOAH_SETTINGS_VERSION, 16u, 32u, 128u, 128u, 0u, 128u, 0u};
+    const uint8_t header[] = {NOAH_SETTINGS_VERSION, 16u, 33u, 128u, 128u, 0u, 128u, 0u};
     memcpy(bytes, header, sizeof(header));
     write_u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_AUTO_MOUSE_TIMEOUT * 4u, 1000u);
     write_u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_FEEDBACK_PERIOD * 4u, 100u);
@@ -65,6 +65,7 @@ static void auto_settings(uint8_t bytes[NOAH_SETTINGS_MIN_SIZE]) {
     write_u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_SNIPING_DPI * 4u, 200u);
     write_u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_DEFAULT_LAYERS * 4u, 1u);
     write_u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_AUTOCORRECT_FEEDBACK_PERIOD * 4u, 100u);
+    write_u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_LEADER_TIMEOUT * 4u, 2000u);
 }
 
 // The authored defaults a profile without a settings domain inherits: the
@@ -190,7 +191,7 @@ static void test_auto_save_modes_and_adjustments(void) {
             // that host edit merely because the keyboard was adjusted too.
             assert(noah_profile_owner_adjust(&left, NOAH_SETTING_DEFAULT_DPI, 1200u));
             // Long enough for the adjustment to reach the other half (about
-            // 1,200 ms for settings v12's domain), short of the quiet period.
+            // 1,200 ms for settings v13's domain), short of the quiet period.
             auto_scans(&left, &right, &now, 1500u);
             write_u32(value, 1400u);
             assert(live_edit(&left, &right, 50u, &dpi, value, 4u, &now) == NOAH_PROFILE_WORKING_OK);

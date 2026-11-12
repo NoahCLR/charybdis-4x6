@@ -4,7 +4,7 @@
 The word characters and their case folding come from the host layouts: every
 letter and digit a layout types, and what each folds to. This tool writes them
 as the firmware's C table and, with golden vectors of the byte format, as the
-fixture tests/fixtures/autocorrect_domain_v1.json. It also encodes a keymap's
+fixture tests/fixtures/autocorrect_domain_v2.json. It also encodes a keymap's
 authored list, autocorrect.txt, into authored_autocorrect_list.h, the compiled
 defaults' domain. See docs/spec/profile-wire-v1/autocorrect-domain.md.
 
@@ -25,12 +25,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 HOST_LAYOUTS = ROOT / "tests" / "fixtures" / "host_layouts_v1.json"
-FIXTURE = ROOT / "tests" / "fixtures" / "autocorrect_domain_v1.json"
+FIXTURE = ROOT / "tests" / "fixtures" / "autocorrect_domain_v2.json"
 TABLE = ROOT / "users" / "noah" / "lib" / "profile" / "schema" / "profile_autocorrect_words_v1.c"
 AUTHORED_LIST = "autocorrect.txt"
 AUTHORED_HEADER = "authored_autocorrect_list.h"
 
-VERSION = 1
+VERSION = 2
 MAX_CORRECTIONS = 1024
 MAX_TYPOS = 1024
 MAX_TEXT = 32  # bytes in one typo
@@ -38,10 +38,18 @@ MAX_CORRECTION = 128  # bytes in one text correction
 MACRO_SLOTS = 128
 KIND_TEXT, KIND_MACRO = 0, 1
 MAX_TEXT_BYTES = 20480
-HEADER_SIZE, CORRECTION_ROW_SIZE, TYPO_ROW_SIZE, PART_ROW_SIZE = 8, 6, 6, 2
-MAX_SIZE = HEADER_SIZE + CORRECTION_ROW_SIZE * MAX_CORRECTIONS + (TYPO_ROW_SIZE + PART_ROW_SIZE) * MAX_TYPOS + MAX_TEXT_BYTES
+HEADER_SIZE, CORRECTION_ROW_SIZE, TYPO_ROW_SIZE, INDEX_ROW_SIZE = 10, 6, 6, 2
+# A part-of-word typo of a correction that fires both ways is in both
+# indexes, so each may hold a row for every typo.
+MAX_SIZE = HEADER_SIZE + CORRECTION_ROW_SIZE * MAX_CORRECTIONS + (TYPO_ROW_SIZE + 2 * INDEX_ROW_SIZE) * MAX_TYPOS + MAX_TEXT_BYTES
 MATCHES = ("whole word", "start of word", "end of word", "anywhere")
 WHOLE_WORD, START, END, ANYWHERE = range(4)
+PART_OF_WORD = (START, END, ANYWHERE)
+# How a correction's typos fire (D-F71), stored above its kind in bits 1-2 of
+# its row's kind byte.
+TRIGGERS = ("as a word ends", "after the leader", "both")
+AS_TYPED, AFTER_LEADER, BOTH = range(3)
+TRIGGER_SHIFT = 1
 APOSTROPHE = "'"
 
 
@@ -104,6 +112,8 @@ def check_text(text: str, what: str, most: int = MAX_CORRECTION) -> bytes:
 
 
 def check_typo(typo: str) -> bytes:
+    """A typo is folded word characters, with apostrophes only between them,
+    however its correction fires."""
     encoded = check_text(typo, "typo", MAX_TEXT)
     for index, char in enumerate(typo):
         if char == APOSTROPHE and 0 < index < len(typo) - 1:
@@ -115,15 +125,16 @@ def check_typo(typo: str) -> bytes:
     return encoded
 
 
-def pack(corrections: list[tuple[int, int, int, int]], typos: list[tuple[int, int, int, int]], part: list[int], text: bytes, counts: tuple[int, int, int, int] | None = None) -> bytes:
+def pack(corrections: list[tuple[int, int, int, int]], typos: list[tuple[int, int, int, int]], part: list[int], leader: list[int], text: bytes, counts: tuple[int, int, int, int, int] | None = None) -> bytes:
     """The domain's bytes from its rows as given, with no checks: corrections
     are (text offset or macro slot, length, kind, first typo), typos (text
     offset, length, match, correction)."""
-    header = counts or (len(corrections), len(typos), len(part), len(text))
-    out = struct.pack("<HHHH", *header)
+    header = counts or (len(corrections), len(typos), len(part), len(leader), len(text))
+    out = struct.pack("<HHHHH", *header)
     out += b"".join(struct.pack("<HBBH", *row) for row in corrections)
     out += b"".join(struct.pack("<HBBH", *row) for row in typos)
     out += b"".join(struct.pack("<H", index) for index in part)
+    out += b"".join(struct.pack("<H", index) for index in leader)
     return out + text
 
 
@@ -134,12 +145,21 @@ def macro_slot(entry: dict) -> int:
     return slot
 
 
-def rows(entries: list[dict]) -> tuple[list, list, list, bytes]:
+def trigger_of(entry: dict) -> int:
+    trigger = entry.get("trigger", TRIGGERS[AS_TYPED])
+    if trigger not in TRIGGERS:
+        raise ListError(f"trigger {trigger!r} is not one of {', '.join(TRIGGERS)}")
+    return TRIGGERS.index(trigger)
+
+
+def rows(entries: list[dict]) -> tuple[list, list, list, list, bytes]:
     """Canonical rows for a list of entries. An entry is a text correction,
-    {"correction": str, "typos": [{"typo": str, "match": one of MATCHES}]}, or
-    a macro one, {"macro": slot, "typos": [...]}, whose typos match the whole
-    word. Text corrections come first, by their bytes; macro ones by slot."""
+    {"correction": str, "trigger": one of TRIGGERS, "typos": [{"typo": str,
+    "match": one of MATCHES}]}, or a macro one, {"macro": slot, ...}, whose
+    typos match the whole word. A trigger left out is "as a word ends". Text
+    corrections come first, by their bytes; macro ones by slot."""
     by_correction: dict[tuple, list] = {}
+    triggers: dict[tuple, int] = {}
     typo_owner: dict[bytes, tuple[int, tuple]] = {}
     for entry in entries:
         if ("macro" in entry) == ("correction" in entry):
@@ -152,40 +172,48 @@ def rows(entries: list[dict]) -> tuple[list, list, list, bytes]:
         if not entry["typos"]:
             raise ListError(f"correction {shown} has no typo")
         by_correction[key] = entry["typos"]
+        triggers[key] = trigger_of(entry)
         for item in entry["typos"]:
+            if item["match"] not in MATCHES:
+                raise ListError(f"match {item['match']!r} is not one of {', '.join(MATCHES)}")
+            match = MATCHES.index(item["match"])
             typo = check_typo(item["typo"])
             if typo in typo_owner:
                 raise ListError(f"typo {item['typo']!r} is listed twice")
             if not plays and typo == key[1]:
                 raise ListError(f"typo {item['typo']!r} is its own correction")
-            if plays and item["match"] != MATCHES[WHOLE_WORD]:
-                raise ListError(f"typo {item['typo']!r} plays a macro, so it matches the whole word only")
-            typo_owner[typo] = (MATCHES.index(item["match"]), key)
+            if plays and match in PART_OF_WORD:
+                raise ListError(f"typo {item['typo']!r} plays a macro, so it matches the whole word")
+            typo_owner[typo] = (match, key)
     if len(by_correction) > MAX_CORRECTIONS:
         raise ListError(f"{len(by_correction)} corrections; the list holds {MAX_CORRECTIONS}")
     if len(typo_owner) > MAX_TYPOS:
         raise ListError(f"{len(typo_owner)} typos; the list holds {MAX_TYPOS}")
     correction_order = sorted(by_correction)
     typo_order = sorted(typo_owner)
-    text, correction_rows, typo_rows, part = b"", [], [], []
+    text, correction_rows, typo_rows, part, leader = b"", [], [], [], []
     first_typo = {}
     for index, typo in enumerate(typo_order):
         first_typo.setdefault(typo_owner[typo][1], index)
     for kind, value in correction_order:
+        byte = kind | triggers[(kind, value)] << TRIGGER_SHIFT
         if kind == KIND_MACRO:
-            correction_rows.append((value, 0, KIND_MACRO, first_typo[(kind, value)]))
+            correction_rows.append((value, 0, byte, first_typo[(kind, value)]))
             continue
-        correction_rows.append((len(text), len(value), KIND_TEXT, first_typo[(kind, value)]))
+        correction_rows.append((len(text), len(value), byte, first_typo[(kind, value)]))
         text += value
     for index, typo in enumerate(typo_order):
         match, correction = typo_owner[typo]
         typo_rows.append((len(text), len(typo), match, correction_order.index(correction)))
-        if match != WHOLE_WORD:
+        # The part index serves a word end, the leader index the leader.
+        if match in PART_OF_WORD and triggers[correction] != AFTER_LEADER:
             part.append(index)
+        if triggers[correction] != AS_TYPED:
+            leader.append(index)
         text += typo
     if len(text) > MAX_TEXT_BYTES:
         raise ListError(f"{len(text)} bytes of text; the list holds {MAX_TEXT_BYTES}")
-    return correction_rows, typo_rows, part, text
+    return correction_rows, typo_rows, part, leader, text
 
 
 def encode(entries: list[dict]) -> bytes:
@@ -195,32 +223,58 @@ def encode(entries: list[dict]) -> bytes:
 
 # --- The authored list ---------------------------------------------------------
 
+# The words a line may begin with to say how its replacement fires (D-F71);
+# a line without one fires as a word ends.
+AUTHORED_TRIGGERS = {"leader": AFTER_LEADER, "both": BOTH}
+
+
 def parse_authored(source: str) -> list[dict]:
     """autocorrect.txt: `typo -> correction` lines in QMK's form. A colon
     before the typo ties it to the start of a word, one after it to the end,
     both to the whole word; with neither it matches anywhere in a word. A
-    line `:typo: => N` plays macro slot N instead of typing text. `#` starts
-    a comment. Typos are folded; lines naming one correction make one
-    entry."""
+    line `:typo: => N` plays macro slot N instead of typing text. A line that
+    begins `leader ` fires only after the Leader key, its typo typed whole,
+    so it takes no colons; one that begins `both ` fires as a word ends and
+    after the Leader key (D-F71); `leader` or `both` straight before the
+    arrow is the typo itself, as typed. Lines naming one replacement fire one
+    way.
+    `#` starts a comment. Typos are folded; lines naming one correction make
+    one entry."""
     entries: dict[str, list] = {}
     macros: dict[int, list] = {}
+    fires: dict[tuple, int] = {}
     for number, raw in enumerate(source.splitlines(), 1):
         line = raw.split("#", 1)[0].strip()
         if not line:
             continue
+        word, _, rest = line.partition(" ")
+        # A trigger word straight before the arrow is the typo, not a trigger.
+        trigger = AS_TYPED if rest.lstrip().startswith(("->", "=>")) else AUTHORED_TRIGGERS.get(word, AS_TYPED)
+        if trigger != AS_TYPED:
+            line = rest.strip()
         plays = "->" not in line and "=>" in line
         typo, arrow, correction = (part.strip() for part in line.partition("=>" if plays else "->"))
-        if not arrow or not typo.strip(":") or not correction:
-            raise ListError(f"line {number}: expected `typo -> correction` or `:typo: => macro slot`")
-        match = (WHOLE_WORD if typo.endswith(":") else START) if typo.startswith(":") else (END if typo.endswith(":") else ANYWHERE)
-        item = {"typo": fold(typo.strip(":")), "match": MATCHES[match]}
+        form = typo.strip(":")
+        if not arrow or not form or not correction:
+            raise ListError(f"line {number}: expected `typo -> correction` or `:typo: => macro slot`, after `leader` or `both` or alone")
+        if trigger == AFTER_LEADER:
+            if ":" in typo:
+                raise ListError(f"line {number}: after the Leader key alone a typo is typed whole, so it takes no colons")
+            match = WHOLE_WORD
+        else:
+            match = (WHOLE_WORD if typo.endswith(":") else START) if typo.startswith(":") else (END if typo.endswith(":") else ANYWHERE)
+        item = {"typo": fold(form), "match": MATCHES[match]}
         if plays:
             if not correction.isdecimal():
                 raise ListError(f"line {number}: `=>` is followed by a macro slot, 0 to {MACRO_SLOTS - 1}")
+            key = ("macro", int(correction))
             macros.setdefault(int(correction), []).append(item)
         else:
+            key = ("correction", correction)
             entries.setdefault(correction, []).append(item)
-    return [{"correction": correction, "typos": typos} for correction, typos in entries.items()] + [{"macro": slot, "typos": typos} for slot, typos in macros.items()]
+        if fires.setdefault(key, trigger) != trigger:
+            raise ListError(f"line {number}: {correction!r} fires {TRIGGERS[fires[key]]} on another line")
+    return [{"correction": correction, "trigger": TRIGGERS[fires[("correction", correction)]], "typos": typos} for correction, typos in entries.items()] + [{"macro": slot, "trigger": TRIGGERS[fires[("macro", slot)]], "typos": typos} for slot, typos in macros.items()]
 
 
 def render_authored(keymap: Path) -> str:
@@ -244,9 +298,10 @@ def render_authored(keymap: Path) -> str:
 
 # --- Golden vectors ------------------------------------------------------------
 
-def entry(correction: str | int, *typos: str | tuple[str, int]) -> dict:
+def entry(correction: str | int, *typos: str | tuple[str, int], trigger: int = AS_TYPED) -> dict:
     """An entry: a text correction, or for a number the macro slot it plays."""
-    return {"macro" if isinstance(correction, int) else "correction": correction, "typos": [{"typo": t, "match": MATCHES[WHOLE_WORD]} if isinstance(t, str) else {"typo": t[0], "match": MATCHES[t[1]]} for t in typos]}
+    fires = {} if trigger == AS_TYPED else {"trigger": TRIGGERS[trigger]}
+    return {"macro" if isinstance(correction, int) else "correction": correction, **fires, "typos": [{"typo": t, "match": MATCHES[WHOLE_WORD]} if isinstance(t, str) else {"typo": t[0], "match": MATCHES[t[1]]} for t in typos]}
 
 
 SMALL = [
@@ -260,6 +315,23 @@ SMALL = [
     entry("café", "cafe", "cafè"),
     entry("un", ("nu", START)),
     entry("ment", ("mnet", END)),
+]
+
+
+# Corrections that fire after the leader: alone, or both ways, one typo the
+# start of another, a part-of-word typo of one that fires both ways (in both
+# indexes), letters outside ASCII, a macro, and one that fires as a word ends
+# beside them.
+LEADER = [
+    entry("+31 6 1234 5678", "pn", trigger=AFTER_LEADER),
+    entry("Kind regards, Sam", "kr", trigger=AFTER_LEADER),
+    entry("alpha", "abc", trigger=AFTER_LEADER),
+    entry("delta", "abcd", trigger=AFTER_LEADER),
+    entry("the", "teh", "hte", trigger=BOTH),
+    entry("receive", ("recieve", START), trigger=BOTH),
+    entry("café", "éé", trigger=AFTER_LEADER),
+    entry("and", "adn"),
+    entry(7, "sig", "sigg", trigger=AFTER_LEADER),
 ]
 
 
@@ -281,8 +353,9 @@ MACROS = [
 
 def maximum_entries() -> list[dict]:
     """A list at every ceiling at once: 1,024 corrections with one typo each,
-    every typo part of a word, one correction of 128 bytes and one typo of 32,
-    and the text exactly full."""
+    every correction firing both ways and every typo part of a word, so in
+    both indexes, one correction of 128 bytes and one typo of 32, and the
+    text exactly full."""
 
     def code(index: int, width: int) -> str:
         return "".join("abcdefghijklmnopqrstuvwxyz"[index // 26**place % 26] for place in reversed(range(width)))
@@ -294,7 +367,7 @@ def maximum_entries() -> list[dict]:
         length = spare // (MAX_CORRECTIONS - 1 - index)
         corrections.append("C" + code(index, 3) + "-" * (length - 4))
         spare -= length
-    entries = [{"correction": correction, "typos": [{"typo": typo, "match": MATCHES[START + index % 3]}]} for index, (correction, typo) in enumerate(zip(corrections, typos))]
+    entries = [{"correction": correction, "trigger": TRIGGERS[BOTH], "typos": [{"typo": typo, "match": MATCHES[START + index % 3]}]} for index, (correction, typo) in enumerate(zip(corrections, typos))]
     assert len(encode(entries)) == MAX_SIZE
     return entries
 
@@ -310,45 +383,51 @@ def invalid_vectors() -> list[dict]:
     def changed(change) -> bytes:
         return pack(*change(*rows(base)))
 
-    def raw(corrections: list, typos: list[tuple[str, int, int]], part: list[int] | None = None, first: list[int] | None = None) -> bytes:
+    def raw(corrections: list, typos: list[tuple[str, int, int]], part: list[int] | None = None, first: list[int] | None = None, leader: list[int] | None = None, fires: list[int] | None = None) -> bytes:
         """Rows laid out canonically from texts in the order given, unchecked.
         A correction that is a number is a macro slot; a tuple is a row's
-        (slot, length, kind) as given."""
+        (slot, length, kind byte) as given. `fires` is each correction's
+        trigger, as a word ends where it is left out."""
+        triggers = fires or [AS_TYPED] * len(corrections)
         text, correction_rows, typo_rows = b"", [], []
         for index, correction in enumerate(corrections):
             lowest = first[index] if first else next((i for i, typo in enumerate(typos) if typo[2] == index), 0)
             if isinstance(correction, int):
-                correction_rows.append((correction, 0, KIND_MACRO, lowest))
+                correction_rows.append((correction, 0, KIND_MACRO | triggers[index] << TRIGGER_SHIFT, lowest))
                 continue
             if isinstance(correction, tuple):
                 correction_rows.append((*correction, lowest))
                 continue
             encoded = correction if isinstance(correction, bytes) else correction.encode()
-            correction_rows.append((len(text), len(encoded), KIND_TEXT, lowest))
+            correction_rows.append((len(text), len(encoded), KIND_TEXT | triggers[index] << TRIGGER_SHIFT, lowest))
             text += encoded
         for typo, match, correction in typos:
             encoded = typo if isinstance(typo, bytes) else typo.encode()
             typo_rows.append((len(text), len(encoded), match, correction))
             text += encoded
-        derived = [i for i, typo in enumerate(typos) if typo[1] != WHOLE_WORD]
-        return pack(correction_rows, typo_rows, derived if part is None else part, text)
+        fired = lambda typo: triggers[typo[2]] if 0 <= typo[2] < len(triggers) else AS_TYPED
+        derived = [i for i, typo in enumerate(typos) if typo[1] in PART_OF_WORD and fired(typo) != AFTER_LEADER]
+        leading = [i for i, typo in enumerate(typos) if fired(typo) != AS_TYPED]
+        return pack(correction_rows, typo_rows, derived if part is None else part, leading if leader is None else leader, text)
 
     valid = encode(base)
-    add("truncated-header", "Shorter than the eight-byte header.", "INVALID_LENGTH", None, None, valid[:7])
+    add("truncated-header", "Shorter than the ten-byte header.", "INVALID_LENGTH", None, None, valid[:9])
     add("trailing-byte", "A byte after the text the header counts.", "INVALID_LENGTH", None, None, valid + b"\0")
     add("truncated-text", "The text ends before the header's count.", "INVALID_LENGTH", None, None, valid[:-1])
-    add("too-many-corrections", "A correction count over the ceiling.", "CAPACITY_EXCEEDED", None, None, pack(*rows(base), counts=(MAX_CORRECTIONS + 1, 3, 1, 16)))
-    add("too-many-typos", "A typo count over the ceiling.", "CAPACITY_EXCEEDED", None, None, pack(*rows(base), counts=(2, MAX_TYPOS + 1, 1, 16)))
-    add("too-much-text", "A text length over the ceiling.", "CAPACITY_EXCEEDED", None, None, pack(*rows(base), counts=(2, 3, 1, MAX_TEXT_BYTES + 1)))
-    add("more-part-typos-than-typos", "More part-of-word typos than typos.", "CAPACITY_EXCEEDED", None, None, pack(*rows(base), counts=(2, 3, 4, 14)))
+    add("too-many-corrections", "A correction count over the ceiling.", "CAPACITY_EXCEEDED", None, None, pack(*rows(base), counts=(MAX_CORRECTIONS + 1, 3, 1, 0, 16)))
+    add("too-many-typos", "A typo count over the ceiling.", "CAPACITY_EXCEEDED", None, None, pack(*rows(base), counts=(2, MAX_TYPOS + 1, 1, 0, 16)))
+    add("too-much-text", "A text length over the ceiling.", "CAPACITY_EXCEEDED", None, None, pack(*rows(base), counts=(2, 3, 1, 0, MAX_TEXT_BYTES + 1)))
+    add("more-part-typos-than-typos", "More part-of-word typos than typos.", "CAPACITY_EXCEEDED", None, None, pack(*rows(base), counts=(2, 3, 4, 0, 14)))
+    add("more-leader-typos-than-typos", "More leader typos than typos.", "CAPACITY_EXCEEDED", None, None, pack(*rows(base), counts=(2, 3, 1, 4, 14)))
     add("typos-without-corrections", "Typos need a correction to name.", "INVALID_REFERENCE", None, None, raw([], [("teh", WHOLE_WORD, 0)]))
-    add("correction-offset", "A correction's text does not begin where the one before it ended.", "INVALID_OFFSET", 0, 1, changed(lambda c, t, p, x: (c[:1] + [(c[1][0] + 1, *c[1][1:])], t, p, x)))
-    add("typo-offset", "A typo's text does not begin where the one before it ended.", "INVALID_OFFSET", 1, 0, changed(lambda c, t, p, x: (c, [(t[0][0] - 1, *t[0][1:])] + t[1:], p, x)))
+    add("correction-offset", "A correction's text does not begin where the one before it ended.", "INVALID_OFFSET", 0, 1, changed(lambda c, t, p, l, x: (c[:1] + [(c[1][0] + 1, *c[1][1:])], t, p, l, x)))
+    add("typo-offset", "A typo's text does not begin where the one before it ended.", "INVALID_OFFSET", 1, 0, changed(lambda c, t, p, l, x: (c, [(t[0][0] - 1, *t[0][1:])] + t[1:], p, l, x)))
     add("empty-correction", "A correction of no bytes.", "INVALID_TEXT_LENGTH", 0, 0, raw(["", "the"], [("teh", WHOLE_WORD, 1)]))
     add("empty-typo", "A typo of no bytes.", "INVALID_TEXT_LENGTH", 1, 0, raw(["the"], [("", WHOLE_WORD, 0), ("teh", WHOLE_WORD, 0)]))
     add("long-correction", "A correction of 129 bytes.", "INVALID_TEXT_LENGTH", 0, 0, raw(["a" * 129], [("teh", WHOLE_WORD, 0)]))
     add("long-typo", "A typo of 33 bytes.", "INVALID_TEXT_LENGTH", 1, 0, raw(["the"], [("a" * 33, WHOLE_WORD, 0)]))
-    add("correction-kind", "A correction that is neither text nor a macro.", "INVALID_KIND", 0, 0, changed(lambda c, t, p, x: ([(c[0][0], c[0][1], 2, c[0][3])] + c[1:], t, p, x)))
+    add("correction-trigger", "A correction that fires no way there is: trigger 3.", "INVALID_KIND", 0, 0, changed(lambda c, t, p, l, x: ([(c[0][0], c[0][1], 3 << TRIGGER_SHIFT, c[0][3])] + c[1:], t, p, l, x)))
+    add("correction-kind-bit", "A correction's kind byte with a bit above the trigger set.", "INVALID_KIND", 0, 0, changed(lambda c, t, p, l, x: ([(c[0][0], c[0][1], 0x08, c[0][3])] + c[1:], t, p, l, x)))
     add("macro-with-length", "A macro correction with a text length.", "INVALID_TEXT_LENGTH", 0, 1, raw(["the", (5, 3, KIND_MACRO)], [("sig", WHOLE_WORD, 1), ("teh", WHOLE_WORD, 0)]))
     add("macro-slot-out-of-range", "A macro correction names a slot past the macro slots.", "INVALID_MACRO", 0, 1, raw(["the", MACRO_SLOTS], [("sig", WHOLE_WORD, 1), ("teh", WHOLE_WORD, 0)]))
     add("macro-order", "Macro corrections out of slot order.", "ORDER", 0, 1, raw([7, 3], [("addr", WHOLE_WORD, 1), ("sig", WHOLE_WORD, 0)]))
@@ -371,7 +450,14 @@ def invalid_vectors() -> list[dict]:
     add("typo-unknown-letter", "A typo with a letter no host layout types.", "NOT_A_WORD", 1, 0, raw(["the"], [("teж", WHOLE_WORD, 0)]))
     add("typo-capital", "A typo with a capital letter.", "NOT_FOLDED", 1, 0, raw(["the"], [("Teh", WHOLE_WORD, 0)]))
     add("typo-accented-capital", "A typo with an accented capital letter.", "NOT_FOLDED", 1, 0, raw(["über"], [("Üebr", WHOLE_WORD, 0)]))
-    add("unknown-match", "A match value above anywhere.", "INVALID_MATCH", 1, 0, raw(["the"], [("teh", 4, 0)], part=[0]))
+    add("unknown-match", "A match value above anywhere: 4 is no match.", "INVALID_MATCH", 1, 0, raw(["the"], [("teh", 4, 0)], part=[0]))
+    add("leader-space", "A typo with a space, of a correction that fires after the leader.", "NOT_A_WORD", 1, 0, raw(["Kind regards, Sam"], [("k r", WHOLE_WORD, 0)], fires=[AFTER_LEADER]))
+    add("leader-capital", "A typo with a capital letter, of a correction that fires after the leader.", "NOT_FOLDED", 1, 0, raw(["+31 6 1234 5678"], [("Pn", WHOLE_WORD, 0)], fires=[AFTER_LEADER]))
+    add("leader-index-missing", "A typo of a correction that fires after the leader the leader index leaves out.", "LEADER_INDEX", 1, 0, raw(["+31 6 1234 5678", "the"], [("pn", WHOLE_WORD, 0), ("teh", WHOLE_WORD, 1)], leader=[], fires=[AFTER_LEADER, AS_TYPED]))
+    add("leader-index-both-missing", "A part-of-word typo of a correction that fires both ways, in the part index and left out of the leader index.", "LEADER_INDEX", 1, 0, raw(["receive"], [("recieve", START, 0)], leader=[], fires=[BOTH]))
+    add("leader-index-word-end", "The leader index lists a typo of a correction that fires as a word ends.", "LEADER_INDEX", 3, 0, raw(["the"], [("teh", WHOLE_WORD, 0)], leader=[0]))
+    add("leader-index-wrong-typo", "The leader index names another typo.", "LEADER_INDEX", 1, 0, raw(["+31 6 1234 5678", "the"], [("pn", WHOLE_WORD, 0), ("teh", WHOLE_WORD, 1)], leader=[1], fires=[AFTER_LEADER, AS_TYPED]))
+    add("part-index-leader-only", "The part index lists a part-of-word typo of a correction that fires only after the leader.", "PART_INDEX", 2, 0, raw(["receive"], [("recieve", START, 0)], part=[0], fires=[AFTER_LEADER]))
     add("missing-correction", "A typo names a correction that does not exist.", "INVALID_REFERENCE", 1, 1, raw(["the"], [("hte", WHOLE_WORD, 0), ("teh", WHOLE_WORD, 1)]))
     add("first-typo-out-of-range", "A correction's first typo is past the typos.", "INVALID_REFERENCE", 0, 0, raw(["the"], [("teh", WHOLE_WORD, 0)], first=[1]))
     add("unused-correction", "A correction no typo names: its first typo names another.", "FIRST_TYPO", 0, 1, raw(["the", "thing"], [("teh", WHOLE_WORD, 0)], first=[0, 0]))
@@ -385,11 +471,12 @@ def invalid_vectors() -> list[dict]:
 
 def build_fixture() -> dict:
     return {
-        "description": "Autocorrect list domain 0x80 version 1: golden vectors and the word-character table, for the firmware and its clients. Layout and rules: docs/spec/profile-wire-v1/autocorrect-domain.md. Payload, integers little-endian: header [corrections u16, typos u16, part-of-word typos u16, text bytes u16]; a 6-byte row per correction [text offset u16, length u8, kind u8 (0 text, 1 macro), first typo u16], a macro correction holding its macro slot in place of the offset and a length of 0; a 6-byte row per typo [text offset u16, length u8, match u8, correction u16]; the part index, one u16 typo index per typo whose match is not whole word, ascending; then the text, every text correction's bytes then every typo's, in row order, back to back. Text corrections come first and ascend strictly by their UTF-8 bytes, macro corrections follow and ascend strictly by slot, and typos ascend strictly by their bytes. An entry is {correction, typos} for text or {macro, typos} for a macro slot, whose typos match the whole word only. wordCharacters lists every character a typo may hold besides an apostrophe between two of them, as [character, folded]; a typo holds folded characters only, and a typed word is folded with this table before it is looked up. Error codes are the firmware's NOAH_PROFILE_AUTOCORRECT_V1_* names, with the table (0 corrections, 1 typos, 2 part index) and row they name. Test evidence, never a migration source.",
+        "description": "Autocorrect list domain 0x80 version 2: golden vectors and the word-character table, for the firmware and its clients. Layout and rules: docs/spec/profile-wire-v1/autocorrect-domain.md. Payload, integers little-endian: header [corrections u16, typos u16, part-of-word typos u16, leader typos u16, text bytes u16]; a 6-byte row per correction [text offset u16, length u8, kind u8 (bit 0: 0 text, 1 macro; bits 1-2 the trigger: 0 as a word ends, 1 after the leader, 2 both; every other bit 0), first typo u16], a macro correction holding its macro slot in place of the offset and a length of 0; a 6-byte row per typo [text offset u16, length u8, match u8 (0 whole word, 1 start, 2 end, 3 anywhere), correction u16]; the part index, one u16 typo index per typo that matches part of a word (match 1 to 3) and whose correction fires as a word ends (trigger 0 or 2), ascending; the leader index, one u16 typo index per typo whose correction fires after the leader (trigger 1 or 2), ascending, so a part-of-word typo of a correction that fires both ways is in both; then the text, every text correction's bytes then every typo's, in row order, back to back. Text corrections come first and ascend strictly by their UTF-8 bytes, macro corrections follow and ascend strictly by slot, and typos ascend strictly by their bytes, so one text is one typo whatever its match. An entry is {correction, trigger, typos} for text or {macro, trigger, typos} for a macro slot, whose typos match the whole word; trigger is one of triggers. wordCharacters lists every character a typo may hold besides an apostrophe between two of them, as [character, folded]; a typo holds folded characters only, and a typed word, or what is typed after the leader, is folded with this table before it is looked up. After the leader a typo is its whole text, whatever its match. Error codes are the firmware's NOAH_PROFILE_AUTOCORRECT_V1_* names, with the table (0 corrections, 1 typos, 2 part index, 3 leader index) and row they name. Test evidence, never a migration source.",
         "generator": "tools/autocorrect/build.py",
         "version": VERSION,
         "ceilings": {"corrections": MAX_CORRECTIONS, "typos": MAX_TYPOS, "bytesPerTypo": MAX_TEXT, "bytesPerCorrection": MAX_CORRECTION, "macroSlots": MACRO_SLOTS, "textBytes": MAX_TEXT_BYTES, "domainBytes": MAX_SIZE},
         "matches": list(MATCHES),
+        "triggers": list(TRIGGERS),
         "apostrophe": APOSTROPHE,
         "wordCharacters": [[char, folded] for char, folded in WORDS.items()],
         "valid": [
@@ -398,6 +485,7 @@ def build_fixture() -> dict:
             {"name": "small", "description": "Several typos for one correction, every match, a capital in a correction, an apostrophe, a space in a correction and letters outside ASCII.", "entries": SMALL, "hex": encode(SMALL).hex()},
             {"name": "long", "description": "A correction of 128 bytes with spaces, digits and punctuation, beside short ones.", "entries": LONG, "hex": encode(LONG).hex()},
             {"name": "macros", "description": "Macro corrections after the text ones, by slot, each with whole-word typos.", "entries": MACROS, "hex": encode(MACROS).hex()},
+            {"name": "leader", "description": "Corrections that fire after the leader alone or both ways: one typo the start of another, a part-of-word typo in both indexes, letters outside ASCII, a macro, and a correction that fires as a word ends beside them.", "entries": LEADER, "hex": encode(LEADER).hex()},
         ],
         "invalid": invalid_vectors(),
     }

@@ -386,15 +386,17 @@ static void assert_maximum_edges(void) {
     assert(noah_active_profile_combo_get(1)->keycode == CUSTOM_KEY_0 + 126 && !noah_active_profile_combo_get(128));
     assert(noah_setting(NOAH_SETTING_AUTO_MOUSE_LAYER, 0) == 15 && noah_setting(NOAH_SETTING_LAYER_COMBOS, 0) == 0x7fff);
     // The autocorrect list at every ceiling: its first typo by binary search,
-    // naming the 128-byte correction, and its last, 32 bytes long.
+    // naming the 128-byte correction, and its last, 32 bytes long, after the
+    // leader. Every correction fires both ways and every typo matches part of
+    // a word, so every typo is in both indexes.
     const noah_profile_autocorrect_v1_list_t *list = noah_active_profile_autocorrect_list();
     noah_profile_autocorrect_v1_typo_t        typo;
     uint8_t                                   text[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX];
     noah_profile_autocorrect_v1_correction_t  stored;
-    assert(list->corrections == NOAH_PROFILE_AUTOCORRECT_V1_MAX_CORRECTIONS && list->typos == NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS && list->part_typos == NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS && list->text_bytes == NOAH_PROFILE_AUTOCORRECT_V1_MAX_TEXT_BYTES);
+    assert(list->corrections == NOAH_PROFILE_AUTOCORRECT_V1_MAX_CORRECTIONS && list->typos == NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS && list->part_typos == NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS && list->leader_typos == NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS && list->text_bytes == NOAH_PROFILE_AUTOCORRECT_V1_MAX_TEXT_BYTES);
     assert(noah_profile_autocorrect_v1_find(list, (const uint8_t *)"taaaaaaa", 8u, &typo) && typo.index == 0u && typo.match == NOAH_PROFILE_AUTOCORRECT_V1_MATCH_START);
     assert(noah_profile_autocorrect_v1_correction(list, typo.correction, &stored, text) && stored.length == NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX && text[0] == 'Z' && text[127] == '!');
-    assert(noah_profile_autocorrect_v1_part_at(list, NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS - 1u, &typo, text) && typo.length == NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX && text[0] == 'z' && text[31] == 'z');
+    assert(noah_profile_autocorrect_v1_leader_at(list, NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS - 1u, &typo, text) && typo.index == NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS - 1u && typo.length == NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX && text[0] == 'z' && text[31] == 'z');
 }
 
 static void put_u16(uint8_t *p, uint16_t value) {
@@ -623,7 +625,7 @@ int main(int argc, char **argv) {
         save(length);
         assert_published(candidate, &expected, 1);
         assert(noah_setting_combo_output_behaviors() == !use_imported);
-        // The fixture's list (autocorrect_domain_v1.json's "small"): several
+        // The fixture's list (autocorrect_domain_v2.json's "small"): several
         // typos resolve to one stored correction.
         if (use_imported) {
             const noah_profile_autocorrect_v1_list_t *list = noah_active_profile_autocorrect_list();

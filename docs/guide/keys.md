@@ -219,6 +219,15 @@ and `AM_TOGG` for auto-mouse
 `AC_ON`, `AC_OFF` and `AC_TOGG` for
 [text replacement (autocorrect)](autocorrect.md).
 
+## The leader
+
+`QK_LEADER` (QMK's `QK_LEAD`) is text replacement's **Leader key**: what you
+type after it stays on the keyboard until it is an input of a replacement
+that fires after Leader, and is then sent as that replacement
+([Text replacement](autocorrect.md#the-leader)). It goes wherever a switch key
+goes, on a key, in a behaviour's tap or hold, or as a combo's output, and acts
+when pressed. It is not QMK's own Leader, which this build does not include.
+
 ## Custom keys
 
 A **custom key** is a key of your own: 128 of them, each with a name, an

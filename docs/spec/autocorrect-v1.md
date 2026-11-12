@@ -5,10 +5,12 @@ The keyboard replaces what is on the profile's
 any computer, with nothing installed there (D-F69,
 [ADR](../adr/0069-autocorrect-is-the-firmwares-own-and-corrects-at-the-word-end.md)):
 a typo with the right word, an abbreviation with a phone number or a
-sign-off, a typed form with a macro. People know the feature as **text
+sign-off, a typed form with a macro, and after its own
+[Leader key](#the-leader) what is typed with what it stands for. People know the feature as **text
 replacement**; the code, the domain and the keys call it autocorrect. A list
 entry is a **replacement** with the **typed forms** that produce it, which
-the bytes and fixtures call a correction and its typos
+fire as a word ends, after the Leader key, or both, as the replacement says;
+the bytes and fixtures call them a correction and its typos
 ([glossary](../../GLOSSARY.md#autocorrect)).
 
 This file is what it does: how it reads what is typed, when and what it
@@ -312,7 +314,8 @@ Held by: `tests/host/run_autocorrect_tests.sh` (rule 7 cases, `typing-over-the-l
 Text replacement runs while the stored switch is on (key option 12 of settings
 scalar 24,
 [settings](profile-wire-v1/settings-domain.md#editor-metadata--get-0x08)), the
-autocorrect override allows it and the list holds a typed form. The override is
+autocorrect override allows it and the list holds a replacement that fires
+as a word ends. [The leader](#the-leader) ignores all three. The override is
 the switch keys' (`AC_ON`, `AC_OFF`, `AC_TOGG`, D-F66): allowed at boot,
 never saved, read back on
 [GET `0x22` page 1](profile-wire-v1/live-edits.md#runtime-get-0x22). No key
@@ -321,7 +324,10 @@ turns on what the profile has off.
 With the override off the keyboard still follows words, so switching back
 on finds the next word; switched in the middle of a word, that word is left
 alone. A replacement already being typed finishes. With the stored switch
-off or the list empty, keyboard reports are not read at all.
+off or no replacement that fires as a word ends, keyboard reports are not
+read at all, except from a Leader press until leading is over. A word end
+passes over a replacement that fires only after the Leader key, its typed
+forms left as typed.
 
 When reports start being read with keys held (the switch or a list has just
 been applied), the computer sees nothing change: those keys stay down for
@@ -332,6 +338,69 @@ The keyboard cannot see a password field or a terminal: `AC_OFF` or
 `AC_TOGG` is how to keep it out of one.
 
 Held by: `tests/host/run_autocorrect_tests.sh` (`switched-off`; `test_the_stage_is_idle_without_a_list`, `test_the_override_and_the_stored_switch_both_allow`, `test_the_stage_starts_with_a_key_held`), `tests/host/run_key_runtime_layer_lock_integration_tests.sh` (`test_plain_autocorrect_keys_switch_the_override`).
+
+## The leader
+
+The **Leader key**, QMK's `QK_LEADER`, is the firmware's own (D-F71,
+[ADR](../adr/0071-the-leader-is-part-of-the-typing-stage.md)): an action kind
+of its own, which goes wherever a switch key goes, a key, a behaviour's tap
+or hold, a combo's output, acts at its tap or press and puts nothing in a
+report. When the list holds a replacement that fires after the leader
+([trigger `1` or `2`](profile-wire-v1/autocorrect-domain.md#layout)) it
+starts **leading**; otherwise it does nothing. While leading the keyboard
+holds every character typed, shows the computer none of it, and matches what
+it holds against the typed forms of those replacements, each its whole text
+whatever its match: a part-of-word typed form `recieve*` is sent by
+`recieve`.
+
+The leader ignores both switches, the stored switch and the override. When
+keyboard reports are not being read, Leader starts reading them: its press
+reads the report the keyboard has not seen, so keys already down are read
+before it. From then every key reaches the computer at the scan after it was
+pressed, until leading is over and nothing waits behind it. A tap decided at
+the next key's press is handed on before that press, so the key comes out
+behind Leader.
+
+Leader takes its turn among the changes held back: keys pressed before it
+come out first, and only what is typed after it is held. A key that is down
+when leading begins stays down for the computer, is not held, and its release
+goes out.
+
+What is held is read as [typing](#what-counts-as-typing) is: Shift and AltGr
+pick characters, a dead key and the key it composes with are one character,
+Caps Lock changes letters, and Space and punctuation are characters like any
+other, though no typed form holds one, so one makes what is held the start of
+none. It is folded with the word table, so it matches whatever its case.
+Modifiers alone, layers and pointer movement change nothing. At most 32
+characters are held, and at most 32 bytes of folded UTF-8 can match.
+
+| While leading | Then |
+| --- | --- |
+| a character that makes what is held a typed form that fires after the leader and that no longer one begins with | it is sent at once |
+| a character that makes what is held the start of none | leading ends with nothing sent, that character included |
+| Enter | what is held is sent if it is a typed form that fires after the leader, even one a longer one begins with; otherwise leading ends with nothing sent. Enter never reaches the computer |
+| the leader timeout, settings scalar 32, from the last key that was held or taken back, once no change waits | as Enter |
+| Escape | leading ends with nothing sent. Escape never reaches the computer |
+| Backspace | the last character held goes; with none held, leading ends with nothing sent. Backspace never reaches the computer |
+| Leader | it starts over, dropping what is held |
+| a dead key, then a character it composes nothing with | leading ends with nothing sent, both dropped |
+| a lock key | it is itself, and leaves a dead key waiting |
+| any other key: Tab, a shortcut (Backspace with Ctrl or Option among them), a key that moves the cursor or deletes, a keypad character, a mouse button, a macro key | leading ends with nothing sent, and the key acts as itself, after a waiting dead key too; a mouse button and a macro key take their place among the keys held back |
+
+No ending that sends nothing lets what was held out.
+
+What is sent is the typed form's replacement. Text is typed exactly as
+written, with no [case](#case) rule and nothing to erase, since nothing reached
+the computer, through the host layout and under its Caps Lock, as a
+[replacement is typed](#typing-a-replacement-and-holding-keys-back); a macro
+plays as a [macro replacement](#a-macro-as-the-replacement) does, with nothing
+erased. Keys pressed meanwhile wait in the queue and come out afterwards, in
+order. A replacement this host cannot type, or whose macro cannot play, is
+passed over and nothing is sent, and so is one with more than 16 changes
+waiting behind it. There is no undo: Backspace after it is Backspace. The
+next word starts fresh.
+
+Held by: `tests/host/run_autocorrect_tests.sh` (rule 11 cases; `test_the_stage_joins_the_report_path_for_the_leader`, `test_the_leader_takes_its_turn_behind_a_replacement`, `test_a_click_while_leading_keeps_its_place`, `test_keys_after_a_dead_key_while_leading`, `test_a_key_down_when_the_list_gains_a_leader_input`, `test_a_key_held_when_leading_begins`), `tests/host/run_key_runtime_layer_lock_integration_tests.sh` (`test_a_plain_leader_key_acts_at_its_press`), `tests/host/run_action_dispatch_tests.sh` (`test_the_leader_goes_where_a_switch_key_goes`), `tests/host/run_profile_autocorrect_v1_tests.sh` (`test_leader`).
 
 ## What lighting is told
 
@@ -344,6 +413,13 @@ word, or whose Backspace undid the replacement, and every key of a combo
 whose output that was. What is reported shows for the replacement-feedback
 flash length (settings scalar 31) and a newer report replaces it. Nothing is
 reported for a word left as typed.
+
+What [the leader](#the-leader) sends is reported the same way (D-F71): a text
+replacement or a macro replacement, at the moment its typing begins or its
+macro starts, with the key that ended leading, the character that made the
+match or Enter, and no key when the timeout sent it. Nothing is reported for
+a leader that sends nothing. Leading itself is the engine's state
+(`noah_autocorrect_leading`), for lighting to read.
 
 The engine reads usages in reports, so the key is noted for it by whatever
 puts a key in a report: a key QMK registers as the hook hands its press on,
@@ -358,32 +434,32 @@ queue: the scan after its press, or later when the key waited there behind
 a replacement being typed, by when a combo that has been released names its
 owner key alone.
 
-Held by: `tests/host/run_autocorrect_tests.sh` (`autocorrect_test.c`, the tests under "What lighting is told"; `test_a_full_queue_stops_a_macro_correction`; the `switched-off` case), `tests/host/run_action_lifecycle_tests.sh` (`test_a_tap_notes_its_key_for_the_typing_stage`), `tests/host/run_key_runtime_physical_ownership_integration_tests.sh` (`test_the_key_that_reaches_the_report_is_noted`, `test_a_plain_press_that_settles_another_key_is_the_one_noted`). No test reads a combo's output through the key runtime to the note, or a key noted after a report that did not fit the queue.
+Held by: `tests/host/run_autocorrect_tests.sh` (`autocorrect_test.c`, the tests under "What lighting is told" and `test_a_leader_send_shows_on_the_key_that_ended_leading`; `test_a_full_queue_stops_a_macro_correction`; the `switched-off` case), `tests/host/run_action_lifecycle_tests.sh` (`test_a_tap_notes_its_key_for_the_typing_stage`), `tests/host/run_key_runtime_physical_ownership_integration_tests.sh` (`test_the_key_that_reaches_the_report_is_noted`, `test_a_plain_press_that_settles_another_key_is_the_one_noted`). No test reads a combo's output through the key runtime to the note, or a key noted after a report that did not fit the queue.
 
 ## The fixture
 
-`tests/fixtures/autocorrect_v1.json`, version 1. Each case has:
+`tests/fixtures/autocorrect_v1.json`, version 2. Each case has:
 
 | Field | Meaning |
 | --- | --- |
-| `name`, `rule`, `description` | The case, and the rule of the ten in the ADR it holds |
+| `name`, `rule`, `description` | The case, and the rule it holds: one of the ten in the ADR, or 11, [the leader](#the-leader) (D-F71) |
 | `layout` | A host layout's slug |
 | `capsLock` | The computer's Caps Lock when the case starts |
-| `list` | The entries, as in `autocorrect_domain_v1.json`: `correction` and `typos`, or `macro` (a slot) and `typos` |
+| `list` | The entries, as in `autocorrect_domain_v2.json`: `correction` and `typos`, or `macro` (a slot) and `typos` |
 | `macros` | For a case with a macro replacement, the text each stored macro types, by slot; a slot left out is empty |
 | `on` | `false` when the stored switch is off; absent otherwise |
 | `events` | The keys, below |
 | `result` | The text the computer ends with |
 | `resultEndsWith` | In place of `result`, only its end, where the rest depends on timing |
-| `screen` | The same input as the characters the computer would show with autocorrect off, `\b` for Backspace: what a text matcher is run over, with the case's list, layout, Caps Lock and macros, to produce `result` |
-| `keyboardOnly` | In place of `screen`, why the case has no text form |
+| `screen` | The same input as the characters the computer would show with autocorrect off, `\b` for Backspace and U+0010 for the Leader key: what a text matcher is run over, with the case's list, layout, Caps Lock and macros, to produce `result` |
+| `keyboardOnly` | In place of `screen`, why the case has no text form; the leader's cases add `Escape`, `a switch key` and `the leader's timeout` to the reasons before them |
 | `strokes` | For one case, how many characters the replacement erased and typed |
 
 | Event | Meaning |
 | --- | --- |
 | `{"type": text}` | the keys that show those characters on the layout under the case's Caps Lock, one after another; `\n` is Enter and `\t` Tab |
 | `{"fast": text}` | the same with no pause, so later keys arrive while a replacement is typed |
-| `{"key": name, "mods": [...]}` | a named key tapped: `Backspace`, `Enter`, `Left`, `Right`, or a letter with `Ctrl` |
+| `{"key": name, "mods": [...]}` | a named key tapped: `Backspace`, `Enter`, `Escape`, `Tab`, `Left`, `Right`, or a letter with `Ctrl` |
 | `{"stroke": stroke}` | a layout stroke tapped, in the host layouts' notation |
 | `{"tap": key}` | a key tapped by its QMK name, with whatever modifiers are held |
 | `{"press": mod}`, `{"release": mod}` | a modifier held and let go |
@@ -391,8 +467,11 @@ Held by: `tests/host/run_autocorrect_tests.sh` (`autocorrect_test.c`, the tests 
 | `{"hold": char, "ms": n, "repeats": n}` | a key held that long while the computer repeats it that many times |
 | `{"macro": text, "fast": bool}` | a macro key pressed, whose macro types the text |
 | `{"mash": char, "count": n}` | a key tapped that many times with no pause |
+| `{"leader": true}` | the Leader key tapped |
+| `{"wait": n}` | `n` milliseconds with no key |
+| `{"override": bool}` | the autocorrect override set, as `AC_ON` and `AC_OFF` set it |
 
 A small letter's capital is the one character of `wordCharacters` in
-`autocorrect_domain_v1.json` that folds to it.
+`autocorrect_domain_v2.json` that folds to it.
 
 Held by: `tests/host/run_autocorrect_tests.sh` (the runner refuses a case without `screen` or `keyboardOnly`, and a rule without a case).

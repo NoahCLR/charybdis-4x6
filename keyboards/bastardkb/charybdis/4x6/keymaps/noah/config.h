@@ -177,6 +177,10 @@ enum charybdis_keymap_layers {
 // 1 when macOS classified the keyboard as ISO.
 #define NOAH_DEFAULT_MACOS_ISO 0
 
+// How long text replacement's leader waits after its last key, ms (1,000 to
+// 10,000). The live profile stores its own once one is saved.
+#define NOAH_LEADER_TIMEOUT_MS 2000
+
 // The keyboard's own name, the USB product name computers and Charybdis Ark
 // list it under: at most 32 bytes of UTF-8. Empty keeps QMK's built-in name.
 #define NOAH_KEYBOARD_NAME "Charybdis - Home"
