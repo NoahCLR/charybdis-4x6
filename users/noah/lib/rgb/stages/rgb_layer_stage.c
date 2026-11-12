@@ -56,7 +56,7 @@ static const rgb_active_profile_layer_profile_t *rgb_runtime_layer_stage_profile
         }
         layer_profile_cache.profile.colors[layer] = hsv_to_rgb(config.color);
         layer_profile_cache.profile.modes[layer]  = config.mode;
-        layer_profile_cache.profile.solid[layer]  = !(config.color.s == 0u && config.color.v == 0u);
+        layer_profile_cache.profile.solid[layer]  = !rgb_hsv_is_passthrough(config.color);
     }
     layer_profile_cache.epoch             = epoch;
     layer_profile_cache.publication_count = publication_count;

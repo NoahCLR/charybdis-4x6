@@ -24,7 +24,7 @@ enum {
     // 128 groups and one table's 255 rows (D-F63): a step per record and six
     // for the domain's framing.
     MAX_RGB_DOMAIN_STEPS          = 395u,
-    TEST_MAXIMUM_RGB_PAYLOAD_SIZE = 2480u,
+    TEST_MAXIMUM_RGB_PAYLOAD_SIZE = 2485u,
 };
 
 typedef struct {
@@ -150,7 +150,7 @@ static void run_maximum_rgb_profile(void) {
         rgb_payload[offset + 4u] = 0u;
         offset += 5u;
     }
-    assert(offset + 4u + 4u + 11u + 13u == sizeof(rgb_payload));
+    assert(offset + 4u + 4u + 13u + 16u == sizeof(rgb_payload));
 
     const noah_profile_domain_v1_t domain = {
         .id             = NOAH_PROFILE_DOMAIN_V1_RGB,

@@ -88,26 +88,49 @@ static inline bool rgb_hsv_is_inherit_color(hsv_t color) {
     return color.h == 0 && color.s == 0 && color.v == 0;
 }
 
+// A colour a layer, pointing slot, combo or feedback case owns is passthrough
+// when its saturation and value are 0, at any hue: it paints nothing and what
+// is beneath shows. Value 0 with saturation is black (D-F74).
+static inline bool rgb_hsv_is_passthrough(hsv_t color) {
+    return color.s == 0 && color.v == 0;
+}
+
 typedef struct {
     hsv_t           color;
     rgb_led_group_t led_group;
 } combo_feedback_led_group_t;
 
+// A tap branch pending: its colour and where it paints (D-F73).
 typedef struct {
-    const hsv_t                   *tap_branch_colors;
-    uint8_t                        tap_branch_color_count;
-    hsv_t                          tap_committed_color;
-    hsv_t                          hold_active_color;
-    hsv_t                          long_hold_active_color;
-    key_feedback_tap_commit_mode_t tap_commit_mode;
-    rgb_locality_t                 locality;
+    hsv_t          color;
+    rgb_locality_t locality;
+} key_behavior_feedback_tap_branch_t;
+
+// Each case of behaviour feedback has its own colour and locality (D-F73).
+typedef struct {
+    const key_behavior_feedback_tap_branch_t *tap_branches;
+    uint8_t                                   tap_branch_count;
+    hsv_t                                     tap_committed_color;
+    rgb_locality_t                            tap_committed_locality;
+    hsv_t                                     hold_active_color;
+    rgb_locality_t                            hold_active_locality;
+    hsv_t                                     long_hold_active_color;
+    rgb_locality_t                            long_hold_active_locality;
+    key_feedback_tap_commit_mode_t            tap_commit_mode;
 } key_behavior_feedback_color_config_t;
 
+// The tiers are 1-3 so stored rows keep their meaning; the tap branches for
+// tap counts 3, 4 and 5 or more take 4-6 (D-F73), and any tap branch 7
+// (D-F75).
 typedef enum {
-    KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING = 0,
+    KEY_FEEDBACK_GROUP_TAP_COUNT_2 = 0,
     KEY_FEEDBACK_GROUP_TAP_COMMITTED,
     KEY_FEEDBACK_GROUP_HOLD_ACTIVE,
     KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE,
+    KEY_FEEDBACK_GROUP_TAP_COUNT_3,
+    KEY_FEEDBACK_GROUP_TAP_COUNT_4,
+    KEY_FEEDBACK_GROUP_TAP_COUNT_5,
+    KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY,
     KEY_FEEDBACK_GROUP_ALL,
 } key_behavior_feedback_group_semantic_t;
 
@@ -117,15 +140,18 @@ typedef struct {
     rgb_led_group_t                        led_group;
 } key_behavior_feedback_led_group_t;
 
-// Replacement feedback: one colour for each thing a replacement can do
-// (D-F70), and one held while the leader waits (D-F72). A colour of
-// saturation and value 0 paints nothing for it.
+// Replacement feedback: a colour and a locality for each thing a replacement
+// can do (D-F70), and for the colour held while the leader waits (D-F72,
+// D-F73). A colour of saturation and value 0 paints nothing for it.
 typedef struct {
-    hsv_t          text_color;    // A typed form was replaced with text.
-    hsv_t          macro_color;   // A typed form was replaced by its macro.
-    hsv_t          undo_color;    // Backspace put a replaced word back.
+    hsv_t          text_color; // A typed form was replaced with text.
+    rgb_locality_t text_locality;
+    hsv_t          macro_color; // A typed form was replaced by its macro.
+    rgb_locality_t macro_locality;
+    hsv_t          undo_color; // Backspace put a replaced word back.
+    rgb_locality_t undo_locality;
     hsv_t          leading_color; // The leader waits for what is typed after it.
-    rgb_locality_t locality;
+    rgb_locality_t leading_locality;
 } autocorrect_feedback_color_config_t;
 
 typedef enum {

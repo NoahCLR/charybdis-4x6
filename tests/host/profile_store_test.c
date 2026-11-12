@@ -48,9 +48,9 @@ typedef struct {
     bool                saw_pristine_marker;
 } reuse_guard_state_t;
 
-static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 4u, 7u, 0u, 1u};
-static const uint8_t rgb_profile[]      = {'N', 'L', 'P', '1', 4u, 7u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB, 3u, 0u, 0u, 0u, 1u, 2u, 3u};
-static const uint8_t behavior_profile[] = {'N', 'L', 'P', '1', 4u, 7u, 1u, 1u, 0x20u, NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS, 2u, 0u, 0u, 0u, 4u, 5u};
+static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 4u, 8u, 0u, 1u};
+static const uint8_t rgb_profile[]      = {'N', 'L', 'P', '1', 4u, 8u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB, 3u, 0u, 0u, 0u, 1u, 2u, 3u};
+static const uint8_t behavior_profile[] = {'N', 'L', 'P', '1', 4u, 8u, 1u, 1u, 0x20u, NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS, 2u, 0u, 0u, 0u, 4u, 5u};
 
 // The flash backend refuses a read or write over the store's I/O bound; one
 // here fails the test.
@@ -896,7 +896,7 @@ static void test_boot_selection_state_machine_is_scan_bounded(void) {
 // These are storage-envelope fixtures: domain bodies are opaque to this layer.
 // The schema validator remains responsible for semantic payload validation.
 static uint16_t pd_payload(uint8_t *payload, uint8_t mask) {
-    const uint8_t header[] = {'N', 'L', 'P', '1', 4u, 7u, 0u, 1u};
+    const uint8_t header[] = {'N', 'L', 'P', '1', 4u, 8u, 0u, 1u};
     uint16_t length = sizeof(header);
     memcpy(payload, header, sizeof(header));
     for (uint8_t domain = 0u; domain < NOAH_PROFILE_DOMAIN_REGISTRY_COUNT; domain++) {
@@ -1002,7 +1002,7 @@ static void test_pd_store_accepts_every_combo_version_the_validator_does(void) {
 }
 
 // The 32-slot domains: the store keeps only the RGB and PD versions the
-// validator accepts, RGB v6 and PD v4. An earlier one never reaches it.
+// validator accepts, RGB v7 and PD v4. An earlier one never reaches it.
 static void test_pd_store_accepts_only_32_slot_rgb_and_pd_versions(void) {
     const struct { uint8_t mask, id; } domains[] = {{1u << 0u, 0x10u}, {1u << 4u, 0x50u}};
     for (size_t d = 0u; d < sizeof(domains) / sizeof(domains[0]); d++) {
@@ -1019,7 +1019,7 @@ static void test_pd_store_accepts_only_32_slot_rgb_and_pd_versions(void) {
             reset_eeprom(&eeprom);
             initialize_pd_store(&store);
             CHECK((commit_pd(&store, payload, &candidate) == NOAH_PROFILE_STORE_OK) == accepted);
-            CHECK(accepted == (version == (domains[d].id == 0x10u ? 6u : 4u)));
+            CHECK(accepted == (version == (domains[d].id == 0x10u ? 7u : 4u)));
         }
     }
 }
@@ -1344,7 +1344,7 @@ static void test_payload_over_64_kib_round_trips(void) {
     uint8_t                        span[40];
     noah_profile_store_result_t    result;
 
-    memcpy(payload, (const uint8_t[]){'N', 'L', 'P', '1', 4u, 7u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB}, 10u);
+    memcpy(payload, (const uint8_t[]){'N', 'L', 'P', '1', 4u, 8u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB}, 10u);
     payload[10] = (uint8_t)(WIDE - 14u);
     payload[11] = (uint8_t)((WIDE - 14u) >> 8u);
     payload[12] = (uint8_t)((WIDE - 14u) >> 16u);

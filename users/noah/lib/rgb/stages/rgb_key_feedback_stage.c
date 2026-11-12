@@ -2,6 +2,12 @@
 // ────────────────────────────────────────────────────────────────────────────
 // RGB Behaviour Feedback Stage
 // ────────────────────────────────────────────────────────────────────────────
+//
+// Each case (a tap branch pending, tap committed, hold, long hold) has its own
+// colour and locality, and the localities' areas stack, widest first (D-F73).
+// Which cases show on which half is read once a frame from the semantic,
+// tap-branch and flash-visibility maps; which key is newest comes from the
+// broad owners the key runtime keeps.
 
 #include "rgb_key_feedback_stage.h"
 
@@ -9,136 +15,191 @@
 
 #    include "../../key/runtime/feedback.h"
 
-typedef struct {
-    key_feedback_semantic_t semantic;
-    uint8_t                 tap_branch;
-} key_feedback_render_state_t;
-
 #    if RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS <= 0
 #        error "RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS must be greater than zero"
 #    endif
 
-static uint8_t rgb_runtime_key_feedback_stage_tap_branch_color_index(const rgb_active_profile_key_feedback_t *config, uint8_t tap_branch) {
+// One bit per case, in case order.
+typedef uint16_t key_feedback_case_mask_t;
+_Static_assert(RGB_ACTIVE_PROFILE_KEY_MAX_CASES <= 16u, "a case mask holds every behaviour-feedback case");
+// A stored tier semantic less tap committed's is its tier; a stored tap
+// branch semantic names case 0 (tap count 2) or, from tap count 3's on, the
+// case its distance from tap count 3's plus one.
+_Static_assert(NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_HOLD - NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_COMMITTED == RGB_ACTIVE_PROFILE_KEY_TIER_HOLD && NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_LONG_HOLD - NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_COMMITTED == RGB_ACTIVE_PROFILE_KEY_TIER_LONG_HOLD && RGB_ACTIVE_PROFILE_KEY_TIER_TAP_COMMITTED == 0, "stored tier semantics are contiguous, in tier order");
+_Static_assert(NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_BRANCH_2 == 0 && NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_BRANCH_4 == NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_BRANCH_3 + 1 && NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_BRANCH_5 == NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_BRANCH_3 + 2, "stored tap branch semantics for tap counts 3 to 5 are contiguous");
+
+// A case index, or what an owner slot names when it holds no case.
+#    define KEY_FEEDBACK_STAGE_NO_CASE UINT8_MAX
+#    define KEY_FEEDBACK_STAGE_NO_OWNER (UINT8_MAX - 1u)
+
+typedef struct {
+    rgb_active_profile_key_feedback_t config;
+    rgb_runtime_frame_t              *frame;
+    const uint8_t                    *semantic_map;
+    const uint8_t                    *tap_branch_map;
+    const uint8_t                    *flash_visibility_bitmap;
+    const uint8_t                    *broad_owner_map;
+    // The cases some key visibly shows, on the left half and the right.
+    key_feedback_case_mask_t shown[2];
+    // The cases whose accents paint this frame: rows naming one tap branch
+    // or a tier, rows naming any tap branch, and 0xff rows.
+    key_feedback_case_mask_t accented;
+    key_feedback_case_mask_t accented_by_any_branch;
+    key_feedback_case_mask_t accented_by_all;
+    uint8_t                  led_min;
+    uint8_t                  led_max;
+} key_feedback_render_t;
+
+static uint8_t rgb_runtime_key_feedback_stage_case_count(const key_feedback_render_t *render) {
+    return rgb_active_profile_key_tier_case(&render->config, RGB_ACTIVE_PROFILE_KEY_TIER_COUNT);
+}
+
+static uint8_t rgb_runtime_key_feedback_stage_tier_case(const key_feedback_render_t *render, rgb_active_profile_key_tier_t tier) {
+    return rgb_active_profile_key_tier_case(&render->config, tier);
+}
+
+static key_feedback_case_mask_t rgb_runtime_key_feedback_stage_case_bit(uint8_t case_index) {
+    return (key_feedback_case_mask_t)(1u << case_index);
+}
+
+static key_feedback_case_mask_t rgb_runtime_key_feedback_stage_tap_branch_cases(const key_feedback_render_t *render) {
+    return (key_feedback_case_mask_t)(rgb_runtime_key_feedback_stage_case_bit(render->config.tap_branch_count) - 1u);
+}
+
+// A deeper tap count takes the last tap branch's case.
+static uint8_t rgb_runtime_key_feedback_stage_tap_branch_case(const key_feedback_render_t *render, uint8_t tap_branch) {
     uint8_t index;
 
-    if (!config || config->tap_branch_color_count == 0u) {
-        return 0u;
+    if (render->config.tap_branch_count == 0u) {
+        return KEY_FEEDBACK_STAGE_NO_CASE;
     }
     if (tap_branch <= 2u) {
         return 0u;
     }
-
     index = (uint8_t)(tap_branch - 2u);
-    if (index >= config->tap_branch_color_count) {
-        index = (uint8_t)(config->tap_branch_color_count - 1u);
+    if (index >= render->config.tap_branch_count) {
+        index = (uint8_t)(render->config.tap_branch_count - 1u);
     }
     return index;
 }
 
-static bool rgb_runtime_key_feedback_stage_semantic_color(const rgb_active_profile_key_feedback_t *config, key_feedback_semantic_t semantic, uint8_t tap_branch, rgb_t *out_color) {
-    if (!(config && out_color)) {
-        return false;
-    }
-
+static uint8_t rgb_runtime_key_feedback_stage_case(const key_feedback_render_t *render, key_feedback_semantic_t semantic, keypos_t key_pos) {
     switch (semantic) {
         case KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING:
-            if (config->tap_branch_color_count == 0u) {
-                *out_color = (rgb_t){0};
-                return false;
-            }
-            *out_color = hsv_to_rgb(config->tap_branch_colors[rgb_runtime_key_feedback_stage_tap_branch_color_index(config, tap_branch)]);
-            return true;
+            return rgb_runtime_key_feedback_stage_tap_branch_case(render, key_feedback_tap_branch_map_get(render->tap_branch_map, key_pos));
         case KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED:
-            *out_color = hsv_to_rgb(config->tap_committed_color);
-            return true;
+            return rgb_runtime_key_feedback_stage_tier_case(render, RGB_ACTIVE_PROFILE_KEY_TIER_TAP_COMMITTED);
         case KEY_FEEDBACK_SEMANTIC_HOLD_PENDING:
         case KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING:
-            *out_color = hsv_to_rgb(config->hold_active_color);
-            return true;
+            return rgb_runtime_key_feedback_stage_tier_case(render, RGB_ACTIVE_PROFILE_KEY_TIER_HOLD);
         case KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY:
         case KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING:
-            *out_color = hsv_to_rgb(config->long_hold_active_color);
-            return true;
+            return rgb_runtime_key_feedback_stage_tier_case(render, RGB_ACTIVE_PROFILE_KEY_TIER_LONG_HOLD);
         case KEY_FEEDBACK_SEMANTIC_NONE:
         default:
-            *out_color = (rgb_t){0};
+            return KEY_FEEDBACK_STAGE_NO_CASE;
+    }
+}
+
+// The case a key shows, and whether it shows it now: a flashing case is
+// dark in its off phase.
+static uint8_t rgb_runtime_key_feedback_stage_key_case(const key_feedback_render_t *render, keypos_t key_pos, bool *visible) {
+    key_feedback_semantic_t semantic = key_feedback_semantic_map_get(render->semantic_map, key_pos);
+
+    *visible = !key_feedback_semantic_is_flashing(semantic) || key_origin_bitmap_has_keypos(render->flash_visibility_bitmap, key_pos);
+    return rgb_runtime_key_feedback_stage_case(render, semantic, key_pos);
+}
+
+// The case the newest key in an owner slot shows: NO_OWNER when the slot
+// names no key, NO_CASE when its key shows none.
+static uint8_t rgb_runtime_key_feedback_stage_owner_case(const key_feedback_render_t *render, key_feedback_broad_owner_slot_t slot, bool *visible) {
+    keypos_t owner_key_pos = key_feedback_broad_owner_map_get(render->broad_owner_map, slot);
+
+    *visible = false;
+    if (!key_origin_keypos_valid(owner_key_pos)) {
+        return KEY_FEEDBACK_STAGE_NO_OWNER;
+    }
+    return rgb_runtime_key_feedback_stage_key_case(render, owner_key_pos, visible);
+}
+
+static rgb_t rgb_runtime_key_feedback_stage_case_rgb(const key_feedback_render_t *render, uint8_t case_index) {
+    return hsv_to_rgb(render->config.case_colors[case_index]);
+}
+
+// A passthrough case paints nothing, nor do its black rows (D-F74).
+static bool rgb_runtime_key_feedback_stage_case_paints(const key_feedback_render_t *render, uint8_t case_index) {
+    return !rgb_hsv_is_passthrough(render->config.case_colors[case_index]);
+}
+
+// Whether no key shows any case: every packed semantic is none, so no area,
+// key or accent has anything to paint this frame.
+_Static_assert(KEY_FEEDBACK_SEMANTIC_NONE == 0, "a semantic map of zero bytes shows nothing");
+static bool rgb_runtime_key_feedback_stage_nothing_shows(const uint8_t *semantic_map) {
+    for (uint8_t index = 0u; index < KEY_FEEDBACK_SEMANTIC_MAP_SIZE; index++) {
+        if (semantic_map[index] != 0u) {
             return false;
+        }
+    }
+    return true;
+}
+
+static void rgb_runtime_key_feedback_stage_scan(key_feedback_render_t *render) {
+    for (uint8_t row = 0u; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0u; col < MATRIX_COLS; col++) {
+            keypos_t key_pos = {.row = row, .col = col};
+            bool     visible;
+            uint8_t  case_index = rgb_runtime_key_feedback_stage_key_case(render, key_pos, &visible);
+
+            if (case_index != KEY_FEEDBACK_STAGE_NO_CASE && visible) {
+                render->shown[split_half_from_keypos(key_pos) == SPLIT_HALF_RIGHT ? 1u : 0u] |= rgb_runtime_key_feedback_stage_case_bit(case_index);
+            }
+        }
     }
 }
 
-static uint8_t rgb_runtime_key_feedback_stage_branch_for_key(const uint8_t *semantic_map, const uint8_t *tap_branch_map, keypos_t key_pos) {
-    if (!(semantic_map && tap_branch_map)) {
-        return 0u;
-    }
-    if (key_feedback_semantic_map_get(semantic_map, key_pos) != KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING) {
-        return 0u;
-    }
-    return key_feedback_tap_branch_map_get(tap_branch_map, key_pos);
-}
-
-static bool rgb_runtime_key_feedback_stage_semantic_visible(key_feedback_semantic_t semantic, const uint8_t *flash_visibility_bitmap, keypos_t key_pos) {
-    return !key_feedback_semantic_is_flashing(semantic) || key_origin_bitmap_has_keypos(flash_visibility_bitmap, key_pos);
-}
-
-static bool rgb_runtime_key_feedback_stage_group_semantic_matches(key_behavior_feedback_group_semantic_t group_semantic, key_feedback_semantic_t semantic) {
-    switch (group_semantic) {
-        case KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING:
-            return semantic == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING;
-        case KEY_FEEDBACK_GROUP_TAP_COMMITTED:
-            return semantic == KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED;
-        case KEY_FEEDBACK_GROUP_HOLD_ACTIVE:
-            return semantic == KEY_FEEDBACK_SEMANTIC_HOLD_PENDING || semantic == KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING;
-        case KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE:
-            return semantic == KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY || semantic == KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING;
-        default:
-            return false;
-    }
-}
-
-static bool rgb_runtime_key_feedback_stage_group_owner_slot(key_behavior_feedback_group_semantic_t group_semantic, key_feedback_broad_owner_slot_t *out_slot) {
-    if (!out_slot) {
-        return false;
-    }
-
-    switch (group_semantic) {
-        case KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING:
-            *out_slot = KEY_FEEDBACK_BROAD_OWNER_GROUP_TAP_BRANCH_PENDING;
-            return true;
-        case KEY_FEEDBACK_GROUP_TAP_COMMITTED:
-            *out_slot = KEY_FEEDBACK_BROAD_OWNER_GROUP_TAP_COMMITTED;
-            return true;
-        case KEY_FEEDBACK_GROUP_HOLD_ACTIVE:
-            *out_slot = KEY_FEEDBACK_BROAD_OWNER_GROUP_HOLD_ACTIVE;
-            return true;
-        case KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE:
-            *out_slot = KEY_FEEDBACK_BROAD_OWNER_GROUP_LONG_HOLD_ACTIVE;
-            return true;
-        default:
-            return false;
-    }
-}
-
-static bool rgb_runtime_key_feedback_stage_paint_range(rgb_runtime_frame_t *frame, rgb_t color, uint8_t from, uint8_t to, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_key_feedback_stage_paint_range(key_feedback_render_t *render, rgb_t color, uint8_t from, uint8_t to) {
     bool painted = false;
 
-    if (!frame || from >= led_max || to <= led_min) {
-        return false;
+    if (from < render->led_min) {
+        from = render->led_min;
     }
-    if (from < led_min) {
-        from = led_min;
-    }
-    if (to > led_max) {
-        to = led_max;
+    if (to > render->led_max) {
+        to = render->led_max;
     }
     for (uint8_t led = from; led < to; led++) {
-        frame->colors[led]  = color;
-        frame->painted[led] = true;
-        painted             = true;
+        render->frame->colors[led]  = color;
+        render->frame->painted[led] = true;
+        painted                     = true;
     }
     return painted;
 }
 
-static bool rgb_runtime_key_feedback_stage_paint_key(rgb_runtime_frame_t *frame, rgb_t color, keypos_t key_pos, uint8_t led_min, uint8_t led_max) {
+// One area: both halves, a fixed half, or the half of the key (D-F73). The
+// newest key decides the area when its case's locality is this one, through
+// its flash's dark phase too and with a passthrough case (D-F74), and when it
+// shows no case the area stays dark. Otherwise each case of this locality
+// that some key shows paints it, a later case over an earlier one, a
+// passthrough one not at all.
+static bool rgb_runtime_key_feedback_stage_paint_area(key_feedback_render_t *render, rgb_locality_t locality, key_feedback_broad_owner_slot_t slot, key_feedback_case_mask_t shown, uint8_t from, uint8_t to) {
+    bool    visible;
+    bool    painted = false;
+    uint8_t newest  = rgb_runtime_key_feedback_stage_owner_case(render, slot, &visible);
+
+    if (newest == KEY_FEEDBACK_STAGE_NO_CASE) {
+        return false;
+    }
+    if (newest != KEY_FEEDBACK_STAGE_NO_OWNER && render->config.case_localities[newest] == locality) {
+        return visible && rgb_runtime_key_feedback_stage_case_paints(render, newest) && rgb_runtime_key_feedback_stage_paint_range(render, rgb_runtime_key_feedback_stage_case_rgb(render, newest), from, to);
+    }
+    for (uint8_t case_index = 0u; case_index < rgb_runtime_key_feedback_stage_case_count(render); case_index++) {
+        if (render->config.case_localities[case_index] == locality && (shown & rgb_runtime_key_feedback_stage_case_bit(case_index)) != 0u && rgb_runtime_key_feedback_stage_case_paints(render, case_index)) {
+            painted |= rgb_runtime_key_feedback_stage_paint_range(render, rgb_runtime_key_feedback_stage_case_rgb(render, case_index), from, to);
+        }
+    }
+    return painted;
+}
+
+static bool rgb_runtime_key_feedback_stage_paint_key(key_feedback_render_t *render, rgb_t color, keypos_t key_pos) {
     uint8_t leds[RGB_MATRIX_LED_COUNT];
     uint8_t led_count = rgb_matrix_map_row_column_to_led(key_pos.row, key_pos.col, leds);
     bool    painted   = false;
@@ -146,228 +207,204 @@ static bool rgb_runtime_key_feedback_stage_paint_key(rgb_runtime_frame_t *frame,
     for (uint8_t index = 0u; index < led_count; index++) {
         uint8_t led = leds[index];
 
-        if (frame && led >= led_min && led < led_max) {
-            frame->colors[led]  = color;
-            frame->painted[led] = true;
-            painted             = true;
+        if (led >= render->led_min && led < render->led_max) {
+            render->frame->colors[led]  = color;
+            render->frame->painted[led] = true;
+            painted                     = true;
         }
     }
     return painted;
 }
 
-static bool rgb_runtime_key_feedback_stage_render_key_mode(const rgb_active_profile_key_feedback_t *config, rgb_runtime_frame_t *frame, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, uint8_t led_min, uint8_t led_max) {
-    bool painted = false;
+// Under the keys locality each key showing such a case paints its own key.
+// With no case in that locality there is nothing to look up.
+static bool rgb_runtime_key_feedback_stage_paint_keys(key_feedback_render_t *render) {
+    bool painted  = false;
+    bool any_keys = false;
 
-    if (!(config && frame && semantic_map && tap_branch_map && flash_visibility_bitmap)) {
+    for (uint8_t case_index = 0u; case_index < rgb_runtime_key_feedback_stage_case_count(render); case_index++) {
+        any_keys |= render->config.case_localities[case_index] == RGB_KEYS_ONLY;
+    }
+    if (!any_keys) {
         return false;
     }
+
     for (uint8_t row = 0u; row < MATRIX_ROWS; row++) {
         for (uint8_t col = 0u; col < MATRIX_COLS; col++) {
-            keypos_t                key_pos  = {.row = row, .col = col};
-            key_feedback_semantic_t semantic = key_feedback_semantic_map_get(semantic_map, key_pos);
-            uint8_t                 tap_branch;
-            rgb_t                   color;
+            keypos_t key_pos = {.row = row, .col = col};
+            bool     visible;
+            uint8_t  case_index = rgb_runtime_key_feedback_stage_key_case(render, key_pos, &visible);
 
-            tap_branch = rgb_runtime_key_feedback_stage_branch_for_key(semantic_map, tap_branch_map, key_pos);
-            if (!rgb_runtime_key_feedback_stage_semantic_color(config, semantic, tap_branch, &color) || !rgb_runtime_key_feedback_stage_semantic_visible(semantic, flash_visibility_bitmap, key_pos)) {
-                continue;
+            if (case_index != KEY_FEEDBACK_STAGE_NO_CASE && visible && render->config.case_localities[case_index] == RGB_KEYS_ONLY && rgb_runtime_key_feedback_stage_case_paints(render, case_index)) {
+                painted |= rgb_runtime_key_feedback_stage_paint_key(render, rgb_runtime_key_feedback_stage_case_rgb(render, case_index), key_pos);
             }
-            painted |= rgb_runtime_key_feedback_stage_paint_key(frame, color, key_pos, led_min, led_max);
         }
     }
     return painted;
 }
 
-static key_feedback_render_state_t rgb_runtime_key_feedback_stage_state_for_owner(const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, key_feedback_broad_owner_slot_t slot) {
-    key_feedback_render_state_t state = {.semantic = KEY_FEEDBACK_SEMANTIC_NONE, .tap_branch = 0u};
-    keypos_t                    owner_key_pos;
+// Widest area first, so a narrower one paints over it: both halves, one half,
+// the half of the key, then the keys alone (D-F73).
+static bool rgb_runtime_key_feedback_stage_render_localities(key_feedback_render_t *render) {
+    key_feedback_case_mask_t anywhere = (key_feedback_case_mask_t)(render->shown[0] | render->shown[1]);
+    bool                     painted  = false;
 
-    if (!(semantic_map && tap_branch_map && flash_visibility_bitmap && broad_owner_map)) {
-        return state;
-    }
-    owner_key_pos = key_feedback_broad_owner_map_get(broad_owner_map, slot);
-    if (!key_origin_keypos_valid(owner_key_pos)) {
-        return state;
-    }
-
-    state.semantic   = key_feedback_semantic_map_get(semantic_map, owner_key_pos);
-    state.tap_branch = rgb_runtime_key_feedback_stage_branch_for_key(semantic_map, tap_branch_map, owner_key_pos);
-    if (!rgb_runtime_key_feedback_stage_semantic_visible(state.semantic, flash_visibility_bitmap, owner_key_pos)) {
-        return (key_feedback_render_state_t){.semantic = KEY_FEEDBACK_SEMANTIC_NONE, .tap_branch = 0u};
-    }
-    return state;
+    painted |= rgb_runtime_key_feedback_stage_paint_area(render, RGB_BOTH_HALVES, KEY_FEEDBACK_BROAD_OWNER_GLOBAL, anywhere, 0u, RGB_MATRIX_LED_COUNT);
+    painted |= rgb_runtime_key_feedback_stage_paint_area(render, RGB_LEFT_HALF, KEY_FEEDBACK_BROAD_OWNER_GLOBAL, anywhere, 0u, RGB_LEFT_LED_COUNT);
+    painted |= rgb_runtime_key_feedback_stage_paint_area(render, RGB_RIGHT_HALF, KEY_FEEDBACK_BROAD_OWNER_GLOBAL, anywhere, RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT);
+    painted |= rgb_runtime_key_feedback_stage_paint_area(render, RGB_KEY_HALF, KEY_FEEDBACK_BROAD_OWNER_LEFT_HALF, render->shown[0], 0u, RGB_LEFT_LED_COUNT);
+    painted |= rgb_runtime_key_feedback_stage_paint_area(render, RGB_KEY_HALF, KEY_FEEDBACK_BROAD_OWNER_RIGHT_HALF, render->shown[1], RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT);
+    painted |= rgb_runtime_key_feedback_stage_paint_keys(render);
+    return painted;
 }
 
-static bool rgb_runtime_key_feedback_stage_paint_half(const rgb_active_profile_key_feedback_t *config, rgb_runtime_frame_t *frame, bool right_half, key_feedback_render_state_t state, uint8_t led_min, uint8_t led_max) {
-    rgb_t color;
+// The cases a row naming one semantic names: one tap branch, the tap count 5
+// semantic also every deeper one, or one tier (D-F73).
+static key_feedback_case_mask_t rgb_runtime_key_feedback_stage_semantic_cases(const key_feedback_render_t *render, uint8_t semantic) {
+    key_feedback_case_mask_t branches = rgb_runtime_key_feedback_stage_tap_branch_cases(render);
 
-    if (!rgb_runtime_key_feedback_stage_semantic_color(config, state.semantic, state.tap_branch, &color)) {
-        return false;
+    switch (semantic) {
+        case NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_BRANCH_2:
+            return (key_feedback_case_mask_t)(branches & rgb_runtime_key_feedback_stage_case_bit(0u));
+        case NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_BRANCH_3:
+        case NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_BRANCH_4:
+            return (key_feedback_case_mask_t)(branches & rgb_runtime_key_feedback_stage_case_bit((uint8_t)(semantic - NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_BRANCH_3 + 1u)));
+        case NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_BRANCH_5:
+            return (key_feedback_case_mask_t)(branches & ~(rgb_runtime_key_feedback_stage_case_bit((uint8_t)(semantic - NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_BRANCH_3 + 1u)) - 1u));
+        case NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_COMMITTED:
+        case NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_HOLD:
+        case NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_LONG_HOLD:
+            return rgb_runtime_key_feedback_stage_case_bit(rgb_runtime_key_feedback_stage_tier_case(render, (rgb_active_profile_key_tier_t)(semantic - NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_COMMITTED)));
+        default:
+            return 0u;
     }
-    if (right_half) {
-        return rgb_runtime_key_feedback_stage_paint_range(frame, color, RGB_LEFT_LED_COUNT, RGB_MATRIX_LED_COUNT, led_min, led_max);
-    }
-    return rgb_runtime_key_feedback_stage_paint_range(frame, color, 0u, RGB_LEFT_LED_COUNT, led_min, led_max);
 }
 
-static bool rgb_runtime_key_feedback_stage_render_locality(const rgb_active_profile_key_feedback_t *config, rgb_runtime_frame_t *frame, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max) {
-    key_feedback_render_state_t left_state;
-    key_feedback_render_state_t right_state;
-    key_feedback_render_state_t global_state;
-    rgb_t                       color;
+// Whether the newest key in an owner slot visibly shows a case among these;
+// that case's bit, or none.
+static key_feedback_case_mask_t rgb_runtime_key_feedback_stage_owner_shows(const key_feedback_render_t *render, key_feedback_broad_owner_slot_t slot, key_feedback_case_mask_t among) {
+    bool    visible;
+    uint8_t shown_case = rgb_runtime_key_feedback_stage_owner_case(render, slot, &visible);
 
-    if (config->locality == RGB_KEYS_ONLY) {
-        return rgb_runtime_key_feedback_stage_render_key_mode(config, frame, semantic_map, tap_branch_map, flash_visibility_bitmap, led_min, led_max);
+    if (!visible || shown_case >= rgb_runtime_key_feedback_stage_case_count(render)) {
+        return 0u;
     }
-    if (config->locality == RGB_KEY_HALF) {
-        bool painted = false;
-
-        left_state  = rgb_runtime_key_feedback_stage_state_for_owner(semantic_map, tap_branch_map, flash_visibility_bitmap, broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_LEFT_HALF);
-        right_state = rgb_runtime_key_feedback_stage_state_for_owner(semantic_map, tap_branch_map, flash_visibility_bitmap, broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_RIGHT_HALF);
-        painted |= rgb_runtime_key_feedback_stage_paint_half(config, frame, false, left_state, led_min, led_max);
-        painted |= rgb_runtime_key_feedback_stage_paint_half(config, frame, true, right_state, led_min, led_max);
-        return painted;
-    }
-
-    global_state = rgb_runtime_key_feedback_stage_state_for_owner(semantic_map, tap_branch_map, flash_visibility_bitmap, broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_GLOBAL);
-    if (config->locality == RGB_LEFT_HALF) {
-        return rgb_runtime_key_feedback_stage_paint_half(config, frame, false, global_state, led_min, led_max);
-    }
-    if (config->locality == RGB_RIGHT_HALF) {
-        return rgb_runtime_key_feedback_stage_paint_half(config, frame, true, global_state, led_min, led_max);
-    }
-    if (!rgb_runtime_key_feedback_stage_semantic_color(config, global_state.semantic, global_state.tap_branch, &color)) {
-        return false;
-    }
-    return rgb_runtime_key_feedback_stage_paint_range(frame, color, 0u, RGB_MATRIX_LED_COUNT, led_min, led_max);
+    return (key_feedback_case_mask_t)(rgb_runtime_key_feedback_stage_case_bit(shown_case) & among);
 }
 
-static bool rgb_runtime_key_feedback_stage_paint_group(rgb_runtime_frame_t *frame, const rgb_active_profile_key_group_t *group, rgb_t color, uint8_t led_min, uint8_t led_max) {
+// Accents of a tier follow the newest key showing that tier. A row naming one
+// tap branch paints while any key visibly shows that branch. A row naming any
+// tap branch takes the tap branches as one semantic, the newest key showing
+// any of them (D-F75); a 0xff row takes them so too, and the tiers (D-F73).
+static void rgb_runtime_key_feedback_stage_accent(key_feedback_render_t *render) {
+    static const key_feedback_broad_owner_slot_t tier_slots[RGB_ACTIVE_PROFILE_KEY_TIER_COUNT] = {
+        [RGB_ACTIVE_PROFILE_KEY_TIER_TAP_COMMITTED] = KEY_FEEDBACK_BROAD_OWNER_GROUP_TAP_COMMITTED,
+        [RGB_ACTIVE_PROFILE_KEY_TIER_HOLD]          = KEY_FEEDBACK_BROAD_OWNER_GROUP_HOLD_ACTIVE,
+        [RGB_ACTIVE_PROFILE_KEY_TIER_LONG_HOLD]     = KEY_FEEDBACK_BROAD_OWNER_GROUP_LONG_HOLD_ACTIVE,
+    };
+    key_feedback_case_mask_t branches = rgb_runtime_key_feedback_stage_tap_branch_cases(render);
+    key_feedback_case_mask_t tiers    = 0u;
+
+    for (uint8_t tier = 0u; tier < RGB_ACTIVE_PROFILE_KEY_TIER_COUNT; tier++) {
+        tiers |= rgb_runtime_key_feedback_stage_owner_shows(render, tier_slots[tier], rgb_runtime_key_feedback_stage_case_bit(rgb_runtime_key_feedback_stage_tier_case(render, (rgb_active_profile_key_tier_t)tier)));
+    }
+    render->accented               = (key_feedback_case_mask_t)(((render->shown[0] | render->shown[1]) & branches) | tiers);
+    render->accented_by_any_branch = rgb_runtime_key_feedback_stage_owner_shows(render, KEY_FEEDBACK_BROAD_OWNER_GROUP_TAP_BRANCH_PENDING, branches);
+    render->accented_by_all        = (key_feedback_case_mask_t)(render->accented_by_any_branch | tiers);
+}
+
+static bool rgb_runtime_key_feedback_stage_paint_group(key_feedback_render_t *render, const rgb_active_profile_key_group_t *group, rgb_t color) {
     bool painted = false;
 
-    if (!(frame && group)) {
-        return false;
-    }
-    for (uint8_t led = led_min; led < led_max; led++) {
+    for (uint8_t led = render->led_min; led < render->led_max; led++) {
         if (led >= NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT || (group->bitmap[led / 8u] & (uint8_t)(1u << (led % 8u))) == 0u) {
             continue;
         }
-        frame->colors[led]  = color;
-        frame->painted[led] = true;
-        painted             = true;
+        render->frame->colors[led]  = color;
+        render->frame->painted[led] = true;
+        painted                     = true;
     }
     return painted;
 }
 
-static const key_behavior_feedback_group_semantic_t all_group_semantics[] = {
-    KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING,
-    KEY_FEEDBACK_GROUP_TAP_COMMITTED,
-    KEY_FEEDBACK_GROUP_HOLD_ACTIVE,
-    KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE,
-};
-
-// The state a row naming this semantic follows, when that semantic shows.
-static bool rgb_runtime_key_feedback_stage_group_semantic_state(key_behavior_feedback_group_semantic_t group_semantic, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, key_feedback_render_state_t *state) {
-    key_feedback_broad_owner_slot_t group_slot;
-
-    if (!rgb_runtime_key_feedback_stage_group_owner_slot(group_semantic, &group_slot)) {
-        return false;
-    }
-    *state = rgb_runtime_key_feedback_stage_state_for_owner(semantic_map, tap_branch_map, flash_visibility_bitmap, broad_owner_map, group_slot);
-    return rgb_runtime_key_feedback_stage_group_semantic_matches(group_semantic, state->semantic);
-}
-
-static uint8_t rgb_runtime_key_feedback_stage_selector_semantic_count(uint8_t selector) {
-    return selector == NOAH_PROFILE_RGB_V1_SELECTOR_ALL ? (uint8_t)ARRAY_SIZE(all_group_semantics) : 1u;
-}
-
-static key_behavior_feedback_group_semantic_t rgb_runtime_key_feedback_stage_selector_semantic(uint8_t selector, uint8_t semantic_index) {
-    return selector == NOAH_PROFILE_RGB_V1_SELECTOR_ALL ? all_group_semantics[semantic_index] : (key_behavior_feedback_group_semantic_t)selector;
-}
-
-// Whether a row with this selector paints now: some semantic it names shows.
-static bool rgb_runtime_key_feedback_stage_selector_shown(uint8_t selector, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map) {
-    for (uint8_t semantic_index = 0u; semantic_index < rgb_runtime_key_feedback_stage_selector_semantic_count(selector); semantic_index++) {
-        key_feedback_render_state_t state;
-
-        if (rgb_runtime_key_feedback_stage_group_semantic_state(rgb_runtime_key_feedback_stage_selector_semantic(selector, semantic_index), semantic_map, tap_branch_map, flash_visibility_bitmap, broad_owner_map, &state)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static bool rgb_runtime_key_feedback_stage_render_group(const rgb_active_profile_key_feedback_t *config, rgb_runtime_frame_t *frame, const rgb_active_profile_key_group_t *group, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max) {
+// A black row takes the colour of each case it names that shows, in case
+// order, and paints nothing for a passthrough one; a coloured row paints its
+// own colour.
+static bool rgb_runtime_key_feedback_stage_render_group(key_feedback_render_t *render, const rgb_active_profile_key_group_t *group, key_feedback_case_mask_t cases) {
     bool painted = false;
 
-    if (!(config && frame && group)) {
-        return false;
+    if (!rgb_hsv_is_inherit_color(group->color)) {
+        return rgb_runtime_key_feedback_stage_paint_group(render, group, hsv_to_rgb(group->color));
     }
-
-    for (uint8_t semantic_index = 0u; semantic_index < rgb_runtime_key_feedback_stage_selector_semantic_count(group->selector); semantic_index++) {
-        key_feedback_render_state_t group_state;
-        rgb_t                       group_rgb;
-
-        if (!rgb_runtime_key_feedback_stage_group_semantic_state(rgb_runtime_key_feedback_stage_selector_semantic(group->selector, semantic_index), semantic_map, tap_branch_map, flash_visibility_bitmap, broad_owner_map, &group_state)) {
-            continue;
+    for (uint8_t case_index = 0u; case_index < rgb_runtime_key_feedback_stage_case_count(render); case_index++) {
+        if ((cases & rgb_runtime_key_feedback_stage_case_bit(case_index)) != 0u && rgb_runtime_key_feedback_stage_case_paints(render, case_index)) {
+            painted |= rgb_runtime_key_feedback_stage_paint_group(render, group, rgb_runtime_key_feedback_stage_case_rgb(render, case_index));
         }
-        if (rgb_hsv_is_inherit_color(group->color)) {
-            if (!rgb_runtime_key_feedback_stage_semantic_color(config, group_state.semantic, group_state.tap_branch, &group_rgb)) {
-                continue;
-            }
-        } else {
-            group_rgb = hsv_to_rgb(group->color);
-        }
-        painted |= rgb_runtime_key_feedback_stage_paint_group(frame, group, group_rgb, led_min, led_max);
     }
     return painted;
 }
 
-static bool rgb_runtime_key_feedback_stage_render_groups(const rgb_active_profile_key_feedback_t *config, rgb_runtime_frame_t *frame, const noah_active_profile_rgb_frame_t *profile_frame, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_key_feedback_stage_render_groups(key_feedback_render_t *render, const noah_active_profile_rgb_frame_t *profile_frame) {
     rgb_active_profile_group_selectors_t selectors;
     bool                                 painted = false;
 
     if (!rgb_active_profile_config_group_selectors(profile_frame, &selectors)) {
-        rgb_runtime_frame_clear(frame, led_min, led_max);
+        rgb_runtime_frame_clear(render->frame, render->led_min, render->led_max);
         return false;
     }
-    // All-semantics rows paint first, then the rows naming one. Each pass
-    // reads only the rows whose semantic shows (D-F63), so a row is read at
-    // most once.
-    for (uint8_t pass = 0u; pass < 2u; pass++) {
-        bool all_base_pass = pass == 0u;
-
+    // Widest first, so a narrower row repaints a wider one: all-semantics
+    // rows, then rows naming any tap branch (D-F75), then the rows naming one
+    // case. Each pass reads only the rows whose semantic shows (D-F63), so a
+    // row is read at most once.
+    for (uint8_t pass = 0u; pass < 3u; pass++) {
         for (uint8_t group_index = 0u; group_index < selectors.key_count; group_index++) {
             rgb_active_profile_key_group_t group;
-            uint8_t                        selector = selectors.key[group_index];
+            uint8_t                        selector  = selectors.key[group_index];
+            uint8_t                        row_pass  = selector == NOAH_PROFILE_RGB_V1_SELECTOR_ALL ? 0u : selector == NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_BRANCH_ANY ? 1u : 2u;
+            key_feedback_case_mask_t       cases;
 
-            if ((selector == NOAH_PROFILE_RGB_V1_SELECTOR_ALL) != all_base_pass || !rgb_runtime_key_feedback_stage_selector_shown(selector, semantic_map, tap_branch_map, flash_visibility_bitmap, broad_owner_map)) {
+            if (row_pass != pass) {
+                continue;
+            }
+            cases = row_pass == 0u ? render->accented_by_all : row_pass == 1u ? render->accented_by_any_branch : (key_feedback_case_mask_t)(rgb_runtime_key_feedback_stage_semantic_cases(render, selector) & render->accented);
+            if (cases == 0u) {
                 continue;
             }
             if (!rgb_active_profile_config_key_group_at(profile_frame, group_index, &group)) {
-                rgb_runtime_frame_clear(frame, led_min, led_max);
+                rgb_runtime_frame_clear(render->frame, render->led_min, render->led_max);
                 return false;
             }
-            painted |= rgb_runtime_key_feedback_stage_render_group(config, frame, &group, semantic_map, tap_branch_map, flash_visibility_bitmap, broad_owner_map, led_min, led_max);
+            painted |= rgb_runtime_key_feedback_stage_render_group(render, &group, cases);
         }
     }
     return painted;
 }
 
 bool rgb_runtime_key_feedback_stage_render_active_profile_frame(rgb_runtime_frame_t *frame, const noah_active_profile_rgb_frame_t *profile_frame, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max) {
-    rgb_active_profile_key_feedback_t config;
-    bool                              painted = false;
+    key_feedback_render_t render;
+    bool                  painted = false;
 
     if (!frame) {
         return false;
     }
     rgb_runtime_frame_clear(frame, led_min, led_max);
-    if (!(semantic_map && tap_branch_map && flash_visibility_bitmap && broad_owner_map) || !rgb_active_profile_config_key_stage_enabled(profile_frame) || !rgb_active_profile_config_key_feedback(profile_frame, &config)) {
+    if (!(semantic_map && tap_branch_map && flash_visibility_bitmap && broad_owner_map) || rgb_runtime_key_feedback_stage_nothing_shows(semantic_map) || !rgb_active_profile_config_key_stage_enabled(profile_frame) || !rgb_active_profile_config_key_feedback(profile_frame, &render.config)) {
         return false;
     }
+    render.frame                   = frame;
+    render.semantic_map            = semantic_map;
+    render.tap_branch_map          = tap_branch_map;
+    render.flash_visibility_bitmap = flash_visibility_bitmap;
+    render.broad_owner_map         = broad_owner_map;
+    render.shown[0]                = 0u;
+    render.shown[1]                = 0u;
+    render.led_min                 = led_min;
+    render.led_max                 = led_max;
 
-    painted |= rgb_runtime_key_feedback_stage_render_locality(&config, frame, semantic_map, tap_branch_map, flash_visibility_bitmap, broad_owner_map, led_min, led_max);
-    painted |= rgb_runtime_key_feedback_stage_render_groups(&config, frame, profile_frame, semantic_map, tap_branch_map, flash_visibility_bitmap, broad_owner_map, led_min, led_max);
+    rgb_runtime_key_feedback_stage_scan(&render);
+    rgb_runtime_key_feedback_stage_accent(&render);
+    painted |= rgb_runtime_key_feedback_stage_render_localities(&render);
+    painted |= rgb_runtime_key_feedback_stage_render_groups(&render, profile_frame);
     if (!rgb_active_profile_config_frame_current(profile_frame)) {
         rgb_runtime_frame_clear(frame, led_min, led_max);
         return false;

@@ -66,11 +66,16 @@ behaviour feedback's.
 The running pointing mode paints its colour where you choose (see
 [Where feedback paints](#where-feedback-paints)). A combo you hold paints the
 combo colour the same way, until you let go. A combo whose action holds a
-layer shows only that layer's colours while it holds it.
+layer shows only that layer's colours while it holds it. A mode's or the
+combo colour with saturation and brightness both at 0 is passthrough: it
+paints nothing and what is beneath shows, though its LED groups in a colour
+of their own still paint. To turn its LEDs off instead, dark over what is beneath, give it saturation with brightness 0.
 
 ## Behaviour feedback
 
-Behaviour feedback shows what a key with a behaviour is doing.
+Behaviour feedback shows what a key with a behaviour is doing. Each case
+below, each tap count among them, has its own colour and its own place to
+paint (see [Where feedback paints](#where-feedback-paints)).
 
 - A single tap paints nothing. From the double tap on, the key takes the
   colour of the tap count it has reached until that branch fires; the colours
@@ -83,6 +88,9 @@ Behaviour feedback shows what a key with a behaviour is doing.
   since the layer or mode shows itself.
 - Holding a branch that has a tap and no hold shows the tap colour once the
   multi tap window has passed, whether or not taps flash.
+- A case whose colour has saturation and brightness both at 0 is
+  passthrough: it paints nothing and what is beneath shows, and the other
+  cases still light. To turn its LEDs off instead, dark over what is beneath, give it saturation with brightness 0.
 
 ## Replacement feedback
 
@@ -94,8 +102,8 @@ to be typed.
 - An input replaced with **text** flashes one colour, one replaced by a
   **macro** another, and a replacement you **undo** with Backspace a third:
   green, magenta and red in my profile.
-- A colour with saturation and brightness both at 0 is off: that case does
-  not flash, and the other two still do.
+- A colour with saturation and brightness both at 0 is passthrough: that
+  case paints nothing, and the others still flash.
 - A word that is left as you typed it never flashes, whatever the reason.
 - One flash shows at a time. An undo right after a replacement takes its
   place.
@@ -115,16 +123,19 @@ it, a fourth colour, **leading**, shows and stays, blue in my profile:
 - Its key is the Leader key you pressed: it paints the Leader key's half
   under the half of the key, the Leader key alone under only the key, and
   otherwise the whole keyboard or the half you chose.
-- With its colour off it paints nothing, but an LED group for it still
-  paints, so leading can show on a few LEDs alone.
+- Each of the four, text, macro, undo and leading, paints where you choose
+  for it, as a layer or a pointing mode does. One shows at a time.
+- With a passthrough colour it paints nothing, but an LED group for it in a
+  colour of its own still paints, so leading can show on a few LEDs alone.
 - It shows with text replacement switched off too, since the leader works
   then. A lighting idle timeout shorter than the leader timeout can turn it
   dark.
 
 ## Where feedback paints
 
-Pointing modes, combo feedback, behaviour feedback and replacement feedback each
-choose where they paint:
+Each pointing mode, combo feedback, and each case of behaviour feedback (each
+tap count, tap, hold and long hold) and of replacement feedback (text, macro,
+undo and leading) chooses where it paints:
 
 - **both halves**;
 - **the left half** or **the right half**;
@@ -132,16 +143,29 @@ choose where they paint:
   paints both;
 - **only the keys** that caused it, every key of a combo.
 
+My profile paints every case on the half of the key. Several keys can show
+behaviour feedback at once, in different cases. Then the wider places paint
+first and the narrower over them, both halves, then one half, then the half
+of the key, then only the keys, so a tap count shown on its key stays seen
+over a hold that lights the whole keyboard. Where two cases share a place,
+the newest key's case paints it, flashing with it when it flashes.
+
 ## LED groups
 
 An **LED group** paints chosen LEDs, such as the thumb keys or the trackball
 LED, over a stage's own colour, while a given layer, pointing mode, combo
 feedback, kind of behaviour feedback or kind of replacement feedback is
 showing (or any of them). A group colour with saturation and brightness at 0
-takes the stage's colour; any other colour paints as itself. Rows paint in
-order, so a later row wins an LED they share. In behaviour feedback and
-replacement feedback, rows for any kind of feedback paint first, so rows for
-one kind paint over them.
+takes the stage's colour; any other colour paints as itself. Each tap count
+of behaviour feedback has its own: a group for the triple tap shows while any
+key is on the triple tap, not on the double tap. A group for any tap count
+lights while a run of taps waits on any of them, in the newest key's tap
+count colour when it takes the stage's colour, and not for a tap, hold or
+long hold; a group for any kind follows the newest key's tap count too, and
+lights for those as well. Rows paint in order, so a later row wins an LED
+they share. In behaviour feedback and replacement feedback, rows for any kind
+of feedback paint first, then in behaviour feedback rows for any tap count,
+so rows for one kind paint over them.
 
 A profile holds up to 128 different LED sets and 640 rows in all, at most 255
 for any one of layers, pointing modes, combo feedback, behaviour feedback

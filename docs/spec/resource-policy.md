@@ -150,7 +150,8 @@ The split slave thread's stack is QMK's serial-protocol thread, not core 1's.
 `tools/check_firmware_stack_budget.py` reads the linked disassembly for each
 function's frame and its direct calls, and walks the paths a manifest names:
 `tools/firmware_stack_budget.json` (key runtime, pointing, macros,
-autocorrect, storage reads) and `tools/firmware_stack_budget_live_profile_owner.json` (the
+autocorrect, storage reads, the behaviour-feedback lighting stage and the
+lighting view's validation) and `tools/firmware_stack_budget_live_profile_owner.json` (the
 live-profile owner, Profile Wire, the split protocol, saving). Every adjacency
 on a path that is not a direct call must be a declared indirect edge; a path
 whose adjacency the linker no longer makes fails the gate.

@@ -121,13 +121,21 @@ bool rgb_runtime_combo_feedback_stage_render_active_profile_frame(rgb_runtime_fr
         return false;
     }
     active_rgb = hsv_to_rgb(feedback_config.color);
-    painted |= rgb_runtime_combo_feedback_stage_paint_locality(frame, active_rgb, feedback_config.locality, bitmap, led_min, led_max);
+    // A passthrough colour paints neither the locality nor the black rows;
+    // coloured rows still paint (D-F74).
+    if (!rgb_hsv_is_passthrough(feedback_config.color)) {
+        painted |= rgb_runtime_combo_feedback_stage_paint_locality(frame, active_rgb, feedback_config.locality, bitmap, led_min, led_max);
+    }
 
     group_count = rgb_active_profile_config_combo_group_count(profile_frame);
     for (uint8_t group = 0u; group < group_count; group++) {
         if (!rgb_active_profile_config_combo_group_at(profile_frame, group, &group_config)) {
             rgb_runtime_frame_clear(frame, led_min, led_max);
             return false;
+        }
+
+        if (rgb_hsv_is_inherit_color(group_config.color) && rgb_hsv_is_passthrough(feedback_config.color)) {
+            continue;
         }
 
         rgb_t group_rgb = rgb_hsv_is_inherit_color(group_config.color) ? active_rgb : hsv_to_rgb(group_config.color);

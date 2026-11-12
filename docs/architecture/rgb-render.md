@@ -179,6 +179,13 @@ lights all its keys.
   master half's phase rather than its own clock.
 - **Newest.** Each activation takes a `feedback_sequence`; the owner map keeps
   the latest per surface, compared across wrap.
+- **Cases.** The stage (`stages/rgb_key_feedback_stage.c`) gives each key's
+  state its case, a tap branch or a tier, and reads which cases show on which
+  half in one scan of the semantic and tap-branch maps and the flash bitmap,
+  a bit per case per half, before it paints the areas widest first (D-F73).
+  The owner map says only which key is newest: everywhere and on each half
+  for the areas, per tier for its accents, and with any tap branch pending
+  for `0xff` accent rows.
 - **Dirty.** `transition.c` marks behaviour feedback dirty for a non-empty
   plan, or an empty one that moved the feedback mark; `feedback_projection.c`
   on every pulse; `qmk_combo_origin.c` marks combos dirty. One mark covers
@@ -237,7 +244,7 @@ timestamps (QMK's split sync, the latter coalesced).
   which key it names.
 - `run_active_profile_rgb_runtime_tests.sh`: the double bank, stale frames.
 - `run_rgb_validation_tests.sh`, `run_profile_rgb_v1_tests.sh`,
-  `run_profile_rgb_v6_tests.sh`: the lighting domain and authored tables.
+  `run_profile_rgb_v7_tests.sh`: the lighting domain and authored tables.
 - `run_runtime_debug_tests.sh`, `run_tap_depth_eight_tests.sh`: the
   behaviour-feedback maps against the reducer, pulses, the preview bridge.
 - `run_qmk_combo_origin_tests.sh`: combo partitioning and the left-out

@@ -194,7 +194,11 @@ bool rgb_runtime_pointing_mode_stage_render_active_profile_beneath_frame(rgb_run
     }
     active_rgb = hsv_to_rgb(active_config.color);
 
-    painted |= rgb_runtime_pointing_mode_stage_paint_locality(frame, active_rgb, active_config.locality, snapshot, owner_bitmap, has_owner_keys, led_min, led_max);
+    // A passthrough slot paints neither its locality nor its black rows; its
+    // coloured rows still paint (D-F74).
+    if (!rgb_hsv_is_passthrough(active_config.color)) {
+        painted |= rgb_runtime_pointing_mode_stage_paint_locality(frame, active_rgb, active_config.locality, snapshot, owner_bitmap, has_owner_keys, led_min, led_max);
+    }
 
     if (!rgb_active_profile_config_group_selectors(profile_frame, &selectors)) {
         rgb_runtime_pointing_mode_stage_clear_frame(frame, led_min, led_max);
@@ -210,6 +214,10 @@ bool rgb_runtime_pointing_mode_stage_render_active_profile_beneath_frame(rgb_run
             return false;
         }
         if (group_config.selector != NOAH_PROFILE_RGB_V1_SELECTOR_ALL && group_config.selector != active_mode) {
+            continue;
+        }
+
+        if (rgb_hsv_is_inherit_color(group_config.color) && rgb_hsv_is_passthrough(active_config.color)) {
             continue;
         }
 

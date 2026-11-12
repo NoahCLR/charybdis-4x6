@@ -98,7 +98,7 @@ Held by: `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_t
 
 The firmware accepts only the formats it writes (D-F10,
 [`0010`](../adr/0010-firmware-accepts-only-current-formats.md)): Profile
-Wire 2.2, profile schema 4.7, each domain at its registry version, and store
+Wire 2.2, profile schema 4.8, each domain at its registry version, and store
 format 6 (D-F28, [`0028`](../adr/0028-new-base-32-bit-profile-lengths.md)).
 Nothing in another format is translated:
 
@@ -222,11 +222,11 @@ byte 36. Integers are little-endian.
 The format is keyed into the header, which has no magic: the CRC16 is
 CRC-16/CCITT (polynomial `0x1021`, initial `0xFFFF`, not reflected, no final
 XOR) over the store format byte `6` followed by bytes 0–32. The schema is
-implied by the format: the firmware's own, 4.7. A record an earlier firmware
+implied by the format: the firmware's own, 4.8. A record an earlier firmware
 wrote under format 6 with schema 4.0, 4.1 or 4.2 holds earlier domain versions, so
 its validation refuses it (D-F62, D-F26), and one written with schema 4.3 to
-4.6 says so in its blob header, which is refused `INCOMPATIBLE_SCHEMA` (D-F68,
-D-F70, D-F71, D-F72); the payload digest is not stored and is computed
+4.7 says so in its blob header, which is refused `INCOMPATIBLE_SCHEMA` (D-F68,
+D-F70, D-F71, D-F72, D-F73); the payload digest is not stored and is computed
 from the payload whenever it is read whole. The origin half is the physical
 half that made the generation ([split protocol](profile-split-v1.md#physical-origin)).
 
@@ -273,7 +273,7 @@ new one's marker is committed. The store admits a candidate only when:
 - boot selection has run, found no generation conflict, and no final marker
   waits to be confirmed;
 - no other save is open;
-- it is format 6, schema 4.7, `8..130,048` bytes, with only known flag bits
+- it is format 6, schema 4.8, `8..130,048` bytes, with only known flag bits
   and origin 0 or 1 (every domain-mask bit names a domain, D-F68);
 - its action-ABI and compiled-default digests are the build's;
 - its generation is strictly greater than the saved one.
@@ -442,11 +442,11 @@ Every ceiling holds at once (D-F14, [`0014`](../adr/0014-bigger-profiles.md)):
 
 `tests/fixtures/maximum_profile_v4.fixture`, written by
 `tests/host/make_maximum_profile.py` from the byte specs, holds every table
-at its ceiling and every name at 32 bytes, in 116,774 bytes:
+at its ceiling and every name at 32 bytes, in 116,783 bytes:
 
 | Domain | Bytes |
 | --- | ---: |
-| Lighting `0x10` | 4,652 |
+| Lighting `0x10` | 4,661 |
 | Key behaviours `0x20` | 13,828 |
 | Combos `0x30` | 9,736 |
 | Settings `0x40` | 10,701 |
@@ -456,10 +456,10 @@ at its ceiling and every name at 32 bytes, in 116,774 bytes:
 | Autocorrect list `0x80` | 36,874 |
 | Blob header and eight envelopes | 56 |
 
-That leaves 13,274 bytes below the 130,048-byte payload ceiling. The
+That leaves 13,265 bytes below the 130,048-byte payload ceiling. The
 generator reads the payload ceiling from the storage layout and refuses a
 fixture that does not leave 12,288 bytes below it, the reserve for later
-additions, so 986 bytes remain before a domain's ceiling could be raised
+additions, so 977 bytes remain before a domain's ceiling could be raised
 into that reserve. The fixture is the maximum for these encodings, not a separate
 limit: a larger profile is refused by a table's ceiling or the payload
 ceiling. The firmware saves, boots, publishes and copies it to the other

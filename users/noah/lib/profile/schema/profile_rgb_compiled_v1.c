@@ -220,8 +220,8 @@ static noah_profile_compiled_v1_result_t rgb_compiled_length(size_t *length, uin
     total += (size_t)combo_feedback_led_group_count * NOAH_PROFILE_RGB_V1_COMBO_GROUP_RECORD_SIZE;
 #    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-    if (key_behavior_feedback_colors.tap_branch_color_count != KEY_BEHAVIOR_MAX_TAP_COUNT - 1u) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_RGB, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, UINT8_MAX, UINT8_MAX);
-    total += (size_t)key_behavior_feedback_colors.tap_branch_color_count * NOAH_PROFILE_RGB_V1_COLOR_RECORD_SIZE + (size_t)key_behavior_feedback_led_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE;
+    if (key_behavior_feedback_colors.tap_branch_count != KEY_BEHAVIOR_MAX_TAP_COUNT - 1u) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_RGB, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, UINT8_MAX, UINT8_MAX);
+    total += (size_t)key_behavior_feedback_colors.tap_branch_count * NOAH_PROFILE_RGB_V1_TAP_BRANCH_RECORD_SIZE + (size_t)key_behavior_feedback_led_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE;
 #    endif
 #    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
     total += (size_t)autocorrect_feedback_led_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE;
@@ -257,7 +257,7 @@ noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_wr
           && emit_u8(writer, 0u)
 #    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-          && emit_u8(writer, key_behavior_feedback_colors.tap_branch_color_count) && emit_u8(writer, key_behavior_feedback_led_group_count)
+          && emit_u8(writer, key_behavior_feedback_colors.tap_branch_count) && emit_u8(writer, key_behavior_feedback_led_group_count)
 #    else
           && emit_u8(writer, 0u) && emit_u8(writer, 0u)
 #    endif
@@ -314,10 +314,11 @@ noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_wr
     if (!(emit_u8(writer, 0u) && emit_u8(writer, 0u) && emit_u8(writer, 0u) && emit_u8(writer, 0u))) return writer->result;
 #    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-    for (uint8_t index = 0u; index < key_behavior_feedback_colors.tap_branch_color_count; index++) {
-        if (!emit_hsv(writer, key_behavior_feedback_colors.tap_branch_colors[index])) return writer->result;
+    _Static_assert((int)KEY_FEEDBACK_GROUP_TAP_COUNT_2 == (int)NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_BRANCH_2 && (int)KEY_FEEDBACK_GROUP_TAP_COMMITTED == (int)NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_COMMITTED && (int)KEY_FEEDBACK_GROUP_HOLD_ACTIVE == (int)NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_HOLD && (int)KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE == (int)NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_LONG_HOLD && (int)KEY_FEEDBACK_GROUP_TAP_COUNT_3 == (int)NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_BRANCH_3 && (int)KEY_FEEDBACK_GROUP_TAP_COUNT_4 == (int)NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_BRANCH_4 && (int)KEY_FEEDBACK_GROUP_TAP_COUNT_5 == (int)NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_BRANCH_5 && (int)KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY == (int)NOAH_PROFILE_RGB_V1_KEY_SEMANTIC_TAP_BRANCH_ANY, "an authored behaviour-feedback semantic is its stored selector");
+    for (uint8_t index = 0u; index < key_behavior_feedback_colors.tap_branch_count; index++) {
+        if (!(emit_hsv(writer, key_behavior_feedback_colors.tap_branches[index].color) && emit_u8(writer, key_behavior_feedback_colors.tap_branches[index].locality))) return writer->result;
     }
-    if (!(emit_hsv(writer, key_behavior_feedback_colors.tap_committed_color) && emit_hsv(writer, key_behavior_feedback_colors.hold_active_color) && emit_hsv(writer, key_behavior_feedback_colors.long_hold_active_color) && emit_u8(writer, key_behavior_feedback_colors.tap_commit_mode) && emit_u8(writer, key_behavior_feedback_colors.locality))) return writer->result;
+    if (!(emit_hsv(writer, key_behavior_feedback_colors.tap_committed_color) && emit_hsv(writer, key_behavior_feedback_colors.hold_active_color) && emit_hsv(writer, key_behavior_feedback_colors.long_hold_active_color) && emit_u8(writer, key_behavior_feedback_colors.tap_commit_mode) && emit_u8(writer, key_behavior_feedback_colors.tap_committed_locality) && emit_u8(writer, key_behavior_feedback_colors.hold_active_locality) && emit_u8(writer, key_behavior_feedback_colors.long_hold_active_locality))) return writer->result;
     for (uint8_t index = 0u; index < key_behavior_feedback_led_group_count; index++) {
         uint8_t selector = key_behavior_feedback_led_groups[index].semantic == KEY_FEEDBACK_GROUP_ALL ? NOAH_PROFILE_RGB_V1_SELECTOR_ALL : key_behavior_feedback_led_groups[index].semantic;
         result           = emit_group_row(writer, selector, key_behavior_feedback_led_groups[index].color, &key_behavior_feedback_led_groups[index].led_group, error);
@@ -330,7 +331,7 @@ noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_wr
 #    endif
 #    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
     _Static_assert((int)AUTOCORRECT_FEEDBACK_GROUP_TEXT == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_TEXT && (int)AUTOCORRECT_FEEDBACK_GROUP_MACRO == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_MACRO && (int)AUTOCORRECT_FEEDBACK_GROUP_UNDO == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_UNDO && (int)AUTOCORRECT_FEEDBACK_GROUP_LEADING == (int)NOAH_PROFILE_RGB_V1_AUTOCORRECT_SEMANTIC_LEADING, "an authored replacement-feedback semantic is its stored selector");
-    if (!(emit_hsv(writer, autocorrect_feedback_colors.text_color) && emit_hsv(writer, autocorrect_feedback_colors.macro_color) && emit_hsv(writer, autocorrect_feedback_colors.undo_color) && emit_hsv(writer, autocorrect_feedback_colors.leading_color) && emit_u8(writer, autocorrect_feedback_colors.locality))) return writer->result;
+    if (!(emit_hsv(writer, autocorrect_feedback_colors.text_color) && emit_hsv(writer, autocorrect_feedback_colors.macro_color) && emit_hsv(writer, autocorrect_feedback_colors.undo_color) && emit_hsv(writer, autocorrect_feedback_colors.leading_color) && emit_u8(writer, autocorrect_feedback_colors.text_locality) && emit_u8(writer, autocorrect_feedback_colors.macro_locality) && emit_u8(writer, autocorrect_feedback_colors.undo_locality) && emit_u8(writer, autocorrect_feedback_colors.leading_locality))) return writer->result;
     for (uint8_t index = 0u; index < autocorrect_feedback_led_group_count; index++) {
         uint8_t selector = autocorrect_feedback_led_groups[index].semantic == AUTOCORRECT_FEEDBACK_GROUP_ALL ? NOAH_PROFILE_RGB_V1_SELECTOR_ALL : autocorrect_feedback_led_groups[index].semantic;
         result           = emit_group_row(writer, selector, autocorrect_feedback_led_groups[index].color, &autocorrect_feedback_led_groups[index].led_group, error);

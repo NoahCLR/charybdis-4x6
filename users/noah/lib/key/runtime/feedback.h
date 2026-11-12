@@ -70,6 +70,8 @@ typedef enum {
     KEY_FEEDBACK_BROAD_OWNER_GLOBAL = 0,
     KEY_FEEDBACK_BROAD_OWNER_LEFT_HALF,
     KEY_FEEDBACK_BROAD_OWNER_RIGHT_HALF,
+    // The newest key with any tap branch pending: behaviour feedback's 0xff
+    // accent rows follow it (D-F73); rows naming one branch read every key.
     KEY_FEEDBACK_BROAD_OWNER_GROUP_TAP_BRANCH_PENDING,
     KEY_FEEDBACK_BROAD_OWNER_GROUP_TAP_COMMITTED,
     KEY_FEEDBACK_BROAD_OWNER_GROUP_HOLD_ACTIVE,

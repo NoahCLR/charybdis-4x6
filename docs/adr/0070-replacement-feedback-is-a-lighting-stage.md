@@ -7,7 +7,7 @@ and says nothing when it should have happened and did not. So the keyboard
 flashes when text replacement (D-F69) changes what was typed (Noah,
 2026-11-10). It is a lighting **stage** of its own, replacement feedback,
 with everything a stage has: a bit in the stage-enable mask, colours, a
-locality and group rows. Chosen over a fourth behaviour-feedback colour,
+locality (one per case since D-F73) and group rows. Chosen over a fourth behaviour-feedback colour,
 because behaviour feedback is the state of a key that has a behaviour, read
 from the key runtime (D-F57), and a replacement is neither; folding it in
 would have put a rule about typing into `feedback.c`. Contract:

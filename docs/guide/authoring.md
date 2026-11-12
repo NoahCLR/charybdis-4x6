@@ -247,12 +247,26 @@ Colours are `HSV(hue, saturation, value)`, each 0 to 255:
 - `pointing_mode_colors[]`: a colour and `.locality` for every pointing slot
   (`POINTING_MODE_DRAGSCROLL`… `POINTING_MODE_PINCH`, then
   `POINTING_MODE_6` to `_31`).
-- `combo_feedback_colors` and `key_behavior_feedback_colors`: the colours,
-  `.tap_commit_mode` (`KEY_FEEDBACK_TAP_COMMIT_OFF` or
-  `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS`) and `.locality`.
-- `autocorrect_feedback_colors`: `.text_color`, `.macro_color` and
-  `.undo_color` for [replacement feedback](lighting.md#replacement-feedback),
-  and `.locality`. Here `HSV(0, 0, 0)` leaves that case off.
+- `combo_feedback_colors`: `.color` and `.locality`.
+- `key_behavior_feedback_colors`: `RGB_TAP_BRANCHES(...)`, one
+  `{.color, .locality}` per tap count from the double tap; each tier's colour
+  beside its locality (`.tap_committed_color` and `.tap_committed_locality`,
+  `.hold_active_*`, `.long_hold_active_*`); and `.tap_commit_mode`
+  (`KEY_FEEDBACK_TAP_COMMIT_OFF` or `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS`).
+  Its group rows name `KEY_FEEDBACK_GROUP_TAP_COUNT_2` to `_5`,
+  `KEY_FEEDBACK_GROUP_TAP_COMMITTED`, `_HOLD_ACTIVE` or `_LONG_HOLD_ACTIVE`,
+  `KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY` for every tap branch, or
+  `KEY_FEEDBACK_GROUP_ALL` for every case.
+- `autocorrect_feedback_colors`: `.text_color`, `.macro_color`,
+  `.undo_color` and `.leading_color` for
+  [replacement feedback](lighting.md#replacement-feedback), each beside its
+  locality (`.text_locality` and so on).
+
+A colour a layer, pointing slot, combo feedback or feedback case owns is
+passthrough at `HSV(0, 0, 0)`, or any hue with saturation and value 0: it
+paints nothing. To turn its LEDs off (dark), give it saturation, `HSV(h, 255, 0)`. In a group
+row `HSV(0, 0, 0)` takes its owner's colour instead, and the auto-mouse
+fade's end colour is literal.
 
 Locality is `RGB_BOTH_HALVES`, `RGB_LEFT_HALF`, `RGB_RIGHT_HALF`,
 `RGB_KEY_HALF` or `RGB_KEYS_ONLY`. Keep `MATERIALIZE_RGB_CONFIG();` at the
