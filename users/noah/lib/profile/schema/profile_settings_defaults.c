@@ -6,8 +6,8 @@
 #    include "../../compat/qmk_factory_settings.h"
 #    include "../../compat/qmk_host_setting.h"
 // The keymap's config.h may author these; without it the keyboard starts with
-// lighting that sleeps after 15 minutes, automatic host settings and the
-// built-in name.
+// lighting that sleeps after 15 minutes, automatic host settings, a leader that
+// waits 2 s and the built-in name.
 #    ifndef NOAH_RGB_IDLE_TIMEOUT_MS
 #        define NOAH_RGB_IDLE_TIMEOUT_MS 900000
 #    endif
@@ -23,6 +23,9 @@
 #    ifndef NOAH_DEFAULT_MACOS_ISO
 #        define NOAH_DEFAULT_MACOS_ISO 0
 #    endif
+#    ifndef NOAH_LEADER_TIMEOUT_MS
+#        define NOAH_LEADER_TIMEOUT_MS 2000
+#    endif
 #    ifndef NOAH_KEYBOARD_NAME
 #        define NOAH_KEYBOARD_NAME ""
 #    endif
@@ -30,6 +33,7 @@
 _Static_assert((NOAH_DEFAULT_HOST_OS) <= NOAH_HOST_LINUX, "The default host is Auto, macOS, Windows or Linux");
 _Static_assert((NOAH_DEFAULT_HOST_LAYOUT) < NOAH_HOST_LAYOUT_LIMIT, "The default host layout is one the firmware has");
 _Static_assert((NOAH_RGB_IDLE_TIMEOUT_MS) <= 86400000, "The lighting timeout is at most one day");
+_Static_assert((NOAH_LEADER_TIMEOUT_MS) >= 1000 && (NOAH_LEADER_TIMEOUT_MS) <= 10000, "The leader waits 1 to 10 seconds");
 _Static_assert(sizeof(NOAH_KEYBOARD_NAME) - 1u <= NOAH_SETTINGS_NAME_MAX, "The keyboard name is at most 32 bytes");
 uint32_t noah_profile_settings_default(uint8_t id) {
     if (id >= NOAH_SETTING_DRAGSCROLL_DPI && id <= NOAH_SETTING_ARROW_DPI) return 0;
@@ -88,6 +92,8 @@ uint32_t noah_profile_settings_default(uint8_t id) {
             return (UINT32_C(1) << NOAH_SETTINGS_LAYERS) - 1u;
         case NOAH_SETTING_AUTOCORRECT_FEEDBACK_PERIOD:
             return RGB_AUTOCORRECT_FEEDBACK_FLASH_MS;
+        case NOAH_SETTING_LEADER_TIMEOUT:
+            return NOAH_LEADER_TIMEOUT_MS;
         default:
             return 0;
     }

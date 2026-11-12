@@ -27,9 +27,22 @@ noah_host_export_qmk_cpath "$ROOT"
 cp "$ROOT/tests/fixtures/client-regression/portable.bin.pd5" "$BUILD_DIR/old.bin"
 for fixture in populated maximum; do
     python3 - "$ROOT/tests/fixtures/${fixture}_profile_v4.fixture" "$BUILD_DIR/$fixture.bin" <<'PYTHON'
-import pathlib, sys
-fields = dict(line.split("=", 1) for line in pathlib.Path(sys.argv[1]).read_text().splitlines() if "=" in line)
-pathlib.Path(sys.argv[2]).write_bytes(bytes.fromhex(fields["profile.hex"]))
+import pathlib, struct, sys
+fields = dict(line.split("=", 1) for line in pathlib.Path(sys.argv[1]).read_text().splitlines() if "=" in line and not line.startswith("#"))
+blob = bytes.fromhex(fields["profile.hex"])
+# The fixture's own lines say what its blob holds: its length, and each
+# domain's version and length, which clients read beside the bytes.
+assert int(fields["profile.byte_length"]) == len(blob), sys.argv[1]
+offset, listed = 8, {key for key in fields if key.startswith("domain.")}
+for _ in range(blob[6]):
+    domain, version, length = blob[offset], blob[offset + 1], struct.unpack_from("<I", blob, offset + 2)[0]
+    for field, value in (("version", version), ("length", length)):
+        key = f"domain.{domain:02x}.{field}"
+        assert fields.get(key) == str(value), f"{sys.argv[1]}: {key} is {fields.get(key)}, the blob holds {value}"
+        listed.discard(key)
+    offset += 6 + length
+assert offset == len(blob) and not listed, (sys.argv[1], sorted(listed))
+pathlib.Path(sys.argv[2]).write_bytes(blob)
 PYTHON
 done
 

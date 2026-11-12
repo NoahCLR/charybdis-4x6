@@ -928,6 +928,28 @@ static void test_plain_autocorrect_keys_switch_the_override(void) {
     CHECK(noah_runtime_debug_active_slot_count() == 0);
 }
 
+// The typing stage's leader, as the Leader key's action calls it (D-F71).
+static unsigned leader_presses;
+void noah_typing_stage_leader(void) {
+    leader_presses++;
+}
+
+// QMK's Leader keycode is the firmware's: it acts at its press, once, and
+// never reaches QMK, whose own Leader is not built.
+static void test_a_plain_leader_key_acts_at_its_press(void) {
+    keypos_t key_pos = test_keypos(4, 0);
+
+    test_reset_state();
+    leader_presses = 0u;
+    CHECK(!test_plain_key_tap(QK_LEADER, key_pos));
+    CHECK(leader_presses == 1u);
+    CHECK(!test_plain_key_tap(QK_LEADER, key_pos));
+    CHECK(leader_presses == 2u);
+    CHECK(autocorrect_switch_override());
+    CHECK(tap_count == 0);
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+}
+
 // A behaviour step can send AM_OFF, and with behaviours off a plain AM_ON
 // still switches auto-mouse back.
 static void test_behavior_step_switches_auto_mouse_off(void) {
@@ -971,6 +993,7 @@ int main(void) {
 
     test_plain_auto_mouse_keys_switch_the_override();
     test_plain_autocorrect_keys_switch_the_override();
+    test_a_plain_leader_key_acts_at_its_press();
     test_behavior_step_switches_auto_mouse_off();
 
     puts("key_runtime layer-lock integration tests passed");

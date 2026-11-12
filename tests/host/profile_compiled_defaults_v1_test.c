@@ -409,6 +409,8 @@ static void test_real_authored_profile(void) {
     // apart, each its own scalar (D-F70).
     assert(noah_profile_settings_default(NOAH_SETTING_AUTOCORRECT_FEEDBACK_PERIOD) == RGB_AUTOCORRECT_FEEDBACK_FLASH_MS);
     assert(noah_profile_settings_default(NOAH_SETTING_FEEDBACK_PERIOD) == RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS);
+    // The leader waits as long as the keymap authors (D-F71).
+    assert(noah_profile_settings_default(NOAH_SETTING_LEADER_TIMEOUT) == NOAH_LEADER_TIMEOUT_MS);
     validate_whole_profile(&profile);
 
     printf("compiled profile v1: %u bytes crc32=%08x fnv1a=%08x action_abi=%08x\n", profile.metadata.byte_length, (unsigned)profile.metadata.crc32, (unsigned)profile.metadata.digest, (unsigned)profile.metadata.action_abi_digest);

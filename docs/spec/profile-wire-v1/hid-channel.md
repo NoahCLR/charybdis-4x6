@@ -78,8 +78,8 @@ Page 0, the identity (see [README.md](README.md#version-identity)):
 | ---: | --- |
 | 0 | capability layout, `3` |
 | 1 | capability page count, `4` |
-| 2–3 | Profile Wire major `2`, minor `1` |
-| 4–5 | schema major `4`, minor `4` |
+| 2–3 | Profile Wire major `2`, minor `2` |
+| 4–5 | schema major `4`, minor `6` |
 | 6 | report size, `32` |
 | 7 | candidate chunk capacity: `20` when feature bit 1 is set, otherwise `0` |
 | 8 | profile status page count, `2` |
@@ -130,7 +130,7 @@ Page 3, the [autocorrect list](autocorrect-domain.md#ceilings)'s ceilings
 | 0–1 | maximum corrections | 1,024 |
 | 2–3 | maximum typos | 1,024 |
 | 4–5 | text capacity in bytes, corrections and typos together | 20,480 |
-| 6–9 | autocorrect domain capacity in bytes | 34,824 |
+| 6–9 | autocorrect domain capacity in bytes | 36,874 |
 | 10 | maximum bytes in one typo | 32 |
 | 11 | maximum bytes in one text correction | 128 |
 | 12–24 | zero | |

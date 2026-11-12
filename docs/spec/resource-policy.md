@@ -123,7 +123,7 @@ engineering regression policies, not SRAM limits:
 | Active-profile lighting runtime / frame | 192 / 80 | `NOAH_ACTIVE_PROFILE_RGB_RUNTIME_STATE_BUDGET_32BIT`, `NOAH_ACTIVE_PROFILE_RGB_FRAME_BUDGET_32BIT` |
 | Split authority | 128 | `NOAH_PROFILE_SPLIT_AUTHORITY_STATE_BUDGET_32BIT` |
 | Key-behaviour domain handle / its validation | 128 / 128 | `key_behavior_domain_v1.c`, `NOAH_KEY_BEHAVIOR_DOMAIN_V1_EMBEDDED_VALIDATION_BUDGET` |
-| Autocorrect list handle / its validation, which holds one 128-byte correction (D-F68) | 24 / 160 | `NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_LIST_BUDGET`, `NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_VALIDATION_BUDGET` |
+| Autocorrect list handle, its range and five counts / its validation, which holds one 128-byte correction (D-F68, D-F71) | 28 / 160 | `NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_LIST_BUDGET`, `NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_VALIDATION_BUDGET` |
 | Autocorrect: the word, the keys shown and live, and the queue of 240 changes (D-F69) | 656 | `NOAH_AUTOCORRECT_EMBEDDED_STATE_BUDGET` |
 | Autocorrect: the scan's workspace for one correction of 128 bytes (D-F69) | 704 | `NOAH_AUTOCORRECT_EMBEDDED_WORK_BUDGET` |
 | Lighting domain view / its validation, with the replacement-feedback row count (D-F70) | 44 / 76 | `NOAH_PROFILE_RGB_V1_EMBEDDED_VIEW_BUDGET`, `NOAH_PROFILE_RGB_V1_EMBEDDED_VALIDATION_BUDGET` |

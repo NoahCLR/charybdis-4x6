@@ -117,6 +117,7 @@ Held by: `tests/host/run_real_profile_validation_tests.sh` (`real_profile_valida
 | `RGB_AUTOCORRECT_FEEDBACK_FLASH_MS` | profile data | settings scalar 31 (D-F70) |
 | `AUTOMOUSE_RGB_DEAD_TIME` | profile data | settings scalar 16 |
 | `NOAH_DEFAULT_HOST_OS`, `NOAH_DEFAULT_HOST_LAYOUT`, `NOAH_DEFAULT_UNICODE_PLAYBACK`, `NOAH_DEFAULT_MACOS_ISO` | profile data | settings scalar 27 |
+| `NOAH_LEADER_TIMEOUT_MS` | profile data | settings scalar 32 (D-F71) |
 | `NOAH_KEYBOARD_NAME` | profile data | settings `0x40`, the keyboard name (D-F25, [ADR](../adr/0025-keyboard-name-is-usb-product-string.md)) |
 
 Settings no authored macro sets take the fixed compiled defaults the

@@ -1,7 +1,7 @@
 {
- "description": "Autocorrect list domain 0x80 version 1: golden vectors and the word-character table, for the firmware and its clients. Layout and rules: docs/spec/profile-wire-v1/autocorrect-domain.md. Payload, integers little-endian: header [corrections u16, typos u16, part-of-word typos u16, text bytes u16]; a 6-byte row per correction [text offset u16, length u8, kind u8 (0 text, 1 macro), first typo u16], a macro correction holding its macro slot in place of the offset and a length of 0; a 6-byte row per typo [text offset u16, length u8, match u8, correction u16]; the part index, one u16 typo index per typo whose match is not whole word, ascending; then the text, every text correction's bytes then every typo's, in row order, back to back. Text corrections come first and ascend strictly by their UTF-8 bytes, macro corrections follow and ascend strictly by slot, and typos ascend strictly by their bytes. An entry is {correction, typos} for text or {macro, typos} for a macro slot, whose typos match the whole word only. wordCharacters lists every character a typo may hold besides an apostrophe between two of them, as [character, folded]; a typo holds folded characters only, and a typed word is folded with this table before it is looked up. Error codes are the firmware's NOAH_PROFILE_AUTOCORRECT_V1_* names, with the table (0 corrections, 1 typos, 2 part index) and row they name. Test evidence, never a migration source.",
+ "description": "Autocorrect list domain 0x80 version 2: golden vectors and the word-character table, for the firmware and its clients. Layout and rules: docs/spec/profile-wire-v1/autocorrect-domain.md. Payload, integers little-endian: header [corrections u16, typos u16, part-of-word typos u16, leader typos u16, text bytes u16]; a 6-byte row per correction [text offset u16, length u8, kind u8 (bit 0: 0 text, 1 macro; bits 1-2 the trigger: 0 as a word ends, 1 after the leader, 2 both; every other bit 0), first typo u16], a macro correction holding its macro slot in place of the offset and a length of 0; a 6-byte row per typo [text offset u16, length u8, match u8 (0 whole word, 1 start, 2 end, 3 anywhere), correction u16]; the part index, one u16 typo index per typo that matches part of a word (match 1 to 3) and whose correction fires as a word ends (trigger 0 or 2), ascending; the leader index, one u16 typo index per typo whose correction fires after the leader (trigger 1 or 2), ascending, so a part-of-word typo of a correction that fires both ways is in both; then the text, every text correction's bytes then every typo's, in row order, back to back. Text corrections come first and ascend strictly by their UTF-8 bytes, macro corrections follow and ascend strictly by slot, and typos ascend strictly by their bytes, so one text is one typo whatever its match. An entry is {correction, trigger, typos} for text or {macro, trigger, typos} for a macro slot, whose typos match the whole word; trigger is one of triggers. wordCharacters lists every character a typo may hold besides an apostrophe between two of them, as [character, folded]; a typo holds folded characters only, and a typed word, or what is typed after the leader, is folded with this table before it is looked up. After the leader a typo is its whole text, whatever its match. Error codes are the firmware's NOAH_PROFILE_AUTOCORRECT_V1_* names, with the table (0 corrections, 1 typos, 2 part index, 3 leader index) and row they name. Test evidence, never a migration source.",
  "generator": "tools/autocorrect/build.py",
- "version": 1,
+ "version": 2,
  "ceilings": {
   "corrections": 1024,
   "typos": 1024,
@@ -9,13 +9,18 @@
   "bytesPerCorrection": 128,
   "macroSlots": 128,
   "textBytes": 20480,
-  "domainBytes": 34824
+  "domainBytes": 36874
  },
  "matches": [
   "whole word",
   "start of word",
   "end of word",
   "anywhere"
+ ],
+ "triggers": [
+  "as a word ends",
+  "after the leader",
+  "both"
  ],
  "apostrophe": "'",
  "wordCharacters": [
@@ -1989,7 +1994,7 @@
    "name": "empty",
    "description": "No entries: the header alone.",
    "entries": [],
-   "hex": "0000000000000000"
+   "hex": "00000000000000000000"
   },
   {
    "name": "one",
@@ -2005,7 +2010,7 @@
      ]
     }
    ],
-   "hex": "0100010000000600000003000000030003000000746865746568"
+   "hex": "01000100000000000600000003000000030003000000746865746568"
   },
   {
    "name": "small",
@@ -2122,7 +2127,7 @@
      ]
     }
    ],
-   "hex": "0a000f0003007c000000050000000500070001000c00050004001100070006001800060009001e0004000a00220003000800250005000d002a0002000b002c0005000e003100040000003500070001003c00070001004300070001004a00040002004e00050002005300060003005900070003006000030006006300060004006900040205006d00020108006f00030006007200050307007700050009000a000b000d0061206c6f7462656361757365636166c3a9646f65736e27746950686f6e656d656e747468657468696e67756ec3bc626572616c6f7462656163757365626563617375656265637561736563616665636166c3a8646f65736e74646f73656e27746874656970686f6e656d6e65746e757465687469686e677565626572"
+   "hex": "0a000f00030000007c000000050000000500070001000c00050004001100070006001800060009001e0004000a00220003000800250005000d002a0002000b002c0005000e003100040000003500070001003c00070001004300070001004a00040002004e00050002005300060003005900070003006000030006006300060004006900040205006d00020108006f00030006007200050307007700050009000a000b000d0061206c6f7462656361757365636166c3a9646f65736e27746950686f6e656d656e747468657468696e67756ec3bc626572616c6f7462656163757365626563617375656265637561736563616665636166c3a8646f65736e74646f73656e27746874656970686f6e656d6e65746e757465687469686e677565626572"
   },
   {
    "name": "long",
@@ -2156,7 +2161,7 @@
      ]
     }
    ],
-   "hex": "030003000000a20000000f0000000f00800001008f00030002009200070000009900060001009f00030002002b33312036203132333420353637384b696e6420726567617264732c2053616d204578616d706c65207c202b3331203620313233342035363738207c2073616d406578616d706c652e636f6d207c204578616d706c65205374726565742031322c203132333420414220416d7374657264616d2c20546865204e65746865726c616e6473207c204b764b2030303030746865706e756d6265727369676f6666746568"
+   "hex": "0300030000000000a20000000f0000000f00800001008f00030002009200070000009900060001009f00030002002b33312036203132333420353637384b696e6420726567617264732c2053616d204578616d706c65207c202b3331203620313233342035363738207c2073616d406578616d706c652e636f6d207c204578616d706c65205374726565742031322c203132333420414220416d7374657264616d2c20546865204e65746865726c616e6473207c204b764b2030303030746865706e756d6265727369676f6666746568"
   },
   {
    "name": "macros",
@@ -2203,14 +2208,118 @@
      ]
     }
    ],
-   "hex": "0400050000002c0000000f0002000f00030004000300000100007f00000103001200040002001600050002001b000700000022000700030029000300010073616d406578616d706c652e636f6d7468656164647261647265736d79656d61696c73696766756c6c746568"
+   "hex": "04000500000000002c0000000f0002000f00030004000300000100007f00000103001200040002001600050002001b000700000022000700030029000300010073616d406578616d706c652e636f6d7468656164647261647265736d79656d61696c73696766756c6c746568"
+  },
+  {
+   "name": "leader",
+   "description": "Corrections that fire after the leader alone or both ways: one typo the start of another, a part-of-word typo in both indexes, letters outside ASCII, a macro, and a correction that fires as a word ends beside them.",
+   "entries": [
+    {
+     "correction": "+31 6 1234 5678",
+     "trigger": "after the leader",
+     "typos": [
+      {
+       "typo": "pn",
+       "match": "whole word"
+      }
+     ]
+    },
+    {
+     "correction": "Kind regards, Sam",
+     "trigger": "after the leader",
+     "typos": [
+      {
+       "typo": "kr",
+       "match": "whole word"
+      }
+     ]
+    },
+    {
+     "correction": "alpha",
+     "trigger": "after the leader",
+     "typos": [
+      {
+       "typo": "abc",
+       "match": "whole word"
+      }
+     ]
+    },
+    {
+     "correction": "delta",
+     "trigger": "after the leader",
+     "typos": [
+      {
+       "typo": "abcd",
+       "match": "whole word"
+      }
+     ]
+    },
+    {
+     "correction": "the",
+     "trigger": "both",
+     "typos": [
+      {
+       "typo": "teh",
+       "match": "whole word"
+      },
+      {
+       "typo": "hte",
+       "match": "whole word"
+      }
+     ]
+    },
+    {
+     "correction": "receive",
+     "trigger": "both",
+     "typos": [
+      {
+       "typo": "recieve",
+       "match": "start of word"
+      }
+     ]
+    },
+    {
+     "correction": "café",
+     "trigger": "after the leader",
+     "typos": [
+      {
+       "typo": "éé",
+       "match": "whole word"
+      }
+     ]
+    },
+    {
+     "correction": "and",
+     "typos": [
+      {
+       "typo": "adn",
+       "match": "whole word"
+      }
+     ]
+    },
+    {
+     "macro": 7,
+     "trigger": "after the leader",
+     "typos": [
+      {
+       "typo": "sig",
+       "match": "whole word"
+      },
+      {
+       "typo": "sigg",
+       "match": "whole word"
+      }
+     ]
+    }
+   ],
+   "hex": "09000b0001000a00620000000f0205000f0011020400200005020000250003000200280005020a002d00050201003200070406003900030403000700000307003c00030002003f00040005004300030003004600030007004900020001004b00020000004d00070106005400030008005700040008005b00030007005e000400040006000000010003000400050006000700080009000a002b33312036203132333420353637384b696e6420726567617264732c2053616d616c706861616e64636166c3a964656c7461726563656976657468656162636162636461646e6874656b72706e7265636965766573696773696767746568c3a9c3a9"
   }
  ],
  "invalid": [
   {
    "name": "truncated-header",
-   "description": "Shorter than the eight-byte header.",
-   "hex": "02000300010015",
+   "description": "Shorter than the ten-byte header.",
+   "hex": "020003000100000015",
    "error": {
     "code": "INVALID_LENGTH",
     "table": null,
@@ -2220,7 +2329,7 @@
   {
    "name": "trailing-byte",
    "description": "A byte after the text the header counts.",
-   "hex": "02000300010015000000030000000300050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e6700",
+   "hex": "020003000100000015000000030000000300050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e6700",
    "error": {
     "code": "INVALID_LENGTH",
     "table": null,
@@ -2230,7 +2339,7 @@
   {
    "name": "truncated-text",
    "description": "The text ends before the header's count.",
-   "hex": "02000300010015000000030000000300050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e",
+   "hex": "020003000100000015000000030000000300050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e",
    "error": {
     "code": "INVALID_LENGTH",
     "table": null,
@@ -2240,7 +2349,7 @@
   {
    "name": "too-many-corrections",
    "description": "A correction count over the ceiling.",
-   "hex": "01040300010010000000030000000300050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e67",
+   "hex": "010403000100000010000000030000000300050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e67",
    "error": {
     "code": "CAPACITY_EXCEEDED",
     "table": null,
@@ -2250,7 +2359,7 @@
   {
    "name": "too-many-typos",
    "description": "A typo count over the ceiling.",
-   "hex": "02000104010010000000030000000300050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e67",
+   "hex": "020001040100000010000000030000000300050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e67",
    "error": {
     "code": "CAPACITY_EXCEEDED",
     "table": null,
@@ -2260,7 +2369,7 @@
   {
    "name": "too-much-text",
    "description": "A text length over the ceiling.",
-   "hex": "02000300010001500000030000000300050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e67",
+   "hex": "020003000100000001500000030000000300050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e67",
    "error": {
     "code": "CAPACITY_EXCEEDED",
     "table": null,
@@ -2270,7 +2379,17 @@
   {
    "name": "more-part-typos-than-typos",
    "description": "More part-of-word typos than typos.",
-   "hex": "0200030004000e000000030000000300050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e67",
+   "hex": "02000300040000000e000000030000000300050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e67",
+   "error": {
+    "code": "CAPACITY_EXCEEDED",
+    "table": null,
+    "row": null
+   }
+  },
+  {
+   "name": "more-leader-typos-than-typos",
+   "description": "More leader typos than typos.",
+   "hex": "02000300010004000e000000030000000300050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e67",
    "error": {
     "code": "CAPACITY_EXCEEDED",
     "table": null,
@@ -2280,7 +2399,7 @@
   {
    "name": "typos-without-corrections",
    "description": "Typos need a correction to name.",
-   "hex": "0000010000000300000003000000746568",
+   "hex": "00000100000000000300000003000000746568",
    "error": {
     "code": "INVALID_REFERENCE",
     "table": null,
@@ -2290,7 +2409,7 @@
   {
    "name": "correction-offset",
    "description": "A correction's text does not begin where the one before it ended.",
-   "hex": "02000300010015000000030000000400050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e67",
+   "hex": "020003000100000015000000030000000400050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e67",
    "error": {
     "code": "INVALID_OFFSET",
     "table": 0,
@@ -2300,7 +2419,7 @@
   {
    "name": "typo-offset",
    "description": "A typo's text does not begin where the one before it ended.",
-   "hex": "02000300010015000000030000000300050001000700030000000b000500010010000503010002007468657468696e6774656874686e69677469686e67",
+   "hex": "020003000100000015000000030000000300050001000700030000000b000500010010000503010002007468657468696e6774656874686e69677469686e67",
    "error": {
     "code": "INVALID_OFFSET",
     "table": 1,
@@ -2310,7 +2429,7 @@
   {
    "name": "empty-correction",
    "description": "A correction of no bytes.",
-   "hex": "0200010000000600000000000000000003000000030003000100746865746568",
+   "hex": "02000100000000000600000000000000000003000000030003000100746865746568",
    "error": {
     "code": "INVALID_TEXT_LENGTH",
     "table": 0,
@@ -2320,7 +2439,7 @@
   {
    "name": "empty-typo",
    "description": "A typo of no bytes.",
-   "hex": "0100020000000600000003000000030000000000030003000000746865746568",
+   "hex": "01000200000000000600000003000000030000000000030003000000746865746568",
    "error": {
     "code": "INVALID_TEXT_LENGTH",
     "table": 1,
@@ -2330,7 +2449,7 @@
   {
    "name": "long-correction",
    "description": "A correction of 129 bytes.",
-   "hex": "0100010000008400000081000000810003000000616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161746568",
+   "hex": "01000100000000008400000081000000810003000000616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161746568",
    "error": {
     "code": "INVALID_TEXT_LENGTH",
     "table": 0,
@@ -2340,7 +2459,7 @@
   {
    "name": "long-typo",
    "description": "A typo of 33 bytes.",
-   "hex": "0100010000002400000003000000030021000000746865616161616161616161616161616161616161616161616161616161616161616161",
+   "hex": "01000100000000002400000003000000030021000000746865616161616161616161616161616161616161616161616161616161616161616161",
    "error": {
     "code": "INVALID_TEXT_LENGTH",
     "table": 1,
@@ -2348,9 +2467,19 @@
    }
   },
   {
-   "name": "correction-kind",
-   "description": "A correction that is neither text nor a macro.",
-   "hex": "02000300010015000000030200000300050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e67",
+   "name": "correction-trigger",
+   "description": "A correction that fires no way there is: trigger 3.",
+   "hex": "020003000100000015000000030600000300050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e67",
+   "error": {
+    "code": "INVALID_KIND",
+    "table": 0,
+    "row": 0
+   }
+  },
+  {
+   "name": "correction-kind-bit",
+   "description": "A correction's kind byte with a bit above the trigger set.",
+   "hex": "020003000100000015000000030800000300050001000800030000000b000500010010000503010002007468657468696e6774656874686e69677469686e67",
    "error": {
     "code": "INVALID_KIND",
     "table": 0,
@@ -2360,7 +2489,7 @@
   {
    "name": "macro-with-length",
    "description": "A macro correction with a text length.",
-   "hex": "0200020000000900000003000100050003010000030003000100060003000000746865736967746568",
+   "hex": "02000200000000000900000003000100050003010000030003000100060003000000746865736967746568",
    "error": {
     "code": "INVALID_TEXT_LENGTH",
     "table": 0,
@@ -2370,7 +2499,7 @@
   {
    "name": "macro-slot-out-of-range",
    "description": "A macro correction names a slot past the macro slots.",
-   "hex": "0200020000000900000003000100800000010000030003000100060003000000746865736967746568",
+   "hex": "02000200000000000900000003000100800000010000030003000100060003000000746865736967746568",
    "error": {
     "code": "INVALID_MACRO",
     "table": 0,
@@ -2380,7 +2509,7 @@
   {
    "name": "macro-order",
    "description": "Macro corrections out of slot order.",
-   "hex": "020002000000070007000001010003000001000000000400010004000300000061646472736967",
+   "hex": "0200020000000000070007000001010003000001000000000400010004000300000061646472736967",
    "error": {
     "code": "ORDER",
     "table": 0,
@@ -2390,7 +2519,7 @@
   {
    "name": "duplicate-macro",
    "description": "One macro slot stored twice.",
-   "hex": "020002000000070007000001010007000001000000000400010004000300000061646472736967",
+   "hex": "0200020000000000070007000001010007000001000000000400010004000300000061646472736967",
    "error": {
     "code": "ORDER",
     "table": 0,
@@ -2400,7 +2529,7 @@
   {
    "name": "text-after-macro",
    "description": "A text correction after a macro one.",
-   "hex": "0200020000000900070000010000000003000100030003000000060003000100746865736967746568",
+   "hex": "02000200000000000900070000010000000003000100030003000000060003000100746865736967746568",
    "error": {
     "code": "ORDER",
     "table": 0,
@@ -2410,7 +2539,7 @@
   {
    "name": "macro-part-of-word-typo",
    "description": "A macro correction's typo that matches part of a word.",
-   "hex": "01000100010003000700000100000000030100000000736967",
+   "hex": "010001000100000003000700000100000000030100000000736967",
    "error": {
     "code": "INVALID_MATCH",
     "table": 1,
@@ -2420,7 +2549,7 @@
   {
    "name": "correction-order",
    "description": "Corrections out of order.",
-   "hex": "02000200000010000000050001000500030000000800030001000b00050000007468696e6774686574656874686e6967",
+   "hex": "020002000000000010000000050001000500030000000800030001000b00050000007468696e6774686574656874686e6967",
    "error": {
     "code": "ORDER",
     "table": 0,
@@ -2430,7 +2559,7 @@
   {
    "name": "duplicate-correction",
    "description": "One correction stored twice.",
-   "hex": "0200020000000c00000003000000030003000100060003000000090003000100746865746865687465746568",
+   "hex": "02000200000000000c00000003000000030003000100060003000000090003000100746865746865687465746568",
    "error": {
     "code": "ORDER",
     "table": 0,
@@ -2440,7 +2569,7 @@
   {
    "name": "typo-order",
    "description": "Typos out of order.",
-   "hex": "0100020000000900000003000000030003000000060003000000746865746568687465",
+   "hex": "01000200000000000900000003000000030003000000060003000000746865746568687465",
    "error": {
     "code": "ORDER",
     "table": 1,
@@ -2450,7 +2579,7 @@
   {
    "name": "duplicate-typo",
    "description": "One typo stored twice, for two corrections.",
-   "hex": "0200020001000d000000030000000300040001000700030000000a000303010001007468657468656e746568746568",
+   "hex": "02000200010000000d000000030000000300040001000700030000000a000303010001007468657468656e746568746568",
    "error": {
     "code": "ORDER",
     "table": 1,
@@ -2460,7 +2589,7 @@
   {
    "name": "prefix-order",
    "description": "A typo before the shorter typo it begins with.",
-   "hex": "0100020000000a0000000300000003000400000007000300000074686574656868746568",
+   "hex": "01000200000000000a0000000300000003000400000007000300000074686574656868746568",
    "error": {
     "code": "ORDER",
     "table": 1,
@@ -2470,7 +2599,7 @@
   {
    "name": "correction-utf8",
    "description": "A correction that is not UTF-8.",
-   "hex": "0100010000000800000004000000040004000000636166e963616665",
+   "hex": "01000100000000000800000004000000040004000000636166e963616665",
    "error": {
     "code": "INVALID_TEXT",
     "table": 0,
@@ -2480,7 +2609,7 @@
   {
    "name": "correction-overlong-utf8",
    "description": "A correction with an overlong UTF-8 form.",
-   "hex": "01000100000007000000040000000400030000007468c1a5746568",
+   "hex": "010001000000000007000000040000000400030000007468c1a5746568",
    "error": {
     "code": "INVALID_TEXT",
     "table": 0,
@@ -2490,7 +2619,7 @@
   {
    "name": "correction-control",
    "description": "A correction with a control character.",
-   "hex": "010001000000070000000400000004000300000074680965746568",
+   "hex": "0100010000000000070000000400000004000300000074680965746568",
    "error": {
     "code": "INVALID_TEXT",
     "table": 0,
@@ -2500,7 +2629,7 @@
   {
    "name": "typo-utf8",
    "description": "A typo cut off inside a UTF-8 character.",
-   "hex": "0100010000000900000005000000050004000000636166c3a9636166c3",
+   "hex": "01000100000000000900000005000000050004000000636166c3a9636166c3",
    "error": {
     "code": "INVALID_TEXT",
     "table": 1,
@@ -2510,7 +2639,7 @@
   {
    "name": "typo-space",
    "description": "A typo with a space.",
-   "hex": "0100010000000a0000000500000005000500000061206c6f7461206c746f",
+   "hex": "01000100000000000a0000000500000005000500000061206c6f7461206c746f",
    "error": {
     "code": "NOT_A_WORD",
     "table": 1,
@@ -2520,7 +2649,7 @@
   {
    "name": "typo-hyphen",
    "description": "A typo with a hyphen.",
-   "hex": "0100010000000c00000006000000060006000000652d6d61696c652d6d69616c",
+   "hex": "01000100000000000c00000006000000060006000000652d6d61696c652d6d69616c",
    "error": {
     "code": "NOT_A_WORD",
     "table": 1,
@@ -2530,7 +2659,7 @@
   {
    "name": "typo-leading-apostrophe",
    "description": "A typo that begins with an apostrophe.",
-   "hex": "010001000000070000000300000003000400000074686527746568",
+   "hex": "0100010000000000070000000300000003000400000074686527746568",
    "error": {
     "code": "NOT_A_WORD",
     "table": 1,
@@ -2540,7 +2669,7 @@
   {
    "name": "typo-trailing-apostrophe",
    "description": "A typo that ends with an apostrophe.",
-   "hex": "010001000000070000000300000003000400000074686574656827",
+   "hex": "0100010000000000070000000300000003000400000074686574656827",
    "error": {
     "code": "NOT_A_WORD",
     "table": 1,
@@ -2550,7 +2679,7 @@
   {
    "name": "typo-unknown-letter",
    "description": "A typo with a letter no host layout types.",
-   "hex": "01000100000007000000030000000300040000007468657465d0b6",
+   "hex": "010001000000000007000000030000000300040000007468657465d0b6",
    "error": {
     "code": "NOT_A_WORD",
     "table": 1,
@@ -2560,7 +2689,7 @@
   {
    "name": "typo-capital",
    "description": "A typo with a capital letter.",
-   "hex": "0100010000000600000003000000030003000000746865546568",
+   "hex": "01000100000000000600000003000000030003000000746865546568",
    "error": {
     "code": "NOT_FOLDED",
     "table": 1,
@@ -2570,7 +2699,7 @@
   {
    "name": "typo-accented-capital",
    "description": "A typo with an accented capital letter.",
-   "hex": "0100010000000a00000005000000050005000000c3bc626572c39c656272",
+   "hex": "01000100000000000a00000005000000050005000000c3bc626572c39c656272",
    "error": {
     "code": "NOT_FOLDED",
     "table": 1,
@@ -2579,8 +2708,8 @@
   },
   {
    "name": "unknown-match",
-   "description": "A match value above anywhere.",
-   "hex": "01000100010006000000030000000300030400000000746865746568",
+   "description": "A match value above anywhere: 4 is no match.",
+   "hex": "010001000100000006000000030000000300030400000000746865746568",
    "error": {
     "code": "INVALID_MATCH",
     "table": 1,
@@ -2588,9 +2717,79 @@
    }
   },
   {
+   "name": "leader-space",
+   "description": "A typo with a space, of a correction that fires after the leader.",
+   "hex": "0100010000000100140000001102000011000300000000004b696e6420726567617264732c2053616d6b2072",
+   "error": {
+    "code": "NOT_A_WORD",
+    "table": 1,
+    "row": 0
+   }
+  },
+  {
+   "name": "leader-capital",
+   "description": "A typo with a capital letter, of a correction that fires after the leader.",
+   "hex": "0100010000000100110000000f0200000f000200000000002b3331203620313233342035363738506e",
+   "error": {
+    "code": "NOT_FOLDED",
+    "table": 1,
+    "row": 0
+   }
+  },
+  {
+   "name": "leader-index-missing",
+   "description": "A typo of a correction that fires after the leader the leader index leaves out.",
+   "hex": "0200020000000000170000000f0200000f00030001001200020000001400030001002b3331203620313233342035363738746865706e746568",
+   "error": {
+    "code": "LEADER_INDEX",
+    "table": 1,
+    "row": 0
+   }
+  },
+  {
+   "name": "leader-index-both-missing",
+   "description": "A part-of-word typo of a correction that fires both ways, in the part index and left out of the leader index.",
+   "hex": "01000100010000000e0000000704000007000701000000007265636569766572656369657665",
+   "error": {
+    "code": "LEADER_INDEX",
+    "table": 1,
+    "row": 0
+   }
+  },
+  {
+   "name": "leader-index-word-end",
+   "description": "The leader index lists a typo of a correction that fires as a word ends.",
+   "hex": "010001000000010006000000030000000300030000000000746865746568",
+   "error": {
+    "code": "LEADER_INDEX",
+    "table": 3,
+    "row": 0
+   }
+  },
+  {
+   "name": "leader-index-wrong-typo",
+   "description": "The leader index names another typo.",
+   "hex": "0200020000000100170000000f0200000f000300010012000200000014000300010001002b3331203620313233342035363738746865706e746568",
+   "error": {
+    "code": "LEADER_INDEX",
+    "table": 1,
+    "row": 0
+   }
+  },
+  {
+   "name": "part-index-leader-only",
+   "description": "The part index lists a part-of-word typo of a correction that fires only after the leader.",
+   "hex": "01000100010001000e00000007020000070007010000000000007265636569766572656369657665",
+   "error": {
+    "code": "PART_INDEX",
+    "table": 2,
+    "row": 0
+   }
+  },
+  {
    "name": "missing-correction",
    "description": "A typo names a correction that does not exist.",
-   "hex": "0100020000000900000003000000030003000000060003000100746865687465746568",
+   "hex": "01000200000000000900000003000000030003000000060003000100746865687465746568",
    "error": {
     "code": "INVALID_REFERENCE",
     "table": 1,
@@ -2600,7 +2799,7 @@
   {
    "name": "first-typo-out-of-range",
    "description": "A correction's first typo is past the typos.",
-   "hex": "0100010000000600000003000100030003000000746865746568",
+   "hex": "01000100000000000600000003000100030003000000746865746568",
    "error": {
     "code": "INVALID_REFERENCE",
     "table": 0,
@@ -2610,7 +2809,7 @@
   {
    "name": "unused-correction",
    "description": "A correction no typo names: its first typo names another.",
-   "hex": "0200010000000b000000030000000300050000000800030000007468657468696e67746568",
+   "hex": "02000100000000000b000000030000000300050000000800030000007468657468696e67746568",
    "error": {
     "code": "FIRST_TYPO",
     "table": 0,
@@ -2620,7 +2819,7 @@
   {
    "name": "first-typo-not-first",
    "description": "A correction's first typo is not the first that names it.",
-   "hex": "0100020000000900000003000100030003000000060003000000746865687465746568",
+   "hex": "01000200000000000900000003000100030003000000060003000000746865687465746568",
    "error": {
     "code": "FIRST_TYPO",
     "table": 1,
@@ -2630,7 +2829,7 @@
   {
    "name": "typo-is-its-correction",
    "description": "A typo equal to its correction.",
-   "hex": "0100010000000600000003000000030003000000746865746865",
+   "hex": "01000100000000000600000003000000030003000000746865746865",
    "error": {
     "code": "TYPO_IS_CORRECTION",
     "table": 1,
@@ -2640,7 +2839,7 @@
   {
    "name": "part-index-missing",
    "description": "A part-of-word typo the part index leaves out.",
-   "hex": "02000200000010000000030000000300050001000800030000000b00050301007468657468696e677465687469686e67",
+   "hex": "020002000000000010000000030000000300050001000800030000000b00050301007468657468696e677465687469686e67",
    "error": {
     "code": "PART_INDEX",
     "table": 1,
@@ -2650,7 +2849,7 @@
   {
    "name": "part-index-whole-word",
    "description": "The part index lists a whole-word typo.",
-   "hex": "01000100010006000000030000000300030000000000746865746568",
+   "hex": "010001000100000006000000030000000300030000000000746865746568",
    "error": {
     "code": "PART_INDEX",
     "table": 2,
@@ -2660,7 +2859,7 @@
   {
    "name": "part-index-wrong-typo",
    "description": "The part index names another typo.",
-   "hex": "02000200010010000000030000000300050001000800030000000b000503010000007468657468696e677465687469686e67",
+   "hex": "020002000100000010000000030000000300050001000800030000000b000503010000007468657468696e677465687469686e67",
    "error": {
     "code": "PART_INDEX",
     "table": 1,

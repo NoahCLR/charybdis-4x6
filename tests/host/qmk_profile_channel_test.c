@@ -327,7 +327,7 @@ static void test_capability_hook(void) {
     channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(read_u16(&frame[WIRE_PAYLOAD]) == 1024u && read_u16(&frame[WIRE_PAYLOAD + 2u]) == 1024u && read_u16(&frame[WIRE_PAYLOAD + 4u]) == 20480u);
-    assert(read_u32(&frame[WIRE_PAYLOAD + 6u]) == 34824u && frame[WIRE_PAYLOAD + 10u] == 32u && frame[WIRE_PAYLOAD + 11u] == 128u);
+    assert(read_u32(&frame[WIRE_PAYLOAD + 6u]) == 36874u && frame[WIRE_PAYLOAD + 10u] == 32u && frame[WIRE_PAYLOAD + 11u] == 128u);
     for (uint8_t index = WIRE_PAYLOAD + 12u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) assert(frame[index] == 0u);
 }
 

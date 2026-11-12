@@ -305,8 +305,8 @@ Replacement feedback is a flash for what text replacement
 
 | Semantic | Shown from | Colour |
 | --- | --- | --- |
-| text replaced | the replacement of a typed form begins to be typed | text replaced |
-| macro replaced | a typed form begins to be erased for its macro | macro replaced |
+| text replaced | the replacement of a typed form, or the text [the leader](autocorrect-v1.md#the-leader) sends, begins to be typed | text replaced |
+| macro replaced | a typed form begins to be erased for its macro, or the macro the leader sends begins to play | macro replaced |
 | undone | Backspace right after a replacement begins to put the word back | undone |
 
 - A flash lasts the replacement-feedback flash length, settings scalar 31
@@ -315,7 +315,8 @@ Replacement feedback is a flash for what text replacement
   flash half-period, scalar 15. One shows at a time: a newer one takes the place
   of the one showing.
 - Its key is the key that ended the word, or the Backspace that undid the
-  replacement; a combo's output is every key of the combo, as they are when
+  replacement, or for what the leader sends the key that ended leading, none
+  when its timeout did (D-F71); a combo's output is every key of the combo, as they are when
   the typing stage reads the key. Locality `3` paints that key's half and
   `4` that key alone. The key is not known when what ended the word reached
   the report by no key's press or action, or in a report read after one
@@ -329,7 +330,9 @@ Replacement feedback is a flash for what text replacement
   so do black rows for it; the other semantics are unaffected.
 - A word that ends and is left as typed shows nothing: a word not on the
   list, one that already reads as its replacement, one the layout cannot
-  type, one passed over or suspended, and text replacement switched off.
+  type, one passed over or suspended, and any word while text replacement is
+  switched off. So does a leader that sends nothing; what the leader sends
+  shows whatever the switches say.
 
 Held by: `tests/host/run_rgb_layer_render_tests.sh` (`rgb_layer_render_test.c`, `test_render_order_*`, `test_combo_*_stays_*`, `test_runtime_boot_indicator_overrides_scene`, the `*automouse*` and `*timeout*` tests, `test_newest_global_feedback_owner_wins_over_older_higher_priority`, `test_key_half_feedback_follows_newest_owner_without_visible_fallback`, `test_render_order_replacement_feedback_covers_key_feedback`, `test_a_frame_reads_replacement_feedback_once`; `rgb_base_underlay_test.c`; `rgb_autocorrect_active_profile_test.c`), `tests/host/run_autocorrect_tests.sh` (`autocorrect_test.c`, the tests under "What lighting is told"), `tests/host/run_runtime_debug_tests.sh` (`runtime_debug_test.c`, the `test_key_feedback_*` and `test_display_preview_*` tests, `test_split_term_branch_names_its_tap_at_the_accept_window`, `test_long_hold_only_branch_keeps_branch_color_until_long_hold`), `tests/host/run_qmk_combo_origin_tests.sh` (`qmk_combo_origin_test.c`, `test_active_combo_partition_*`).
 

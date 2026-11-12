@@ -58,6 +58,12 @@ static inline bool noah_action_keycode_is_switch_key(uint16_t action) {
     return (action >= QK_COMBO_ON && action <= QK_COMBO_TOGGLE) || (action >= QK_AUTOCORRECT_ON && action <= QK_AUTOCORRECT_TOGGLE) || (action >= BH_ON && action <= BH_TOGG) || (action >= AM_ON && action <= AM_TOGG);
 }
 
+// QMK's Leader keycode, the leader of text replacement (D-F71). QMK's own
+// Leader is not built; the typing stage holds what follows it.
+static inline bool noah_action_keycode_is_leader(uint16_t action) {
+    return action == QK_LEADER;
+}
+
 static inline bool noah_action_keycode_is_momentary(uint16_t action) {
     return IS_QK_MOMENTARY(action) && QK_MOMENTARY_GET_LAYER(action) < LAYER_COUNT;
 }

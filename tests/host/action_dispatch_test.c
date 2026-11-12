@@ -892,6 +892,27 @@ static void test_switch_keys_go_everywhere_a_key_goes(void) {
     }
 }
 
+// QMK's Leader keycode is the firmware's own leader (D-F71), not a QMK
+// function: it goes where the switch keys go, a saved profile is held to the
+// same rule, and it taps itself where a behaviour leaves the tap empty.
+static void test_the_leader_goes_where_a_switch_key_goes(void) {
+    const noah_action_placement_t placements[] = {NOAH_ACTION_PLACEMENT_KEY, NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER, NOAH_ACTION_PLACEMENT_COMBO_OUTPUT};
+    const noah_profile_validator_v1_placement_t stored_placements[] = {NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_KEY, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_OTHER, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT};
+    const noah_profile_action_v1_t                leader   = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = QK_LEADER};
+    const noah_profile_action_v1_t                switcher = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = QK_AUTOCORRECT_OFF};
+
+    CHECK(noah_action_describe(QK_LEADER).kind == NOAH_ACTION_KIND_LEADER);
+    CHECK(noah_action_desc_default_tap_action(noah_action_describe(QK_LEADER)) == QK_LEADER);
+    for (uint8_t p = 0; p < ARRAY_SIZE(placements); p++) {
+        CHECK(noah_action_supported_at(QK_LEADER, placements[p]));
+        CHECK(noah_action_supported_at(QK_LEADER, placements[p]) == noah_action_supported_at(QK_AUTOCORRECT_OFF, placements[p]));
+    }
+    for (uint8_t p = 0; p < ARRAY_SIZE(stored_placements); p++)
+        CHECK(noah_profile_action_placement_v1_supported(&leader, stored_placements[p]) == noah_profile_action_placement_v1_supported(&switcher, stored_placements[p]));
+    // Its neighbours stay QMK's functions.
+    CHECK(noah_action_describe(QK_LEADER - 1).kind == NOAH_ACTION_KIND_QMK_FUNCTION && noah_action_describe(QK_LEADER + 1).kind == NOAH_ACTION_KIND_QMK_FUNCTION);
+}
+
 // A key that acts at its press and whose behaviour leaves a tap empty taps
 // itself there, the standard key's tap (D-F64): a switch key switches and a
 // pointing-mode lock locks.
@@ -992,6 +1013,7 @@ int main(void) {
     test_saved_profile_placement_matches_the_rules();
     test_unassigned_userspace_codes_are_refused_everywhere();
     test_switch_keys_go_everywhere_a_key_goes();
+    test_the_leader_goes_where_a_switch_key_goes();
     test_press_only_keys_tap_themselves_where_a_behaviour_leaves_the_tap_empty();
     test_last_layer_actions();
     test_macro_bank_ends_at_127();

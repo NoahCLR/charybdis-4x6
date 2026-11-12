@@ -62,6 +62,41 @@ in four ways:
   by erasing;
 - if its macro is empty, nothing happens and what you typed stays.
 
+## The leader
+
+Put the **Leader key**, `QK_LEADER` ([keys](keys.md#the-leader)), on a key, in
+a behaviour's tap or hold, or make it a combo's output. A replacement fires
+as you type, after the Leader key, or both: you choose for each one in Ark,
+and its inputs stay the same whichever you choose. Press Leader, then type an
+input of a replacement that fires after it, a **leader input**: nothing you
+type after Leader reaches the computer. When what you typed is one, the
+keyboard types its replacement or plays its macro, and that is all the
+computer sees. A replacement that fires only after Leader is left alone when
+you type its input as a word.
+
+- It sends as soon as no other leader input could still follow: with `pn` on
+  your list, Leader then `p` `n` types your phone number at once.
+- When one leader input begins another, `abc` and `abcd`, press Enter to
+  send the shorter one, or wait: after the leader timeout, 2 seconds unless
+  you set another in Ark (Settings → Host), it is sent too.
+- A character that leaves what you typed the start of no leader input ends
+  it, and nothing is sent, that character included. Escape ends it too, and
+  so do Enter and the timeout when what you typed is no leader input.
+- Backspace takes back the last character, and with nothing typed ends it.
+  Leader again starts over.
+- Any other key, an arrow, Tab, a shortcut, a click or a macro key, ends it
+  with nothing sent and then does what it always does.
+
+A leader input is an input like any other, letters and digits, and after
+Leader it is typed whole: `recieve*` is sent by `recieve`. A space or a
+punctuation mark is in no input, so typing one drops what you typed. The
+replacement is typed exactly as written, with no capitals rule, and there is
+no taking it back: Backspace afterwards is just Backspace.
+
+The leader works with text replacement switched off, in Ark or by key. With
+no replacement that fires after Leader on your list the Leader key does
+nothing.
+
 ## Capitals
 
 Inputs match whatever their case, and a text replacement follows what
@@ -92,7 +127,9 @@ It does not work for a macro.
 
 The keyboard flashes when it replaces something and when you take a
 replacement back, each in its own colour; a word it leaves alone never
-flashes. The colours, where the flash paints and which cases flash are part
+flashes. What the leader sends flashes as a replacement does, on the key
+that sent it, or on the whole keyboard when the timeout did; a leader that
+sends nothing never flashes. The colours, where the flash paints and which cases flash are part
 of lighting: [Replacement feedback](lighting.md#replacement-feedback).
 
 ## Only what you type
@@ -151,4 +188,5 @@ replacement switched off there `AC_ON` does not turn it on.
 
 The keyboard cannot see what you are typing into. Put `AC_TOGG` or `AC_OFF`
 on a key and use it before a password, in a terminal, or anywhere a real
-word on your list would be wrong.
+word on your list would be wrong. None of this turns off
+[the leader](#the-leader): it only does anything when you press it.

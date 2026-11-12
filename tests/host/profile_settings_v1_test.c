@@ -39,9 +39,9 @@ static uint16_t layer_record(uint8_t layer, uint8_t field) {
 }
 // A canonical domain: every name `size` bytes of `fill`.
 static void named(uint8_t size, char fill) {
-    const uint32_t values[NOAH_SETTINGS_COUNT] = {200, 150, 400, 150, 1, 4, 1200, 25, 1, 0x8, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0, 1, 0xffff, 0xffff, 120};
+    const uint32_t values[NOAH_SETTINGS_COUNT] = {200, 150, 400, 150, 1, 4, 1200, 25, 1, 0x8, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0, 1, 0xffff, 0xffff, 120, 2000};
     memset(bytes, 0, sizeof(bytes));
-    const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {12, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
+    const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {13, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
     memcpy(bytes, header, sizeof(header));
     for (uint8_t i = 0; i < NOAH_SETTINGS_COUNT; i++)
         set_scalar(i, values[i]);
@@ -81,12 +81,12 @@ static void put_name(uint16_t index, const char *text, uint8_t size) {
 static void test_header_and_versions(void) {
     defaults();
     assert(valid());
-    for (uint8_t version = 0; version <= 12; version++) {
+    for (uint8_t version = 0; version <= 13; version++) {
         defaults();
         bytes[0] = version;
         assert(valid() == (version == NOAH_SETTINGS_VERSION));
     }
-    assert(NOAH_SETTINGS_VERSION == 12 && NOAH_SETTINGS_COUNT == 32);
+    assert(NOAH_SETTINGS_VERSION == 13 && NOAH_SETTINGS_COUNT == 33);
     for (uint8_t at = 1; at < NOAH_SETTINGS_HEADER_SIZE; at++) {
         defaults();
         bytes[at]++;
@@ -174,12 +174,25 @@ static void test_scalars(void) {
     assert(!valid());
     assert(!noah_profile_setting_v1_valid(NOAH_SETTING_AUTOCORRECT_FEEDBACK_PERIOD, 0, 16));
     assert(noah_profile_setting_v1_valid(NOAH_SETTING_AUTOCORRECT_FEEDBACK_PERIOD, 200, 16));
+    // Scalar 32, the leader timeout (D-F71), follows it: 1 to 10 seconds.
+    assert(NOAH_SETTING_LEADER_TIMEOUT == 32);
+    defaults();
+    set_scalar(NOAH_SETTING_LEADER_TIMEOUT, 999);
+    assert(!valid());
+    set_scalar(NOAH_SETTING_LEADER_TIMEOUT, 1000);
+    assert(valid());
+    set_scalar(NOAH_SETTING_LEADER_TIMEOUT, 10000);
+    assert(valid());
+    set_scalar(NOAH_SETTING_LEADER_TIMEOUT, 10001);
+    assert(!valid());
+    set_scalar(NOAH_SETTING_LEADER_TIMEOUT, 0);
+    assert(!valid());
     assert(!noah_profile_setting_v1_valid(NOAH_SETTINGS_COUNT, 1, 16));
 }
 // The scalar encoding against the spec's literal layout: scalar `id` is four
-// little-endian bytes at 8 + 4 * id, and layer records follow at 136.
+// little-endian bytes at 8 + 4 * id, and layer records follow at 140.
 static void test_scalar_encoding(void) {
-    assert(NOAH_SETTINGS_LAYER_RECORDS_OFFSET == 136);
+    assert(NOAH_SETTINGS_LAYER_RECORDS_OFFSET == 140);
     for (uint8_t id = 0; id < NOAH_SETTINGS_COUNT; id++) {
         assert(noah_profile_settings_v1_scalar_offset(id) == 8 + 4 * id);
         for (uint8_t part = 0; part < 4; part++) {
@@ -190,7 +203,7 @@ static void test_scalar_encoding(void) {
     }
     uint8_t id = 0xee, part = 0xdd;
     assert(!noah_profile_settings_v1_scalar_at(7, &id, &part) && id == 0xee && part == 0xdd);
-    assert(!noah_profile_settings_v1_scalar_at(136, &id, &part) && id == 0xee && part == 0xdd);
+    assert(!noah_profile_settings_v1_scalar_at(140, &id, &part) && id == 0xee && part == 0xdd);
     static const uint32_t values[] = {0, 1, 0x204060, 0x07010101, UINT32_MAX};
     for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); i++) {
         uint8_t encoded[4];
@@ -292,7 +305,7 @@ static uint16_t shortcut_record(uint8_t slot, uint8_t field) {
 static void test_shortcuts(void) {
     assert(NOAH_SETTINGS_SHORTCUTS_OFFSET == NOAH_SETTINGS_LAYER_RECORDS_OFFSET + NOAH_SETTINGS_LAYERS * NOAH_SETTINGS_LAYER_RECORD_SIZE);
     assert(NOAH_SETTINGS_FIXED_SIZE == NOAH_SETTINGS_SHORTCUTS_OFFSET + 1280);
-    assert(NOAH_SETTINGS_MIN_SIZE == 1961 && NOAH_SETTINGS_MAX_SIZE == 10697);
+    assert(NOAH_SETTINGS_MIN_SIZE == 1965 && NOAH_SETTINGS_MAX_SIZE == 10701);
     assert(NOAH_SETTINGS_SHORTCUT_COUNT_OFFSET == 6);
     for (unsigned mods = 0; mods <= 255; mods++) {
         defaults();
@@ -484,7 +497,7 @@ static void test_names(void) {
     // the last custom key's and 272 the keyboard's; a name in any is read in
     // order.
     assert(NOAH_SETTINGS_NAME_COUNT == 273 && NOAH_SETTINGS_KEYBOARD_NAME_RECORD == 272);
-    assert(NOAH_SETTINGS_MIN_SIZE == 1961 && NOAH_SETTINGS_MAX_SIZE == 10697);
+    assert(NOAH_SETTINGS_MIN_SIZE == 1965 && NOAH_SETTINGS_MAX_SIZE == 10701);
     defaults();
     put_name(272, "Keyboard", 8);
     put_name(271, "Last custom", 11);
@@ -575,6 +588,7 @@ static void test_publication(void) {
     assert(noah_setting(NOAH_SETTING_LAYER_COMBOS, 0) == 0xffff);
     // The replacement flash reads its own scalar, not the half-period's.
     assert(noah_setting(NOAH_SETTING_AUTOCORRECT_FEEDBACK_PERIOD, 99) == 120 && noah_setting(NOAH_SETTING_FEEDBACK_PERIOD, 99) == 200);
+    assert(noah_setting(NOAH_SETTING_LEADER_TIMEOUT, 99) == 2000);
     assert(noah_setting_layer_record(9, NOAH_SETTINGS_LAYER_REFERENCE) == 2);
     assert(noah_setting_layer_record(9, NOAH_SETTINGS_LAYER_BYPASS + 7) == 0x08);
     assert(noah_setting_layer_record(15, NOAH_SETTINGS_LAYER_REFERENCE) == 15);

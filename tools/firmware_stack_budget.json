@@ -53,6 +53,11 @@
           "reason": "GCC 15 inlines emission and action tap dispatch into noah_emit_action_tap_at; a step that sends a custom key taps its shortcut through the action-kind operations table (D-F26)."
         },
         {
+          "caller": "noah_emit_action_tap_at",
+          "callee": "noah_action_leader",
+          "reason": "GCC 15 inlines emission and action tap dispatch into noah_emit_action_tap_at; the Leader key's tap or press calls the typing stage through the action-kind operations table (D-F71)."
+        },
+        {
           "caller": "io_read",
           "callee": "flash_read",
           "reason": "the profile store reads the slot flash region in place through its injected flash backend (D-F29)"
@@ -426,7 +431,7 @@
         },
         {
           "name": "matrix scan autocorrect reading a key through the host layout",
-          "functions": ["main", "matrix_scan", "autocorrect_pump", "macro_payload_typing_host", "macro_payload_host_resolve", "host_layout_lookup"]
+          "functions": ["main", "matrix_scan", "autocorrect_pump", "autocorrect_read_key", "macro_payload_typing_host", "macro_payload_host_resolve", "host_layout_lookup"]
         },
         {
           "name": "handled press custom-key shortcut tap, its usage's owners told to the typing stage",
@@ -446,11 +451,31 @@
         },
         {
           "name": "matrix scan autocorrect candidate macro storage read",
-          "functions": ["main", "matrix_scan", "autocorrect_lookup", "autocorrect_consider", "macro_slot_provider_compile", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_active_profile_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+          "functions": ["main", "matrix_scan", "autocorrect_lookup", "autocorrect_consider", "noah_profile_macro_can_play", "macro_slot_provider_compile", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_active_profile_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "matrix scan autocorrect replacement macro storage read",
           "functions": ["main", "matrix_scan", "profile_macro_start_from", "macro_slot_provider_compile", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_active_profile_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "handled press Leader key, the report the typing stage missed read first",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_action_leader", "send_6kro_report", "autocorrect_queue_change", "autocorrect_push"]
+        },
+        {
+          "name": "matrix scan leader send text",
+          "functions": ["main", "matrix_scan", "autocorrect_lead_match", "autocorrect_strokes_for", "host_layout_lookup"]
+        },
+        {
+          "name": "matrix scan leader send start",
+          "functions": ["main", "matrix_scan", "autocorrect_lead_match", "autocorrect_play", "macro_payload_start_windows", "send_6kro_report", "autocorrect_queue_change", "autocorrect_push"]
+        },
+        {
+          "name": "matrix scan leader send macro storage read",
+          "functions": ["main", "matrix_scan", "autocorrect_lead_match", "noah_profile_macro_can_play", "macro_slot_provider_compile", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_active_profile_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "matrix scan leader send macro start",
+          "functions": ["main", "matrix_scan", "autocorrect_lead_match", "profile_macro_start_from", "macro_slot_provider_compile", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_active_profile_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         }
       ]
     },

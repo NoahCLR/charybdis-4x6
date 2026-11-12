@@ -200,10 +200,11 @@ the ball moves.
   tap and hold rules, described in [Keys](docs/guide/keys.md). Permissive
   Hold, Chordal Hold and Flow Tap aren't used, and tapping a dual-role key
   then holding it starts a new hold rather than repeating the tap. Nothing is
-  tuned for home row mods. This build has no Caps Word, Leader or key
-  overrides. Text replacement (autocorrect) is the firmware's own, not
-  QMK's: when a word ends it fixes a typo, types longer text or plays a macro
-  from the list in your profile
+  tuned for home row mods. This build has no Caps Word or key overrides.
+  Text replacement (autocorrect) is the firmware's own, not QMK's: when a
+  word ends it fixes a typo, types longer text or plays a macro from the list
+  in your profile, and after its own Leader key it sends the replacement of
+  what you typed, which never reaches the computer otherwise
   ([Text replacement](docs/guide/autocorrect.md)).
 - **Limits:** 16 layers, 128 behaviours with five tap counts each, 128 combos,
   128 custom keys, 128 macros and 32 pointing modes.

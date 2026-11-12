@@ -1,5 +1,5 @@
 // ───────────────────────────────────────────────────────────────────────────
-// Autocorrect List — profile domain 0x80 version 1
+// Autocorrect List — profile domain 0x80 version 2
 // ───────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -10,18 +10,22 @@
 #include "profile_reader.h"
 #include "profile_versions.h"
 
-// The list as written (D-F68): each correction once, and every typo with
-// where it matches and the correction it names. A correction is text, or a
-// macro slot to play. Integers little-endian:
+// The list as written (D-F68): each correction once, with how its typos
+// fire, and every typo with where it matches and the correction it names. A
+// correction is text, or a macro slot to play; its typos fire as a word ends,
+// after the leader, or both (D-F71). Integers little-endian:
 //
 //   header        corrections u16, typos u16, part-of-word typos u16,
-//                 text bytes u16
+//                 leader typos u16, text bytes u16
 //   corrections   6 bytes each: text offset u16 (a macro correction: its
 //                 macro slot), length u8 (a macro correction: zero),
-//                 kind u8, first typo u16
+//                 kind u8 (bit 0 the kind, bits 1-2 the trigger),
+//                 first typo u16
 //   typos         6 bytes each: text offset u16, length u8, match u8,
 //                 correction u16
-//   part index    one u16 typo index per typo whose match is not whole word,
+//   part index    one u16 typo index per typo that matches part of a word
+//                 and fires as a word ends, ascending
+//   leader index  one u16 typo index per typo that fires after the leader,
 //                 ascending
 //   text          every text correction's bytes, then every typo's, in row
 //                 order, back to back
@@ -29,16 +33,19 @@
 // Text corrections come first and ascend strictly by their UTF-8 bytes; macro
 // corrections follow and ascend strictly by slot; typos ascend strictly by
 // their bytes. So a list has one encoding, a typo is found by binary search,
-// and a typo cannot name two corrections. A correction's first typo is the lowest typo row naming
+// and a typo cannot name two corrections, nor one text be two typos. The
+// leader index is in that order too, so the typos that fire after the leader
+// and begin with a text are found by binary search over it (D-F71). A correction's first typo is the lowest typo row naming
 // it, which is how the validator proves every correction is named without
 // remembering them all. The contract is
 // docs/spec/profile-wire-v1/autocorrect-domain.md.
 enum {
     NOAH_PROFILE_AUTOCORRECT_V1_VERSION             = NOAH_PROFILE_DOMAIN_VERSION_AUTOCORRECT,
-    NOAH_PROFILE_AUTOCORRECT_V1_HEADER_SIZE         = 8u,
+    NOAH_PROFILE_AUTOCORRECT_V1_HEADER_SIZE         = 10u,
     NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_ROW_SIZE = 6u,
     NOAH_PROFILE_AUTOCORRECT_V1_TYPO_ROW_SIZE       = 6u,
-    NOAH_PROFILE_AUTOCORRECT_V1_PART_ROW_SIZE       = 2u,
+    // A row of the part index or of the leader index.
+    NOAH_PROFILE_AUTOCORRECT_V1_INDEX_ROW_SIZE      = 2u,
     // Counted ceilings (D-F14). A realistic full list, 1,024 typos and as
     // many corrections of ten bytes each, fills the text exactly.
     NOAH_PROFILE_AUTOCORRECT_V1_MAX_CORRECTIONS = 1024u,
@@ -49,13 +56,19 @@ enum {
     // The macro slots a macro correction may name (the macros domain's).
     NOAH_PROFILE_AUTOCORRECT_V1_MACRO_SLOTS     = 128u,
     NOAH_PROFILE_AUTOCORRECT_V1_MAX_TEXT_BYTES  = 20480u,
-    NOAH_PROFILE_AUTOCORRECT_V1_MAX_SIZE        = NOAH_PROFILE_AUTOCORRECT_V1_HEADER_SIZE + NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_ROW_SIZE * NOAH_PROFILE_AUTOCORRECT_V1_MAX_CORRECTIONS + (NOAH_PROFILE_AUTOCORRECT_V1_TYPO_ROW_SIZE + NOAH_PROFILE_AUTOCORRECT_V1_PART_ROW_SIZE) * NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS + NOAH_PROFILE_AUTOCORRECT_V1_MAX_TEXT_BYTES,
+    // A part-of-word typo of a correction that fires both ways is in both
+    // indexes, so each may hold a row for every typo.
+    NOAH_PROFILE_AUTOCORRECT_V1_MAX_SIZE        = NOAH_PROFILE_AUTOCORRECT_V1_HEADER_SIZE + NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_ROW_SIZE * NOAH_PROFILE_AUTOCORRECT_V1_MAX_CORRECTIONS + (NOAH_PROFILE_AUTOCORRECT_V1_TYPO_ROW_SIZE + 2u * NOAH_PROFILE_AUTOCORRECT_V1_INDEX_ROW_SIZE) * NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS + NOAH_PROFILE_AUTOCORRECT_V1_MAX_TEXT_BYTES,
+    // A correction row's kind byte: the kind in bit 0, the trigger above it,
+    // every other bit zero.
+    NOAH_PROFILE_AUTOCORRECT_V1_KIND_BIT        = 0x01u,
+    NOAH_PROFILE_AUTOCORRECT_V1_TRIGGER_SHIFT   = 1u,
     NOAH_PROFILE_AUTOCORRECT_V1_STEP_READ_MAX   = 20u,
     NOAH_PROFILE_AUTOCORRECT_V1_APOSTROPHE      = 0x27u,
     NOAH_PROFILE_AUTOCORRECT_V1_LOCATION_NONE   = 0xFFFFu,
     // Regression policies for the 32-bit target's state, not SRAM limits.
     NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_VALIDATION_BUDGET = 160u,
-    NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_LIST_BUDGET       = 24u,
+    NOAH_PROFILE_AUTOCORRECT_V1_EMBEDDED_LIST_BUDGET       = 28u,
 };
 
 // What a correction is: text to type, or a macro slot to play.
@@ -64,8 +77,16 @@ typedef enum {
     NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO,
 } noah_profile_autocorrect_v1_kind_t;
 
+// How a correction's typos fire (D-F71): as a word ends, after the leader,
+// or both. After the leader a typo is its whole text, whatever its match.
+typedef enum {
+    NOAH_PROFILE_AUTOCORRECT_V1_TRIGGER_WORD = 0u,
+    NOAH_PROFILE_AUTOCORRECT_V1_TRIGGER_LEADER,
+    NOAH_PROFILE_AUTOCORRECT_V1_TRIGGER_BOTH,
+} noah_profile_autocorrect_v1_trigger_t;
+
 // Where a typo matches a word. A macro correction's typos match the whole
-// word only.
+// word.
 typedef enum {
     NOAH_PROFILE_AUTOCORRECT_V1_MATCH_WHOLE_WORD = 0u,
     NOAH_PROFILE_AUTOCORRECT_V1_MATCH_START,
@@ -78,6 +99,7 @@ enum {
     NOAH_PROFILE_AUTOCORRECT_V1_TABLE_CORRECTIONS = 0u,
     NOAH_PROFILE_AUTOCORRECT_V1_TABLE_TYPOS,
     NOAH_PROFILE_AUTOCORRECT_V1_TABLE_PART_INDEX,
+    NOAH_PROFILE_AUTOCORRECT_V1_TABLE_LEADER_INDEX,
 };
 
 // Why a list is refused. The numbers travel as a validation error's field
@@ -95,7 +117,8 @@ typedef enum {
     // A text correction is empty or over 128 bytes, a typo empty or over 32,
     // or a macro correction has a length.
     NOAH_PROFILE_AUTOCORRECT_V1_INVALID_TEXT_LENGTH,
-    // A correction is neither text nor a macro.
+    // A correction is neither text nor a macro, fires no way there is, or
+    // sets another bit of its kind byte.
     NOAH_PROFILE_AUTOCORRECT_V1_INVALID_KIND,
     // Not canonical UTF-8, or a control character.
     NOAH_PROFILE_AUTOCORRECT_V1_INVALID_TEXT,
@@ -114,10 +137,14 @@ typedef enum {
     NOAH_PROFILE_AUTOCORRECT_V1_NOT_A_WORD,
     NOAH_PROFILE_AUTOCORRECT_V1_NOT_FOLDED,
     NOAH_PROFILE_AUTOCORRECT_V1_TYPO_IS_CORRECTION,
-    // The part index is not exactly the part-of-word typos, in order.
+    // The part index is not exactly the part-of-word typos of corrections
+    // that fire as a word ends, in order.
     NOAH_PROFILE_AUTOCORRECT_V1_PART_INDEX,
     // A macro correction names a slot past the macro slots.
     NOAH_PROFILE_AUTOCORRECT_V1_INVALID_MACRO,
+    // The leader index is not exactly the typos of corrections that fire
+    // after the leader, in order.
+    NOAH_PROFILE_AUTOCORRECT_V1_LEADER_INDEX,
 } noah_profile_autocorrect_v1_result_t;
 
 typedef struct {
@@ -130,8 +157,8 @@ typedef struct {
 // Word characters: every letter and digit a host layout types, each with the
 // character it folds to (itself, for a small letter or a digit), generated
 // from the host layouts into profile_autocorrect_words_v1.c. False for any
-// other character. A typo holds folded characters only, so a typed word is
-// folded with this before it is looked up.
+// other character. A typo holds folded characters only, so a typed word, or
+// what is typed after the leader, is folded with this before it is looked up.
 bool noah_profile_autocorrect_v1_fold(uint32_t character, uint32_t *folded);
 // A small letter's capital: the one word character that folds to it. False
 // for a capital, a digit and a letter without one.
@@ -148,12 +175,17 @@ uint8_t noah_profile_autocorrect_v1_character(const uint8_t *bytes, uint8_t coun
 // needs.
 typedef struct {
     uint8_t  text[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX];
-    uint32_t text_offset; // text bytes consumed: where the next text begins
-    uint16_t corrections, typos, part_typos, text_bytes;
-    uint16_t row;  // in the table being walked
-    uint16_t part; // part-index rows consumed
+    uint16_t text_offset; // text bytes consumed: where the next text begins
+    uint16_t corrections, typos, part_typos, leader_typos, text_bytes;
+    uint16_t row;    // in the table being walked
+    uint16_t part;   // part-index rows consumed
+    uint16_t leader; // leader-index rows consumed
     uint16_t link; // the correction row's first typo, or the typo row's correction
-    uint16_t macro; // the macro correction before this row, once one was read
+    // One byte for either walk, so the state keeps its size.
+    union {
+        uint8_t macro;   // the corrections' walk: the macro correction before this row, once one was read
+        uint8_t trigger; // the typos' walk: how the typo's correction fires
+    };
     bool     macros; // the corrections' walk has reached the macro ones
     uint8_t  phase;
     uint8_t  length, have;     // the current text and how much of it is read
@@ -181,7 +213,7 @@ noah_profile_autocorrect_v1_validation_step_t noah_profile_autocorrect_v1_valida
 typedef struct {
     noah_profile_reader_t reader;
     size_t                base;
-    uint16_t              corrections, typos, part_typos, text_bytes;
+    uint16_t              corrections, typos, part_typos, leader_typos, text_bytes;
 } noah_profile_autocorrect_v1_list_t;
 
 typedef struct {
@@ -201,12 +233,31 @@ bool noah_profile_autocorrect_v1_typo_at(const noah_profile_autocorrect_v1_list_
 bool noah_profile_autocorrect_v1_find(const noah_profile_autocorrect_v1_list_t *list, const uint8_t *folded, uint8_t length, noah_profile_autocorrect_v1_typo_t *typo);
 // The part-of-word typos, by position 0..part_typos-1 in typo order.
 bool noah_profile_autocorrect_v1_part_at(const noah_profile_autocorrect_v1_list_t *list, uint16_t position, noah_profile_autocorrect_v1_typo_t *typo, uint8_t text[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX]);
+// The typos that fire after the leader, by position 0..leader_typos-1 in
+// typo order.
+bool noah_profile_autocorrect_v1_leader_at(const noah_profile_autocorrect_v1_list_t *list, uint16_t position, noah_profile_autocorrect_v1_typo_t *typo, uint8_t text[NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX]);
+// What the leader holds, as folded bytes, against the typos that fire after
+// the leader: the one that is exactly these bytes, if any, and whether a
+// longer one begins with them. A binary search over the leader index, at most
+// eleven positions, then two more.
 typedef struct {
-    uint8_t  kind;   // noah_profile_autocorrect_v1_kind_t
-    uint8_t  length; // bytes of UTF-8, zero for a macro
+    noah_profile_autocorrect_v1_typo_t typo; // the exact one, when `exact`
+    bool                               exact;
+    bool                               longer;
+} noah_profile_autocorrect_v1_leader_t;
+bool noah_profile_autocorrect_v1_leader(const noah_profile_autocorrect_v1_list_t *list, const uint8_t *folded, uint8_t length, noah_profile_autocorrect_v1_leader_t *found);
+typedef struct {
+    uint8_t  kind;    // noah_profile_autocorrect_v1_kind_t
+    uint8_t  trigger; // noah_profile_autocorrect_v1_trigger_t
+    uint8_t  length;  // bytes of UTF-8, zero for a macro
     uint16_t macro;  // the macro slot, for a macro
 } noah_profile_autocorrect_v1_correction_t;
 
-// A correction: what it is, and a text correction's bytes, as written, when
-// `text` is given.
+// A correction: what it is, how its typos fire, and a text correction's
+// bytes, as written, when `text` is given.
 bool noah_profile_autocorrect_v1_correction(const noah_profile_autocorrect_v1_list_t *list, uint16_t index, noah_profile_autocorrect_v1_correction_t *correction, uint8_t text[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX]);
+// Whether a correction of the list fires as a word ends: its rows read in
+// order until one does, so a list that has one says so at its first. False
+// for an empty list and for one whose corrections all fire after the leader
+// alone.
+bool noah_profile_autocorrect_v1_fires_as_typed(const noah_profile_autocorrect_v1_list_t *list);

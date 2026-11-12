@@ -1,5 +1,5 @@
-// The autocorrect list domain (0x80 v1): the golden vectors of
-// tests/fixtures/autocorrect_domain_v1.json against the validator, the
+// The autocorrect list domain (0x80 v2): the golden vectors of
+// tests/fixtures/autocorrect_domain_v2.json against the validator, the
 // lookups an engine makes, the validator's bounded steps, and that no
 // malformed list makes a lookup or a validation loop or read out of range.
 #include <stdint.h>
@@ -18,6 +18,8 @@
     } while (0)
 
 enum { MAX_BYTES = NOAH_PROFILE_AUTOCORRECT_V1_MAX_SIZE + 16u };
+// read_vector's field width, a literal fscanf needs, held to the buffer.
+_Static_assert(2u * MAX_BYTES - 4u == 73776u, "the hex field width follows the largest list");
 
 typedef struct {
     char    code[32], name[64];
@@ -45,14 +47,15 @@ static const char *const code_names[] = {
     [NOAH_PROFILE_AUTOCORRECT_V1_TYPO_IS_CORRECTION] = "TYPO_IS_CORRECTION",
     [NOAH_PROFILE_AUTOCORRECT_V1_PART_INDEX] = "PART_INDEX",
     [NOAH_PROFILE_AUTOCORRECT_V1_INVALID_MACRO] = "INVALID_MACRO",
+    [NOAH_PROFILE_AUTOCORRECT_V1_LEADER_INDEX] = "LEADER_INDEX",
 };
 // The codes travel as a validation error's field id.
-_Static_assert(NOAH_PROFILE_AUTOCORRECT_V1_INVALID_LENGTH == 3 && NOAH_PROFILE_AUTOCORRECT_V1_ORDER == 9 && NOAH_PROFILE_AUTOCORRECT_V1_PART_INDEX == 16 && NOAH_PROFILE_AUTOCORRECT_V1_INVALID_MACRO == 17, "refusal codes are fixed");
+_Static_assert(NOAH_PROFILE_AUTOCORRECT_V1_INVALID_LENGTH == 3 && NOAH_PROFILE_AUTOCORRECT_V1_ORDER == 9 && NOAH_PROFILE_AUTOCORRECT_V1_PART_INDEX == 16 && NOAH_PROFILE_AUTOCORRECT_V1_INVALID_MACRO == 17 && NOAH_PROFILE_AUTOCORRECT_V1_LEADER_INDEX == 18, "refusal codes are fixed");
 
 // One line of the converted fixture: code, table, row (-1 for none), name, hex.
 static bool read_vector(FILE *file, vector_t *vector) {
     static char hex[2u * MAX_BYTES + 2u];
-    if (fscanf(file, "%31s %d %d %63s %69680s", vector->code, &vector->table, &vector->row, vector->name, hex) != 5) return false;
+    if (fscanf(file, "%31s %d %d %63s %73776s", vector->code, &vector->table, &vector->row, vector->name, hex) != 5) return false;
     vector->length = strcmp(hex, "-") == 0 ? 0u : strlen(hex) / 2u;
     CHECK(vector->length <= sizeof(vector->bytes));
     for (size_t i = 0; i < vector->length; i++) {
@@ -101,7 +104,7 @@ static noah_profile_autocorrect_v1_result_t validate_bounded(const uint8_t *byte
     return error->code;
 }
 
-static vector_t small, long_list, macros;
+static vector_t small, long_list, macros, leader;
 
 static size_t check_vectors(const char *path) {
     static vector_t vector;
@@ -120,12 +123,13 @@ static size_t check_vectors(const char *path) {
         if (strcmp(vector.name, "small") == 0) small = vector;
         if (strcmp(vector.name, "long") == 0) long_list = vector;
         if (strcmp(vector.name, "macros") == 0) macros = vector;
+        if (strcmp(vector.name, "leader") == 0) leader = vector;
         count++;
     }
     fclose(file);
     // Every refusal a client can cause has a vector.
     for (size_t code = NOAH_PROFILE_AUTOCORRECT_V1_INVALID_LENGTH; code < sizeof(seen); code++) CHECK(seen[code]);
-    CHECK(seen[NOAH_PROFILE_AUTOCORRECT_V1_OK] && small.length != 0u && long_list.length != 0u && macros.length != 0u);
+    CHECK(seen[NOAH_PROFILE_AUTOCORRECT_V1_OK] && small.length != 0u && long_list.length != 0u && macros.length != 0u && leader.length != 0u);
     return count;
 }
 
@@ -238,6 +242,79 @@ static void test_long_and_macro_corrections(void) {
     expect_correction(&list, typo.correction, "sam@example.com");
 }
 
+static bool after_leader(const noah_profile_autocorrect_v1_list_t *list, const char *held, noah_profile_autocorrect_v1_leader_t *found) {
+    return noah_profile_autocorrect_v1_leader(list, (const uint8_t *)held, (uint8_t)strlen(held), found);
+}
+
+// What the leader holds, against the fixture's "leader" list (D-F71): the
+// exact typo of a correction that fires after the leader, if any, and whether
+// a longer one begins with what is held. A typo of a correction that fires
+// only as a word ends is never one, and a part-of-word typo of one that fires
+// both ways is in both indexes.
+static void test_leader(void) {
+    noah_profile_reader_t                reader = noah_profile_reader_from_memory(leader.bytes, leader.length);
+    noah_profile_autocorrect_v1_list_t   list;
+    noah_profile_autocorrect_v1_leader_t found;
+    noah_profile_autocorrect_v1_typo_t   typo;
+    uint8_t                              text[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX];
+    static const struct {
+        const char *held;
+        bool        exact, longer;
+    } cases[] = {
+        {"a", false, true},  {"ab", false, true},   {"abc", true, true},     {"abcd", true, false},  {"abcde", false, false},
+        {"ad", false, false}, {"adn", false, false}, {"k", false, true},      {"kr", true, false},    {"k ", false, false},
+        {"pn", true, false}, {"pnx", false, false}, {"s", false, true},      {"sig", true, true},    {"sigg", true, false},
+        {"t", false, true},  {"te", false, true},   {"teh", true, false},    {"h", false, true},     {"hte", true, false},
+        {"r", false, true},  {"recieve", true, false}, {"\xc3\xa9", false, true}, {"\xc3\xa9\xc3\xa9", true, false},
+        {"z", false, false}, {" ", false, false},
+    };
+    static const char *const order[] = {"abc", "abcd", "hte", "kr", "pn", "recieve", "sig", "sigg", "teh", "\xc3\xa9\xc3\xa9"};
+    noah_profile_autocorrect_v1_correction_t stored;
+
+    CHECK(noah_profile_autocorrect_v1_open(&list, &reader, 0u, leader.length));
+    CHECK(list.corrections == 9u && list.typos == 11u && list.part_typos == 1u && list.leader_typos == 10u);
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        CHECK(after_leader(&list, cases[i].held, &found));
+        if (found.exact != cases[i].exact || found.longer != cases[i].longer) {
+            fprintf(stderr, "after the leader \"%s\": exact %d longer %d\n", cases[i].held, found.exact, found.longer);
+            exit(1);
+        }
+        if (found.exact) CHECK(found.typo.length == strlen(cases[i].held));
+    }
+    CHECK(after_leader(&list, "pn", &found));
+    expect_correction(&list, found.typo.correction, "+31 6 1234 5678");
+    CHECK(noah_profile_autocorrect_v1_correction(&list, found.typo.correction, &stored, NULL) && stored.trigger == NOAH_PROFILE_AUTOCORRECT_V1_TRIGGER_LEADER);
+    // A correction that fires both ways: its whole-word typos and its
+    // part-of-word one, whole after the leader.
+    CHECK(after_leader(&list, "teh", &found));
+    expect_correction(&list, found.typo.correction, "the");
+    CHECK(noah_profile_autocorrect_v1_correction(&list, found.typo.correction, &stored, NULL) && stored.trigger == NOAH_PROFILE_AUTOCORRECT_V1_TRIGGER_BOTH);
+    CHECK(after_leader(&list, "recieve", &found) && found.typo.match == NOAH_PROFILE_AUTOCORRECT_V1_MATCH_START);
+    expect_correction(&list, found.typo.correction, "receive");
+    CHECK(noah_profile_autocorrect_v1_part_at(&list, 0u, &typo, text) && typo.index == found.typo.index && !noah_profile_autocorrect_v1_part_at(&list, 1u, &typo, text));
+    // A macro that fires after the leader, by either of its typos.
+    CHECK(after_leader(&list, "sig", &found));
+    CHECK(noah_profile_autocorrect_v1_correction(&list, found.typo.correction, &stored, NULL) && stored.kind == NOAH_PROFILE_AUTOCORRECT_V1_KIND_MACRO && stored.macro == 7u && stored.trigger == NOAH_PROFILE_AUTOCORRECT_V1_TRIGGER_LEADER);
+    expect_macro(&list, "sigg", 7u);
+    // One that fires as a word ends is found by its bytes, never by the leader.
+    CHECK(find(&list, "adn", &typo) && typo.match == NOAH_PROFILE_AUTOCORRECT_V1_MATCH_WHOLE_WORD);
+    CHECK(noah_profile_autocorrect_v1_correction(&list, typo.correction, &stored, NULL) && stored.trigger == NOAH_PROFILE_AUTOCORRECT_V1_TRIGGER_WORD);
+    // In typo order, and only these.
+    for (uint16_t position = 0u; position < 10u; position++) {
+        CHECK(noah_profile_autocorrect_v1_leader_at(&list, position, &typo, text));
+        CHECK(typo.length == strlen(order[position]) && memcmp(text, order[position], typo.length) == 0);
+    }
+    CHECK(!noah_profile_autocorrect_v1_leader_at(&list, 10u, &typo, text));
+    // Nothing held, or more than a typo can be, finds nothing.
+    CHECK(!noah_profile_autocorrect_v1_leader(&list, (const uint8_t *)"a", 0u, &found));
+    CHECK(!noah_profile_autocorrect_v1_leader(&list, leader.bytes, 33u, &found));
+
+    // The small list has none: whatever is held starts nothing.
+    reader = noah_profile_reader_from_memory(small.bytes, small.length);
+    CHECK(noah_profile_autocorrect_v1_open(&list, &reader, 0u, small.length) && list.leader_typos == 0u);
+    CHECK(after_leader(&list, "t", &found) && !found.exact && !found.longer);
+}
+
 // The fixture's "small" list, as an engine reads it.
 static void test_lookups(void) {
     noah_profile_reader_t              reader = noah_profile_reader_from_memory(small.bytes, small.length);
@@ -247,7 +324,7 @@ static void test_lookups(void) {
     noah_profile_autocorrect_v1_correction_t stored;
 
     CHECK(noah_profile_autocorrect_v1_open(&list, &reader, 0u, small.length));
-    CHECK(list.corrections == 10u && list.typos == 15u && list.part_typos == 3u);
+    CHECK(list.corrections == 10u && list.typos == 15u && list.part_typos == 3u && list.leader_typos == 0u);
 
     // A whole-word typo, and its correction as written.
     CHECK(find(&list, "teh", &typo) && typo.match == NOAH_PROFILE_AUTOCORRECT_V1_MATCH_WHOLE_WORD && typo.length == 3u);
@@ -321,41 +398,104 @@ static void test_empty_list(void) {
     CHECK(!find(&list, "teh", &typo) && !noah_profile_autocorrect_v1_part_at(&list, 0u, &typo, NULL));
 }
 
+// Whether a list fires as a word ends: a correction whose trigger is not the
+// leader alone. Corrections are read in row order, so a macro that fires as
+// typed after text that fires only after the leader still counts.
+static void test_fires_as_typed(void) {
+    // Header, then rows: "x" after the leader alone, typed "y".
+    static const uint8_t leader_only[] = {
+        1u, 0u, 1u, 0u, 0u, 0u, 1u, 0u, 2u, 0u,
+        0u, 0u, 1u, 2u, 0u, 0u,
+        1u, 0u, 1u, 0u, 0u, 0u,
+        0u, 0u,
+        'x', 'y',
+    };
+    // "x" after the leader alone, typed "a", then macro slot 3 as a word
+    // ends, typed "b".
+    static const uint8_t macro_as_typed[] = {
+        2u, 0u, 2u, 0u, 0u, 0u, 1u, 0u, 3u, 0u,
+        0u, 0u, 1u, 2u, 0u, 0u,
+        3u, 0u, 0u, 1u, 1u, 0u,
+        1u, 0u, 1u, 0u, 0u, 0u,
+        2u, 0u, 1u, 0u, 1u, 0u,
+        0u, 0u,
+        'x', 'a', 'b',
+    };
+    static const uint8_t                empty[NOAH_PROFILE_AUTOCORRECT_V1_HEADER_SIZE] = {0};
+    noah_profile_autocorrect_v1_list_t  list;
+    noah_profile_autocorrect_v1_error_t error;
+    static const struct {
+        const uint8_t *bytes;
+        size_t         length;
+        bool           fires;
+    } cases[] = {
+        {empty, sizeof(empty), false},
+        {leader_only, sizeof(leader_only), false},
+        {macro_as_typed, sizeof(macro_as_typed), true},
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        noah_profile_reader_t reader = noah_profile_reader_from_memory(cases[i].bytes, cases[i].length);
+        CHECK(validate_bounded(cases[i].bytes, cases[i].length, &error) == NOAH_PROFILE_AUTOCORRECT_V1_OK);
+        CHECK(noah_profile_autocorrect_v1_open(&list, &reader, 0u, cases[i].length));
+        CHECK(noah_profile_autocorrect_v1_fires_as_typed(&list) == cases[i].fires);
+    }
+    // The fixture's lists: the small one fires as typed only, the leader
+    // one has a correction that fires as a word ends among its leader ones.
+    for (size_t i = 0u; i < 2u; i++) {
+        const vector_t       *vector = i ? &leader : &small;
+        noah_profile_reader_t reader = noah_profile_reader_from_memory(vector->bytes, vector->length);
+        CHECK(noah_profile_autocorrect_v1_open(&list, &reader, 0u, vector->length) && noah_profile_autocorrect_v1_fires_as_typed(&list));
+    }
+    CHECK(!noah_profile_autocorrect_v1_fires_as_typed(NULL));
+}
+
 // Every single-byte change to a valid list: validation ends within its step
 // bound either way, and every lookup on the changed bytes stays inside the
 // payload (the counted reader refuses anything else) and ends.
-static void test_malformed_lists_stay_bounded(void) {
+static void malformed_lists_stay_bounded(const vector_t *valid) {
     static uint8_t                      bytes[MAX_BYTES];
     noah_profile_autocorrect_v1_error_t error;
     size_t                              refused = 0u;
     static const uint8_t                changes[] = {0x00u, 0x01u, 0x7Fu, 0x80u, 0xFFu};
-    for (size_t at = 0u; at < small.length; at++) {
+    for (size_t at = 0u; at < valid->length; at++) {
         for (size_t change = 0u; change < sizeof(changes); change++) {
-            memcpy(bytes, small.bytes, small.length);
+            memcpy(bytes, valid->bytes, valid->length);
             if (bytes[at] == changes[change]) continue;
             bytes[at] = changes[change];
-            refused += validate_bounded(bytes, small.length, &error) != NOAH_PROFILE_AUTOCORRECT_V1_OK;
+            refused += validate_bounded(bytes, valid->length, &error) != NOAH_PROFILE_AUTOCORRECT_V1_OK;
 
-            counted_t                          counted = {.bytes = bytes, .length = small.length};
-            noah_profile_reader_t              reader  = {.read = counted_read, .context = &counted, .length = small.length};
+            counted_t                          counted = {.bytes = bytes, .length = valid->length};
+            noah_profile_reader_t              reader  = {.read = counted_read, .context = &counted, .length = valid->length};
             noah_profile_autocorrect_v1_list_t list;
             noah_profile_autocorrect_v1_typo_t typo;
             uint8_t                                  text[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX];
             noah_profile_autocorrect_v1_correction_t stored;
-            if (!noah_profile_autocorrect_v1_open(&list, &reader, 0u, small.length)) continue;
+            noah_profile_autocorrect_v1_leader_t     found;
+            if (!noah_profile_autocorrect_v1_open(&list, &reader, 0u, valid->length)) continue;
             counted.calls = 0u;
             (void)find(&list, "teh", &typo);
             (void)find(&list, "zzzzzzzz", &typo);
             // Eleven rows at most, a row and its text each.
             CHECK(counted.calls <= 2u * 2u * 11u);
+            counted.calls = 0u;
+            (void)after_leader(&list, "ab", &found);
+            // Thirteen positions at most, an index row, a row and its text each.
+            CHECK(counted.calls <= 3u * 13u);
             for (uint16_t index = 0u; index < list.typos; index++) (void)noah_profile_autocorrect_v1_typo_at(&list, index, &typo, text);
             for (uint16_t position = 0u; position < list.part_typos; position++) (void)noah_profile_autocorrect_v1_part_at(&list, position, &typo, text);
+            for (uint16_t position = 0u; position < list.leader_typos; position++) (void)noah_profile_autocorrect_v1_leader_at(&list, position, &typo, text);
             for (uint16_t correction = 0u; correction < list.corrections; correction++) (void)noah_profile_autocorrect_v1_correction(&list, correction, &stored, text);
         }
     }
     // Nearly every change is refused; a letter changed to another valid,
     // still ordered letter is simply another list.
-    CHECK(refused > 4u * small.length);
+    CHECK(refused > 4u * valid->length);
+}
+
+static void test_malformed_lists_stay_bounded(void) {
+    malformed_lists_stay_bounded(&small);
+    malformed_lists_stay_bounded(&leader);
 }
 
 static void test_arguments(void) {
@@ -380,9 +520,11 @@ int main(int argc, char **argv) {
     test_character();
     test_lookups();
     test_long_and_macro_corrections();
+    test_leader();
     test_empty_list();
+    test_fires_as_typed();
     test_malformed_lists_stay_bounded();
     test_arguments();
-    printf("autocorrect domain v1 tests passed (%zu vectors)\n", vectors);
+    printf("autocorrect domain v2 tests passed (%zu vectors)\n", vectors);
     return 0;
 }

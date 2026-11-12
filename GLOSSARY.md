@@ -340,6 +340,32 @@ same thing. `typo` in code, on the wire and in fixtures.
 _Avoid_: typo (as the term, outside those names; a misspelling is still a
 typo), trigger, pattern, source, abbreviation (as a second term)
 
+**Leader**:
+Text replacement's own Leader key, QMK's `QK_LEADER`: after it, what is typed
+is held on the keyboard and sent only as the replacement of a typed form that
+fires after the leader (D-F71). Not QMK's Leader feature, which the build leaves out.
+_Avoid_: leader sequence (for the key), QMK Leader
+
+**Leading**:
+The keyboard holding what is typed after the Leader key, showing the computer
+none of it, until it sends a replacement or drops what it holds.
+_Avoid_: leader mode, waiting (alone)
+
+**How it fires** (a replacement's trigger):
+Whether a replacement's typed forms fire as a word ends, after the Leader key
+alone, or both (D-F71): the replacement's, never a typed form's, so a client
+switches it without touching them. After the leader a typed form is its whole
+text, whatever its match. Trigger `0`, `1` or `2` in bits 1–2 of the
+correction row's kind byte; Ark writes them As you type, After Leader and
+Both. A typed form of a replacement that fires after the leader is what
+people call a **leader input**.
+_Avoid_: leader sequence (for what is stored), leader typo, shortcut, mode
+
+**Leader timeout**:
+How long the leader waits after its last key before it sends a typed form a
+longer one begins with, or drops what is held: settings scalar 32.
+_Avoid_: leader term, leader window
+
 **Word**:
 What text replacement follows as it is typed: letters and digits, with
 apostrophes between them. Apostrophes before and after it stay on screen and
@@ -374,8 +400,9 @@ _Avoid_: filter, interceptor, deferral layer
 **Where it matches**:
 What part of a word a typed form has to be: the whole word, the start of a
 word, the end of a word, or anywhere in a word. A stored number; a client may
-write the last three with `*` where other letters may go (`recieve*`,
-`*mnet`, `*tihng*`). A macro's typed forms match the whole word only.
+write the three part-of-word ones with `*` where other letters may go
+(`recieve*`, `*mnet`, `*tihng*`). A macro's typed forms match the whole word.
+After the leader a typed form is its whole text, whatever its match.
 _Avoid_: boundary, anchor, mode, match type
 
 ## Pointing
@@ -458,7 +485,8 @@ _Avoid_: key feedback (the code keeps key_feedback and KEY_BEHAVIOR_FEEDBACK nam
 **Replacement feedback**:
 The stage that flashes when text replacement changes what was typed: a typed
 form replaced with text, replaced by its macro, or a replacement undone, each
-in its own colour (D-F70). `autocorrect feedback` in code.
+in its own colour (D-F70). What the leader sends flashes as a replacement
+does (D-F71). `autocorrect feedback` in code.
 _Avoid_: autocorrect flash (in prose), correction feedback, typo light
 
 **Background effect**:
@@ -468,8 +496,8 @@ _Avoid_: base lighting, base RGB, RGB mode
 **Locality**:
 Where a feedback colour paints: both halves, one half, the half of the key
 that caused it, or only the keys themselves. For replacement feedback the key
-that caused it is the one that ended the word, or the Backspace that undid
-the replacement.
+that caused it is the one that ended the word, the Backspace that undid the
+replacement, or the key that ended leading, none when the leader timeout did.
 _Avoid_: scope, target, region
 
 ## Talking to the keyboard

@@ -109,16 +109,24 @@ mnet: -> ment                   # at the end of a word
 tihng -> thing                  # anywhere in a word
 :pnumber: -> +31 6 1234 5678    # text that is no word
 :sig: => 12                     # plays macro slot 12
+leader pn -> +31 6 1234 5678    # after the Leader key only
+leader kr => 12                 # after the Leader key, plays macro slot 12
+both :adn: -> and               # as you type and after the Leader key
 ```
 
 A colon before the input ties it to the start of a word and one after
 it to the end; both make it the whole word, and neither lets it match
 anywhere. These are the matches Ark writes with `*`. `=>` names a macro slot
-in place of text, for a whole word only. Several inputs can name one
-replacement, and each names only one. An input is letters and digits,
-with apostrophes only between them, of up to 32 bytes, and matches whatever
-its case; the replacement is up to 128 bytes on one line, typed as you write
-it. The list holds 1,024 inputs and 1,024 replacements. It ships empty.
+in place of text, for a whole word. Several inputs
+can name one replacement, and each names only one. An input is letters and
+digits, with apostrophes only between them, of up to 32 bytes, and matches
+whatever its case; the replacement is up to 128 bytes on one line, typed as
+you write it. A line that begins `leader` fires only after the Leader key
+([the leader](keys.md#the-leader)), its input typed whole, so without
+colons; one that begins `both` fires as you type and after the Leader key.
+Straight before the arrow either word is an input like any other: `both ->
+and` replaces `both` as you type. Every line of one replacement fires the same way. The list holds 1,024
+inputs and 1,024 replacements. It ships empty.
 
 After changing it, regenerate `authored_autocorrect_list.h`:
 
@@ -195,6 +203,8 @@ behaviour.
   `CUSTOM_LONGER_HOLD_TERM`, `CUSTOM_MULTI_TAP_TERM`, `COMBO_TERM`.
 - **Pointing**: the DPI ladders, `CHARYBDIS_AUTO_SNIPING_LAYER`,
   `AUTO_MOUSE_DEFAULT_LAYER` and `AUTO_MOUSE_TIME`.
+- **Text replacement**: how long the leader waits after its last key,
+  `NOAH_LEADER_TIMEOUT_MS` (1,000 to 10,000; [keys](keys.md#the-leader)).
 - **Lighting**: `RGB_MATRIX_MAXIMUM_BRIGHTNESS` (the limit no colour may
   pass), the background effect, `NOAH_RGB_IDLE_TIMEOUT_MS`, the behaviour
   feedback flash interval (`RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS`),

@@ -19,7 +19,7 @@ import json, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 sys.path.insert(0, str(root / "tools" / "autocorrect"))
 import build
-fixture = json.loads((root / "tests/fixtures/autocorrect_domain_v1.json").read_text())
+fixture = json.loads((root / "tests/fixtures/autocorrect_domain_v2.json").read_text())
 none = lambda value: -1 if value is None else value
 lines = []
 for case in fixture["valid"]:
@@ -40,6 +40,11 @@ for entries in (
     [{"correction": "the", "typos": [{"typo": "x" * 33, "match": "whole word"}]}],
     [{"macro": 128, "typos": [{"typo": "sig", "match": "whole word"}]}],
     [{"macro": 3, "typos": [{"typo": "sig", "match": "start of word"}]}],
+    [{"correction": "+31", "trigger": "after the leader", "typos": [{"typo": "Pn", "match": "whole word"}]}],
+    [{"correction": "+31", "trigger": "after the leader", "typos": [{"typo": "p n", "match": "whole word"}]}],
+    [{"correction": "+31", "trigger": "after the leader", "typos": [{"typo": "pn", "match": "after the leader"}]}],
+    [{"correction": "+31", "trigger": "neither", "typos": [{"typo": "pn", "match": "whole word"}]}],
+    [{"correction": "+31", "trigger": "both", "typos": [{"typo": "pn", "match": "whole word"}]}, {"correction": "+32", "trigger": "after the leader", "typos": [{"typo": "pn", "match": "whole word"}]}],
     [{"macro": 3, "typos": [{"typo": "sig", "match": "whole word"}]}, {"macro": 3, "typos": [{"typo": "sgi", "match": "whole word"}]}],
     [{"macro": 3, "correction": "both", "typos": [{"typo": "sig", "match": "whole word"}]}],
     build.maximum_entries() + [{"correction": "one more", "typos": [{"typo": "onemore", "match": "whole word"}]}],
@@ -49,6 +54,12 @@ for entries in (
     except build.ListError:
         continue
     raise SystemExit(f"the encoder accepted {entries[-1]}")
+# A trigger word straight before the arrow is the typo itself, as typed.
+assert build.parse_authored("both -> and\nleader => 3\nboth leader -> x\n") == [
+    {"correction": "and", "trigger": "as a word ends", "typos": [{"typo": "both", "match": "anywhere"}]},
+    {"correction": "x", "trigger": "both", "typos": [{"typo": "leader", "match": "anywhere"}]},
+    {"macro": 3, "trigger": "as a word ends", "typos": [{"typo": "leader", "match": "anywhere"}]},
+], build.parse_authored("both -> and\nleader => 3\nboth leader -> x\n")
 pathlib.Path(sys.argv[2]).write_text("\n".join(lines) + "\n")
 PYCODE
 
@@ -70,7 +81,7 @@ build_and_run sanitized -fsanitize=address,undefined -fno-omit-frame-pointer
 # what was written and fails once the list and the header disagree.
 KEYMAP="$BUILD_DIR/keymap"
 mkdir "$KEYMAP"
-printf '# A test list.\n:teh: -> the\n:Hte: -> the\ntihng -> thing\n:nu -> un\nmnet: -> ment\n:Sig: => 12\n:pnumber: -> +31 6 1234 5678\n' >"$KEYMAP/autocorrect.txt"
+printf '# A test list.\n:teh: -> the\n:Hte: -> the\ntihng -> thing\n:nu -> un\nmnet: -> ment\nleader Sig => 12\nleader s => 12\nboth :pnumber: -> +31 6 1234 5678\nboth  Pn:  -> +31 6 1234 5678\nleader kr -> Kind regards\n' >"$KEYMAP/autocorrect.txt"
 python3 "$ROOT/tools/autocorrect/build.py" --write-authored "$KEYMAP"
 python3 "$ROOT/tools/autocorrect/build.py" --check-authored "$KEYMAP"
 python3 - "$ROOT" "$KEYMAP/authored_autocorrect_list.h" <<'PYCODE'
@@ -84,8 +95,9 @@ assert data == build.encode([
     {"correction": "thing", "typos": [{"typo": "tihng", "match": anywhere}]},
     {"correction": "un", "typos": [{"typo": "nu", "match": start}]},
     {"correction": "ment", "typos": [{"typo": "mnet", "match": end}]},
-    {"macro": 12, "typos": [{"typo": "sig", "match": whole}]},
-    {"correction": "+31 6 1234 5678", "typos": [{"typo": "pnumber", "match": whole}]},
+    {"macro": 12, "trigger": "after the leader", "typos": [{"typo": "sig", "match": whole}, {"typo": "s", "match": whole}]},
+    {"correction": "+31 6 1234 5678", "trigger": "both", "typos": [{"typo": "pnumber", "match": whole}, {"typo": "pn", "match": end}]},
+    {"correction": "Kind regards", "trigger": "after the leader", "typos": [{"typo": "kr", "match": whole}]},
 ])
 PYCODE
 printf ':becuase: -> because\n' >>"$KEYMAP/autocorrect.txt"
@@ -101,6 +113,15 @@ if python3 "$ROOT/tools/autocorrect/build.py" --check-authored "$KEYMAP" 2>"$BUI
     exit 1
 fi
 grep -q "listed twice" "$BUILD_DIR/refused.txt"
+# One replacement fires one way, and after the Leader key alone a typo takes
+# no colons.
+for list in 'leader pn -> +31\n:pnumber: -> +31\n' 'leader :pn: -> +31\n' 'leader k r -> Kind regards\n'; do
+    printf "$list" >"$KEYMAP/autocorrect.txt"
+    if python3 "$ROOT/tools/autocorrect/build.py" --check-authored "$KEYMAP" 2>"$BUILD_DIR/refused.txt"; then
+        echo "an authored list the domain cannot hold passed: $list" >&2
+        exit 1
+    fi
+done
 
 # The firmware's compiler takes the module.
 ARM_CC="${ARM_CC:-arm-none-eabi-gcc}"
