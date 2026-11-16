@@ -62,9 +62,20 @@ macro (row) it falls in.
 
 What a well-formed macro needs to play is checked when it plays, over every
 window of the macro before any output: presses balanced by releases, at most
-16 keys held at once, and its text typeable through the host layout in
+16 keys held at once, at most six of them keyboard keys (`0x04`–`0xa4`), and
+its text typeable through the host layout in
 [settings](settings-domain.md#scalars) scalar 27
 ([host layouts](../host-layouts-v1.md)). A macro that fails plays nothing.
+
+The six are the keyboard report's key slots, whatever the build: no NKRO
+(D-F65, [ADR](../../adr/0065-a-macro-holds-at-most-six-keys-besides-modifiers.md)).
+They count the presses still held, a chord's keys and the key that types a
+character, together; a key a chord names that is already held, or names
+twice, counts once. Modifiers (`0xe0`–`0xe7`) and system, consumer and mouse
+keys don't count. So a chord holds at most six keyboard keys besides its
+modifiers, fewer while presses are held, and text needs a slot the held keys
+leave free, even when the key typing it is one of them. Applying a profile
+never checks this.
 
 Held by: `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_test.c`), `tests/host/run_macro_payload_tests.sh` (`macro_payload_test.c`), `tests/host/run_macro_payload_engine_tests.sh` (`macro_payload_engine_test.c`).
 
