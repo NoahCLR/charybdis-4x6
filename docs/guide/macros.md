@@ -20,7 +20,7 @@ page writes and records them.
   all the keyboard report has room for; modifiers, media, system and mouse
   keys don't count, up to 16 keys held in all. A chord counts with the keys
   still held, and text needs one of the six free.
-- The 128 macros share 34,903 bytes, and one macro can use all the free
+- The 128 macros share 40,960 bytes, and one macro can use all the free
   space.
 
 ## Typing through your host layout

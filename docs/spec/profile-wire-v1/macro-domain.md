@@ -17,8 +17,9 @@ The bank is the 128 macros back to back, slot 0 first, each ended by a zero
 byte; an empty macro is its terminator alone. Unused capacity may follow the
 128th terminator and may hold stale bytes, for instance after a macro was
 shortened; playback never reads it. The domain's last byte must be zero. The
-domain is at most 34,903 bytes, so at least 128 (every macro empty). This is
-the encoding VIA's dynamic macro bank used, so any bank VIA could hold fits.
+domain is at most 40,960 bytes (D-F76), so at least 128 (every macro empty).
+This is the encoding VIA's dynamic macro bank used, and the ceiling is above
+VIA's, so any bank VIA could hold fits.
 
 Macro slot `n` is played by keycode `QK_MACRO + n`.
 

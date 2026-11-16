@@ -5,6 +5,7 @@
 #include "users/noah/lib/profile/runtime/active_profile_keymap_macros_runtime.h"
 #include "users/noah/lib/macro/profile_macro_provider.h"
 #include "users/noah/lib/macro/macro_slot_provider.h"
+#include "users/noah/lib/profile/schema/profile_macros_v1.h"
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     [0] = {{KC_A}}, [15] = {{KC_Z}},
@@ -14,7 +15,7 @@ static unsigned invalidations, windows;
 static uint8_t first_text;
 static bool fail_reads;
 static size_t largest_read;
-static uint8_t blob[8 + 6 + 1920 + 6 + 34903];
+static uint8_t blob[8 + 6 + 1920 + 6 + NOAH_PROFILE_MACROS_V1_MAX_SIZE];
 static bool read_bytes(void *context, size_t offset, uint8_t *target, size_t length) {
     (void)context;
     if (length > largest_read) largest_read = length;
@@ -50,8 +51,8 @@ static noah_active_profile_snapshot_t saved(void) {
     blob[8] = 0x60; blob[9] = 1; u32(blob + 10, 1920);
     blob[14] = KC_B;
     blob[14 + 1918] = KC_Y;
-    blob[1934] = 0x70; blob[1935] = 1; u32(blob + 1936, 34903);
-    memset(blob + 1940, 's', 34903 - 128);
+    blob[1934] = 0x70; blob[1935] = 1; u32(blob + 1936, NOAH_PROFILE_MACROS_V1_MAX_SIZE);
+    memset(blob + 1940, 's', NOAH_PROFILE_MACROS_V1_MAX_SIZE - 128);
     memset(blob + sizeof(blob) - 128, 0, 128);
     return (noah_active_profile_snapshot_t){
         .identity = {.kind = NOAH_ACTIVE_PROFILE_KIND_VALIDATED_PROFILE, .generation = 1},

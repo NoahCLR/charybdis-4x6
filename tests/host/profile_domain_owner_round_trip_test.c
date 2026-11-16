@@ -9,6 +9,7 @@
 #include "users/noah/lib/profile/runtime/active_profile_settings_runtime.h"
 #include "users/noah/lib/profile/runtime/active_profile_keymap_macros_runtime.h"
 #include "users/noah/lib/profile/runtime/active_profile_autocorrect_runtime.h"
+#include "users/noah/lib/profile/schema/profile_macros_v1.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/noah_keymap.h"
@@ -44,6 +45,8 @@ uint32_t noah_profile_activation_policy_safe_boundary(void *context) {
     (void)context;
     return 0;
 }
+// The room the maximum profile leaves for later additions: make_maximum_profile.py's ALLOWANCE (D-F76).
+static const uint32_t MAXIMUM_PROFILE_RESERVE = 7168u;
 static unsigned settings_applies;
 void            noah_qmk_portable_apply(void) {
     settings_applies++;
@@ -351,7 +354,7 @@ static void    load_maximum(const char *path) {
                 maximum[maximum_length++] = (uint8_t)byte;
             }
     fclose(file);
-    assert(maximum_length > 32768u && maximum_length + 12288u <= NOAH_PROFILE_PAYLOAD_MAX);
+    assert(maximum_length > 32768u && maximum_length + MAXIMUM_PROFILE_RESERVE <= NOAH_PROFILE_PAYLOAD_MAX);
 }
 static void use_maximum(noah_profile_blob_v1_t *expected) {
     memcpy(candidate, maximum, maximum_length);
@@ -425,12 +428,14 @@ static void test_maximum_profile(void) {
     use_maximum(&expected);
     save(maximum_length);
     printf("maximum profile: %u bytes validated in %u scans\n", (unsigned)maximum_length, (unsigned)validation_scans);
-    // One validator step a scan, each one read of at most 20 bytes. The other
-    // half's copy of this validation is the longest stretch a split prepare
-    // spends without transfer progress, inside the owner's no-progress window.
+    // Up to NOAH_PROFILE_CANDIDATE_VALIDATION_CALLS validator steps a scan,
+    // each one read of at most 20 bytes, so the bound below, one step a scan,
+    // is generous. The other half's copy of this validation is the longest
+    // stretch a split prepare spends without transfer progress, inside the
+    // owner's no-progress window.
     // Keep the prior table-work bound and add only the two bounded passes
     // over the new domains (checksum and semantic decoding), plus envelopes.
-    const uint32_t extra_steps = (1920u + 34903u + 12u + 19u) / 20u + (1920u + 19u) / 20u + (34903u + 19u) / 20u + 2u;
+    const uint32_t extra_steps = (1920u + NOAH_PROFILE_MACROS_V1_MAX_SIZE + 12u + 19u) / 20u + (1920u + 19u) / 20u + (NOAH_PROFILE_MACROS_V1_MAX_SIZE + 19u) / 20u + 2u;
     assert(validation_scans < 8000u + extra_steps);
     assert(validation_scans * NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS < NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS);
     assert_published(maximum, &expected, 1);
