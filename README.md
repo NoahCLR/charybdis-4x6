@@ -83,7 +83,7 @@ key is held. A held number key types its shifted symbol, such as `!` for `1`.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme/left-thumb-dark.png">
-    <img src="docs/images/readme/left-thumb-light.png" width="452"
+    <img src="docs/images/readme/left-thumb-light.png" width="640"
          alt="Ark's grid for the left thumb key: a row for each of one to five taps; a tap locks Symbol, Number, Function, Game or Pointing, and a hold holds it">
   </picture>
   <br>
