@@ -71,9 +71,11 @@ one-byte metadata (unchecked, valid, invalid), `profile_macro_slots`;
 3. **Preflight, before any output.** `macro_payload_preflight_begin` latches
    the host; `macro_slot_provider_compile` then decodes every window and
    checks each against it, carrying held-key balance across windows, and
-   reloads the first. A decode failure marks the slot invalid until the next
-   publication; a preflight refusal does not, since it depends on host
-   settings.
+   reloads the first. Besides balance it holds the report's six key slots
+   (D-F65): held keyboard keys plus a chord's new ones, or held ones plus a
+   character's key, never more than `KEYBOARD_REPORT_KEYS`. A decode failure
+   marks the slot invalid until the next publication; a preflight refusal
+   does not, since it depends on host settings.
 4. `macro_payload_start_windows` starts the engine. When a window ends with
    more to come, `load_next` refills the same buffer from the saved cursor,
    reusing the slot offset found by the first window.
