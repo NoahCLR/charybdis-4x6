@@ -279,7 +279,10 @@ hook functions that call the runtime's helpers.
 - [Development](docs/development.md) and
   [architecture](docs/architecture/README.md): working on the firmware
 
-The firmware is GPL-2.0; see [LICENSE](LICENSE).
+The firmware is licensed GPL-2.0-or-later: version 2 of the GNU General Public
+License ([LICENSE](LICENSE)) or, at your option, any later version. The
+flashable files also contain QMK and ChibiOS, and ChibiOS is under version 3,
+so the files themselves are distributed under version 3.
 
 ## Thanks
 
