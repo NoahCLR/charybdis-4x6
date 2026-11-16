@@ -118,7 +118,7 @@ Page 2, the wider ceilings; every byte count is 32 bits:
 | 2–5 | profile slot size in bytes | 131,072 |
 | 6–9 | maximum profile payload | 130,048 |
 | 10–13 | slot payload capacity | 130,048 |
-| 14–17 | macro domain capacity in bytes | 34,903 |
+| 14–17 | macro domain capacity in bytes | 40,960 |
 | 18–19 | maximum lighting group rows in all four stage tables (D-F63) | 640 |
 | 20–24 | zero | |
 

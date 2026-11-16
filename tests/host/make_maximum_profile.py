@@ -10,7 +10,7 @@ five full steps (640 steps); 128 combos of sixteen inputs; settings v13 with
 a shortcut on every custom key, most of them six keys with layers, and
 every one of its 273 names at 32 bytes of UTF-8; and 32 pointing slots (v4), each named with 32
 bytes, with every layer starting one of them; the full 1,920-byte matrix and
-34,903-byte macro bank; and an autocorrect list (v2) of 1,024 corrections and
+40,960-byte macro bank; and an autocorrect list (v2) of 1,024 corrections and
 1,024 typos, every correction firing both ways and every typo part of a word,
 so in both indexes, and one correction of 128 bytes, in 20,480 bytes of text
 (36,874 bytes).
@@ -46,7 +46,8 @@ def slot_payload_max() -> int:
 
 
 PAYLOAD_MAX = slot_payload_max()
-ALLOWANCE = 12288  # reserved for future payload (per-key RGB and other additions)
+ALLOWANCE = 7168  # reserved for future payload (per-key RGB and other additions; D-F76)
+MACRO_BANK = 40960  # the macro domain's ceiling (macro-domain.md, D-F76)
 
 KIND_KEY, KIND_LAYER_MO, KIND_LAYER_LOCK, KIND_PD, KIND_PD_LOCK, KIND_MACRO, KIND_CUSTOM = 1, 2, 3, 4, 5, 6, 7
 
@@ -247,7 +248,7 @@ def keymap() -> bytes:
 
 def macros() -> bytes:
     # One long stream and all 128 terminators fill today's bank exactly.
-    return b"a" * (34903 - 128) + b"\0" * 128
+    return b"a" * (MACRO_BANK - 128) + b"\0" * 128
 
 
 def autocorrect() -> bytes:

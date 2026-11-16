@@ -430,7 +430,7 @@ Every ceiling holds at once (D-F14, [`0014`](../adr/0014-bigger-profiles.md)):
 | Layers | 16 |
 | Behaviours / branches per behaviour / branches in all | 128 / tap depth `d` (5) / `128 × d` (640) |
 | Combos / inputs per combo | 128 / 2–16 |
-| Macros / macro bank | 128 / 34,903 bytes |
+| Macros / macro bank (D-F76) | 128 / 40,960 bytes |
 | Autocorrect corrections / typos / bytes in one typo / in one text correction / text in all / the domain | 1,024 / 1,024 / 32 / 128 / 20,480 / 36,874 bytes |
 | Custom keys | 128 |
 | Names | 32 bytes of UTF-8 each |
@@ -442,7 +442,7 @@ Every ceiling holds at once (D-F14, [`0014`](../adr/0014-bigger-profiles.md)):
 
 `tests/fixtures/maximum_profile_v4.fixture`, written by
 `tests/host/make_maximum_profile.py` from the byte specs, holds every table
-at its ceiling and every name at 32 bytes, in 116,783 bytes:
+at its ceiling and every name at 32 bytes, in 122,840 bytes:
 
 | Domain | Bytes |
 | --- | ---: |
@@ -452,16 +452,16 @@ at its ceiling and every name at 32 bytes, in 116,783 bytes:
 | Settings `0x40` | 10,701 |
 | Pointing `0x50` | 4,104 |
 | Keymap `0x60` | 1,920 |
-| Macros `0x70` | 34,903 |
+| Macros `0x70` | 40,960 |
 | Autocorrect list `0x80` | 36,874 |
 | Blob header and eight envelopes | 56 |
 
-That leaves 13,265 bytes below the 130,048-byte payload ceiling. The
+That leaves 7,208 bytes below the 130,048-byte payload ceiling. The
 generator reads the payload ceiling from the storage layout and refuses a
-fixture that does not leave 12,288 bytes below it, the reserve for later
-additions, so 977 bytes remain before a domain's ceiling could be raised
-into that reserve. The fixture is the maximum for these encodings, not a separate
-limit: a larger profile is refused by a table's ceiling or the payload
+fixture that does not leave 7,168 bytes below it, the reserve for later
+additions (D-F76), so 40 bytes remain before a domain's ceiling could be
+raised into that reserve. The fixture is the maximum for these encodings,
+not a separate limit: a larger profile is refused by a table's ceiling or the payload
 ceiling. The firmware saves, boots, publishes and copies it to the other
 half, and refuses over-limit and truncated copies of it.
 

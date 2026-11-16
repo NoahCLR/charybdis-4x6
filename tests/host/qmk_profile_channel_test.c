@@ -317,7 +317,7 @@ static void test_capability_hook(void) {
     assert(read_u32(&frame[WIRE_PAYLOAD + 2u]) == NOAH_PROFILE_STORAGE_SLOT_A_SIZE);
     assert(read_u32(&frame[WIRE_PAYLOAD + 6u]) == NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX);
     assert(read_u32(&frame[WIRE_PAYLOAD + 10u]) == NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX);
-    assert(read_u32(&frame[WIRE_PAYLOAD + 14u]) == 34903u);
+    assert(read_u32(&frame[WIRE_PAYLOAD + 14u]) == 40960u);
     // The group rows of all four lighting tables (D-F63).
     assert(read_u16(&frame[WIRE_PAYLOAD + 18u]) == 640u);
     for (uint8_t index = WIRE_PAYLOAD + 20u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) assert(frame[index] == 0u);

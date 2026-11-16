@@ -38,7 +38,7 @@ enum {
     NOAH_PROFILE_WORKING_MAX_PIECES = 1u + 2u * NOAH_PROFILE_DOMAIN_REGISTRY_COUNT + 2u * NOAH_PROFILE_WORKING_MAX_SPLICES,
     NOAH_PROFILE_WORKING_LITERAL_BYTES = NOAH_PROFILE_BLOB_V1_HEADER_SIZE + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE * NOAH_PROFILE_DOMAIN_REGISTRY_COUNT,
     // Validation reads RAM, so one scan grant may take this many validator
-    // steps (each at most 20 bytes): a full macro bank in about 28 scans.
+    // steps (each at most 20 bytes): a full macro bank in about 32 scans.
     NOAH_PROFILE_WORKING_VALIDATION_STEPS = 64u,
     // Bytes of the saved profile copied into the buffer per scan grant when
     // the first edit loads it.
