@@ -238,15 +238,15 @@ The FNV-1a digest of this byte stream, integers little-endian:
 | 5 | 1 | pointing slot count |
 | 6 | 1 | macro slot count |
 | 7 | 1 | custom-key count |
-| 8 | 4 | `NOAH_FIRMWARE_VERSION` |
-| 9 | 2 each | `KC_NO`, `KC_TRNS`, `MO(0)`, `LT(0, KC_NO)`, `OSM(0)`, `MT(0, KC_NO)`, `QK_MACRO_0`, `CUSTOM_KEY_0`, the first layer lock |
-| 10 | 1 + 2 + 2 per layer | layer id, `MO(n)`, `LOCK_LAYER(n)` |
-| 11 | 1 + 4 + 2 + 2 per slot | slot id, its 32-bit mode flag, its hold keycode, its lock keycode |
-| 12 | 2 + 2 | the end of the userspace keycode blocks before custom keys (`0x7f00`), then `0xFFFF` |
+| 8 | 2 each | `KC_NO`, `KC_TRNS`, `MO(0)`, `LT(0, KC_NO)`, `OSM(0)`, `MT(0, KC_NO)`, `QK_MACRO_0`, `CUSTOM_KEY_0`, the first layer lock |
+| 9 | 1 + 2 + 2 per layer | layer id, `MO(n)`, `LOCK_LAYER(n)` |
+| 10 | 1 + 4 + 2 + 2 per slot | slot id, its 32-bit mode flag, its hold keycode, its lock keycode |
+| 11 | 2 + 2 | the end of the userspace keycode blocks before custom keys (`0x7f00`), then `0xFFFF` |
 
 It depends on no authored row, so an empty profile and a populated one share
-it. Because it includes the firmware version and the layer count, a new
-firmware version or layer bank has its own digest, and a profile saved under
-another is refused.
+it. Because it includes the layer count, a new layer bank has its own digest,
+and a profile saved under another is refused. It does not include the
+firmware version, so a new release on its own keeps the digest (D-F77,
+[`0077`](../../adr/0077-the-firmware-version-is-the-release.md)).
 
 Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`), `tests/fixtures/compiled_profile_pd_v2.fixture` (`profile.action_abi`).

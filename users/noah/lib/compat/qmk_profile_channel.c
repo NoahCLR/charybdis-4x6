@@ -382,6 +382,9 @@ _Static_assert(LAYER_COUNT <= UINT8_MAX, "compiled layer count must fit the capa
 _Static_assert(LAYER_COUNT <= NOAH_PROFILE_WIRE_V1_MAX_LOGICAL_LAYERS, "compiled layer count must fit the declared Profile Wire ceiling");
 _Static_assert(NOAH_PROFILE_MACROS_V1_SLOTS <= UINT8_MAX, "macro count must fit the capability frame");
 _Static_assert(NOAH_FIRMWARE_VERSION != 0u, "Profile Wire firmware must advertise a meaningful firmware version");
+// The firmware version names a release (D-F77): a real month and day.
+_Static_assert(((NOAH_FIRMWARE_VERSION >> 8) & 0xFFu) >= 1u && ((NOAH_FIRMWARE_VERSION >> 8) & 0xFFu) <= 12u, "the firmware version's month is not 1-12");
+_Static_assert((NOAH_FIRMWARE_VERSION & 0x1Fu) >= 1u && (NOAH_FIRMWARE_VERSION & 0x1Fu) <= 31u, "the firmware version's day is not 1-31");
 _Static_assert(NOAH_PROFILE_WIRE_V1_REPORT_SIZE == 32u, "Profile Wire requires the reviewed 32-byte QMK Raw HID report");
 _Static_assert(RAW_EPSIZE == NOAH_PROFILE_WIRE_V1_REPORT_SIZE, "QMK's Raw HID report is not the Profile Wire report size");
 

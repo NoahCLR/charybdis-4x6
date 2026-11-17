@@ -82,11 +82,6 @@ static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, noa
     emit_u8(&writer, POINTING_MODE_COUNT);
     emit_u8(&writer, MACRO_SLOT_COUNT);
     emit_u8(&writer, NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS);
-#ifdef NOAH_FIRMWARE_VERSION
-    emit_u32(&writer, NOAH_FIRMWARE_VERSION);
-#else
-    emit_u32(&writer, 0u);
-#endif
     emit_u16(&writer, KC_NO);
     emit_u16(&writer, KC_TRNS);
     emit_u16(&writer, MO(0));

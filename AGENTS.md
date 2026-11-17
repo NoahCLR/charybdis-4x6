@@ -51,6 +51,8 @@ and any skipped, and for boundary work the contracts touched.
   quoting a measurement; never edit a capture file.
 - A change to a wire format, fixture bytes, a spec's contract, or a probe Ark
   compiles names the Ark follow-up ([independence](docs/development.md#independence-from-ark)).
+- The firmware version (`users/noah/firmware_version.h`) is written only by
+  the vault's `release`; never change it by hand (D-F77).
 - A lasting decision is the next ADR (D-F<n>, [domain docs](docs/agents/domain.md));
   plans and status live in the vault, never in `docs/`, and pull requests
   never quote or link it.

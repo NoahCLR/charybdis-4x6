@@ -85,7 +85,7 @@ Page 0, the identity (see [README.md](README.md#version-identity)):
 | 8 | profile status page count, `2` |
 | 9–12 | feature word, below |
 | 13–16 | action-ABI digest; `0` until the live-profile owner reports |
-| 17–20 | firmware version, never `0` |
+| 17–20 | firmware version: the release the build includes ([README.md](README.md#version-identity)), never `0` |
 | 21–24 | compiled-default digest; `0` until the owner reports |
 
 Page 1, every ceiling that fits a byte:

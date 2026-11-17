@@ -97,6 +97,11 @@ What a firmware build reports it supports and holds, read by a client before
 anything else.
 _Avoid_: features, feature flags, version check
 
+**Firmware version**:
+The firmware release a build includes, such as `v2026.10.27`, reported in its
+capabilities; it says which build is running and nothing depends on it.
+_Avoid_: ABI version, firmware revision, build number
+
 ## Changing the profile
 
 **Edit mode**:
