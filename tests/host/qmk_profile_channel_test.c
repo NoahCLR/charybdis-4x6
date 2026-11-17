@@ -289,6 +289,11 @@ static void test_capability_hook(void) {
     assert(read_u32(&frame[WIRE_PAYLOAD + 21u]) == live_owner_status.compiled_default_digest);
 #endif
     assert(read_u32(&frame[WIRE_PAYLOAD + 17u]) == NOAH_FIRMWARE_VERSION);
+    // The firmware version is the release the build includes (D-F77): year,
+    // month, then the release's .N above a five-bit day.
+    assert(NOAH_FIRMWARE_RELEASE(2026u, 10u, 27u, 0u) == UINT32_C(0x07EA0A1B));
+    assert(NOAH_FIRMWARE_RELEASE(2026u, 10u, 27u, 1u) == UINT32_C(0x07EA0A3B));
+    assert(NOAH_FIRMWARE_RELEASE(2031u, 12u, 31u, 7u) == UINT32_C(0x07EF0CFF));
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x32u, 1u);
     channel(frame, sizeof(frame));

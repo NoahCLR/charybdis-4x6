@@ -50,9 +50,18 @@ protocol-version or firmware-version read. Capability page 0
 | Profile Wire version | major `2`, minor `2` (D-F66: the behaviours, auto-mouse and autocorrect switch keys; D-F71: the Leader key) | page 0 bytes 2–3 |
 | Profile schema version | major `4`, minor `8` (D-F62: pointing v4; D-F26: settings v11; D-F68: the autocorrect list; D-F70: lighting v5 and settings v12, replacement feedback and its flash length; D-F71: autocorrect v2 and settings v13, the leader and its timeout; D-F72: lighting v6, the leading colour; D-F73: lighting v7, a locality per feedback case) | page 0 bytes 4–5, and blob header bytes 4–5 |
 | Capability layout | `3`, four pages | page 0 bytes 0–1 |
-| Firmware version | `NOAH_FIRMWARE_VERSION`, never zero | page 0 bytes 17–20 |
+| Firmware version | the firmware release the build includes, `NOAH_FIRMWARE_VERSION` (D-F77, below), never zero | page 0 bytes 17–20 |
 | Action-ABI digest | see [blob-and-digests.md](blob-and-digests.md#action-abi-digest) | page 0 bytes 13–16 |
 | Compiled-default digest | see [blob-and-digests.md](blob-and-digests.md#digests-and-checksums) | page 0 bytes 21–24 |
+
+The firmware version names the firmware release the build includes,
+`vYYYY.MM.DD[.N]`: the year in bits 31–16, the month in bits 15–8, then `N`
+(0–7, 0 without a suffix) in bits 7–5 above the day in bits 4–0, so
+`v2026.10.27` is `0x07EA0A1B` and `v2026.10.27.1` is `0x07EA0A3B`. A build from
+`dev` or a task branch reports the last release it includes. It says which
+build is running and nothing else: no contract depends on it, and it is not
+part of the action-ABI digest (D-F77,
+[`0077`](../../adr/0077-the-firmware-version-is-the-release.md)).
 
 Everything this base does is implied by its Profile Wire and schema versions.
 The feature word holds only what a build varies by, never a step in the

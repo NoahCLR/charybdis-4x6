@@ -35,14 +35,15 @@ repository builds a generic image that can't store a profile; see
 
 Flashing doesn't erase the saved profile, but a new release may not use it.
 The keyboard keeps running a saved profile only when the new firmware has
-exactly the same compiled defaults, profile format and firmware version as
-the firmware that saved it. Otherwise it starts from the new firmware's compiled defaults, and
-you restore your profile from a backup.
+exactly the same compiled defaults, profile format and actions a profile can
+hold as the firmware that saved it; the release itself doesn't matter.
+Otherwise it starts from the new firmware's compiled defaults, and you
+restore your profile from a backup.
 
-A backup restores onto any firmware of the same profile format and firmware
-version, whatever its compiled defaults. A release that changes the profile
-format, the firmware version or the actions a profile can hold refuses older
-backups, even when the firmware version it shows is the same. So before you update:
+A backup restores onto any firmware of the same profile format and actions,
+whatever its release and compiled defaults. A release that changes the
+profile format or the actions a profile can hold refuses older backups; its
+release notes say so. So before you update:
 
 1. Export a backup in Ark.
 2. Read the release notes.

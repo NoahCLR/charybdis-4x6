@@ -214,8 +214,8 @@
 
 // ─── Firmware identity and EEPROM ─────────────────────────────────────────
 
-// The firmware version the Profile Wire capability page reports (D-F31).
-#define NOAH_FIRMWARE_VERSION 0x00010000u
+// The firmware version (D-F77).
+#include "firmware_version.h"
 // VIA is not supported (D-F31). QMK's logical EEPROM holds only its eeconfig,
 // with room for a user datablock: the wear-leveling backing is QMK's RP2040
 // default of 8 KiB, so the RAM mirror of logical EEPROM is 4 KiB per half. The

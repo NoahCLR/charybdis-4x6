@@ -99,7 +99,10 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         -o "$bin"
-    if [ "$name" = configured ] || [ "$name" = configured_sanitized ]; then
+    if [ "$name" = other_release ]; then
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture"
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/populated.bin"
+    elif [ "$name" = configured ] || [ "$name" = configured_sanitized ]; then
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" ${NOAH_WRITE_PD_FIXTURE:+--write-fixture}
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --reject-profile "$BUILD_DIR/old.bin"
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/populated.bin"
@@ -114,6 +117,9 @@ build_and_run() {
 
 build_and_run configured -DNOAH_PORTABLE_PROFILE_ENABLE
 build_and_run configured_sanitized -DNOAH_PORTABLE_PROFILE_ENABLE -fsanitize=address,undefined -fno-omit-frame-pointer
+# A build of another release has the same action-ABI digest, so a profile
+# saved under one release restores onto the next (D-F77).
+build_and_run other_release -DNOAH_PORTABLE_PROFILE_ENABLE -DNOAH_FIRMWARE_VERSION='NOAH_FIRMWARE_RELEASE(2030u, 1u, 2u, 3u)'
 build_and_run empty -DNOAH_KEYMAP_EMPTY_KEY_BEHAVIORS -DNOAH_KEYMAP_EMPTY_COMBOS -DNOAH_PORTABLE_PROFILE_ENABLE
 
 # Keep the materializer available when RGB is compiled out: that variant emits

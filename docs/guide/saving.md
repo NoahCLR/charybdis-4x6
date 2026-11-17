@@ -18,8 +18,9 @@ The keyboard runs, in order of preference:
 
 Unplugging, or a restart, drops the working copy, so the keyboard always
 starts from its saved profile. A saved profile is used only by firmware with
-exactly the same compiled defaults and firmware version as the firmware that
-saved it; any other firmware starts from its own compiled defaults (see
+exactly the same compiled defaults, profile format and actions as the
+firmware that saved it; any other firmware starts from its own compiled
+defaults (see
 [Installing](installing.md#what-happens-to-your-profile)).
 
 ## Edits, Save and the edit mode

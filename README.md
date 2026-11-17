@@ -212,10 +212,9 @@ the ball moves.
   128 custom keys, 128 macros and 32 pointing modes.
 - **Updates:** flashing never erases the saved profile, but the keyboard runs
   it only if the new release has the same compiled defaults, profile format
-  and firmware version (a number separate from the release name). Otherwise
-  it starts from the new defaults, and importing a backup brings your profile
-  back. A release that changes the profile format or the firmware version
-  refuses older backups. Before
+  and actions. Otherwise it starts from the new defaults, and importing a
+  backup brings your profile back. A release that changes the profile format
+  or the actions refuses older backups. Before
   updating, export a backup in Ark, read the release notes and keep the old
   release's `.uf2` files to go back to. Ark edits only firmware whose profile
   format it knows, so update both halves.

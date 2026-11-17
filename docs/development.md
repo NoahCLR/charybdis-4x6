@@ -31,7 +31,9 @@ changes only through pull requests. `main` is the released line and moves only
 when a release promotes `dev` into it. Each landed commit's message ends with
 what verify ran, and the BK commit it was built with is the one its own
 `qmk-pin.json` names. A firmware release is a date tag, `vYYYY.MM.DD`, on this
-repository and on the BK commit it is built with; Ark releases separately, and
+repository and on the BK commit it is built with, and the firmware version the
+keyboard reports names it (D-F77): `release` writes it into `dev` through a
+pull request of its own before it opens the promotion; Ark releases separately, and
 both release together only when the contract between them changes. This
 repository is a GitHub fork of Bastard Keyboards' userspace: push only to
 `NoahCLR/charybdis-4x6`, never upstream. The clone's `gh` default and
