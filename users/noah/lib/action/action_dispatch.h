@@ -35,6 +35,7 @@ typedef struct {
 } noah_emit_policy_t;
 
 #define NOAH_EMIT_POLICY_NONE ((noah_emit_policy_t){0})
+#define NOAH_EMIT_POLICY_PRESERVE_MODS ((noah_emit_policy_t){.preserve_keyboard_mod_state = true})
 #define NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS ((noah_emit_policy_t){.settle_pending_fallback_holds = true})
 #define NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS_AND_PRESERVE_MODS ((noah_emit_policy_t){.settle_pending_fallback_holds = true, .preserve_keyboard_mod_state = true})
 

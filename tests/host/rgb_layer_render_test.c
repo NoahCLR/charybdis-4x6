@@ -51,6 +51,13 @@
 #ifndef RGB_LAYER_RENDER_TEST_IDLE_TIMEOUT
 #    define RGB_LAYER_RENDER_TEST_IDLE_TIMEOUT 0
 #endif
+// The shared drawing cases (rgb_render_fixture_test.inc) in place of the tests.
+#ifndef RGB_LAYER_RENDER_TEST_FIXTURE
+#    define RGB_LAYER_RENDER_TEST_FIXTURE 0
+#endif
+#if RGB_LAYER_RENDER_TEST_FIXTURE && (RGB_LAYER_RENDER_TEST_IDLE_TIMEOUT || !defined(NOAH_PORTABLE_PROFILE_ENABLE))
+#    error "The drawing cases build with NOAH_PORTABLE_PROFILE_ENABLE, for the idle timeout, and stub its settings themselves"
+#endif
 #if RGB_LAYER_RENDER_TEST_IDLE_TIMEOUT && !defined(NOAH_PORTABLE_PROFILE_ENABLE)
 #    error "The idle timeout is a profile setting: its variant builds with NOAH_PORTABLE_PROFILE_ENABLE"
 #endif
@@ -253,6 +260,9 @@ noah_autocorrect_feedback_t noah_autocorrect_feedback(void) {
 EXPORT_RGB_COMPILED_CACHE(0u, 7u, 2u, 1u, 4u, 0u);
 const pointing_mode_def_t pointing_modes[POINTING_MODE_COUNT] = {
     [POINTING_MODE_INDEX_DRAGSCROLL] = {.mode_flag = POINTING_MODE_DRAGSCROLL}, [POINTING_MODE_INDEX_VOLUME] = {.mode_flag = POINTING_MODE_VOLUME}, [POINTING_MODE_INDEX_BRIGHTNESS] = {.mode_flag = POINTING_MODE_BRIGHTNESS}, [POINTING_MODE_INDEX_ZOOM] = {.mode_flag = POINTING_MODE_ZOOM}, [POINTING_MODE_INDEX_ARROW] = {.mode_flag = POINTING_MODE_ARROW}, [POINTING_MODE_INDEX_PINCH] = {.mode_flag = POINTING_MODE_PINCH},
+#if RGB_LAYER_RENDER_TEST_FIXTURE
+    [6] = {.mode_flag = POINTING_MODE_6}, [7] = {.mode_flag = POINTING_MODE_7},
+#endif
 };
 
 static void test_fail(const char *expr, const char *file, int line) {
@@ -577,9 +587,12 @@ int rgb_matrix_led_index(int index) {
     return index;
 }
 
+// The drawing cases link QMK's own conversion (quantum/color.c).
+#if !RGB_LAYER_RENDER_TEST_FIXTURE
 rgb_t hsv_to_rgb(hsv_t hsv) {
     return rgb_from_hsv(hsv);
 }
+#endif
 
 uint16_t keymap_key_to_keycode(uint8_t layer_num, keypos_t key) {
     uint8_t row = key.row, column = key.col;
@@ -922,6 +935,32 @@ static void test_preview_full_and_chunked_output_matches_normal(void) {
 
     test_check_led_range_equal(normal, preview_full, 0, 4);
     test_check_led_range_equal(normal, preview_chunked, 0, 4);
+}
+
+// A running slot linked to a layer that is on splits the stack beneath it only
+// when it has a colour to paint (D-F62). A passthrough slot without a coloured
+// row paints nothing (D-F74), so Num's row still paints over Sym's fill, as
+// it does while no mode runs; a coloured slot still paints beneath Sym.
+static void test_passthrough_linked_slot_leaves_the_layer_stack_whole(void) {
+    rgb_t num_row  = rgb_from_hsv(layer_led_groups_data[1].color);
+    rgb_t sym_fill = rgb_from_hsv(layer_colors[LAYER_SYM].color);
+
+    test_reset();
+    fake_is_master     = true;
+    fake_linked_layers = 1u << LAYER_SYM;
+    layer_state        = ((layer_state_t)1u << LAYER_NUM) | ((layer_state_t)1u << LAYER_SYM);
+    CHECK(render_output());
+    check_led(1, num_row);
+
+    fake_linked_mode    = POINTING_MODE_DRAGSCROLL;
+    fake_pd_active_mode = POINTING_MODE_DRAGSCROLL;
+    CHECK(render_output());
+    check_led(1, num_row);
+
+    fake_linked_mode    = POINTING_MODE_BRIGHTNESS;
+    fake_pd_active_mode = POINTING_MODE_BRIGHTNESS;
+    CHECK(render_output());
+    check_led(1, sym_fill);
 }
 #endif
 
@@ -2801,7 +2840,14 @@ static void test_ceiling_profile_reads_only_lit_accents(void) {
 }
 #endif
 
+#if RGB_LAYER_RENDER_TEST_FIXTURE
+#    include "rgb_render_fixture_test.inc"
+#endif
+
 int main(int argc, char **argv) {
+#if RGB_LAYER_RENDER_TEST_FIXTURE
+    return rgb_render_fixture_main(argc, argv);
+#endif
 #if RGB_LAYER_RENDER_TEST_IDLE_TIMEOUT
     (void)argc;
     (void)argv;
@@ -2833,6 +2879,8 @@ int main(int argc, char **argv) {
         test_preview_preserves_later_group_override_order();
     } else if (strcmp(argv[1], "chunks") == 0) {
         test_preview_full_and_chunked_output_matches_normal();
+    } else if (strcmp(argv[1], "passthrough-link") == 0) {
+        test_passthrough_linked_slot_leaves_the_layer_stack_whole();
     } else {
         fprintf(stderr, "unknown RGB layer-group scenario: %s\n", argv[1]);
         return 1;

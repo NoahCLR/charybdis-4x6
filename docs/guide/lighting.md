@@ -5,7 +5,7 @@ keys made a combo, which tap count a key is on, whether a hold has started,
 when text replacement changed what you typed, and when the leader is waiting
 for what you type after it.
 Ark's
-[Lighting](https://github.com/NoahCLR/charybdis-ark/blob/dev/docs/guide/lighting.md)
+[Lighting](https://github.com/NoahCLR/charybdis-ark/blob/main/docs/guide/lighting.md)
 page edits all of it and paints its board the way the keyboard will.
 
 LED 56, on the right half, is a trackball LED I soldered in. A board without
@@ -68,8 +68,8 @@ The running pointing mode paints its colour where you choose (see
 combo colour the same way, until you let go. A combo whose action holds a
 layer shows only that layer's colours while it holds it. A mode's or the
 combo colour with saturation and brightness both at 0 is passthrough: it
-paints nothing and what is beneath shows, though its LED groups in a colour
-of their own still paint. To turn its LEDs off instead, dark over what is beneath, give it saturation with brightness 0.
+paints nothing and what is beneath shows, though its [accents](#accents) in
+a colour of their own still paint. To turn its LEDs off instead, dark over what is beneath, give it saturation with brightness 0.
 
 ## Behaviour feedback
 
@@ -125,7 +125,7 @@ it, a fourth colour, **leading**, shows and stays, blue in my profile:
   otherwise the whole keyboard or the half you chose.
 - Each of the four, text, macro, undo and leading, paints where you choose
   for it, as a layer or a pointing mode does. One shows at a time.
-- With a passthrough colour it paints nothing, but an LED group for it in a
+- With a passthrough colour it paints nothing, but an accent for it in a
   colour of its own still paints, so leading can show on a few LEDs alone.
 - It shows with text replacement switched off too, since the leader works
   then. A lighting idle timeout shorter than the leader timeout can turn it
@@ -150,27 +150,33 @@ of the key, then only the keys, so a tap count shown on its key stays seen
 over a hold that lights the whole keyboard. Where two cases share a place,
 the newest key's case paints it, flashing with it when it flashes.
 
-## LED groups
+## Accents
 
-An **LED group** paints chosen LEDs, such as the thumb keys or the trackball
-LED, over a stage's own colour, while a given layer, pointing mode, combo
-feedback, kind of behaviour feedback or kind of replacement feedback is
-showing (or any of them). A group colour with saturation and brightness at 0
-takes the stage's colour; any other colour paints as itself. Each tap count
-of behaviour feedback has its own: a group for the triple tap shows while any
-key is on the triple tap, not on the double tap. A group for any tap count
-lights while a run of taps waits on any of them, in the newest key's tap
-count colour when it takes the stage's colour, and not for a tap, hold or
-long hold; a group for any kind follows the newest key's tap count too, and
-lights for those as well. Rows paint in order, so a later row wins an LED
-they share. In behaviour feedback and replacement feedback, rows for any kind
-of feedback paint first, then in behaviour feedback rows for any tap count,
-so rows for one kind paint over them.
+An **accent** lights chosen LEDs, such as the thumb keys or the trackball
+LED, over its stage's own colour while what it belongs to shows: a layer that
+is on, a pointing mode that runs, combo feedback, a case of behaviour
+feedback or of replacement feedback, or any one of them. Ark adds them on
+each stage's tab of Lighting, under **Accents**. An accent coloured exactly
+`0, 0, 0` takes the colour of what it belongs to, and paints nothing when
+that colour is passthrough; any other colour paints as itself.
 
-A profile holds up to 128 different LED sets and 640 rows in all, at most 255
-for any one of layers, pointing modes, combo feedback, behaviour feedback
-and replacement feedback. Rows
-that light the same LEDs share one set. A row that is not showing costs the
+In behaviour feedback each tap branch is a case of its own: an accent for the
+triple tap lights while any key is on the triple tap, not on the double tap.
+An accent for tap committed, hold or long hold follows the newest key
+showing it. An accent for every tap branch lights while a run of taps waits
+on any of them, in the newest key's tap branch colour when it takes that
+colour, and not for tap committed, hold or long hold; an accent for every
+case follows the newest key's tap branch too, and lights for those as well.
+
+Accents paint in their stored order, so a later one wins an LED they share.
+In behaviour feedback and replacement feedback, accents for every case paint
+first, then in behaviour feedback those for every tap branch, so accents for
+one case paint over them.
+
+A profile holds up to 640 accents in all, at most 255 for any one of layers,
+pointing modes, combo feedback, behaviour feedback and replacement feedback.
+The different sets of LEDs they light are **LED sets**, up to 128: accents
+that light the same LEDs share one. An accent that is not showing costs the
 keyboard nothing to draw.
 
 ## Brightness and the lighting keys

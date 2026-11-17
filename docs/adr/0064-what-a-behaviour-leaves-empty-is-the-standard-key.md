@@ -63,4 +63,21 @@ hold. That let one branch's actions turn up at another: Right Alt's double
 tap toggled the arrow lock, and Escape's long hold fired from a fourth
 press. Its run also went out only on the held press's release, after the
 hold. D-F33's amendment for a bare modifier's lone tap is rule 1 here.
+
+Amended (Noah, 2026-11-16), in place, since D-F64 was unreleased: a
+pointing-mode key holds its mode from the press (rule 1), but held at the Nth
+press of a branch it leaves empty inside the depth, it starts its mode at the
+tap / hold threshold, after the N - 1 standard taps before it have gone out
+(rules 5, 7 and 8). Past the depth it still holds its mode from the press
+(rule 6).
+
+Amended (Noah, 2026-11-16): rule 1 left out three kinds of key. A QMK
+function key (the Charybdis DPI and sniping keys, RGB Matrix keys, `QK_BOOT`
+and the like) taps itself and holds itself from the tap / hold threshold, as
+a plain key does: holding `SNIPING` holds sniping. `TT()` and `OSL()` hold
+their layer from the press, as `MO()` does. `TT()` taps nothing; with no
+behaviour its `TAPPING_TOGGLE`-th tap locks the layer (D-F46), and a
+behaviour on it replaces that lock. `OSL()`'s tap arms its layer for the next
+key press.
+
 Contract: [What keys can do](../guide/keys.md#tap-counts).

@@ -3,7 +3,7 @@
 The trackball moves the pointer until a **pointing mode** takes it over. A
 mode either scrolls or sends keys and shortcuts as the ball moves, and runs
 while its key is held or locked, or while one of its linked layers is on. Ark's
-[Pointing](https://github.com/NoahCLR/charybdis-ark/blob/dev/docs/guide/pointing.md)
+[Pointing](https://github.com/NoahCLR/charybdis-ark/blob/main/docs/guide/pointing.md)
 page edits every setting below.
 
 ## Slots and their keys

@@ -41,6 +41,9 @@ typedef struct {
     key_runtime_core_pending_multi_tap_release_outcome_t outcome;
     uint16_t                                             action;
     uint8_t                                              repeat_count;
+    // HELD_LIFECYCLE: the standard tap an empty branch sends repeat_count
+    // times before its hold (D-F64).
+    uint16_t                                             tap_action;
     bool                                                 tap_branch_feedback;
     bool                                                 tap_commit_feedback;
     bool                                                 action_feedback;

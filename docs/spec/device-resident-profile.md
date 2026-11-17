@@ -111,8 +111,8 @@ Nothing in another format is translated:
   the flag clears once a profile is saved.
 
 A saved record is bound to the build that wrote it by its compiled-default
-and action-ABI digests. The action-ABI digest includes the firmware version
-and the layer count ([action-ABI digest](profile-wire-v1/blob-and-digests.md#action-abi-digest)),
+and action-ABI digests. The action-ABI digest includes the schema major and minor, the
+firmware version and the layer count ([action-ABI digest](profile-wire-v1/blob-and-digests.md#action-abi-digest)),
 and the compiled-default digest every byte of the compiled defaults, so after
 a reflash that changes either, the saved profile is not used and the half
 runs its compiled defaults until a client restores one (D-F12,
@@ -208,7 +208,7 @@ byte 36. Integers are little-endian.
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | domain mask, one bit per registry row; bit 7 zero |
+| 0 | 1 | domain mask, one bit per registry row |
 | 1 | 4 | payload length, uint32, `8..130,048` |
 | 5 | 1 | flags: bit 0 origin half, bit 1 override; other bits zero |
 | 6 | 4 | generation, nonzero |

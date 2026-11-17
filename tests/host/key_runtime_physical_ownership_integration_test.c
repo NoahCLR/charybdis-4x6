@@ -339,9 +339,8 @@ void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
 }
 
 void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods) {
-    // As delayed_action.c's emit does, the tap settles pending fallback holds,
-    // all but its own key's, as it goes out. Its modifiers are not replayed
-    // here.
+    // As delayed_action.c does, the tap first settles the pending fallback
+    // holds due at its key (api.h). Its modifiers are not replayed here.
     noah_key_runtime_settle_pending_fallback_hold(key_pos);
     dispatch_delayed_action(action, mods);
 }

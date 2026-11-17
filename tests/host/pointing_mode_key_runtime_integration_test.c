@@ -367,6 +367,12 @@ const key_behavior_t key_behaviors[] = {
     {.keycode = KC_F21, .tap_counts[0] = {.tap = TAP_SENDS(KC_F24)}},
     {.keycode = TEST_LAYER_ROW_KEY, .tap_hold_term = TEST_PD_TAP_HOLD_TERM, .multi_tap_term = TEST_PD_MULTI_TAP_TERM, .tap_counts[0] = {.tap = TAP_SENDS(KC_J)}},
     {.keycode = TEST_LAYER_STEP_KEY, .tap_hold_term = TEST_PD_TAP_HOLD_TERM, .multi_tap_term = TEST_PD_MULTI_TAP_TERM, .tap_counts[0] = {.tap = TAP_SENDS(TEST_LAYER_SHORTCUT_KEY), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_LAYER_SHORTCUT_KEY)}},
+    // A pointing key whose single tap types the key below, whose double tap
+    // is empty and whose triple tap is set.
+    {.keycode = PD_MODE_9, .tap_hold_term = TEST_PD_TAP_HOLD_TERM, .multi_tap_term = TEST_PD_MULTI_TAP_TERM, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_TRNS)}, [2] = {.tap = TAP_SENDS(KC_J)}}},
+    // A mod-tap whose single and double taps are empty and whose triple tap is
+    // set.
+    {.keycode = MT(MOD_LCTL, KC_K), .tap_hold_term = TEST_PD_TAP_HOLD_TERM, .multi_tap_term = TEST_PD_MULTI_TAP_TERM, .tap_counts = {[2] = {.tap = TAP_SENDS(KC_J)}}},
 #endif
     {.keycode = TEST_OSL_ROW_SHORTCUT_KEY, .tap_hold_term = TEST_PD_TAP_HOLD_TERM, .tap_counts[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HIGH_SHORTCUT_KEY)}},
 };
@@ -405,6 +411,8 @@ static uint16_t              last_tap_code16;
 static uint8_t               reset_dragscroll_count;
 static uint16_t              last_delayed_action;
 static delayed_action_mods_t last_delayed_mods;
+// The pointing modes running when the last delayed action went out.
+static pointing_mode_mask_t  last_delayed_modes;
 #ifndef NOAH_TEST_QMK_GESTURES
 // What reached the host, in order: 'R' a key registered, 'U' one let go, 'T'
 // a tap.
@@ -608,6 +616,7 @@ static void test_reset_state(void) {
     reset_dragscroll_count                 = 0;
     last_delayed_action                    = KC_NO;
     last_delayed_mods                      = (delayed_action_mods_t){0};
+    last_delayed_modes                     = 0;
 #ifndef NOAH_TEST_QMK_GESTURES
     host_out_count = 0;
 #endif
@@ -1251,6 +1260,7 @@ void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     delayed_action_count++;
     last_delayed_action = action;
     last_delayed_mods   = mods;
+    last_delayed_modes  = pointing_mode_local_active_snapshot();
 #ifdef NOAH_TEST_QMK_GESTURES
     gesture_replaying   = true;
     gesture_replay_mods = (uint8_t)(mods.real | mods.weak);
@@ -1262,10 +1272,12 @@ void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
 }
 
 void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods) {
-    // As delayed_action.c's emit does, the tap settles pending fallback holds,
-    // all but its own key's, as it goes out. Its modifiers are not replayed
-    // here.
+    uint8_t before = fake_mods;
+
+    // As delayed_action.c does, the tap first settles the pending fallback
+    // holds due at its key (api.h), and goes out under those it registers.
     noah_key_runtime_settle_pending_fallback_hold(key_pos);
+    mods.real = (uint8_t)(mods.real | (fake_mods & ~before));
     dispatch_delayed_action(action, mods);
 }
 
@@ -1857,6 +1869,140 @@ static void test_authored_second_press_hold_branches_into_other_pointing_mode(vo
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
     CHECK(current_cpi == default_dpi);
 }
+
+#ifndef NOAH_TEST_QMK_GESTURES
+// PD_MODE_9 runs Dragscroll over a key that types '.'. Its double tap is
+// empty: the standard key pressed twice with the last held (D-F64). Held at
+// the second press, one '.' goes out at the tap / hold threshold, then the
+// mode runs, and its release types nothing; tapped twice it types two.
+static void test_pointing_key_held_at_an_empty_branch_types_its_earlier_taps_first(void) {
+    keypos_t             key_pos = test_keypos(1, 2);
+    pointing_mode_mask_t mode    = pointing_mode_mask_from_id(9);
+    noah_pd_config_t     config  = noah_pd_defaults[0];
+
+    for (uint8_t held = 0; held < 3u; held++) {
+        test_reset_state();
+        config.id = 9;
+        noah_profile_pd_v1_encode_record(&config, configured_pd_records[9]);
+        publish_configured_pd();
+        test_set_keymap_key(TEST_LAYER_BASE, key_pos, KC_DOT);
+        test_set_keymap_key(TEST_LAYER_POINTER, key_pos, PD_MODE_9);
+        layer_state = test_layer_mask(TEST_LAYER_BASE) | test_layer_mask(TEST_LAYER_POINTER);
+        CHECK(pointing_mode_for_keycode(PD_MODE_9) == mode);
+
+        if (held == 0u) {
+            // Held alone, the mode runs from the press and nothing is typed.
+            CHECK(!key_runtime_integration_process_record(PD_MODE_9, key_pos, true));
+            CHECK(pointing_mode_local_active(mode));
+            key_runtime_integration_advance(&fake_time, 1000);
+            key_runtime_integration_scan();
+            CHECK(!key_runtime_integration_process_record(PD_MODE_9, key_pos, false));
+            test_flush_pending_tap_branch();
+            CHECK(delayed_action_count == 0);
+            CHECK(!pointing_mode_local_active(mode));
+            continue;
+        }
+
+        CHECK(!key_runtime_integration_process_record(PD_MODE_9, key_pos, true));
+        key_runtime_integration_advance(&fake_time, 10);
+        CHECK(!key_runtime_integration_process_record(PD_MODE_9, key_pos, false));
+        key_runtime_integration_advance(&fake_time, 20);
+        CHECK(!key_runtime_integration_process_record(PD_MODE_9, key_pos, true));
+        CHECK(delayed_action_count == 0);
+        if (held == 1u) {
+            CHECK(!pointing_mode_local_active(mode));
+            key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
+            key_runtime_integration_scan();
+            CHECK(delayed_action_count == 1);
+            CHECK(last_delayed_action == KC_DOT);
+            CHECK((last_delayed_modes & mode) == 0);
+            CHECK(pointing_mode_local_active(mode));
+            key_runtime_integration_advance(&fake_time, 1000);
+            key_runtime_integration_scan();
+            CHECK(pointing_mode_local_active(mode));
+            CHECK(!key_runtime_integration_process_record(PD_MODE_9, key_pos, false));
+            test_flush_pending_tap_branch();
+            CHECK(delayed_action_count == 1);
+        } else {
+            key_runtime_integration_advance(&fake_time, 10);
+            CHECK(!key_runtime_integration_process_record(PD_MODE_9, key_pos, false));
+            test_flush_pending_tap_branch();
+            CHECK(delayed_action_count == 2);
+            CHECK(last_delayed_action == KC_DOT);
+        }
+        CHECK(!pointing_mode_local_active(mode));
+        CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
+        CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
+    }
+}
+
+// The same hold, released past the threshold before any scan crossed it (a
+// slow loop pass, or a press replayed from admission): the release catches
+// the hold up. The one earlier '.' goes out, then the mode is held and let go
+// at once, and the release types nothing more, though the key's tap ('.') is
+// not its hold (the mode).
+static void test_pointing_key_caught_up_at_an_empty_branch_types_only_its_earlier_taps(void) {
+    keypos_t             key_pos = test_keypos(1, 2);
+    pointing_mode_mask_t mode    = pointing_mode_mask_from_id(9);
+    noah_pd_config_t     config  = noah_pd_defaults[0];
+
+    test_reset_state();
+    config.id = 9;
+    noah_profile_pd_v1_encode_record(&config, configured_pd_records[9]);
+    publish_configured_pd();
+    test_set_keymap_key(TEST_LAYER_BASE, key_pos, KC_DOT);
+    test_set_keymap_key(TEST_LAYER_POINTER, key_pos, PD_MODE_9);
+    layer_state = test_layer_mask(TEST_LAYER_BASE) | test_layer_mask(TEST_LAYER_POINTER);
+
+    CHECK(!key_runtime_integration_process_record(PD_MODE_9, key_pos, true));
+    key_runtime_integration_advance(&fake_time, 10);
+    CHECK(!key_runtime_integration_process_record(PD_MODE_9, key_pos, false));
+    key_runtime_integration_advance(&fake_time, 20);
+    CHECK(!key_runtime_integration_process_record(PD_MODE_9, key_pos, true));
+    fake_time = (uint16_t)(fake_time + TEST_PD_TAP_HOLD_TERM + 10);
+    CHECK(delayed_action_count == 0);
+    CHECK(!pointing_mode_local_active(mode));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_9, key_pos, false));
+    CHECK(delayed_action_count == 1);
+    CHECK(last_delayed_action == KC_DOT);
+    CHECK((last_delayed_modes & mode) == 0);
+    test_flush_pending_tap_branch();
+    CHECK(delayed_action_count == 1);
+    CHECK(!pointing_mode_local_active(mode));
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
+}
+
+// A mod-tap's tap is its key and its hold its modifier, so the same holds for
+// it: held at an empty Double tap and caught up at release, its tap (K) once,
+// then Control held and let go, and no second K.
+static void test_mod_tap_caught_up_at_an_empty_branch_types_only_its_earlier_taps(void) {
+    keypos_t key_pos = test_keypos(1, 2);
+    uint16_t key     = MT(MOD_LCTL, KC_K);
+
+    test_reset_state();
+    test_set_keymap_key(TEST_LAYER_BASE, key_pos, key);
+    layer_state = test_layer_mask(TEST_LAYER_BASE);
+
+    CHECK(!key_runtime_integration_process_record(key, key_pos, true));
+    key_runtime_integration_advance(&fake_time, 10);
+    CHECK(!key_runtime_integration_process_record(key, key_pos, false));
+    key_runtime_integration_advance(&fake_time, 20);
+    CHECK(!key_runtime_integration_process_record(key, key_pos, true));
+    fake_time = (uint16_t)(fake_time + TEST_PD_TAP_HOLD_TERM + 10);
+    CHECK(delayed_action_count == 0);
+    CHECK(!key_runtime_integration_process_record(key, key_pos, false));
+    CHECK(delayed_action_count == 1);
+    CHECK(last_delayed_action == key);
+    CHECK(host_out_count == 2 && host_out[0].kind == 'R' && host_out[0].code == LCTL(KC_NO) && host_out[1].kind == 'U' && host_out[1].code == LCTL(KC_NO));
+    test_flush_pending_tap_branch();
+    CHECK(delayed_action_count == 1);
+    CHECK(host_out_count == 2);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
+    CHECK(fake_mods == 0);
+}
+#endif
 
 static void test_right_alt_single_tap_locks_arrow_mode_without_leaking_ralt_state(void) {
     keypos_t right_alt_pos = test_keypos(3, 5);
@@ -6228,6 +6374,9 @@ int main(int argc, char **argv) {
     test_mode_tap_registers_held_key_fallback_hold_first();
     test_mode_tap_registers_every_due_fallback_hold_in_key_order();
     test_mode_tap_registers_only_due_fallback_holds();
+    test_pointing_key_held_at_an_empty_branch_types_its_earlier_taps_first();
+    test_pointing_key_caught_up_at_an_empty_branch_types_only_its_earlier_taps();
+    test_mod_tap_caught_up_at_an_empty_branch_types_only_its_earlier_taps();
 #endif
     test_last_slot_hold_lock_dpi_and_disabled_slot();
     test_a_qmk_charybdis_key_has_the_policy_write_its_cpi_again();

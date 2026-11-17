@@ -89,8 +89,9 @@ MACRO(MACRO_10, "Select All + Copy", "{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}")
 
 After changing the macros, regenerate `authored_macro_bank.h`:
 
-```sh NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh
-tests/host/run_real_profile_validation_tests.sh ```
+```sh
+NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh
+```
 
 A stale copy fails the build. Authored macros play uninterruptibly only when
 they need Unicode entry ([Macros](macros.md#uninterruptible-playback)).

@@ -542,11 +542,32 @@ void key_runtime_core_plan_missed_scans_for_token(key_runtime_core_state_t *stat
     state->current_time = current_time;
 }
 
+// Whether `token` was pressed after the latest press of the key at
+// `emitting`; presses in the same millisecond go by token ID. A key whose
+// token is cleared has been released and settled, so its press came before
+// every press still pending: one already down then had its fallback hold
+// registered by that press. So did the press of a key that has been down
+// past its own hold time, and that is not asked of the press times: they are
+// 16-bit, so a press that follows a key down for more than half their range
+// (a held repeat, 32.8 seconds on) would read as pressed before it.
+static bool key_runtime_core_scan_pressed_after(const press_token_t *token, const press_token_t *emitting) {
+    uint16_t since = (uint16_t)(token->pressed_at - emitting->pressed_at);
+
+    if (emitting->token_id == 0u || emitting->phase == PRESS_TOKEN_PHASE_HELD) {
+        return true;
+    }
+    return since == 0u ? token->token_id > emitting->token_id : since < UINT16_C(0x8000);
+}
+
 // Not inlined: the reviewed stack paths name it beneath an output.
-// The press at `except_key_pos` is never due: its own key's output is going out.
+// The press at `except_key_pos` is never due: its own key's output is going
+// out. Nor is a press after that key's: taps go out in press order, before a
+// later press's fallback hold (D-F64). An output of no key finds every other
+// pending fallback hold due.
 __attribute__((noinline)) bool key_runtime_core_pending_fallback_holds(uint32_t due[KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT], keypos_t except_key_pos) {
     key_runtime_core_state_t *state = key_runtime_core_state();
-    bool                      any   = false;
+    const press_token_t      *emitting;
+    bool                      any = false;
 
     for (uint16_t word = 0; word < KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT; word++) {
         due[word] = 0u;
@@ -555,8 +576,14 @@ __attribute__((noinline)) bool key_runtime_core_pending_fallback_holds(uint32_t 
         return false;
     }
 
+    emitting = key_runtime_core_scan_press_token_state(state, except_key_pos);
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY; index++) {
-        if (key_runtime_core_scan_keypos_index(except_key_pos) != index && key_runtime_core_fallback_hold_due(state, &state->press_tokens[index])) {
+        const press_token_t *token = &state->press_tokens[index];
+
+        if (key_runtime_core_scan_keypos_index(except_key_pos) == index || (emitting && key_runtime_core_scan_pressed_after(token, emitting))) {
+            continue;
+        }
+        if (key_runtime_core_fallback_hold_due(state, token)) {
             due[index / 32u] |= UINT32_C(1) << (index % 32u);
             any = true;
         }

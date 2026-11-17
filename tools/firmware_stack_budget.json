@@ -199,7 +199,7 @@
         },
         {
           "name": "handled release bounded deferred fallback settlement",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
         },
         {
           "name": "non-handled release cleanup lookup",
@@ -215,7 +215,7 @@
         },
         {
           "name": "matrix scan bounded deferred fallback settlement",
-          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
         },
         {
           "name": "matrix scan combo-origin candidate retirement",
@@ -476,6 +476,10 @@
         {
           "name": "matrix scan leader send macro start",
           "functions": ["main", "matrix_scan", "autocorrect_lead_match", "profile_macro_start_from", "macro_slot_provider_compile", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_active_profile_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "matrix scan autocorrect list read",
+          "functions": ["main", "matrix_scan", "autocorrect_read_list", "noah_profile_autocorrect_v1_correction", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "lighting behaviour feedback area by the newest key",

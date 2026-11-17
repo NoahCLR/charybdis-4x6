@@ -7,9 +7,9 @@ behaviour belongs to the keycode, not to a position, so it runs wherever that
 keycode is pressed, on any layer or as a combo's output.
 
 Ark edits all of this on the keyboard
-([Keys](https://github.com/NoahCLR/charybdis-ark/blob/dev/docs/guide/keys.md),
-[Behaviours](https://github.com/NoahCLR/charybdis-ark/blob/dev/docs/guide/behaviours.md),
-[Combos](https://github.com/NoahCLR/charybdis-ark/blob/dev/docs/guide/combos.md)).
+([Keys](https://github.com/NoahCLR/charybdis-ark/blob/main/docs/guide/keys.md),
+[Behaviours](https://github.com/NoahCLR/charybdis-ark/blob/main/docs/guide/behaviours.md),
+[Combos](https://github.com/NoahCLR/charybdis-ark/blob/main/docs/guide/combos.md)).
 This page is what the keyboard does with it. The C names are in
 [Authoring in C](authoring.md).
 
@@ -88,7 +88,11 @@ hold.
   types nothing there.
 - A branch you leave wholly empty is the standard key pressed that many
   times. Held at its second press, an empty double tap on Left Control sends
-  Control once, then holds Control from the tap / hold threshold.
+  Control once, then holds Control from the tap / hold threshold. A pointing
+  key whose single tap is Transparent does the same: held at its second
+  press, it types the key below once at the tap / hold threshold, then runs
+  its mode from there, not from the press, and types nothing when you let
+  go.
 - **Tapping past the deepest branch is typing the standard key.** If you keep
   tapping within the window after the deepest branch you set, no branch
   fires: every press in the run, the first included, is the standard key. A

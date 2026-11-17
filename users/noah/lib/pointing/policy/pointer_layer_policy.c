@@ -138,7 +138,12 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
         return;
     }
 
-    noah_qmk_contract_auto_mouse_keyevent(pressed);
+    // QMK zeroes the tracker if auto-mouse was switched, retargeted or
+    // retimed while the button was held (AM_ON, AM_TOGG, a live settings
+    // edit), and a release below zero would leave auto-mouse active.
+    if (pressed || noah_qmk_contract_auto_mouse_key_tracker() > 0) {
+        noah_qmk_contract_auto_mouse_keyevent(pressed);
+    }
 }
 
 // One count on QMK's key tracker while the runtime locks or holds the

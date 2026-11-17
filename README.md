@@ -2,8 +2,8 @@
 
 QMK firmware for the [BastardKB Charybdis 4x6](https://bastardkb.com/), a
 split keyboard with a trackball. The keyboard's profile (keymap, behaviours,
-combos, macros, trackball and lighting) is stored on the keyboard itself and
-is edited in [Charybdis Ark](https://github.com/NoahCLR/charybdis-ark), a web
+combos, macros, text replacement, trackball and lighting) is stored on the
+keyboard itself and is edited in [Charybdis Ark](https://github.com/NoahCLR/charybdis-ark), a web
 editor. In Ark's default edit mode, a change takes effect from the next
 keypress, with no reflashing.
 
@@ -188,8 +188,10 @@ the ball moves.
   Splinky build). The trackball and the USB cable go on the right half;
   builds with the trackball on the left aren't supported.
 - **Starting point:** the default profile, set up for a Mac with the Dutch
-  layout and the author's app shortcuts. There is no blank profile, and your
-  current keymap isn't carried over. On Windows or Linux, Ark's **Host**
+  layout and the author's app shortcuts. There is no blank profile. Coming
+  from VIA, save your layout there before flashing (Save + Load, Save Current
+  Layout): Ark's **Backups** imports its keys and macros, and nothing else is
+  carried over. On Windows or Linux, Ark's **Host**
   settings can swap Ctrl and Command, but the default shortcuts and macros
   are Mac shortcuts, so expect to change some of them.
 - **Editor:** Ark, in Chrome or Edge. VIA isn't supported.
@@ -209,10 +211,11 @@ the ball moves.
 - **Limits:** 16 layers, 128 behaviours with five tap counts each, 128 combos,
   128 custom keys, 128 macros and 32 pointing modes.
 - **Updates:** flashing never erases the saved profile, but the keyboard runs
-  it only if the new release has the same compiled defaults and firmware
-  version (a number separate from the release name). Otherwise it starts from
-  the new defaults, and importing a backup brings your profile back. A
-  release with a new firmware version refuses older backups. Before
+  it only if the new release has the same compiled defaults, profile format
+  and firmware version (a number separate from the release name). Otherwise
+  it starts from the new defaults, and importing a backup brings your profile
+  back. A release that changes the profile format or the firmware version
+  refuses older backups. Before
   updating, export a backup in Ark, read the release notes and keep the old
   release's `.uf2` files to go back to. Ark edits only firmware whose profile
   format it knows, so update both halves.

@@ -188,7 +188,13 @@ static bool key_runtime_core_release_hold_action_feedback_kind(const press_token
     return true;
 }
 
-static uint16_t key_runtime_core_pending_multi_tap_release_held_lifecycle_action(const press_token_t *token, uint16_t candidate_action, uint16_t elapsed) {
+// The hold a pending multi-tap release catches up: one held from the
+// threshold until release, past its threshold, in place of the release's own
+// `candidate_action` when that is the same action. In a branch that sets
+// nothing the last press is the standard key's hold whatever its tap is
+// (D-F64): a pointing-mode key's tap is the key below and its hold the mode,
+// LT()'s and MT()'s tap their key and their hold a layer or modifiers.
+static uint16_t key_runtime_core_pending_multi_tap_release_held_lifecycle_action(const press_token_t *token, uint16_t candidate_action, uint16_t elapsed, bool empty_branch) {
     handled_key_hold_semantics_t semantics;
 
     if (!(token && token->handled_key)) {
@@ -204,7 +210,7 @@ static uint16_t key_runtime_core_pending_multi_tap_release_held_lifecycle_action
         return KC_NO;
     }
 
-    if (candidate_action != KC_NO && candidate_action != semantics.threshold_action) {
+    if (!empty_branch && candidate_action != KC_NO && candidate_action != semantics.threshold_action) {
         return KC_NO;
     }
 
@@ -325,6 +331,22 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, const key_ru
     }
 }
 
+// A press released past its hold threshold before a scan crossed it is held
+// and let go at once, as the scan would have held it. A branch that sets
+// nothing is the standard key pressed N times with the last held: its N - 1
+// standard taps go out before that hold (D-F64), as the scan's do.
+static inline __attribute__((always_inline)) void key_runtime_core_pending_multi_tap_release_held_lifecycle(key_runtime_core_state_t *state, tap_series_t *series, uint16_t action, uint16_t tap_action, uint8_t tap_repeat_count, key_runtime_core_pending_multi_tap_release_resolution_t *out) {
+    uint8_t taps_before_hold = key_runtime_core_tap_series_is_empty_branch(series) && tap_repeat_count > 1u ? (uint8_t)(tap_repeat_count - 1u) : 0u;
+
+    key_runtime_core_tap_series_clear(state, series);
+    *out = (key_runtime_core_pending_multi_tap_release_resolution_t){
+        .outcome      = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE,
+        .action       = action,
+        .repeat_count = taps_before_hold,
+        .tap_action   = tap_action,
+    };
+}
+
 // The outcome of a pending multi-tap release, given its key's released press
 // token: every field but release_owned_state.
 static inline __attribute__((always_inline)) void key_runtime_core_resolve_pending_multi_tap_release_outcome(key_runtime_core_state_t *state, const press_token_t *token, keypos_t key_pos, uint16_t tap_action, uint8_t tap_repeat_count, bool preserve_chain_available, key_runtime_core_pending_multi_tap_release_resolution_t *out) {
@@ -341,8 +363,10 @@ static inline __attribute__((always_inline)) void key_runtime_core_resolve_pendi
     bool                           tap_branch_feedback_on_release;
     bool                           authored_branch;
     bool                           authored_tap_branch;
+    bool                           empty_branch;
 
     series              = key_runtime_core_tap_series_state(state, key_pos);
+    empty_branch        = key_runtime_core_tap_series_is_empty_branch(series);
     elapsed             = key_runtime_core_release_elapsed(token->pressed_at, token->released_at);
     series_tap_count    = series ? series->tap_count : 0u;
     authored_branch     = key_runtime_core_tap_series_has_authored_branch(series);
@@ -370,16 +394,12 @@ static inline __attribute__((always_inline)) void key_runtime_core_resolve_pendi
 
     switch (decision.outcome) {
         case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_ACTION: {
-            uint16_t                  held_lifecycle_action = key_runtime_core_pending_multi_tap_release_held_lifecycle_action(token, decision.action, elapsed);
+            uint16_t                  held_lifecycle_action = key_runtime_core_pending_multi_tap_release_held_lifecycle_action(token, decision.action, elapsed, empty_branch);
             key_feedback_pulse_kind_t action_feedback_kind  = KEY_FEEDBACK_PULSE_HOLD;
             bool                      action_feedback       = series_tap_count > 1u && key_runtime_core_release_hold_action_feedback_kind(token, decision.action, elapsed, &action_feedback_kind);
 
             if (held_lifecycle_action != KC_NO) {
-                key_runtime_core_tap_series_clear(state, series);
-                *out = (key_runtime_core_pending_multi_tap_release_resolution_t){
-                    .outcome = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE,
-                    .action  = held_lifecycle_action,
-                };
+                key_runtime_core_pending_multi_tap_release_held_lifecycle(state, series, held_lifecycle_action, tap_action, tap_repeat_count, out);
                 return;
             }
 
@@ -396,15 +416,11 @@ static inline __attribute__((always_inline)) void key_runtime_core_resolve_pendi
             return;
         }
         case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_TAP: {
-            uint16_t held_lifecycle_action = key_runtime_core_pending_multi_tap_release_held_lifecycle_action(token, tap_action, elapsed);
+            uint16_t held_lifecycle_action = key_runtime_core_pending_multi_tap_release_held_lifecycle_action(token, tap_action, elapsed, empty_branch);
             bool     consumes_oneshot      = IS_QK_MOD_TAP(token->resolved_keycode) && noah_qmk_contract_tap_uses_oneshot_layer(tap_action);
 
             if (held_lifecycle_action != KC_NO) {
-                key_runtime_core_tap_series_clear(state, series);
-                *out = (key_runtime_core_pending_multi_tap_release_resolution_t){
-                    .outcome = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE,
-                    .action  = held_lifecycle_action,
-                };
+                key_runtime_core_pending_multi_tap_release_held_lifecycle(state, series, held_lifecycle_action, tap_action, tap_repeat_count, out);
                 return;
             }
 
@@ -431,14 +447,10 @@ static inline __attribute__((always_inline)) void key_runtime_core_resolve_pendi
         case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_POINTING_MODE_LOCK_TAP:
         case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_NONE:
         default: {
-            uint16_t held_lifecycle_action = key_runtime_core_pending_multi_tap_release_held_lifecycle_action(token, tap_action, elapsed);
+            uint16_t held_lifecycle_action = key_runtime_core_pending_multi_tap_release_held_lifecycle_action(token, tap_action, elapsed, empty_branch);
 
             if (held_lifecycle_action != KC_NO) {
-                key_runtime_core_tap_series_clear(state, series);
-                *out = (key_runtime_core_pending_multi_tap_release_resolution_t){
-                    .outcome = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE,
-                    .action  = held_lifecycle_action,
-                };
+                key_runtime_core_pending_multi_tap_release_held_lifecycle(state, series, held_lifecycle_action, tap_action, tap_repeat_count, out);
                 return;
             }
 
@@ -511,6 +523,7 @@ bool key_runtime_core_plan_pending_multi_tap_release_effects(keypos_t key_pos, b
 
     switch (resolution->outcome) {
         case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE:
+            key_runtime_core_release_effect_plan_push_delayed_action(out, key_pos, resolution->tap_action, mods, resolution->repeat_count);
             key_runtime_core_release_effect_plan_push_held_action(out, KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER, key_pos, resolution->action);
             key_runtime_core_release_effect_plan_push_held_action(out, KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER, key_pos, resolution->action);
             (void)key_runtime_core_reset_pending_multi_tap(key_pos);

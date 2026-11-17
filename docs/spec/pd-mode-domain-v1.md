@@ -362,14 +362,15 @@ whichever source runs it, paints in the lighting domain's layer stage directly
 beneath the lowest such layer: the layers below, then the mode, then that
 layer and every layer above. Every layer of the link that is on so paints over
 the mode: a layer coloured "only mapped keys" shows its keys over the mode's
-colour, and a higher layer covers both. While the pointing-mode stage is off
-the mode has nothing to paint and the layer stage draws as without it. Any
+colour, and a higher layer covers both. While the pointing-mode stage is off,
+or the slot is passthrough with no coloured row for it, the mode has nothing
+to paint and the layer stage draws as without it. Any
 other running mode paints in the pointing-mode stage,
 above the layers ([drawing](rgb-domain-v1.md#drawing)). Each half decides from
 the mirrored mode, its own pointing slots and the synced layer state, so both
 halves light alike with no extra state to send (D-F62).
 
-Held by: `tests/host/run_rgb_layer_render_tests.sh` (`rgb_layer_render_test.c`, `test_linked_mode_paints_beneath_its_layer`, on both halves; `rgb_pd_active_profile_test.c`, the stage off), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_a_running_mode_names_its_link_layers`).
+Held by: `tests/host/run_rgb_layer_render_tests.sh` (`rgb_layer_render_test.c`, `test_linked_mode_paints_beneath_its_layer`, on both halves, and `test_passthrough_linked_slot_leaves_the_layer_stack_whole`; `rgb_pd_active_profile_test.c`, the stage off), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_a_running_mode_names_its_link_layers`).
 
 ## Directional movement
 

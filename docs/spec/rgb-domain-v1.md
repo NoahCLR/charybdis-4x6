@@ -266,7 +266,8 @@ paints nothing, what is beneath shows.
 1. **Layer**: every layer that is on, the base layer always, lowest first, so
    a higher layer covers a lower one; a passthrough layer colour paints nothing.
    Then the layer rows. While a layer of a running pointing mode's link is
-   on and the mode has a colour to paint (the pointing-mode stage is on), the
+   on and the mode has a colour to paint (the pointing-mode stage is on, and
+   the slot is not passthrough or has a coloured row), the
    stage draws in two parts: the layers below the lowest such layer
    and their rows, then the mode's colour and rows as stage 5 would paint
    them, then that layer, the layers above and their rows (D-F62). The rows of the layers below no
@@ -399,7 +400,44 @@ colour held while [the leader](autocorrect-v1.md#the-leader) waits (D-F72):
   minutes; an idle timeout set shorter than the leader's can turn leading
   dark.
 
-Held by: `tests/host/run_rgb_layer_render_tests.sh` (`rgb_key_active_profile_test.c`, `test_one_locality_paints_as_before`, `test_a_narrower_case_paints_over_a_wider_one`, `test_the_newest_key_decides_a_shared_area`, `test_each_tap_branch_is_a_case`, `test_each_case_beside_another`, `test_an_owner_showing_no_case_keeps_its_area_dark`, `test_an_all_row_follows_the_newest_tap_branch`, `test_a_passthrough_case_paints_nothing`; `rgb_pd_active_profile_test.c`, `test_a_passthrough_slot_paints_nothing`; `rgb_combo_active_profile_test.c`, `test_a_passthrough_combo_colour_paints_nothing`; `rgb_layer_render_test.c`, `test_render_order_*`, `test_combo_*_stays_*`, `test_runtime_boot_indicator_overrides_scene`, the `*automouse*` and `*timeout*` tests, `test_newest_global_feedback_owner_wins_over_older_higher_priority`, `test_key_half_feedback_follows_newest_owner_without_visible_fallback`, `test_render_order_replacement_feedback_covers_key_feedback`, `test_slave_half_draws_the_mirrored_leading_on_the_leader_key`, `test_a_frame_reads_replacement_feedback_once`; `rgb_base_underlay_test.c`; `rgb_autocorrect_active_profile_test.c`), `tests/host/run_autocorrect_tests.sh` (`autocorrect_test.c`, the tests under "What lighting is told", `test_leading_holds_until_leading_ends`), `tests/host/run_runtime_debug_tests.sh` (`runtime_debug_test.c`, the `test_key_feedback_*` and `test_display_preview_*` tests, `test_split_term_branch_names_its_tap_at_the_accept_window`, `test_long_hold_only_branch_keeps_branch_color_until_long_hold`), `tests/host/run_qmk_combo_origin_tests.sh` (`qmk_combo_origin_test.c`, `test_active_combo_partition_*`).
+Held by: `tests/host/run_rgb_layer_render_tests.sh` (`rgb_key_active_profile_test.c`, `test_one_locality_paints_as_before`, `test_a_narrower_case_paints_over_a_wider_one`, `test_the_newest_key_decides_a_shared_area`, `test_each_tap_branch_is_a_case`, `test_each_case_beside_another`, `test_an_owner_showing_no_case_keeps_its_area_dark`, `test_an_all_row_follows_the_newest_tap_branch`, `test_a_passthrough_case_paints_nothing`; `rgb_pd_active_profile_test.c`, `test_a_passthrough_slot_paints_nothing`; `rgb_combo_active_profile_test.c`, `test_a_passthrough_combo_colour_paints_nothing`; `rgb_layer_render_test.c`, `test_render_order_*`, `test_combo_*_stays_*`, `test_runtime_boot_indicator_overrides_scene`, the `*automouse*` and `*timeout*` tests, `test_newest_global_feedback_owner_wins_over_older_higher_priority`, `test_key_half_feedback_follows_newest_owner_without_visible_fallback`, `test_render_order_replacement_feedback_covers_key_feedback`, `test_slave_half_draws_the_mirrored_leading_on_the_leader_key`, `test_a_frame_reads_replacement_feedback_once`; `rgb_base_underlay_test.c`; `rgb_autocorrect_active_profile_test.c`), `tests/host/run_autocorrect_tests.sh` (`autocorrect_test.c`, the tests under "What lighting is told", `test_leading_holds_until_leading_ends`), `tests/host/run_runtime_debug_tests.sh` (`runtime_debug_test.c`, the `test_key_feedback_*` and `test_display_preview_*` tests, `test_split_term_branch_names_its_tap_at_the_accept_window`, `test_long_hold_only_branch_keeps_branch_color_until_long_hold`), `tests/host/run_qmk_combo_origin_tests.sh` (`qmk_combo_origin_test.c`, `test_active_combo_partition_*`), `tests/fixtures/rgb_render_v1.json`.
+
+### The drawing cases
+
+`tests/fixtures/rgb_render_v1.json`, version 1, holds still frames of this
+drawing for a client to hold its own preview to. Its `board` is the
+keyboard's own tables (`keyboard.json` at the pinned BK commit): `keys`, each
+layout key's matrix position, LEDs and half; `leds`, each LED's matrix
+position (`null` for the two no key carries) and half; `leftLeds`, `29`.
+`keymap.mapped` names the layout keys each layer maps in every case,
+`background` the solid background effect every lit case starts from, and
+`profiles` the lighting domains the cases use, each as its payload (`hex`)
+and as its fields (`lighting`). Each case names its `profile` and its
+`state`:
+
+| Field | Meaning |
+| --- | --- |
+| `lightingOn` | QMK's lighting switch; off, QMK draws no stage and every LED is dark |
+| `idle` | the last input is older than the lighting idle timeout |
+| `layersOn` | the layers on besides the base layer |
+| `pointing` | the running `slot`, the layout `key` that runs it or `null`, and its `link`: `linked` and `turnsOn` layers |
+| `combo` | the held combo's layout `keys`, and `runsPointingMode`: its output runs the mode, so it paints beneath it |
+| `behaviour` | the layout `key` showing a `case` (`tapBranch` with its `tapCount`, `tapCommitted`, `hold`, `longHold`), steady |
+| `replacement` | the `case` showing (`textReplaced`, `macroReplaced`, `undone`, `leading`) and its layout `keys`, empty when not known |
+
+`leds[n]` is LED `n`: `rgb`, what the renderer writes; `hsv`, the colour a
+stage picked, `null` where the LED is off; `by`, the owner that painted it.
+`rgb` is QMK's `hsv_to_rgb` (`quantum/color.c`, no CIE curve), and every colour
+is exact under it: hue `0`, `85` or `170` at saturation `255`, or saturation
+`0`. Fades, flashes, animated background effects and the layer preview are
+not in it.
+
+Every layout key carries exactly one LED, and every LED with a matrix
+position is under a key's; the two right-half LEDs no key carries, 56 and 57,
+light only where a stage paints a half, both halves or an LED set, or a
+layer paints every key.
+
+Held by: `tests/host/run_rgb_layer_render_tests.sh` (`rgb_render_fixture_test.inc`, every case of `tests/fixtures/rgb_render_v1.json`; its board checked against `keyboard.json` at the BK commit `qmk-pin.json` names, which must give every key one LED and file no LED under a position no key uses).
 
 ## Compiled lighting and the running view
 

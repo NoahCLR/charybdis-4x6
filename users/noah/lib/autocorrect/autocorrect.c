@@ -245,19 +245,28 @@ static uint8_t autocorrect_core(uint8_t *start) {
 
 // Whether the list has a correction that fires as a word ends, read once a
 // publication (D-F71): a list of replacements that fire only after the leader
-// leaves typing alone until Leader.
+// leaves typing alone until Leader. Finding out may read every row from
+// storage, so only the scan reads it; the report path, which asks on every
+// report, reads only the answer.
 static struct {
     uint32_t publication;
     bool     read, fires;
 } autocorrect_words;
 
-static bool autocorrect_has_list(void) {
+static __attribute__((noinline)) void autocorrect_read_list(void) {
     uint32_t publication = noah_active_profile_autocorrect_publication();
-    if (!autocorrect_words.read || autocorrect_words.publication != publication) {
-        autocorrect_words.fires       = noah_profile_autocorrect_v1_fires_as_typed(noah_active_profile_autocorrect_list());
-        autocorrect_words.publication = publication;
-        autocorrect_words.read        = true;
-    }
+    if (autocorrect_words.read && autocorrect_words.publication == publication) return;
+    autocorrect_words.fires       = noah_profile_autocorrect_v1_fires_as_typed(noah_active_profile_autocorrect_list());
+    autocorrect_words.publication = publication;
+    autocorrect_words.read        = true;
+}
+
+// From a publication to the scan that reads it, the answer is the one for the
+// list before. Either answer keeps every report whole: the stage leaves the
+// path only once nothing is held back, and joining it shows the keys as they
+// are. Keeping the old one only spares the word being typed, which a report
+// passing unread would suspend.
+static bool autocorrect_has_list(void) {
     return autocorrect_words.fires;
 }
 
@@ -1173,6 +1182,8 @@ void noah_autocorrect_scan(void) {
     // A key is noted and its report sent within one key event or action, so
     // by the scan the note names nothing still to come.
     noah_typing_stage_noted_key = autocorrect_no_key;
+    // Read while out of the path too: the answer is what brings the stage in.
+    autocorrect_read_list();
     if (!autocorrect.synced) return;
     autocorrect_read_switches();
     autocorrect_stop_before_full();
@@ -1220,6 +1231,8 @@ void noah_autocorrect_scan(void) {
 void noah_autocorrect_init(void) {
     // No report has gone out: the host has no key down and no word begun.
     autocorrect                 = (autocorrect_t){.synced = true, .allowed = true};
+    autocorrect_words.read      = false;
+    autocorrect_words.fires     = false;
     noah_typing_stage_noted_key = autocorrect_no_key;
     noah_autocorrect_feedback_reset();
 }

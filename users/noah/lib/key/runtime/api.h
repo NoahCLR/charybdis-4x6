@@ -24,7 +24,8 @@ void noah_key_runtime_scan(void);
 // Registers every fallback hold that is due, as an output goes out: a key held
 // as a modifier modifies it. `emitting_key_pos` is the output's own key, whose
 // pending press it leaves alone, so a key's taps never turn its own press into
-// a hold; an output of no key passes NOAH_KEY_RUNTIME_NO_KEY.
+// a hold, and a press after that key's latest press waits, so the output goes
+// out before it (D-F64); an output of no key passes NOAH_KEY_RUNTIME_NO_KEY.
 bool noah_key_runtime_settle_pending_fallback_hold(keypos_t emitting_key_pos);
 // A physical press about to be resolved, of a key without a behaviour, ends
 // other keys' multi-tap windows: settle their pending layer-changing taps

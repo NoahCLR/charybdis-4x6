@@ -211,7 +211,9 @@ uint16_t handled_key_tap_action_behavior(const handled_key_resolution_t *resolut
 // holds itself from the tap / hold threshold does so through its fallback
 // hold, which another key's output settles at once; `threshold_hold` makes it
 // an ordinary threshold hold instead, for a series that must send its taps
-// before the hold.
+// before the hold. A pointing-mode key, which runs its mode from the press,
+// runs it from the threshold then too: an empty branch's hold starts there,
+// after the taps before it (D-F64).
 void handled_key_resolution_standard_key_into(const handled_key_resolution_t *resolution, bool threshold_hold, handled_key_resolution_t *out) {
     *out           = *resolution;
     out->tap_count = 1u;
@@ -219,7 +221,7 @@ void handled_key_resolution_standard_key_into(const handled_key_resolution_t *re
     if (resolution->single_tap_transparent) {
         out->step.tap = (tap_behavior_t)TAP_SENDS(KC_TRNS);
     }
-    if (threshold_hold && handled_key_hold_strategy_behavior(out) == KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK) {
+    if (threshold_hold && (handled_key_hold_strategy_behavior(out) == KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK || out->pointing_mode != 0)) {
         out->step.hold = (hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(out->keycode);
     }
 }

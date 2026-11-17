@@ -158,7 +158,9 @@ whose adjacency the linker no longer makes fails the gate.
 
 The keyboard-report filters end the deepest of these paths, so they keep
 nothing large on the stack: their working copies of a report's usages are
-static, and the typing stage only queues what changed there. The ledger
+static, and the typing stage only queues what changed there: whether the
+list has replacements that fire as a word ends is read from storage at the
+scan, and the filters read only that answer. The ledger
 tells the stage of a usage's owners from the same key paths, with one small
 frame that queues at most one change. Autocorrect's
 lookup and its starts each keep their workspace in a frame of their own

@@ -367,6 +367,27 @@ static void test_mouse_button_actions_notify_auto_mouse(void) {
     CHECK(!auto_mouse_keyevent_pressed[1]);
 }
 
+// A behaviour's MS_BTN3 hold counts on QMK's tracker while auto-mouse is off;
+// AM_ON then zeroes the tracker (set_auto_mouse_enable resets auto-mouse), so
+// the release has no count left to take back. Taking one anyway leaves the
+// tracker at -1: auto-mouse active with no movement and the pointer layer on.
+static void test_mouse_button_release_after_a_qmk_reset_leaves_the_tracker_at_zero(void) {
+    test_reset_stubs();
+    fake_auto_mouse_enabled = false;
+    fake_auto_mouse_layer   = 4;
+
+    pointer_layer_policy_note_action(MS_BTN3, true);
+    CHECK(fake_auto_mouse_key_tracker == 1);
+
+    fake_auto_mouse_enabled     = true;
+    fake_auto_mouse_key_tracker = 0;
+
+    pointer_layer_policy_note_action(MS_BTN3, false);
+    CHECK(fake_auto_mouse_key_tracker == 0);
+    CHECK(!is_auto_mouse_active());
+    CHECK(pointer_layer_policy_apply((layer_state_t)1u << 0) == (layer_state_t)1u << 0);
+}
+
 static void test_arrow_mode_prefers_typing_layer_over_auto_mouse_layer(void) {
     test_reset_stubs();
     fake_active_modes     = POINTING_MODE_ARROW;
@@ -701,6 +722,7 @@ int main(void) {
     test_custom_key_with_layers_counts_as_a_mouse_record();
     test_authored_anchor_row_counts_as_a_mouse_record();
     test_mouse_button_actions_notify_auto_mouse();
+    test_mouse_button_release_after_a_qmk_reset_leaves_the_tracker_at_zero();
     test_arrow_mode_prefers_typing_layer_over_auto_mouse_layer();
     test_anchored_pointing_mode_restores_auto_mouse_layer_when_dropped();
     test_auto_mouse_toggle_restores_auto_mouse_layer_when_dropped();
