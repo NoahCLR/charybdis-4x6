@@ -1,10 +1,12 @@
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "host_runtime_reset_fixture.h"
+#include "released_half_fixture.h"
 #include "transactions.h"
 #include "users/noah/lib/key/runtime/feedback.h"
 #include "users/noah/lib/rgb/automouse/rgb_automouse.h"
@@ -1462,6 +1464,88 @@ static void test_slave_base_rpc_ignores_short_packets(void) {
     CHECK(remote_snapshot_apply_count == 0u);
 }
 
+#if defined(RGB_AUTOCORRECT_FEEDBACK_ENABLE) && defined(RGB_POINTING_MODE_ACTIVE_HALF_ENABLE)
+// ─── Beside a half on the released firmware ─────────────────────────────────
+//
+// While a person flashes one half, then the other, one half runs the released
+// firmware, v2026.10.27, whose base packet is this one without replacement
+// feedback: 14 bytes in the keyboard's configuration (released_half_fixture.h).
+// Both halves register the same RPC ids, and the RPC carries the length sent.
+
+// A released master sends its 14 bytes. This half refuses the packet as
+// short and changes nothing: no field, no publication, no pointing snapshot.
+static void test_a_released_masters_base_packet_leaves_this_half_as_it_was(void) {
+    split_runtime_base_sync_packet_t    packet = {
+        .automouse_progress         = 61u,
+        .active_mode_id             = pointing_mode_id_from_mask(POINTING_MODE_ARROW),
+        .locked_mode_id             = POINTING_MODE_ID_NONE,
+        .pointing_mode_owner_sides  = SPLIT_SIDE_MASK_LEFT,
+        .pointing_mode_owner_bitmap = {0x10u},
+        .key_preview_layer          = 2u,
+    };
+    static split_runtime_sync_remote_t before;
+    uint8_t                             released[sizeof(split_runtime_base_sync_packet_t)] = {0};
+    noah_autocorrect_feedback_t         read;
+    uint8_t                             applied;
+
+    packet.autocorrect_feedback.kind = NOAH_AUTOCORRECT_FEEDBACK_MACRO;
+    key_origin_bitmap_add_keypos(packet.autocorrect_feedback.keys, (keypos_t){.row = 0u, .col = 5u});
+    test_reset_stubs();
+    fake_is_master = false;
+    split_runtime_sync_init();
+    test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC)((uint8_t)sizeof(packet), &packet, 0u, NULL);
+    memcpy(&before, &split_runtime_sync_remote, sizeof(before));
+    applied = remote_snapshot_apply_count;
+
+    // The released packet's own layout, with other values in every field.
+    released[RELEASED_BASE_AUTOMOUSE_PROGRESS_OFFSET] = 9u;
+    released[RELEASED_BASE_ACTIVE_MODE_OFFSET]        = pointing_mode_id_from_mask(POINTING_MODE_VOLUME);
+    released[RELEASED_BASE_LOCKED_MODE_OFFSET]        = pointing_mode_id_from_mask(POINTING_MODE_ZOOM);
+    released[RELEASED_BASE_OWNER_SIDES_OFFSET]        = SPLIT_SIDE_MASK_RIGHT;
+    released[RELEASED_BASE_OWNER_BITMAP_OFFSET]       = 0x01u;
+    released[RELEASED_BASE_PREVIEW_LAYER_OFFSET]      = 7u;
+    test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC)(RELEASED_BASE_PACKET_SIZE, released, 0u, NULL);
+
+    CHECK(memcmp(&before, &split_runtime_sync_remote, sizeof(before)) == 0);
+    CHECK(remote_snapshot_apply_count == applied);
+    CHECK(split_runtime_sync_remote_read_autocorrect_feedback(&read) && memcmp(&read, &packet.autocorrect_feedback, sizeof(read)) == 0);
+}
+
+// This master's packet starts with the released one, field for field, so a
+// released slave, which takes a longer packet and reads the struct it knows,
+// reads what this master means; replacement feedback follows it, unread.
+static void test_this_masters_base_packet_starts_with_the_released_one(void) {
+    const uint8_t *bytes = (const uint8_t *)&rpc_last_base_packet;
+
+    CHECK(KEY_ORIGIN_BITMAP_SIZE == RELEASED_BASE_OWNER_BITMAP_SIZE);
+    CHECK(offsetof(split_runtime_base_sync_packet_t, automouse_progress) == RELEASED_BASE_AUTOMOUSE_PROGRESS_OFFSET);
+    CHECK(offsetof(split_runtime_base_sync_packet_t, active_mode_id) == RELEASED_BASE_ACTIVE_MODE_OFFSET);
+    CHECK(offsetof(split_runtime_base_sync_packet_t, locked_mode_id) == RELEASED_BASE_LOCKED_MODE_OFFSET);
+    CHECK(offsetof(split_runtime_base_sync_packet_t, pointing_mode_owner_sides) == RELEASED_BASE_OWNER_SIDES_OFFSET);
+    CHECK(offsetof(split_runtime_base_sync_packet_t, pointing_mode_owner_bitmap) == RELEASED_BASE_OWNER_BITMAP_OFFSET);
+    CHECK(offsetof(split_runtime_base_sync_packet_t, key_preview_layer) == RELEASED_BASE_PREVIEW_LAYER_OFFSET);
+    CHECK(offsetof(split_runtime_base_sync_packet_t, autocorrect_feedback) == RELEASED_BASE_PACKET_SIZE);
+    CHECK(sizeof(split_runtime_base_sync_packet_t) == RELEASED_BASE_PACKET_SIZE + sizeof(noah_autocorrect_feedback_t));
+
+    test_reset_stubs();
+    fake_autocorrect_feedback.kind = NOAH_AUTOCORRECT_FEEDBACK_UNDO;
+    key_origin_bitmap_add_keypos(fake_autocorrect_feedback.keys, (keypos_t){.row = 1u, .col = 2u});
+    split_runtime_sync_init();
+    split_runtime_sync_tick(timer_read32());
+    // Sent whole: transaction_rpc_send checks it went at the struct's size.
+    CHECK(rpc_send_count_base == 1u);
+    // The bytes a released slave reads, at its offsets, are this master's.
+    CHECK(bytes[RELEASED_BASE_AUTOMOUSE_PROGRESS_OFFSET] == (uint8_t)rpc_last_base_packet.automouse_progress && bytes[RELEASED_BASE_AUTOMOUSE_PROGRESS_OFFSET + 1u] == (uint8_t)(rpc_last_base_packet.automouse_progress >> 8u));
+    CHECK(rpc_last_base_packet.automouse_progress != 0u);
+    CHECK(bytes[RELEASED_BASE_ACTIVE_MODE_OFFSET] == pointing_mode_id_from_mask(POINTING_MODE_ZOOM));
+    CHECK(bytes[RELEASED_BASE_LOCKED_MODE_OFFSET] == rpc_last_base_packet.locked_mode_id);
+    CHECK(bytes[RELEASED_BASE_OWNER_SIDES_OFFSET] == SPLIT_SIDE_MASK_RIGHT);
+    CHECK(memcmp(&bytes[RELEASED_BASE_OWNER_BITMAP_OFFSET], fake_pd_owner_bitmap, RELEASED_BASE_OWNER_BITMAP_SIZE) == 0);
+    CHECK(bytes[RELEASED_BASE_PREVIEW_LAYER_OFFSET] == fake_key_preview_layer);
+    CHECK(memcmp(&bytes[RELEASED_BASE_PACKET_SIZE], &fake_autocorrect_feedback, sizeof(fake_autocorrect_feedback)) == 0);
+}
+#endif
+
 // ─── Publication interleaving ───────────────────────────────────────────────
 //
 // Slave RPC callbacks publish from the split worker context, so these tests
@@ -1763,6 +1847,10 @@ int main(void) {
     test_heartbeats_keep_their_own_period_and_changes_do_not_wait();
     test_slave_rpcs_apply_exact_remote_state();
     test_slave_base_rpc_ignores_short_packets();
+#if defined(RGB_AUTOCORRECT_FEEDBACK_ENABLE) && defined(RGB_POINTING_MODE_ACTIVE_HALF_ENABLE)
+    test_a_released_masters_base_packet_leaves_this_half_as_it_was();
+    test_this_masters_base_packet_starts_with_the_released_one();
+#endif
     test_combo_publication_is_atomic_for_readers();
     test_key_feedback_semantic_publication_is_atomic_for_readers();
     test_key_feedback_branch_publication_is_atomic_for_readers();

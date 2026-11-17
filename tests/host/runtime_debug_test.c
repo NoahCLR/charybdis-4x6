@@ -2086,6 +2086,23 @@ static void test_hold_of_an_empty_branch_is_the_standard_key(void) {
     test_sent_only(KC_LEFT_CTRL, 1u);
 }
 
+// The same hold, released past the threshold before any scan crossed it (a
+// slow loop pass, or a press replayed from admission): its release catches the
+// hold up, and the earlier tap still goes out before it.
+static void test_hold_of_an_empty_branch_caught_up_at_release_keeps_its_taps(void) {
+    keypos_t key_pos = test_keypos(6, 3);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    test_tap_quickly(KC_LEFT_CTRL, key_pos, 1u);
+    CHECK(!test_process_record(KC_LEFT_CTRL, key_pos, true));
+    fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM + 10u);
+    CHECK(output_count == 0u);
+    test_release_and_settle(KC_LEFT_CTRL, key_pos);
+    CHECK(!test_held_at(key_pos, KC_LEFT_CTRL));
+    test_sent_only(KC_LEFT_CTRL, 1u);
+}
+
 static void test_inherited_terminal_modifier_tap_waits_the_window_without_commit_feedback(void) {
     uint8_t             semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
     uint8_t             tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
@@ -3941,6 +3958,7 @@ int main(void) {
     test_quick_taps_past_the_depth_type_the_standard_tap();
     test_hold_past_the_depth_holds_after_the_typed_taps();
     test_hold_of_an_empty_branch_is_the_standard_key();
+    test_hold_of_an_empty_branch_caught_up_at_release_keeps_its_taps();
 
     puts("runtime_debug host tests passed");
     return 0;

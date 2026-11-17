@@ -2,7 +2,7 @@
 
 What the firmware on your Charybdis does, and how to write its defaults in C.
 To change the keyboard, use Charybdis Ark: its
-[guide](https://github.com/NoahCLR/charybdis-ark/tree/dev/docs/guide) walks
+[guide](https://github.com/NoahCLR/charybdis-ark/tree/main/docs/guide) walks
 through every screen. These pages say what the keyboard does with what you
 set there.
 

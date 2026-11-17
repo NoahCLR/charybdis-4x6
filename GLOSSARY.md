@@ -498,7 +498,34 @@ from 2, tap committed, hold and long hold; for replacement feedback text
 replaced, macro replaced, undone and leading. A stored row names a case by
 its semantic, every tap branch at once by semantic `7` (D-F75), or every
 case by `0xff`. When a stage's cases share one setting it says when, not where.
+Ark calls a case of behaviour feedback a **behaviour state** (**Every
+behaviour state** for `0xff`) and keeps case for replacement feedback's: the
+same thing.
 _Avoid_: kind, state (for this), mode
+
+**Accent**:
+Chosen LEDs that light over their stage's own colour while what owns them
+shows: a layer that is on, the running pointing slot, the combo feedback, a
+feedback case, or any one of a stage's owners (D-F63). An accent lights in a
+colour of its own or, at `0, 0, 0`, its owner's. It is stored as a group row,
+and Ark says accent too.
+_Avoid_: LED group, override, kind of feedback
+
+**Group row**:
+How the lighting domain stores an accent: a selector naming its owner (a
+layer, a pointing slot, a case's semantic, `7` for every tap branch, or
+`0xff` for all; combo rows have none), a colour and an LED set's id, in one
+table per stage that has accents: at most 255 in one table and 640 in all
+(D-F63). The specs and code say group
+row; prose says accent.
+_Avoid_: LED group (for the row), assignment, rule
+
+**LED set**:
+One of the lighting domain's reusable sets of LEDs, which group rows name by
+id: up to 128, stored once however many rows light it, so rows that light the
+same LEDs share one (D-F63). The specs call it a reusable group, authored
+data an `rgb_led_group_t`; Ark says LED set too.
+_Avoid_: LED group (in prose), mask, bitmap (for the set)
 
 **Passthrough**:
 A colour of saturation and value `0`, at any hue, owned by a layer, pointing

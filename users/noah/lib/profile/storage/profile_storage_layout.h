@@ -18,7 +18,7 @@
 #define NOAH_PROFILE_WIRE_V1_MAX_COMBOS 128u
 #define NOAH_PROFILE_WIRE_V1_MAX_KEYS_PER_COMBO 16u
 #define NOAH_PROFILE_WIRE_V1_MAX_REUSABLE_RGB_GROUPS 128u
-// Group rows in all four lighting tables together, and in any one (D-F63).
+// Group rows in all five lighting tables together, and in any one (D-F63).
 #define NOAH_PROFILE_WIRE_V1_MAX_RGB_STAGE_GROUP_ROWS 640u
 #define NOAH_PROFILE_WIRE_V1_MAX_RGB_TABLE_GROUP_ROWS 255u
 #define NOAH_PROFILE_WIRE_V1_MAX_PHYSICAL_LEDS 58u

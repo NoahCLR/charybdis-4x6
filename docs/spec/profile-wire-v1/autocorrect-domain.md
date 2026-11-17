@@ -218,7 +218,7 @@ Held by: `tests/host/run_profile_autocorrect_v1_tests.sh` (`profile_autocorrect_
 
 The keyboard reads the list where it lies, in the active profile: a saved
 slot in flash or the working copy in RAM (D-F54,
-[ADR](../../adr/0054-profile-flash-and-validation-leave-the-raw-hid-callback.md)).
+[ADR](../../adr/0054-callbacks-never-write-flash.md)).
 It keeps the list's range and its five counts, and no index or copy of the
 list in RAM. A newly active profile, a live edit included, replaces the range.
 

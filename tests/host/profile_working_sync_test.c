@@ -11,6 +11,7 @@
 #include "split_fault_link.h"
 #include "users/noah/lib/profile/split/profile_working_sync.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
+#include "tests/host/include/released_half_fixture.h"
 
 _Static_assert((unsigned)NOAH_PROFILE_WORKING_SYNC_FRAME_MAX <= (unsigned)SPLIT_FAULT_LINK_FRAME_MAX, "the fault link carries the largest working-sync frame");
 
@@ -557,9 +558,110 @@ static void test_frames(void) {
     puts("frames are sized by kind and sealed");
 }
 
+// One request from the released half to the other half, answered as its
+// retry collects it: the callback admits it, the scan answers.
+static const uint8_t *released_exchange(uint8_t *frame, uint8_t length) {
+    static uint8_t reply[NOAH_PROFILE_WORKING_SYNC_FRAME_SIZE];
+
+    noah_profile_working_sync_seal(frame, length);
+    assert(noah_profile_working_sync_receive(&other.sync, frame, length, reply, sizeof(reply)) && reply[3] == NOAH_PROFILE_WORKING_SYNC_ADMITTED);
+    assert(noah_profile_working_sync_slave_scan(&other.sync));
+    assert(noah_profile_working_sync_receive(&other.sync, frame, length, reply, sizeof(reply)) && reply[0] == (frame[0] | 0x80u) && reply[1] == frame[1]);
+    return reply;
+}
+
+static void released_request(uint8_t *frame, uint8_t kind, uint16_t sequence, uint16_t transaction, uint32_t session, uint32_t revision) {
+    memset(frame, 0, NOAH_PROFILE_WORKING_SYNC_FRAME_MAX);
+    frame[0] = kind;
+    frame[1] = (uint8_t)sequence;
+    frame[2] = (uint8_t)(sequence >> 8u);
+    frame[3] = (uint8_t)transaction;
+    frame[4] = (uint8_t)(transaction >> 8u);
+    released_put_u32(&frame[5], session);
+    released_put_u32(&frame[9], revision);
+}
+
+// The whole working copy from a half on the released firmware (schema 4.3,
+// released_half_fixture.h), as its master half sends it: the frames are this
+// build's, since the working-copy sync is unchanged since that release; the
+// copy is this build's profile with that release's schema minor, so its
+// header is the one thing to refuse. Both halves run their compiled defaults
+// (nothing saved on either), which the sync reads as the same saved profile
+// (generation 0, compiled), so ADOPT is taken: an identity, no bytes. The
+// replacement is checked by this half's own validator, whose blob header
+// check refuses schema 4.3 (profile_blob_v1.c): what it runs is unchanged,
+// and nothing here can store.
+static void test_a_released_halfs_whole_copy_is_refused(void) {
+    static uint8_t                  released[CAPACITY];
+    uint8_t                         frame[NOAH_PROFILE_WORKING_SYNC_FRAME_MAX];
+    const uint8_t                  *reply;
+    const uint32_t                  session = 0x7777u;
+    uint16_t                        sequence = 1u;
+    uint32_t                        crc      = NOAH_PROFILE_CRC32_INITIAL;
+    uint32_t                        saved_generation;
+    uint8_t                         saved_origin;
+    uint8_t                         flags;
+    noah_active_profile_status_t before;
+    noah_active_profile_status_t after;
+
+    setup();
+    memcpy(released, saved_bytes, saved_length);
+    assert(released[4] == NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR && released[5] == NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR);
+    released[5] = RELEASED_SCHEMA_MINOR;
+    assert(noah_active_profile_provider_status(&other.provider, &before) == NOAH_ACTIVE_PROFILE_OK);
+
+    released_request(frame, NOAH_PROFILE_WORKING_SYNC_STATUS, sequence++, 0u, session, 1u);
+    reply            = released_exchange(frame, NOAH_PROFILE_WORKING_SYNC_FRAME_SIZE);
+    saved_generation = (uint32_t)reply[17] | (uint32_t)reply[18] << 8u | (uint32_t)reply[19] << 16u | (uint32_t)reply[20] << 24u;
+    saved_origin     = reply[21];
+    flags            = reply[16];
+    assert(saved_generation == 0u && (flags & NOAH_PROFILE_WORKING_SYNC_SLAVE_SAVED_COMPILED) && !(flags & NOAH_PROFILE_WORKING_SYNC_SLAVE_ACTIVE));
+
+    released_request(frame, NOAH_PROFILE_WORKING_SYNC_ADOPT, sequence++, 0u, session, 0u);
+    released_put_u32(&frame[13], saved_generation);
+    frame[17] = saved_origin;
+    frame[18] = 1u;
+    assert(released_exchange(frame, NOAH_PROFILE_WORKING_SYNC_FRAME_SIZE)[3] == NOAH_PROFILE_WORKING_OK);
+    assert(other.copy.session == session && other.copy.revision == 0u && !other.copy.active);
+
+    released_request(frame, NOAH_PROFILE_WORKING_SYNC_BEGIN, sequence++, 1u, session, 0u);
+    frame[13] = 0u;
+    frame[14] = NOAH_PROFILE_WORKING_EDIT_REPLACE;
+    released_put_u32(&frame[15], saved_length);
+    assert(released_exchange(frame, NOAH_PROFILE_WORKING_SYNC_FRAME_SIZE)[3] == NOAH_PROFILE_WORKING_OK);
+    for (uint32_t offset = 0u; offset < saved_length;) {
+        uint8_t count = saved_length - offset < NOAH_PROFILE_WORKING_SYNC_DATA_MAX ? (uint8_t)(saved_length - offset) : (uint8_t)NOAH_PROFILE_WORKING_SYNC_DATA_MAX;
+        uint8_t length;
+
+        released_request(frame, NOAH_PROFILE_WORKING_SYNC_DATA, sequence++, 1u, session, 0u);
+        released_put_u32(&frame[13], offset);
+        frame[17] = count;
+        memcpy(&frame[18], &released[offset], count);
+        length = noah_profile_working_sync_frame_length(frame, sizeof(frame));
+        assert(released_exchange(frame, length)[3] == NOAH_PROFILE_WORKING_OK);
+        crc = noah_profile_crc32_update(crc, &released[offset], count);
+        offset += count;
+    }
+    released_request(frame, NOAH_PROFILE_WORKING_SYNC_COMMIT, sequence++, 1u, session, 0u);
+    released_put_u32(&frame[13], noah_profile_crc32_finish(crc));
+    reply = released_exchange(frame, NOAH_PROFILE_WORKING_SYNC_FRAME_SIZE);
+    for (uint32_t scan = 0u; scan < 4096u && noah_profile_working_copy_busy(&other.copy); scan++) {
+        (void)noah_profile_working_copy_scan(&other.copy);
+    }
+    released_request(frame, NOAH_PROFILE_WORKING_SYNC_STATUS, sequence++, 0u, session, 1u);
+    reply = released_exchange(frame, NOAH_PROFILE_WORKING_SYNC_FRAME_SIZE);
+    assert(reply[13] == NOAH_PROFILE_WORKING_VALIDATION_REJECTED);
+    assert(!other.copy.active && other.copy.revision == 0u && !(reply[16] & NOAH_PROFILE_WORKING_SYNC_SLAVE_ACTIVE));
+    assert(noah_active_profile_provider_status(&other.provider, &after) == NOAH_ACTIVE_PROFILE_OK);
+    assert(after.publication_count == before.publication_count && !after.has_pending);
+    assert(after.active.kind == before.active.kind && after.active.payload_digest == before.active.payload_digest && after.active.payload_crc32 == before.active.payload_crc32);
+    puts("a released half's whole working copy is refused at its header");
+}
+
 int main(int argc, char **argv) {
     assert(argc == 2);
     load_fixture(argv[1]);
+    test_a_released_halfs_whole_copy_is_refused();
     test_frames();
     test_adopt_edit_revert();
     test_reset_other_half_is_sent_the_whole_copy();

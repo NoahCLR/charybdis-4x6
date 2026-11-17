@@ -8,6 +8,7 @@
 #include "users/noah/lib/profile/split/profile_split_authority.h"
 #include "users/noah/lib/profile/split/profile_split_protocol_v1.h"
 #include "users/noah/lib/profile/storage/profile_store.h"
+#include "tests/host/include/released_half_fixture.h"
 
 static noah_profile_split_descriptor_t compiled_descriptor(void) {
     return (noah_profile_split_descriptor_t){
@@ -638,7 +639,42 @@ static void test_protocol_over_64_kib(void) {
     assert(noah_profile_split_v1_frame_length(&reuse) == 0u);
 }
 
+// A half on the released firmware (v2026.10.27, schema 4.3,
+// released_half_fixture.h) sends descriptor frames this build's framing reads
+// field for field, but whose schema minor its descriptor check refuses
+// (noah_profile_split_descriptor_valid): none decodes, as a request or as a
+// reply. With this build's minor in its place the same frame decodes, so the
+// schema alone is refused. The error it answers this build with does decode:
+// INVALID_FRAME naming no copy.
+static void test_released_descriptor_frames_do_not_decode(void) {
+    static const released_record_t record = {.generation = 12u, .payload_length = 4096u, .payload_crc32 = 1u, .payload_digest = 2u, .origin_half = 1u};
+    const uint8_t                  kinds[] = {NOAH_PROFILE_SPLIT_V1_METADATA, NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN, NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE, NOAH_PROFILE_SPLIT_V1_PREPARE_COMMIT, NOAH_PROFILE_SPLIT_V1_ABORT};
+    uint8_t                        frame[RELEASED_SPLIT_FRAME_SIZE];
+    noah_profile_split_v1_frame_t  decoded;
+
+    for (size_t index = 0u; index < sizeof(kinds); index++) {
+        for (unsigned saved = 0u; saved < 2u; saved++) {
+            if (!saved && kinds[index] != NOAH_PROFILE_SPLIT_V1_METADATA) {
+                continue;
+            }
+            released_descriptor_frame(frame, kinds[index], saved ? &record : NULL, kinds[index] == NOAH_PROFILE_SPLIT_V1_METADATA ? RELEASED_FLAG_NO_PREPARED_PUSH : 0u);
+            assert(!noah_profile_split_v1_frame_decode(frame, sizeof(frame), &decoded));
+            assert(!noah_profile_split_v1_reply_decode(frame, sizeof(frame), &decoded));
+            frame[5]  = NOAH_PROFILE_SCHEMA_MINOR;
+            frame[31] = released_crc8(frame, 31u);
+            assert(noah_profile_split_v1_frame_decode(frame, sizeof(frame), &decoded));
+            assert(decoded.kind == kinds[index] && decoded.descriptor.compiled_default_digest == RELEASED_COMPILED_DEFAULT_DIGEST && decoded.descriptor.action_abi_digest == RELEASED_ACTION_ABI_DIGEST);
+            assert(decoded.descriptor.domain_mask == (saved ? RELEASED_DOMAIN_MASK : 0u) && decoded.descriptor.generation == (saved ? record.generation : 0u));
+        }
+    }
+    released_invalid_frame_reply(frame);
+    assert(noah_profile_split_v1_reply_decode(frame, sizeof(frame), &decoded));
+    assert(decoded.kind == NOAH_PROFILE_SPLIT_V1_ERROR && decoded.status == NOAH_PROFILE_SPLIT_V1_STATUS_INVALID_FRAME && decoded.generation == 0u && decoded.payload_digest == 0u);
+    puts("a released half's descriptor frames do not decode; its error does");
+}
+
 int main(void) {
+    test_released_descriptor_frames_do_not_decode();
     test_protocol_over_64_kib();
     test_protocol_descriptor_flags();
     test_protocol_no_prepared_push_flag();

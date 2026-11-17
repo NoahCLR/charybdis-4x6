@@ -422,10 +422,20 @@ static size_t unhex(const char *text, uint8_t *bytes, size_t capacity) {
     return length;
 }
 
+// Every read of the published list, as the keyboard reads it from storage.
+static unsigned list_reads;
+
+static bool counted_read(void *context, size_t offset, uint8_t *target, size_t length) {
+    list_reads++;
+    memcpy(target, (const uint8_t *)context + offset, length);
+    return true;
+}
+
 static void use_list(const uint8_t *bytes, size_t length) {
-    noah_profile_reader_t reader = noah_profile_reader_from_memory(bytes, length);
+    noah_profile_reader_t reader = {.read = counted_read, .context = (void *)(uintptr_t)bytes, .length = length};
     CHECK(noah_profile_autocorrect_v1_open(&list, &reader, 0u, length));
     list_publication++;
+    list_reads = 0u;
 }
 
 static size_t screen_utf8(char *out, size_t capacity) {
@@ -493,6 +503,7 @@ static unsigned run_fixture(const char *path) {
         } else if (strcmp(word, "LIST") == 0) {
             CHECK(sscanf(line, "LIST %8199s", text) == 1);
             use_list(list_bytes, unhex(text, list_bytes, sizeof(list_bytes)));
+            scan(1u);
         } else if (strcmp(word, "SLOT") == 0) {
             uint8_t bytes[sizeof(stored_macros[0])];
             CHECK(sscanf(line, "SLOT %u %8199s", &a, text) == 2 && a < NOAH_PROFILE_AUTOCORRECT_V1_MACRO_SLOTS);
@@ -569,10 +580,13 @@ static unsigned run_fixture(const char *path) {
 static const uint8_t the_list[] = {0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x03, 0x00, 0x03, 0x00, 0x00, 0x00, 't', 'h', 'e', 't', 'e', 'h'};
 static const uint8_t no_list[]  = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
+// A case starts as the keyboard does: the list published, and read by the
+// scan before the first key.
 static void begin(const char *name, const uint8_t *bytes, size_t length) {
     reset();
     snprintf(case_name, sizeof(case_name), "%s", name);
     use_list(bytes, length);
+    scan(1u);
 }
 
 // A list the runner encoded for these cases, by its name there.
@@ -599,6 +613,7 @@ static void begin_named(const char *name, const char *list_name) {
     reset();
     snprintf(case_name, sizeof(case_name), "%s", name);
     use_named_list(list_name);
+    scan(1u);
 }
 
 static void type(const char *text, bool fast) {
@@ -622,6 +637,44 @@ static void test_the_stage_is_idle_without_a_list(void) {
     CHECK(!noah_typing_stage_active());
     keymap_config.autocorrect_enable = true;
     CHECK(noah_typing_stage_active());
+}
+
+// The report filter asks the stage on every report, deep in key processing,
+// so it never reads the list from storage: the scan reads a published list,
+// and until it has, the filter keeps the answer for the list before.
+static void test_the_report_filter_never_reads_the_list(void) {
+    begin("the report filter never reads the list", the_list, sizeof(the_list));
+    scan(1u);
+    CHECK(list_reads != 0u);
+    type("teh ", false);
+
+    use_list(the_list, sizeof(the_list));
+    CHECK(noah_typing_stage_active());
+    CHECK(list_reads == 0u);
+    scan(1u);
+    CHECK(list_reads != 0u);
+    type("teh ", false);
+    expect_screen("the the ", false);
+
+    // A list that is empty, or fires only after the leader, keeps the stage
+    // out of the report path from the scan that reads it.
+    use_list(no_list, sizeof(no_list));
+    CHECK(noah_typing_stage_active());
+    scan(1u);
+    CHECK(!noah_typing_stage_active());
+    type("teh ", false);
+    expect_screen("the the teh ", false);
+
+    use_named_list("leader-only");
+    (void)noah_typing_stage_active();
+    CHECK(list_reads == 0u);
+    scan(1u);
+    CHECK(list_reads != 0u);
+    list_reads = 0u;
+    CHECK(!noah_typing_stage_active());
+    type("pn ", false);
+    CHECK(list_reads == 0u);
+    expect_screen("the the teh pn ", false);
 }
 
 // A list published while a word's lookup is spread over scans: the lookup
@@ -1193,9 +1246,11 @@ static void test_the_stage_joins_the_report_path_for_the_leader(void) {
     CHECK(!leading());
     expect_screen("pn +31 6 1234 5678", false);
     CHECK(!noah_typing_stage_active());
-    // A list with words to replace keeps it in the path, as without a leader.
+    // A list with words to replace keeps it in the path, as without a leader,
+    // from the scan that reads it.
     keymap_config.autocorrect_enable = true;
     use_named_list("leader");
+    scan(1u);
     CHECK(noah_typing_stage_active());
 }
 
@@ -1434,6 +1489,7 @@ int main(int argc, char **argv) {
     lists_path     = argv[2];
     unsigned cases = run_fixture(argv[1]);
     test_the_stage_is_idle_without_a_list();
+    test_the_report_filter_never_reads_the_list();
     test_switching_off_forgets_the_word();
     test_the_stage_starts_with_a_key_held();
     test_a_list_published_during_a_lookup();

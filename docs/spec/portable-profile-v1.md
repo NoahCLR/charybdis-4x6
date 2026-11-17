@@ -143,12 +143,13 @@ does. No part of a backup is translated (D-F10,
 earlier schema or domain version, or declared under another action-ABI digest,
 is refused.
 
-The action-ABI digest covers the action vocabulary, the layer and slot counts
-and `NOAH_FIRMWARE_VERSION`, and no authored row
+The action-ABI digest covers the schema major and minor, the action
+vocabulary, the layer and slot counts and `NOAH_FIRMWARE_VERSION`, and no
+authored row
 ([action-ABI digest](profile-wire-v1/blob-and-digests.md#action-abi-digest)).
-So a backup restores onto any build of the same firmware version whatever its
-compiled defaults are, including a build with no authored behaviours or
-combos, and onto no other firmware version.
+So a backup restores onto any build of the same schema and firmware version
+whatever its compiled defaults are, including a build with no authored
+behaviours or combos, and onto no other schema or firmware version.
 
 Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`: `--import-profile` with the populated and maximum profiles, `--empty-profile` on a build without behaviours or combos, `--reject-profile` refusing an earlier schema as `INCOMPATIBLE_SCHEMA`), `tests/fixtures/client-regression/portable.bin.pd5`.
 
@@ -156,9 +157,9 @@ Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compil
 
 A saved profile names the compiled-default and action-ABI digests it was saved
 under. After a reflash that changes either one (new authored defaults, a new
-firmware version), the half does not use it and runs its compiled defaults
+schema or firmware version), the half does not use it and runs its compiled defaults
 ([device-resident profile](device-resident-profile.md)). A backup taken before
 the reflash restores if its action-ABI digest still matches, that is when only
-the authored defaults changed; a new firmware version refuses it.
+the authored defaults changed; a new schema or firmware version refuses it.
 
 Held by: `tests/host/run_profile_store_tests.sh` (`profile_store_test.c`, `test_boot_rejects_old_compiled_default_identity`), `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`).

@@ -15,6 +15,7 @@
 #include "users/noah/lib/profile/schema/profile_settings_v1.h"
 #include "users/noah/lib/profile/storage/profile_flash_store.h"
 #include "profile_store_saved_fixture.h"
+#include "released_half_fixture.h"
 
 _Static_assert((unsigned)NOAH_PROFILE_SPLIT_V1_FRAME_MAX <= (unsigned)SPLIT_FAULT_LINK_FRAME_MAX && (unsigned)NOAH_PROFILE_WORKING_SYNC_FRAME_MAX <= (unsigned)SPLIT_FAULT_LINK_FRAME_MAX, "the fault link carries both protocols' largest frames");
 
@@ -2754,7 +2755,76 @@ static void test_a_save_after_taking_the_other_halfs_copy_lands(void) {
 #include "profile_owner_admission_test.inc"
 #include "profile_owner_stopped_test.inc"
 
+// The other half runs the released firmware, v2026.10.27 (schema 4.3,
+// released_half_fixture.h): it answers this half's polls as undecodable, and
+// its own polls name a schema this half's decoder refuses. A half holding a
+// saved profile then waits for reconciliation that never comes, with no
+// timeout (scan_boot_reconciliation): RECONCILING_COMMITTED on its compiled
+// defaults, writing nothing, as master and as slave.
+static bool released_half_receive(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
+    (void)context;
+    (void)request;
+    assert(request_length >= NOAH_PROFILE_SPLIT_V1_FRAME_SIZE && response_length >= NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    memset(response, 0, response_length);
+    released_invalid_frame_reply(response);
+    return true;
+}
+
+static void test_a_saved_half_beside_a_released_half_waits_on_its_compiled_defaults(void) {
+    static const released_record_t released = {.generation = 7u, .payload_length = 4096u, .payload_crc32 = 1u, .payload_digest = 2u, .origin_half = 1u};
+    noah_profile_owner_t           seeded;
+    noah_profile_owner_t           owner;
+    memory_t                       memory;
+    uint32_t                       now = 1000u;
+
+    memset(&memory, 0, sizeof(memory));
+    memset(memory.bytes, 0xff, sizeof(memory.bytes));
+    boot_empty(&seeded, &memory);
+    commit_blob(&seeded, 71u, &now);
+    assert(seeded.saved_descriptor.generation == 1u);
+    for (unsigned master = 0u; master < 2u; master++) {
+        split_link_t                 link   = {.link = {.receive = released_half_receive}};
+        uint32_t                     writes = memory.writes;
+        uint32_t                     reached = 0u;
+        uint32_t                     polls_answered = 0u;
+        noah_profile_owner_status_t  status;
+
+        assert(noah_profile_owner_init(&owner, &(noah_profile_owner_config_t){
+                                                   .store_io                = {.read = memory_read, .write = memory_write, .context = &memory},
+                                                   .split_exchange          = split_exchange,
+                                                   .split_transport_context = &link,
+                                                   .origin_half             = 0u,
+                                                   .other_half_required     = true,
+                                               }));
+        for (uint32_t elapsed = 0u; elapsed < 60000u; elapsed += 10u, now += 10u) {
+            if (!master && elapsed % 50u == 0u) {
+                uint8_t poll[RELEASED_SPLIT_FRAME_SIZE];
+                uint8_t reply[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+
+                released_descriptor_frame(poll, NOAH_PROFILE_SPLIT_V1_METADATA, &released, RELEASED_FLAG_NO_PREPARED_PUSH);
+                // Its polls are answered once the owner has built its split
+                // endpoint, before then refused as the callback refuses them.
+                if (noah_profile_split_reconciler_receive(noah_profile_owner_split_reconciler(&owner), poll, sizeof(poll), reply, sizeof(reply))) {
+                    assert(reply[1] == NOAH_PROFILE_SPLIT_V1_ERROR && reply[2] == NOAH_PROFILE_SPLIT_V1_STATUS_INVALID_FRAME);
+                    polls_answered++;
+                }
+            }
+            (void)noah_profile_owner_scan(&owner, master != 0u, now);
+            if (owner.state == NOAH_PROFILE_OWNER_RECONCILING_COMMITTED && reached == 0u) {
+                reached = elapsed;
+            }
+            assert(reached == 0u || owner.state == NOAH_PROFILE_OWNER_RECONCILING_COMMITTED);
+        }
+        assert(owner.state == NOAH_PROFILE_OWNER_RECONCILING_COMMITTED && reached < 1000u);
+        assert(noah_profile_owner_status(&owner, &status) && status.active.kind == NOAH_ACTIVE_PROFILE_KIND_COMPILED_DEFAULTS);
+        assert(memory.writes == writes);
+        assert(master ? link.metadata_frames >= 50u : link.link.exchanges == 0u && polls_answered >= 1000u);
+    }
+    puts("a saved half beside a released half waits on its compiled defaults and writes nothing");
+}
+
 int main(void) {
+    test_a_saved_half_beside_a_released_half_waits_on_its_compiled_defaults();
     test_admission_matrix();
     test_a_mode_change_waits_until_the_halves_agree();
     test_a_mode_change_waits_for_an_apply_copying_to_the_other_half();

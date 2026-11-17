@@ -356,7 +356,7 @@ noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_wr
 #if defined(RGB_MATRIX_ENABLE)
 // The compiled lighting's bytes, kept once encoded. The keymap sizes the
 // buffer to its own tables (EXPORT_RGB_COMPILED_CACHE, rgb_config_helpers.h),
-// not to the domain's maximum, 4,649 bytes (D-F63, D-F70).
+// not to the domain's maximum, 4,661 bytes (D-F63, D-F70).
 extern uint8_t *const  noah_rgb_compiled_cache;
 extern const uint16_t  noah_rgb_compiled_cache_size;
 static noah_profile_rgb_v1_view_t cached_view;

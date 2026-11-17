@@ -41,9 +41,12 @@ layer_state_t layer_state = 0;
 static uint16_t fake_time;
 static uint16_t test_tap_code16_count;
 static uint16_t test_last_tap_code16;
+// The report's modifiers as the last tap went out.
+static uint8_t  test_last_tap_mods;
 static uint16_t test_delayed_action_count;
 static uint16_t test_last_delayed_action;
 static uint16_t test_delayed_actions[TEST_DELAYED_ACTION_LOG_CAPACITY];
+static uint8_t  test_delayed_action_mods[TEST_DELAYED_ACTION_LOG_CAPACITY];
 static uint16_t test_pressed_keycodes[MATRIX_ROWS][MATRIX_COLS];
 static uint16_t current_cpi;
 static uint8_t  fake_mods;
@@ -97,6 +100,8 @@ static bool test_keypos_equal(keypos_t lhs, keypos_t rhs) {
 
 static uint8_t test_modifier_mask(uint16_t keycode) {
     switch (keycode) {
+        case KC_LEFT_SHIFT:
+            return MOD_BIT(KC_LEFT_SHIFT);
         case KC_LEFT_GUI:
             return MOD_BIT(KC_LEFT_GUI);
         case KC_LEFT_ALT:
@@ -411,9 +416,11 @@ static void test_reset_state(void) {
     fake_time                 = 1000;
     test_tap_code16_count     = 0;
     test_last_tap_code16      = KC_NO;
+    test_last_tap_mods        = 0;
     test_delayed_action_count = 0;
     test_last_delayed_action  = KC_NO;
     memset(test_delayed_actions, 0, sizeof(test_delayed_actions));
+    memset(test_delayed_action_mods, 0, sizeof(test_delayed_action_mods));
     current_cpi                = 0;
     fake_mods                  = 0;
     fake_weak_mods             = 0;
@@ -603,6 +610,7 @@ void send_keyboard_report(void) {}
 void tap_code16(uint16_t keycode) {
     test_tap_code16_count++;
     test_last_tap_code16 = keycode;
+    test_last_tap_mods   = fake_mods;
 }
 
 void register_code16(uint16_t keycode) {
@@ -618,9 +626,7 @@ void register_code(uint8_t keycode) {
 }
 
 void unregister_code(uint8_t keycode) {
-    uint8_t mask = test_modifier_mask(keycode);
-
-    fake_mods = (uint8_t)((fake_mods & (uint8_t)~mask) | fake_physical_mods | fake_managed_mods);
+    fake_mods &= (uint8_t)~test_modifier_mask(keycode);
 }
 
 void wait_ms(uint16_t ms) {
@@ -726,6 +732,9 @@ void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyre
     }
 
     switch (keycode) {
+        case KC_LEFT_SHIFT:
+            mask = MOD_BIT(KC_LEFT_SHIFT);
+            break;
         case KC_LEFT_GUI:
             mask = MOD_BIT(KC_LEFT_GUI);
             break;
@@ -739,20 +748,21 @@ void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyre
             return;
     }
 
+    // As keyboard_mod_ownership.c does, only the count: a handled modifier's
+    // press never reaches QMK's register_code(), so it adds nothing to the
+    // report until its hold registers it.
     if (record->event.pressed) {
         fake_physical_mods |= mask;
     } else {
         fake_physical_mods &= (uint8_t)~mask;
     }
-
-    fake_mods = (uint8_t)(fake_mods | fake_physical_mods);
-    if ((fake_physical_mods & mask) == 0 && (fake_managed_mods & mask) == 0) {
-        fake_mods &= (uint8_t)~mask;
-    }
 }
 
 void keyboard_mod_ownership_register(uint16_t keycode) {
     switch (keycode) {
+        case KC_LEFT_SHIFT:
+            keyboard_mod_ownership_register_mods(MOD_BIT(KC_LEFT_SHIFT));
+            break;
         case KC_LEFT_GUI:
             keyboard_mod_ownership_register_mods(MOD_BIT(KC_LEFT_GUI));
             break;
@@ -769,6 +779,9 @@ void keyboard_mod_ownership_register(uint16_t keycode) {
 
 void keyboard_mod_ownership_unregister(uint16_t keycode) {
     switch (keycode) {
+        case KC_LEFT_SHIFT:
+            keyboard_mod_ownership_unregister_mods(MOD_BIT(KC_LEFT_SHIFT));
+            break;
         case KC_LEFT_GUI:
             keyboard_mod_ownership_unregister_mods(MOD_BIT(KC_LEFT_GUI));
             break;
@@ -791,9 +804,11 @@ bool keyboard_mod_ownership_register_mods(uint8_t mods) {
     return added != 0u;
 }
 
+// As keyboard_mod_ownership.c does for a modifier QMK never registered: the
+// last managed owner's release takes it out, whoever is physically down.
 void keyboard_mod_ownership_unregister_mods(uint8_t mods) {
     fake_managed_mods &= (uint8_t)~mods;
-    fake_mods = (uint8_t)((fake_mods & (uint8_t)~mods) | fake_physical_mods | fake_managed_mods);
+    fake_mods &= (uint8_t)~mods;
 }
 
 uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
@@ -1063,20 +1078,23 @@ void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     test_last_delayed_action = action;
     if (test_delayed_actions_dispatch) noah_action_tap(action);
     if (test_delayed_action_count <= ARRAY_SIZE(test_delayed_actions)) {
-        test_delayed_actions[test_delayed_action_count - 1u] = action;
+        test_delayed_actions[test_delayed_action_count - 1u]     = action;
+        test_delayed_action_mods[test_delayed_action_count - 1u] = fake_mods;
     }
     (void)mods;
 }
 
-// As delayed_action.c does: the tap's own modifiers are replayed around it,
-// and its emit settles pending fallback holds first, all but its own key's.
+// As delayed_action.c does: the pending fallback holds due at its key (api.h)
+// are settled first, then the tap's own modifiers and those just settled are
+// replayed around it.
 void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods) {
-    keyboard_mod_state_t saved = keyboard_mod_policy_begin_action_replay(mods);
+    uint8_t              before = fake_mods;
+    keyboard_mod_state_t saved;
 
+    noah_key_runtime_settle_pending_fallback_hold(key_pos);
+    saved = keyboard_mod_policy_begin_action_replay(keyboard_mod_policy_with_real_mods(mods, (uint8_t)(fake_mods & ~before)));
     if (IS_QK_ONE_SHOT_MOD(action)) {
-        noah_emit_action_tap_at(key_pos, action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
-    } else {
-        noah_key_runtime_settle_pending_fallback_hold(key_pos);
+        noah_emit_action_tap_at(key_pos, action, NOAH_EMIT_POLICY_NONE);
     }
     dispatch_delayed_action(action, mods);
     keyboard_mod_policy_end_action_replay(action, saved);
@@ -1731,11 +1749,12 @@ static void test_noah_transparent_pointing_keys_type_the_key_below(void) {
     }
 }
 
-// A held modifier a delayed tap settles stays held. Escape tapped, then Left
-// Command pressed inside Escape's multi tap window and held: Escape goes out,
-// and Command, settled as Escape's tap goes out, is still in the report
-// while held and after its threshold.
-static void test_noah_modifier_settled_by_a_delayed_tap_stays_held(void) {
+// A modifier pressed inside an earlier key's multi tap window is not that
+// tap's: Escape tapped, then Left Command pressed inside Escape's window and
+// held. Escape goes out without Command when the window closes; Command is
+// pressed after it, so it holds from its own threshold, stays in the report
+// while held, and leaves with its release (D-F64).
+static void test_noah_modifier_pressed_inside_a_delayed_tap_window_holds_after_it(void) {
     keypos_t esc_pos = test_noah_row_on_layer(LAYER_BASE, KC_ESC);
     keypos_t gui_pos = test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_GUI);
 
@@ -1747,14 +1766,150 @@ static void test_noah_modifier_settled_by_a_delayed_tap_stays_held(void) {
     for (uint16_t elapsed = 0u; elapsed <= CUSTOM_TAP_HOLD_TERM + 50u; elapsed = (uint16_t)(elapsed + 5u)) {
         key_runtime_integration_advance(&fake_time, 5u);
         key_runtime_integration_scan();
+        if (test_delayed_action_count == 0u) {
+            CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) == 0u);
+        }
     }
-    CHECK(test_delayed_action_count >= 1u && test_delayed_actions[0] == KC_ESC);
+    CHECK(test_delayed_action_count == 1u && test_delayed_actions[0] == KC_ESC);
+    CHECK(test_delayed_action_mods[0] == 0u);
     CHECK(noah_runtime_debug_slot_held_action_keycode(gui_pos) == KC_LEFT_GUI);
     CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) != 0u);
     test_release_resolved(gui_pos);
     key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 20u);
     key_runtime_integration_scan();
     CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) == 0u);
+    CHECK(test_delayed_action_count == 1u);
+}
+
+// The later press types the earlier key's tap first, then goes out itself
+// (D-F27, D-F64): Enter rolled into Left Shift sends Enter, not Shift+Enter,
+// and `3` rolled into Left Command sends 3, not Command+3. The modifier then
+// holds, settled by the next key's press or by its own threshold, and its
+// release sends nothing of its own.
+static void test_noah_tap_goes_out_before_a_modifier_pressed_after_it(void) {
+    static const struct {
+        uint16_t tapped;
+        uint16_t modifier;
+    } rolls[] = {{KC_ENT, KC_LEFT_SHIFT}, {KC_3, KC_LEFT_GUI}};
+
+    for (uint8_t roll = 0u; roll < ARRAY_SIZE(rolls); roll++) {
+        for (uint8_t by_next_key = 0u; by_next_key < 2u; by_next_key++) {
+            keypos_t tapped_pos = test_noah_row_on_layer(LAYER_BASE, rolls[roll].tapped);
+            keypos_t mod_pos    = test_find_keypos_on_layer(LAYER_BASE, rolls[roll].modifier);
+            keypos_t next_pos   = test_find_keypos_on_layer(LAYER_BASE, KC_DOT);
+            uint8_t  mod        = test_modifier_mask(rolls[roll].modifier);
+
+            test_press_resolved(tapped_pos);
+            key_runtime_integration_advance(&fake_time, 30u);
+            test_press_resolved(mod_pos);
+            CHECK(test_tap_code16_count == 1u && test_last_tap_code16 == rolls[roll].tapped);
+            CHECK(test_last_tap_mods == 0u);
+            CHECK((fake_mods & mod) == 0u);
+            key_runtime_integration_advance(&fake_time, 20u);
+            test_release_resolved(tapped_pos);
+            key_runtime_integration_advance(&fake_time, 20u);
+            key_runtime_integration_scan();
+            CHECK(test_tap_code16_count == 1u && (fake_mods & mod) == 0u);
+
+            if (by_next_key) {
+                test_press_resolved(next_pos);
+                CHECK((fake_mods & mod) != 0u);
+                key_runtime_integration_advance(&fake_time, 20u);
+                test_release_resolved(next_pos);
+                CHECK(test_tap_code16_count == 2u && test_last_tap_code16 == KC_DOT && test_last_tap_mods == mod);
+            } else {
+                for (uint16_t elapsed = 0u; elapsed <= CUSTOM_TAP_HOLD_TERM; elapsed = (uint16_t)(elapsed + 5u)) {
+                    key_runtime_integration_advance(&fake_time, 5u);
+                    key_runtime_integration_scan();
+                }
+                CHECK(test_tap_code16_count == 1u);
+            }
+            CHECK(noah_runtime_debug_slot_held_action_keycode(mod_pos) == rolls[roll].modifier);
+            CHECK((fake_mods & mod) != 0u);
+
+            test_release_resolved(mod_pos);
+            key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 20u);
+            key_runtime_integration_scan();
+            CHECK(fake_mods == 0u && fake_managed_mods == 0u);
+            CHECK(test_tap_code16_count == (by_next_key ? 2u : 1u) && test_delayed_action_count == 0u);
+        }
+    }
+}
+
+// Enter rolled into Left Shift, and Shift let go before its threshold with
+// nothing pressed after it: Shift was tapped alone, so after Enter it types
+// its own tap, Caps Lock, and holds nothing.
+static void test_noah_modifier_rolled_onto_and_let_go_is_its_own_tap(void) {
+    keypos_t enter_pos = test_noah_row_on_layer(LAYER_BASE, KC_ENT);
+    keypos_t shift_pos = test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_SHIFT);
+
+    test_press_resolved(enter_pos);
+    key_runtime_integration_advance(&fake_time, 30u);
+    test_press_resolved(shift_pos);
+    key_runtime_integration_advance(&fake_time, 20u);
+    test_release_resolved(enter_pos);
+    key_runtime_integration_advance(&fake_time, 20u);
+    test_release_resolved(shift_pos);
+    key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 20u);
+    key_runtime_integration_scan();
+    CHECK(test_tap_code16_count == 2u && test_last_tap_code16 == KC_CAPS && test_last_tap_mods == 0u);
+    CHECK(test_delayed_action_count == 0u);
+    CHECK(fake_mods == 0u && fake_managed_mods == 0u);
+}
+
+// The control: a modifier held first is the tap's own. Left Shift held, then
+// Enter tapped: Enter's press settles Shift, and Enter goes out under it.
+static void test_noah_tap_goes_out_under_a_modifier_pressed_before_it(void) {
+    keypos_t enter_pos = test_noah_row_on_layer(LAYER_BASE, KC_ENT);
+    keypos_t shift_pos = test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_SHIFT);
+
+    test_press_resolved(shift_pos);
+    key_runtime_integration_advance(&fake_time, 30u);
+    CHECK(fake_mods == 0u);
+    test_press_resolved(enter_pos);
+    CHECK(fake_mods == MOD_BIT(KC_LEFT_SHIFT));
+    key_runtime_integration_advance(&fake_time, 20u);
+    test_release_resolved(enter_pos);
+    CHECK(test_tap_code16_count == 1u && test_last_tap_code16 == KC_ENT && test_last_tap_mods == MOD_BIT(KC_LEFT_SHIFT));
+    key_runtime_integration_advance(&fake_time, 20u);
+    test_release_resolved(shift_pos);
+    key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 20u);
+    key_runtime_integration_scan();
+    CHECK(fake_mods == 0u && test_tap_code16_count == 1u);
+}
+
+// An output at a key leaves a modifier pressed after that key pending,
+// however long the key has been down: a held repeat's next tap is such an
+// output. Left Command held a moment, then for 40 seconds (more than half
+// the 16-bit timer's range, where two press times no longer order), then Left
+// Shift pressed. An output at Command's key does not register Shift; an
+// output of no key does.
+static void test_noah_output_at_a_long_held_key_leaves_a_later_modifier_pending(void) {
+    static const uint16_t held_for_ms[] = {1000u, 40000u};
+    keypos_t              gui_pos       = test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_GUI);
+    keypos_t              shift_pos     = test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_SHIFT);
+
+    for (uint8_t held = 0u; held < ARRAY_SIZE(held_for_ms); held++) {
+        test_press_resolved(gui_pos);
+        for (uint16_t elapsed = 0u; elapsed < held_for_ms[held]; elapsed = (uint16_t)(elapsed + 500u)) {
+            key_runtime_integration_advance(&fake_time, 500u);
+            key_runtime_integration_scan();
+        }
+        CHECK(fake_mods == MOD_BIT(KC_LEFT_GUI));
+        test_press_resolved(shift_pos);
+        key_runtime_integration_advance(&fake_time, 20u);
+        key_runtime_integration_scan();
+        CHECK(!noah_key_runtime_settle_pending_fallback_hold(gui_pos));
+        CHECK(fake_mods == MOD_BIT(KC_LEFT_GUI));
+        CHECK(noah_key_runtime_settle_pending_fallback_hold(NOAH_KEY_RUNTIME_NO_KEY));
+        CHECK(fake_mods == (MOD_BIT(KC_LEFT_GUI) | MOD_BIT(KC_LEFT_SHIFT)));
+
+        test_release_resolved(shift_pos);
+        test_release_resolved(gui_pos);
+        key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 20u);
+        key_runtime_integration_scan();
+        CHECK(fake_mods == 0u && fake_managed_mods == 0u);
+    }
 }
 
 // Left Command held, and before its threshold Escape tapped three times: the
@@ -4310,8 +4465,12 @@ int main(void) {
     test_noah_right_alt_double_tap_taps_right_alt();
     test_noah_thumbs_past_the_depth_do_nothing();
     test_noah_transparent_pointing_keys_type_the_key_below();
-    test_noah_modifier_settled_by_a_delayed_tap_stays_held();
+    test_noah_modifier_pressed_inside_a_delayed_tap_window_holds_after_it();
     test_noah_modifier_settled_by_a_run_stays_held();
+    test_noah_tap_goes_out_before_a_modifier_pressed_after_it();
+    test_noah_modifier_rolled_onto_and_let_go_is_its_own_tap();
+    test_noah_tap_goes_out_under_a_modifier_pressed_before_it();
+    test_noah_output_at_a_long_held_key_leaves_a_later_modifier_pending();
     test_pointer_drag_window_tap_falls_through_to_the_base_layer_key();
     test_click_spam_combo_output_keeps_the_pointer_layer_anchored();
     test_click_spam_combo_uses_authored_combo_owner();

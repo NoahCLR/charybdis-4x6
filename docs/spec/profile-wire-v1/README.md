@@ -85,6 +85,7 @@ client can tell which vectors this firmware answers to.
 | `combo_domain_v3.fixture`, `combo_output_behaviors_v1.fixture` | Combo domain `0x30` version 3 payloads | `run_active_profile_combo_runtime_tests.sh` |
 | `combo_readback_v3.fixture` | Native combo readback (GET `0x06`) pages | `run_combo_readback_tests.sh` |
 | `rgb_domain_v1.fixture`, `rgb_domain_v7.json` | Lighting domain `0x10` vectors | `run_profile_rgb_v1_tests.sh`, `run_profile_rgb_v7_tests.sh`, `run_active_profile_rgb_runtime_tests.sh`, `run_rgb_layer_render_tests.sh` |
+| `rgb_render_v1.json` | Lighting drawn LED by LED for a profile, the keyboard's tables and a still state ([drawing cases](../rgb-domain-v1.md#the-drawing-cases)) | `run_rgb_layer_render_tests.sh` |
 | `pd_mode_domain_v4.json` | Pointing domain `0x50` version 4 vectors | `run_profile_pd_v1_tests.sh`, `run_pd_profile_integration_tests.sh`, `run_profile_compiled_defaults_v1_tests.sh` |
 | `pd_mode_domain_v1.json` | A test-only snapshot of the compiled pointing modes | `run_pointing_mode_handlers_tests.sh` |
 | `folded_keyboard_profile.json` | Noah's profile in logical form, which the compiled defaults must reproduce | `run_profile_compiled_defaults_v1_tests.sh` |
