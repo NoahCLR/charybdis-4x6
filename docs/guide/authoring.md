@@ -4,8 +4,15 @@ With Ark you never need this page. But the **compiled defaults**, what a
 keyboard with nothing saved runs, are plain data in C, and you can write
 your own and build a pair from them.
 
-The authored profile lives in
-[`keyboards/bastardkb/charybdis/4x6/keymaps/noah/`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/):
+An authored profile lives in a keymap folder. There are two:
+[`keymaps/starter/`](../../keyboards/bastardkb/charybdis/4x6/keymaps/starter/),
+the plain keymap a release is built from, and
+[`keymaps/noah/`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/), the
+author's own (D-F78). Start your own defaults from `starter`; the examples on
+this page come from `noah`. `starter` has no combos or behaviours, which its
+`config.h` says with `NOAH_KEYMAP_EMPTY_COMBOS` and
+`NOAH_KEYMAP_EMPTY_KEY_BEHAVIORS`; remove each when you add the first. Both
+folders hold the same files, linked here in `noah`:
 
 | File | What it holds |
 | --- | --- |
@@ -324,10 +331,12 @@ builds a generic image that can't store a profile.
    names, or point `QMK_ROOT` at it.
 3. Run `sh tools/build-firmware-pair.sh`.
 
-It builds both halves in the same Docker image releases are built in and
-writes them to `../builds/<branch>/` (or `BUILD_ROOT`) as
-`<n>_charybdis_left.uf2` and `<n>_charybdis_right.uf2`, with a note of what
-they were built from. Every build also validates the authored profile: a
+It builds both halves of both keymaps in the same Docker image releases are
+built in and writes them to `../builds/<branch>/` (or `BUILD_ROOT`): the
+`noah` pair as `<n>_charybdis_left.uf2` and `<n>_charybdis_right.uf2`, and
+the `starter` pair beside it as `<n>_charybdis_left_starter.uf2` and
+`<n>_charybdis_right_starter.uf2`, each with a note of what it was built from.
+`NOAH_KEYMAP=starter` (or `noah`) builds one keymap alone. Every build also validates the authored profile: a
 misplaced action, a stale macro bank or autocorrect list or a bad colour fails
 it.
 

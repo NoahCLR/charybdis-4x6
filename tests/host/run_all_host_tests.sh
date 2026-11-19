@@ -28,6 +28,7 @@ sh run_rgb_layer_render_tests.sh
 sh run_qmk_usb_product_name_owner_tests.sh
 sh run_runtime_debug_tests.sh
 sh run_profile_compiled_defaults_v1_tests.sh
+sh run_starter_keymap_tests.sh
 python3 pair_build_script_test.py
 python3 weak_const_default_test.py
 sh run_source_manifest_tests.sh

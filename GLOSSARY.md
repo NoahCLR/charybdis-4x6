@@ -53,9 +53,15 @@ or the lighting.
 _Avoid_: section, area, block, table
 
 **Authored profile**:
-The profile written in C in the keymap folder, the only place it exists as
+The profile written in C in a keymap folder, the only place it exists as
 source.
 _Avoid_: source profile, C profile, factory profile
+
+**Starter keymap**:
+The keymap folder a release is built from, `keymaps/starter`: Bastard
+Keyboards' QWERTY layout in four layers and nothing else set up (D-F78).
+`keymaps/noah` is the author's own, built beside it in every pair build.
+_Avoid_: default keymap, release keymap, factory keymap
 
 **Compiled defaults**:
 The authored profile as built into the firmware: what runs when nothing is
