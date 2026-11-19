@@ -217,6 +217,88 @@ static void test_text_uses_lease_backed_press_and_release_scans(void) {
     CHECK(wait_call_count == 0u);
 }
 
+// An erase step taps Backspace its count of times at the text pace.
+static void test_erase_taps_backspace_at_the_text_pace(void) {
+    macro_payload_ir_t             ir = {.length = 5u, .bytes = {MACRO_PAYLOAD_IR_OP_ERASE, 2u, MACRO_PAYLOAD_IR_OP_TEXT, 1u, 'a'}};
+    macro_payload_ir_t             empty = {.length = 2u, .bytes = {MACRO_PAYLOAD_IR_OP_ERASE, 0u}};
+    macro_payload_debug_snapshot_t snapshot;
+
+    test_reset();
+    CHECK(macro_payload_start_ir(&empty, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_DIRECT, 0u, NULL, NULL) == MACRO_PAYLOAD_START_INVALID);
+    CHECK(macro_payload_start_ir(&ir, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_DIRECT, 0u, NULL, NULL) == MACRO_PAYLOAD_START_STARTED);
+    macro_payload_engine_scan();
+    CHECK(test_op_count == 1u && test_ops[0].kind == TEST_OP_ACQUIRE && test_ops[0].keycode == KC_BACKSPACE);
+    test_scan_after(6u);
+    CHECK(test_op_count == 1u);
+    test_scan_after(1u);
+    macro_payload_engine_scan();
+    CHECK(test_op_count == 2u && test_ops[1].kind == TEST_OP_RELEASE && test_ops[1].keycode == KC_BACKSPACE);
+    test_scan_after(6u);
+    macro_payload_engine_scan();
+    CHECK(test_op_count == 2u);
+    test_scan_after(1u);
+    macro_payload_engine_scan();
+    CHECK(test_op_count == 3u && test_ops[2].kind == TEST_OP_ACQUIRE && test_ops[2].keycode == KC_BACKSPACE);
+    test_scan_after(7u);
+    macro_payload_engine_scan();
+    CHECK(test_op_count == 4u && test_ops[3].kind == TEST_OP_RELEASE && test_ops[3].keycode == KC_BACKSPACE);
+    test_scan_after(7u);
+    macro_payload_engine_scan();
+    CHECK(test_op_count == 5u && test_ops[4].kind == TEST_OP_ACQUIRE && test_ops[4].keycode == KC_A);
+    test_scan_after(7u);
+    macro_payload_engine_scan();
+    test_scan_after(7u);
+    macro_payload_engine_scan();
+    macro_payload_debug_snapshot(&snapshot);
+    CHECK(snapshot.state == MACRO_PAYLOAD_ENGINE_IDLE && snapshot.completed_count == 1u && macro_payload_engine_idle());
+}
+
+// A correction's output is isolated as a protected macro's is, but only a
+// protected macro has new presses ignored: a correction's are held back and
+// replayed by the typing stage.
+static void test_a_correction_is_isolated_without_ignoring_presses(void) {
+    const macro_payload_ir_t  ir = {.length = 3u, .protection = 1u, .bytes = {MACRO_PAYLOAD_IR_OP_TEXT, 1u, 'a'}};
+    macro_payload_preflight_t preflight;
+
+    test_reset();
+    CHECK(macro_payload_start_ir(&ir, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_DIRECT, 0, NULL, NULL) == MACRO_PAYLOAD_START_STARTED);
+    CHECK(macro_payload_engine_protected() && macro_payload_engine_ignores_presses() && !macro_payload_engine_idle());
+    CHECK(macro_payload_engine_cancel());
+    test_drain_cleanup();
+    macro_payload_preflight_begin(&preflight);
+    CHECK(macro_payload_preflight_window(&preflight, &ir));
+    CHECK(macro_payload_start_windows(&ir, &preflight, NULL, NULL, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 5u, MACRO_PAYLOAD_SOURCE_CORRECTION, 0u, NULL, NULL) == MACRO_PAYLOAD_START_STARTED);
+    CHECK(macro_payload_engine_protected() && !macro_payload_engine_ignores_presses());
+    CHECK(macro_payload_engine_cancel());
+    test_drain_cleanup();
+    CHECK(macro_payload_engine_idle());
+}
+
+// The stored macro a correction plays is isolated and keeps its presses the
+// same way whatever protection it is stored with: on, or off, where the same
+// macro from its key would play interruptibly.
+static void test_a_corrections_macro_is_isolated_whatever_its_protection(void) {
+    for (uint8_t protection = 1u; protection <= 2u; protection++) {
+        const macro_payload_ir_t ir = {.length = 3u, .protection = protection, .bytes = {MACRO_PAYLOAD_IR_OP_TEXT, 1u, 'a'}};
+
+        test_reset();
+        live_mods = MOD_BIT(KC_LEFT_SHIFT);
+        CHECK(macro_payload_start_ir(&ir, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_SLOT, 0, NULL, NULL) == MACRO_PAYLOAD_START_STARTED);
+        CHECK(macro_payload_engine_protected() == (protection == 1u) && macro_payload_engine_ignores_presses() == (protection == 1u));
+        CHECK(macro_payload_engine_cancel());
+        test_drain_cleanup();
+        CHECK(macro_payload_start_ir(&ir, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_REPLACEMENT, 0, NULL, NULL) == MACRO_PAYLOAD_START_STARTED);
+        CHECK(macro_payload_engine_protected() && !macro_payload_engine_ignores_presses());
+        // The held Shift is not in what the computer is sent.
+        send_keyboard_report();
+        CHECK(last_report_mods == 0u);
+        CHECK(macro_payload_engine_cancel());
+        test_drain_cleanup();
+        CHECK(macro_payload_engine_idle());
+        live_mods = 0u;
+    }
+}
+
 static void test_busy_start_is_rejected_without_restarting_active_ir(void) {
     macro_payload_ir_t             active = {.length = 3u, .bytes = {MACRO_PAYLOAD_IR_OP_DELAY, 100u, 0u}};
     macro_payload_ir_t             other  = {.length = 3u, .bytes = {MACRO_PAYLOAD_IR_OP_DELAY, 1u, 0u}};
@@ -478,6 +560,95 @@ static void test_untypeable_text_is_refused_before_output(void) {
     CHECK(start_on_host(&held_entry, LAYOUT_WINDOWS_GERMAN, NOAH_HOST_WINDOWS, NOAH_HOST_UNICODE_ENABLED) == MACRO_PAYLOAD_START_INVALID);
 }
 
+static macro_payload_start_result_t start_and_drain(const macro_payload_ir_t *ir) {
+    macro_payload_start_result_t result = start_on_host(ir, 0u, NOAH_HOST_AUTO, 0u);
+    if (result == MACRO_PAYLOAD_START_STARTED) {
+        test_unicode_drain();
+        CHECK(callback_result == MACRO_PAYLOAD_FINISH_SUCCESS);
+    }
+    return result;
+}
+
+// The 6-key report has six key slots whatever the build, so a macro holds at
+// most six keys at once besides its modifiers (D-F65).
+static void test_a_chord_holds_at_most_six_keys_besides_modifiers(void) {
+    const macro_payload_ir_t seven = {.length = 9u, .bytes = {MACRO_PAYLOAD_IR_OP_TAP_LIST, 7u, KC_E, KC_Y, KC_K, KC_SEMICOLON, KC_P, KC_0, KC_U}};
+    CHECK(start_and_drain(&seven) == MACRO_PAYLOAD_START_INVALID);
+    CHECK(test_op_count == 0u);
+    const macro_payload_ir_t six_and_mods = {.length = 12u, .bytes = {MACRO_PAYLOAD_IR_OP_TAP_LIST, 10u, KC_LEFT_GUI, KC_LEFT_ALT, KC_LEFT_CTRL, KC_LEFT_SHIFT, KC_E, KC_Y, KC_K, KC_SEMICOLON, KC_P, KC_0}};
+    CHECK(start_and_drain(&six_and_mods) == MACRO_PAYLOAD_START_STARTED);
+}
+
+// A program that presses each key, plays `middle`, then releases the keys in
+// reverse.
+static macro_payload_ir_t holding(const uint8_t *keys, uint8_t count, const uint8_t *middle, uint8_t middle_length) {
+    macro_payload_ir_t ir = {0};
+    for (uint8_t i = 0u; i < count; i++) {
+        ir.bytes[ir.length++] = MACRO_PAYLOAD_IR_OP_KEY_DOWN;
+        ir.bytes[ir.length++] = keys[i];
+    }
+    if (middle_length) memcpy(ir.bytes + ir.length, middle, middle_length);
+    ir.length = (uint16_t)(ir.length + middle_length);
+    for (uint8_t i = count; i-- > 0u;) {
+        ir.bytes[ir.length++] = MACRO_PAYLOAD_IR_OP_KEY_UP;
+        ir.bytes[ir.length++] = keys[i];
+    }
+    return ir;
+}
+
+static const uint8_t KEYS_A_TO_G[] = {KC_A, KC_B, KC_C, KC_D, KC_E, KC_F, KC_G};
+
+static void test_held_keys_and_a_chord_share_the_six(void) {
+    const uint8_t five[] = {MACRO_PAYLOAD_IR_OP_TAP_LIST, 5u, KC_C, KC_D, KC_E, KC_F, KC_G};
+    const uint8_t four[] = {MACRO_PAYLOAD_IR_OP_TAP_LIST, 4u, KC_C, KC_D, KC_E, KC_F};
+    const uint8_t again[] = {MACRO_PAYLOAD_IR_OP_TAP_LIST, 5u, KC_A, KC_C, KC_D, KC_E, KC_F};
+    macro_payload_ir_t ir = holding(KEYS_A_TO_G, 2u, five, sizeof(five));
+    CHECK(start_and_drain(&ir) == MACRO_PAYLOAD_START_INVALID);
+    CHECK(test_op_count == 0u);
+    ir = holding(KEYS_A_TO_G, 2u, four, sizeof(four));
+    CHECK(start_and_drain(&ir) == MACRO_PAYLOAD_START_STARTED);
+    // A key a chord names that is already held takes no second slot.
+    ir = holding(KEYS_A_TO_G, 2u, again, sizeof(again));
+    CHECK(start_and_drain(&ir) == MACRO_PAYLOAD_START_STARTED);
+    ir = holding(KEYS_A_TO_G, 7u, NULL, 0u);
+    CHECK(start_and_drain(&ir) == MACRO_PAYLOAD_START_INVALID);
+    CHECK(test_op_count == 0u);
+}
+
+// A stored macro plays in windows, and the keys one window leaves held count
+// in the next.
+static void test_held_keys_count_in_the_next_window(void) {
+    const macro_payload_ir_t held = {.length = 4u, .more = true, .bytes = {MACRO_PAYLOAD_IR_OP_KEY_DOWN, KC_A, MACRO_PAYLOAD_IR_OP_KEY_DOWN, KC_B}};
+    const macro_payload_ir_t five = {.length = 11u, .bytes = {MACRO_PAYLOAD_IR_OP_TAP_LIST, 5u, KC_C, KC_D, KC_E, KC_F, KC_G, MACRO_PAYLOAD_IR_OP_KEY_UP, KC_B, MACRO_PAYLOAD_IR_OP_KEY_UP, KC_A}};
+    const macro_payload_ir_t four = {.length = 10u, .bytes = {MACRO_PAYLOAD_IR_OP_TAP_LIST, 4u, KC_C, KC_D, KC_E, KC_F, MACRO_PAYLOAD_IR_OP_KEY_UP, KC_B, MACRO_PAYLOAD_IR_OP_KEY_UP, KC_A}};
+    macro_payload_preflight_t preflight;
+    test_reset();
+    macro_payload_preflight_begin(&preflight);
+    CHECK(macro_payload_preflight_window(&preflight, &held));
+    CHECK(!macro_payload_preflight_window(&preflight, &five));
+    macro_payload_preflight_begin(&preflight);
+    CHECK(macro_payload_preflight_window(&preflight, &held));
+    CHECK(macro_payload_preflight_window(&preflight, &four));
+    CHECK(macro_payload_preflight_end(&preflight));
+}
+
+static void test_media_system_and_mouse_keys_take_no_report_slot(void) {
+    const macro_payload_ir_t chord = {.length = 11u, .bytes = {MACRO_PAYLOAD_IR_OP_TAP_LIST, 9u, KC_A, KC_B, KC_C, KC_D, KC_E, KC_F, KC_AUDIO_VOL_UP, KC_SYSTEM_SLEEP, MS_BTN1}};
+    CHECK(start_and_drain(&chord) == MACRO_PAYLOAD_START_STARTED);
+}
+
+// Text types each character as a key, so it needs a slot the holds leave
+// free, even when its key is one of them.
+static void test_text_needs_a_report_slot_the_holds_leave_free(void) {
+    const uint8_t z[] = {MACRO_PAYLOAD_IR_OP_TEXT, 1u, 'z'}, a[] = {MACRO_PAYLOAD_IR_OP_TEXT, 1u, 'a'};
+    macro_payload_ir_t ir = holding(KEYS_A_TO_G, 5u, z, sizeof(z));
+    CHECK(start_and_drain(&ir) == MACRO_PAYLOAD_START_STARTED);
+    ir = holding(KEYS_A_TO_G, 6u, z, sizeof(z));
+    CHECK(start_and_drain(&ir) == MACRO_PAYLOAD_START_INVALID);
+    ir = holding(KEYS_A_TO_G, 6u, a, sizeof(a));
+    CHECK(start_and_drain(&ir) == MACRO_PAYLOAD_START_INVALID);
+}
+
 static void test_unicode_restores_current_modifiers_after_neutral_commit(void) {
     test_reset(); unicode_mode = 1u;
     live_mods = MOD_BIT(KC_LEFT_ALT) | MOD_BIT(KC_LEFT_SHIFT);
@@ -580,6 +751,9 @@ static void test_protected_unicode_cancellation_never_replays_existing_keys(void
 }
 
 int main(void) {
+    test_erase_taps_backspace_at_the_text_pace();
+    test_a_correction_is_isolated_without_ignoring_presses();
+    test_a_corrections_macro_is_isolated_whatever_its_protection();
     test_protected_output_isolates_existing_keys_and_modifiers();
     test_protected_unicode_cancellation_never_replays_existing_keys();
     test_protection_is_latched_and_released();
@@ -589,6 +763,11 @@ int main(void) {
     test_ascii_text_uses_keys_in_every_unicode_mode();
     test_text_types_through_the_host_layout();
     test_untypeable_text_is_refused_before_output();
+    test_a_chord_holds_at_most_six_keys_besides_modifiers();
+    test_held_keys_and_a_chord_share_the_six();
+    test_held_keys_count_in_the_next_window();
+    test_media_system_and_mouse_keys_take_no_report_slot();
+    test_text_needs_a_report_slot_the_holds_leave_free();
     memset(external_keys, 0, sizeof(external_keys));
     memset(report_keys, 0, sizeof(report_keys));
     memset(managed_count, 0, sizeof(managed_count));
@@ -612,18 +791,23 @@ void send_keyboard_report(void) {
     if (overridden && mods == 0u) neutral_reports++;
     last_report_mods = mods;
     report_keyboard_t report = {0};
-    report_nkro_t nkro = {0};
     uint8_t index = 0u;
-    for (uint16_t key = 1u; key < KC_LEFT_CTRL; key++) if (managed_count[key] || (external_keys[key / 8u] & (1u << (key % 8u)))) {
+    // QMK's keyboard report carries keyboard keys (KC_A..KC_EXSEL); system,
+    // consumer and mouse keys go to reports of their own.
+    for (uint16_t key = KC_A; key <= KC_EXSEL; key++) if (managed_count[key] || (external_keys[key / 8u] & (1u << (key % 8u)))) {
         if (index < sizeof(report.keys)) report.keys[index++] = (uint8_t)key;
-        nkro.bits[key / 8u] |= (uint8_t)(1u << (key % 8u));
     }
     keyboard_report_keys_filter_user(&report);
-    nkro_report_keys_filter_user(&nkro);
     uint8_t keys[32] = {0};
     for (uint8_t i = 0u; i < sizeof(report.keys); i++) if (report.keys[i]) keys[report.keys[i] / 8u] |= (uint8_t)(1u << (report.keys[i] % 8u));
-    // Fixtures use <=6 simultaneous usages: both projections must agree.
+#ifdef NKRO_ENABLE
+    report_nkro_t nkro = {0};
+    for (uint16_t key = KC_A; key <= KC_EXSEL; key++) if (managed_count[key] || (external_keys[key / 8u] & (1u << (key % 8u)))) nkro.bits[key / 8u] |= (uint8_t)(1u << (key % 8u));
+    nkro_report_keys_filter_user(&nkro);
+    // A macro never holds more than the 6-key report's slots (D-F65), so
+    // both projections must agree.
     CHECK(memcmp(keys, nkro.bits, sizeof(nkro.bits)) == 0);
+#endif
     for (uint16_t key = 1u; key < 256u; key++) if ((keys[key / 8u] & (1u << (key % 8u))) && !(report_keys[key / 8u] & (1u << (key % 8u)))) host_presses[key]++;
     memcpy(report_keys, keys, sizeof(keys));
 }

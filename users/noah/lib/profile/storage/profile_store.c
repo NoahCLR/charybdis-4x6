@@ -14,7 +14,7 @@
 // format is keyed into the header CRC16 (its first input byte is the format
 // version) and into the marker values. A format-5 header (`NT`, markers
 // 0xA5/0x5A) is recognised and refused. The first byte is the whole domain
-// mask, one bit per registry row (seven with the keymap and macros); the
+// mask, one bit per registry row (eight, which fill it, D-F68); the
 // payload length is 32 bits; a separate flags byte holds the
 // origin half (bit 0) and the override flag (bit 1). Bytes 22..32 are
 // reserved and zero: 22..29 held the VIA store's generation and digest a

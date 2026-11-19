@@ -43,22 +43,6 @@ static bool noah_action_desc_has_policy_flag(noah_action_desc_t desc, noah_actio
     return def && (def->policy_flags & (uint16_t)flag) != 0;
 }
 
-static bool noah_action_keycode_is_pure_modifier_literal(uint16_t action) {
-    switch (action) {
-        case KC_LEFT_CTRL:
-        case KC_LEFT_SHIFT:
-        case KC_LEFT_ALT:
-        case KC_LEFT_GUI:
-        case KC_RIGHT_CTRL:
-        case KC_RIGHT_SHIFT:
-        case KC_RIGHT_ALT:
-        case KC_RIGHT_GUI:
-            return true;
-        default:
-            return false;
-    }
-}
-
 // The firmware always links the live lookup
 // (active_profile_settings_runtime.c), which falls back to the keymap's
 // shortcuts before a profile is live. This default, no shortcuts, only serves
@@ -141,10 +125,6 @@ bool noah_action_desc_default_tap_uses_action_keycode(noah_action_desc_t desc) {
     return noah_action_desc_has_policy_flag(desc, NOAH_ACTION_POLICY_DEFAULT_TAP_USES_ACTION_KEYCODE) || noah_action_desc_is_custom_key_with_shortcut(desc);
 }
 
-bool noah_action_desc_is_pure_modifier_literal(noah_action_desc_t desc) {
-    return desc.kind == NOAH_ACTION_KIND_LITERAL && noah_action_keycode_is_pure_modifier_literal(desc.action);
-}
-
 bool noah_action_desc_source_sets_momentary_layer_flag(noah_action_desc_t desc) {
     return noah_action_desc_source_layer_uses_desc_layer(desc);
 }
@@ -223,6 +203,28 @@ bool noah_action_kind_match_layer_lock(uint16_t action, pointing_mode_mask_t poi
     }
 
     *out = noah_action_desc_build(NOAH_ACTION_KIND_LAYER_LOCK, action, noah_action_keycode_layer_lock_layer(action), 0);
+    return true;
+}
+
+bool noah_action_kind_match_switch_key(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
+    (void)pointing_mode;
+
+    if (!(out && noah_action_keycode_is_switch_key(action))) {
+        return false;
+    }
+
+    *out = noah_action_desc_build(NOAH_ACTION_KIND_SWITCH_KEY, action, 0, 0);
+    return true;
+}
+
+bool noah_action_kind_match_leader(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
+    (void)pointing_mode;
+
+    if (!(out && noah_action_keycode_is_leader(action))) {
+        return false;
+    }
+
+    *out = noah_action_desc_build(NOAH_ACTION_KIND_LEADER, action, 0, 0);
     return true;
 }
 

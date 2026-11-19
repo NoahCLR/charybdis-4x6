@@ -37,7 +37,16 @@ typedef struct {
 _Static_assert(sizeof(macro_slot_metadata_t) == 1u, "macro slot metadata must remain one byte");
 
 macro_payload_start_result_t macro_slot_provider_start(const macro_slot_provider_t *provider, macro_slot_metadata_t *metadata, uint8_t slot, macro_payload_text_output_t text_output, uint8_t interval, macro_payload_source_t source);
+// Whether the slot's macro would start now: it is there, decodes, and passes
+// playback's checks on this host, with nothing playing. Nothing is sent.
+bool                         macro_slot_provider_can_start(const macro_slot_provider_t *provider, macro_slot_metadata_t *metadata, uint8_t slot);
 void                         macro_slot_provider_invalidate(const macro_slot_provider_t *provider, macro_slot_metadata_t *metadata, uint8_t slot);
 void                         macro_slot_provider_invalidate_all(const macro_slot_provider_t *provider, macro_slot_metadata_t *metadata);
+// Plays a correction (D-F69) from the shared window, uninterruptibly:
+// Backspace `erase` times, then `characters` through the host layout, each
+// key held `interval` ms and followed by as long a gap. BUSY while a macro
+// plays; INVALID, with nothing sent, when there is nothing to do or the layout
+// cannot type a character. `finish` is called once playback ends.
+macro_payload_start_result_t macro_slot_provider_start_correction(uint8_t erase, const uint16_t *characters, uint8_t count, uint8_t interval, macro_payload_finish_fn finish);
 // Call before the stored macros change: cancels a macro still reading them.
 void                         macro_slot_provider_storage_changing(void);

@@ -18,7 +18,9 @@ what a mode does is
   path and `emit_tap`; `pointing_mode_dragscroll.c` is the
   scrolling path every scrolling pointing slot drives.
 - `policy/`: `pointing_mode_policy.h` answers trait questions about a mode, a
-  key or a snapshot; `pointer_layer_policy.c` steers QMK's auto-mouse.
+  key or a snapshot; `pointer_layer_policy.c` steers QMK's auto-mouse;
+  `auto_mouse_switch.c` owns auto-mouse's runtime override and puts the
+  stored setting AND it into QMK's flag (D-F66).
 - `runtime/`: `pointing_mode_state.c` (the command model),
   `pointing_mode_lifecycle.c` (transition side effects, DPI),
   `pointing_mode_registry.c` (traits from the effective slot, lifecycle hooks,

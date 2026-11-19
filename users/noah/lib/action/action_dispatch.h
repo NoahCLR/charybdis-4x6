@@ -35,6 +35,7 @@ typedef struct {
 } noah_emit_policy_t;
 
 #define NOAH_EMIT_POLICY_NONE ((noah_emit_policy_t){0})
+#define NOAH_EMIT_POLICY_PRESERVE_MODS ((noah_emit_policy_t){.preserve_keyboard_mod_state = true})
 #define NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS ((noah_emit_policy_t){.settle_pending_fallback_holds = true})
 #define NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS_AND_PRESERVE_MODS ((noah_emit_policy_t){.settle_pending_fallback_holds = true, .preserve_keyboard_mod_state = true})
 
@@ -49,6 +50,19 @@ static inline bool noah_action_keycode_is_layer_toggle(uint16_t action) {
 
 static inline uint8_t noah_action_keycode_layer_lock_layer(uint16_t action) {
     return noah_action_keycode_is_layer_toggle(action) ? (uint8_t)QK_TOGGLE_LAYER_GET_LAYER(action) : (uint8_t)(action - LAYER_LOCK_BASE);
+}
+
+// The switch keys (D-F66): QMK's CM_ON, CM_OFF and CM_TOGG for combos and
+// AC_ON, AC_OFF and AC_TOGG for autocorrect, and the firmware's BH_ON, BH_OFF
+// and BH_TOGG for behaviours and AM_ON, AM_OFF and AM_TOGG for auto-mouse.
+static inline bool noah_action_keycode_is_switch_key(uint16_t action) {
+    return (action >= QK_COMBO_ON && action <= QK_COMBO_TOGGLE) || (action >= QK_AUTOCORRECT_ON && action <= QK_AUTOCORRECT_TOGGLE) || (action >= BH_ON && action <= BH_TOGG) || (action >= AM_ON && action <= AM_TOGG);
+}
+
+// QMK's Leader keycode, the leader of text replacement (D-F71). QMK's own
+// Leader is not built; the typing stage holds what follows it.
+static inline bool noah_action_keycode_is_leader(uint16_t action) {
+    return action == QK_LEADER;
 }
 
 static inline bool noah_action_keycode_is_momentary(uint16_t action) {
@@ -179,7 +193,6 @@ bool     noah_action_desc_releases_momentary_layer_before_action(noah_action_des
 bool     noah_action_desc_uses_held_lifecycle_for_press_and_hold(noah_action_desc_t desc);
 bool     noah_action_desc_default_tap_uses_layer_tap_keycode(noah_action_desc_t desc);
 bool     noah_action_desc_default_tap_uses_action_keycode(noah_action_desc_t desc);
-bool     noah_action_desc_is_pure_modifier_literal(noah_action_desc_t desc);
 bool     noah_action_desc_source_sets_momentary_layer_flag(noah_action_desc_t desc);
 bool     noah_action_desc_source_sets_layer_tap_flag(noah_action_desc_t desc);
 bool     noah_action_desc_supports_fallback_hold(noah_action_desc_t desc);

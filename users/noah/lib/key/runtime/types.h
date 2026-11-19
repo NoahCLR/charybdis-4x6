@@ -7,6 +7,9 @@
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
+// The key position outside the matrix: an output or a record of no key.
+#define NOAH_KEY_RUNTIME_NO_KEY ((keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS})
+
 typedef enum {
     KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT = 0,
     KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT,

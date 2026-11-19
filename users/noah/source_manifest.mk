@@ -15,6 +15,8 @@ NOAH_COMMON_SOURCES := \
     lib/profile/schema/profile_pd_v1.c \
     lib/profile/schema/profile_keymap_v1.c \
     lib/profile/schema/profile_macros_v1.c \
+    lib/profile/schema/profile_autocorrect_v1.c \
+    lib/profile/schema/profile_autocorrect_words_v1.c \
     lib/profile/schema/profile_reader.c \
     lib/profile/schema/key_behavior_domain_v1.c \
     lib/profile/schema/profile_rgb_v1.c \
@@ -26,11 +28,13 @@ NOAH_COMMON_SOURCES := \
     lib/profile/schema/profile_pd_compiled_v1.c \
     lib/profile/schema/profile_keymap_compiled_v1.c \
     lib/profile/schema/profile_macros_compiled_v1.c \
+    lib/profile/schema/profile_autocorrect_compiled_v1.c \
     lib/profile/runtime/profile_action_runtime_v1.c \
     lib/profile/runtime/active_profile_provider.c \
     lib/profile/runtime/profile_working_copy.c \
     lib/profile/split/profile_working_sync.c \
     lib/profile/runtime/active_profile_keymap_macros_runtime.c \
+    lib/profile/runtime/active_profile_autocorrect_runtime.c \
     lib/compat/qmk_profile_keymap.c \
     lib/macro/profile_macro_provider.c \
     lib/profile/runtime/active_profile_key_behavior_runtime.c \
@@ -82,6 +86,7 @@ NOAH_COMMON_SOURCES := \
     lib/key/behavior/handled_key_materialize.c \
     lib/key/behavior/key_behavior_lookup.c \
     lib/key/behavior/participation.c \
+    lib/pointing/policy/auto_mouse_switch.c \
     lib/key/behavior/keymap_validation.c \
     lib/key/runtime/api.c \
     lib/key/runtime/preflight.c \
@@ -100,6 +105,9 @@ NOAH_COMMON_SOURCES := \
     lib/key/ownership/held_repeat.c \
     lib/action/action_dispatch.c \
     lib/action/owned_keycode.c \
+    lib/autocorrect/autocorrect.c \
+    lib/autocorrect/autocorrect_feedback.c \
+    lib/autocorrect/autocorrect_switch.c \
     lib/macro/macro_input_guard.c \
     lib/macro/macro_slot_provider.c \
     lib/macro/macro_payload.c \
@@ -135,6 +143,7 @@ NOAH_COMMON_SOURCES := \
     lib/key/runtime/trace/core_trace.c \
     lib/rgb/core/rgb_runtime.c \
     lib/rgb/core/rgb_active_profile_config.c \
+    lib/rgb/stages/rgb_autocorrect_feedback_stage.c \
     lib/rgb/stages/rgb_combo_feedback_stage.c \
     lib/rgb/stages/rgb_key_feedback_stage.c \
     lib/rgb/stages/rgb_layer_stage.c \

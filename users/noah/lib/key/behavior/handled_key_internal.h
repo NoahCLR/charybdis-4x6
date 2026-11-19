@@ -26,6 +26,8 @@ bool                             handled_key_resolution_step_present(const handl
 bool                             handled_key_resolution_uses_fallback_hold_behavior(const handled_key_resolution_t *resolution);
 bool                             handled_key_resolution_uses_deferred_stacked_pd_hold(const handled_key_resolution_t *resolution);
 uint16_t                         handled_key_tap_action_behavior(const handled_key_resolution_t *resolution);
+void                             handled_key_resolution_standard_key_into(const handled_key_resolution_t *resolution, bool threshold_hold, handled_key_resolution_t *out);
+bool                             handled_key_resolution_is_empty_branch(const handled_key_resolution_t *resolution);
 uint8_t                          handled_key_tap_repeat_count_behavior(const handled_key_resolution_t *resolution, uint16_t tap_action);
 hold_behavior_t                  handled_key_hold_behavior(const handled_key_resolution_t *resolution);
 key_runtime_slot_hold_strategy_t handled_key_hold_strategy_behavior(const handled_key_resolution_t *resolution);

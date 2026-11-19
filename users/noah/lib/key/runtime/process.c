@@ -22,6 +22,7 @@
 #include "../../compat/qmk_combo_origin.h"
 #include "../../macro/macro_input_guard.h"
 #include "../../macro/macro_payload.h"
+#include "../../macro/typing_stage.h"
 #include "../../compat/qmk_native_report_contract.h"
 #include "../../compat/qmk_pointing_contract.h"
 #include "../../compat/qmk_source_layer_contract.h"
@@ -234,7 +235,9 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_idle_custom
     return ctx->record->event.pressed ? KEY_RUNTIME_PROCESS_NEXT : KEY_RUNTIME_PROCESS_RETURN_TRUE;
 }
 
-static bool key_runtime_process_finish(key_runtime_process_ctx_t *ctx, bool keep_processing) {
+// Inlined into the hook, so the reviewed stack paths through the DPI
+// adjustment keep the shape their manifest names.
+static inline __attribute__((always_inline)) bool key_runtime_process_finish(key_runtime_process_ctx_t *ctx, bool keep_processing) {
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
     // It also tells the DPI policy of QMK's Charybdis keys it passes on.
     if (keep_processing) keep_processing = noah_qmk_profile_adjustment_process(ctx->keycode, ctx->record);
@@ -243,6 +246,11 @@ static bool key_runtime_process_finish(key_runtime_process_ctx_t *ctx, bool keep
     // scan applies the DPI policy again.
     if (keep_processing && noah_qmk_contract_pointer_keycode_sets_cpi(ctx->keycode)) pointing_mode_forget_applied_dpi();
 #endif
+    // A press QMK registers reaches the report after this hook, so its key is
+    // noted for the typing stage last: the stages above may have sent another
+    // key's action first, which noted that key. A combo's output names its
+    // owner key (noah_qmk_combo_origin_normalize_record).
+    if (keep_processing && ctx->record->event.pressed && !noah_synthetic_record_active()) noah_typing_stage_noted_key = ctx->record->event.key;
     noah_runtime_diag_scope_leave();
     return keep_processing;
 }
@@ -329,7 +337,7 @@ bool is_tap_record_user(keyrecord_t *record, bool native_tap, bool default_tap) 
 }
 
 bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
-    if (!noah_record_admission_macro_admit(record, macro_payload_engine_protected(), noah_synthetic_record_active())) return false;
+    if (!noah_record_admission_macro_admit(record, macro_payload_engine_ignores_presses(), noah_synthetic_record_active())) return false;
     if (noah_synthetic_record_active()) {
         return true;
     }
@@ -359,6 +367,9 @@ bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
 
     return true;
 }
+
+// A build or host test without the typing stage (typing_stage.h).
+__attribute__((weak)) keypos_t noah_typing_stage_noted_key;
 
 bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     static const key_runtime_process_stage_entry_t stages[] = {

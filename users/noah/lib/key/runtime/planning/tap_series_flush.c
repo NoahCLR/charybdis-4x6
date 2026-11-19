@@ -60,6 +60,10 @@ bool key_runtime_core_tap_series_has_authored_branch(const tap_series_t *series)
     return series && series->active && series->tap_count > 1u && series->tap_branch_has_authored_step;
 }
 
+bool key_runtime_core_tap_series_is_empty_branch(const tap_series_t *series) {
+    return series && series->active && key_behavior_branch_is_empty(series->tap_count, series->tap_branch_has_authored_step);
+}
+
 bool key_runtime_core_tap_series_pending_gesture(const key_runtime_core_state_t *state, const tap_series_t *series) {
     keypos_t key_pos;
 
@@ -79,8 +83,8 @@ bool key_runtime_core_pending_multi_tap_flush_resolution(const tap_series_t *ser
         return false;
     }
 
-    resolved_action       = series->tap_repeat_count > 0u ? series->tap_action : series->single_action;
-    resolved_repeat_count = series->tap_repeat_count > 0u ? series->tap_repeat_count : series->tap_count;
+    resolved_action       = series->tap_action;
+    resolved_repeat_count = series->tap_repeat_count;
     if (action) {
         *action = resolved_action;
     }

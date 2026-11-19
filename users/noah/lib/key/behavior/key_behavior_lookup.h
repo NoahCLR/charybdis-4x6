@@ -20,7 +20,7 @@ typedef struct {
     bool                  is_momentary_layer; // holds its layer from the press: MO(), TT(), OSL(), LM(), a Tap-toggle or One-shot custom key
     bool                  is_layer_tap;       // specifically authored LT() row
     bool                  has_multi_tap;
-    uint8_t               authored_tap_depth; // branch count; a quick run past it types the first tap (D-F33)
+    uint8_t               authored_tap_depth; // branch count; a quick run past it types the standard key (D-F64)
     uint16_t              tap_hold_term;      // resolved: per-key → TAPPING_TERM for authored LT() → CUSTOM_TAP_HOLD_TERM
     uint16_t              long_hold_term;     // resolved: per-key → CUSTOM_LONGER_HOLD_TERM
     uint16_t              multi_tap_term;     // resolved: per-key → CUSTOM_MULTI_TAP_TERM

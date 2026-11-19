@@ -143,6 +143,43 @@ static bool rgb_runtime_pointing_mode_stage_paint_group(rgb_runtime_frame_t *fra
     return painted;
 }
 
+// Only the running slot's rows and the all-slots rows are read (D-F63).
+static bool rgb_runtime_pointing_mode_stage_selector_reads(uint8_t selector, pointing_mode_id_t active_mode) {
+    return selector == NOAH_PROFILE_RGB_V1_SELECTOR_ALL || selector == active_mode;
+}
+
+// A passthrough slot paints neither its locality nor its black rows; its
+// coloured rows still paint (D-F74).
+static bool rgb_runtime_pointing_mode_stage_row_paints(const rgb_active_profile_pd_group_t *group, pointing_mode_id_t active_mode, hsv_t slot_color) {
+    return rgb_runtime_pointing_mode_stage_selector_reads(group->selector, active_mode) && !(rgb_hsv_is_inherit_color(group->color) && rgb_hsv_is_passthrough(slot_color));
+}
+
+// Whether the running slot has a colour to paint: its own, or a row's. A row
+// that cannot be read paints nothing, as the stage then draws nothing.
+static bool rgb_runtime_pointing_mode_stage_has_paint(const noah_active_profile_rgb_frame_t *profile_frame, pointing_mode_id_t active_mode, hsv_t slot_color) {
+    rgb_active_profile_group_selectors_t selectors;
+    rgb_active_profile_pd_group_t        group_config;
+
+    if (!rgb_hsv_is_passthrough(slot_color)) {
+        return true;
+    }
+    if (!rgb_active_profile_config_group_selectors(profile_frame, &selectors)) {
+        return false;
+    }
+    for (uint8_t group = 0u; group < selectors.pd_count; group++) {
+        if (!rgb_runtime_pointing_mode_stage_selector_reads(selectors.pd[group], active_mode)) {
+            continue;
+        }
+        if (!rgb_active_profile_config_pd_group_at(profile_frame, group, &group_config)) {
+            return false;
+        }
+        if (rgb_runtime_pointing_mode_stage_row_paints(&group_config, active_mode, slot_color)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 _Static_assert(POINTING_MODE_NO_LAYER == UINT8_MAX, "the stub without pointing lighting answers UINT8_MAX for no layer");
 
 uint8_t rgb_runtime_pointing_mode_stage_beneath_layer(layer_state_t state, const noah_active_profile_rgb_frame_t *profile_frame) {
@@ -150,8 +187,9 @@ uint8_t rgb_runtime_pointing_mode_stage_beneath_layer(layer_state_t state, const
     layer_state_t            on       = snapshot.display.active_mode != 0 ? state & (layer_state_t)pointing_mode_link_layers(snapshot.display.active_mode) : 0u;
     pointing_mode_color_t    config;
 
-    // A mode with nothing to paint, its stage off, leaves the layer stack whole.
-    if (!on || !rgb_active_profile_config_pd_color(profile_frame, snapshot.display.active_index, &config)) {
+    // A mode with nothing to paint (its stage off, or a passthrough slot
+    // without a coloured row) leaves the layer stack whole.
+    if (!on || !rgb_active_profile_config_pd_color(profile_frame, snapshot.display.active_index, &config) || !rgb_runtime_pointing_mode_stage_has_paint(profile_frame, snapshot.display.active_index, config.color)) {
         return POINTING_MODE_NO_LAYER;
     }
     return (uint8_t)__builtin_ctz((unsigned int)on);
@@ -168,15 +206,15 @@ bool rgb_runtime_pointing_mode_stage_render_active_profile_frame(rgb_runtime_fra
 bool rgb_runtime_pointing_mode_stage_render_active_profile_beneath_frame(rgb_runtime_frame_t *frame, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t beneath_layer, uint8_t led_min, uint8_t led_max) {
     // Mirrored identity and owner keys are rendered together, so they come from
     // one published generation rather than two independent reads.
-    uint8_t                       owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
-    bool                          has_owner_keys = false;
-    pointing_mode_snapshot_t      snapshot;
-    bool                          painted = false;
-    pointing_mode_id_t            active_mode;
-    pointing_mode_color_t         active_config;
-    rgb_t                         active_rgb;
-    rgb_active_profile_pd_group_t group_config;
-    uint8_t                       group_count;
+    uint8_t                              owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    bool                                 has_owner_keys = false;
+    pointing_mode_snapshot_t             snapshot;
+    bool                                 painted = false;
+    pointing_mode_id_t                   active_mode;
+    pointing_mode_color_t                active_config;
+    rgb_t                                active_rgb;
+    rgb_active_profile_pd_group_t        group_config;
+    rgb_active_profile_group_selectors_t selectors;
 
     if (!frame) {
         return false;
@@ -194,15 +232,23 @@ bool rgb_runtime_pointing_mode_stage_render_active_profile_beneath_frame(rgb_run
     }
     active_rgb = hsv_to_rgb(active_config.color);
 
-    painted |= rgb_runtime_pointing_mode_stage_paint_locality(frame, active_rgb, active_config.locality, snapshot, owner_bitmap, has_owner_keys, led_min, led_max);
+    if (!rgb_hsv_is_passthrough(active_config.color)) {
+        painted |= rgb_runtime_pointing_mode_stage_paint_locality(frame, active_rgb, active_config.locality, snapshot, owner_bitmap, has_owner_keys, led_min, led_max);
+    }
 
-    group_count = rgb_active_profile_config_pd_group_count(profile_frame);
-    for (uint8_t group = 0u; group < group_count; group++) {
+    if (!rgb_active_profile_config_group_selectors(profile_frame, &selectors)) {
+        rgb_runtime_pointing_mode_stage_clear_frame(frame, led_min, led_max);
+        return false;
+    }
+    for (uint8_t group = 0u; group < selectors.pd_count; group++) {
+        if (!rgb_runtime_pointing_mode_stage_selector_reads(selectors.pd[group], active_mode)) {
+            continue;
+        }
         if (!rgb_active_profile_config_pd_group_at(profile_frame, group, &group_config)) {
             rgb_runtime_pointing_mode_stage_clear_frame(frame, led_min, led_max);
             return false;
         }
-        if (group_config.selector != NOAH_PROFILE_RGB_V1_SELECTOR_ALL && group_config.selector != active_mode) {
+        if (!rgb_runtime_pointing_mode_stage_row_paints(&group_config, active_mode, active_config.color)) {
             continue;
         }
 

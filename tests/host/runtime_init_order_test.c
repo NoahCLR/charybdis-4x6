@@ -75,8 +75,21 @@ void noah_active_profile_pd_load_compiled_defaults(const noah_pd_config_t defaul
     test_log_stage("active_profile_pd_load_compiled_defaults");
 }
 
+// And reads the authored autocorrect list, which the owner would publish.
+void noah_active_profile_autocorrect_load_authored(void) {
+    test_log_stage("active_profile_autocorrect_load_authored");
+}
+
 void noah_record_admission_reset(void) {
     test_log_stage("record_admission_reset");
+}
+
+void noah_autocorrect_scan(void) {
+    test_log_stage("autocorrect_scan");
+}
+
+void noah_autocorrect_init(void) {
+    test_log_stage("autocorrect_init");
 }
 
 void macro_payload_engine_scan(void) {
@@ -187,7 +200,7 @@ static void test_eeconfig_init_order(void) {
 // sync's sends and the pointer CPI refresh.
 static void test_matrix_scan_order(void) {
     static const char *const expected[] = {
-        "profile_store_runtime_matrix_scan", "qmk_combo_origin_scan", "key_runtime_scan", "record_admission_task", "macro_payload_engine_scan", "timer_read32", "split_runtime_sync_tick", "pointing_mode_refresh_applied_dpi",
+        "profile_store_runtime_matrix_scan", "qmk_combo_origin_scan", "key_runtime_scan", "record_admission_task", "macro_payload_engine_scan", "autocorrect_scan", "timer_read32", "split_runtime_sync_tick", "pointing_mode_refresh_applied_dpi",
     };
 
     test_log_reset();
@@ -212,9 +225,9 @@ static void test_keyboard_post_init_order(void) {
         // core state.
         "runtime_shared_state_post_init",
         // QMK's Charybdis post-init wrote the sensor's CPI just before.
-        "pointing_mode_forget_applied_dpi", "qmk_combo_origin_init", "record_admission_reset", "macro_payload_engine_init", "profile_store_runtime_init",
+        "pointing_mode_forget_applied_dpi", "qmk_combo_origin_init", "record_admission_reset", "macro_payload_engine_init", "autocorrect_init", "profile_store_runtime_init",
 #ifndef NOAH_LIVE_PROFILE_OWNER_ENABLE
-        "active_profile_pd_load_compiled_defaults",
+        "active_profile_pd_load_compiled_defaults", "active_profile_autocorrect_load_authored",
 #endif
         "rgb_runtime_post_init", "split_runtime_sync_init",
     };

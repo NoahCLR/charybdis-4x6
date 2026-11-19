@@ -8,6 +8,8 @@
 #include "users/noah/lib/profile/runtime/active_profile_pd_runtime.h"
 #include "users/noah/lib/profile/runtime/active_profile_settings_runtime.h"
 #include "users/noah/lib/profile/runtime/active_profile_keymap_macros_runtime.h"
+#include "users/noah/lib/profile/runtime/active_profile_autocorrect_runtime.h"
+#include "users/noah/lib/profile/schema/profile_macros_v1.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/noah_keymap.h"
@@ -43,6 +45,8 @@ uint32_t noah_profile_activation_policy_safe_boundary(void *context) {
     (void)context;
     return 0;
 }
+// The room the maximum profile leaves for later additions: make_maximum_profile.py's ALLOWANCE (D-F76).
+static const uint32_t MAXIMUM_PROFILE_RESERVE = 7168u;
 static unsigned settings_applies;
 void            noah_qmk_portable_apply(void) {
     settings_applies++;
@@ -254,6 +258,22 @@ static void assert_published(const uint8_t *base, const noah_profile_blob_v1_t *
             assert(noah_active_profile_macro_bank_read(0, &byte, 1u) && byte == domain->payload[0]);
             assert(noah_active_profile_macro_bank_read(domain->payload_length - 1, &byte, 1u) && byte == 0);
         }
+        if (domain->id == NOAH_PROFILE_DOMAIN_V1_AUTOCORRECT) {
+            // Every stored typo is found by its bytes and names a correction
+            // the list returns, read in place from the published profile.
+            const noah_profile_autocorrect_v1_list_t *list = noah_active_profile_autocorrect_list();
+            noah_profile_autocorrect_v1_typo_t        typo, found;
+            uint8_t                                   text[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX];
+            noah_profile_autocorrect_v1_correction_t  stored;
+            assert(list->corrections == (domain->payload[0] | domain->payload[1] << 8) && list->typos == (domain->payload[2] | domain->payload[3] << 8) && list->part_typos == (domain->payload[4] | domain->payload[5] << 8));
+            for (uint16_t index = 0; index < list->typos; index++) {
+                assert(noah_profile_autocorrect_v1_typo_at(list, index, &typo, text));
+                assert(noah_profile_autocorrect_v1_find(list, text, typo.length, &found) && found.index == index);
+                assert(noah_profile_autocorrect_v1_correction(list, typo.correction, &stored, text));
+            }
+            for (uint16_t position = 0; position < list->part_typos; position++)
+                assert(noah_profile_autocorrect_v1_part_at(list, position, &typo, NULL));
+        }
         if (domain->id == NOAH_PROFILE_DOMAIN_V1_SETTINGS) {
             assert(noah_active_profile_settings_length() == domain->payload_length);
             for (size_t j = 0; j < domain->payload_length; j++)
@@ -334,7 +354,7 @@ static void    load_maximum(const char *path) {
                 maximum[maximum_length++] = (uint8_t)byte;
             }
     fclose(file);
-    assert(maximum_length > 32768u && maximum_length + 12288u <= NOAH_PROFILE_PAYLOAD_MAX);
+    assert(maximum_length > 32768u && maximum_length + MAXIMUM_PROFILE_RESERVE <= NOAH_PROFILE_PAYLOAD_MAX);
 }
 static void use_maximum(noah_profile_blob_v1_t *expected) {
     memcpy(candidate, maximum, maximum_length);
@@ -368,6 +388,18 @@ static void assert_maximum_edges(void) {
     assert(noah_active_profile_combo_get(0)->keycode == QK_MACRO_0 && noah_active_profile_combo_get(63)->keycode == QK_MACRO_0 + 63 && noah_active_profile_combo_get(127)->keycode == CUSTOM_KEY_0 + 0);
     assert(noah_active_profile_combo_get(1)->keycode == CUSTOM_KEY_0 + 126 && !noah_active_profile_combo_get(128));
     assert(noah_setting(NOAH_SETTING_AUTO_MOUSE_LAYER, 0) == 15 && noah_setting(NOAH_SETTING_LAYER_COMBOS, 0) == 0x7fff);
+    // The autocorrect list at every ceiling: its first typo by binary search,
+    // naming the 128-byte correction, and its last, 32 bytes long, after the
+    // leader. Every correction fires both ways and every typo matches part of
+    // a word, so every typo is in both indexes.
+    const noah_profile_autocorrect_v1_list_t *list = noah_active_profile_autocorrect_list();
+    noah_profile_autocorrect_v1_typo_t        typo;
+    uint8_t                                   text[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX];
+    noah_profile_autocorrect_v1_correction_t  stored;
+    assert(list->corrections == NOAH_PROFILE_AUTOCORRECT_V1_MAX_CORRECTIONS && list->typos == NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS && list->part_typos == NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS && list->leader_typos == NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS && list->text_bytes == NOAH_PROFILE_AUTOCORRECT_V1_MAX_TEXT_BYTES);
+    assert(noah_profile_autocorrect_v1_find(list, (const uint8_t *)"taaaaaaa", 8u, &typo) && typo.index == 0u && typo.match == NOAH_PROFILE_AUTOCORRECT_V1_MATCH_START);
+    assert(noah_profile_autocorrect_v1_correction(list, typo.correction, &stored, text) && stored.length == NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX && text[0] == 'Z' && text[127] == '!');
+    assert(noah_profile_autocorrect_v1_leader_at(list, NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS - 1u, &typo, text) && typo.index == NOAH_PROFILE_AUTOCORRECT_V1_MAX_TYPOS - 1u && typo.length == NOAH_PROFILE_AUTOCORRECT_V1_TEXT_MAX && text[0] == 'z' && text[31] == 'z');
 }
 
 static void put_u16(uint8_t *p, uint16_t value) {
@@ -396,12 +428,14 @@ static void test_maximum_profile(void) {
     use_maximum(&expected);
     save(maximum_length);
     printf("maximum profile: %u bytes validated in %u scans\n", (unsigned)maximum_length, (unsigned)validation_scans);
-    // One validator step a scan, each one read of at most 20 bytes. The other
-    // half's copy of this validation is the longest stretch a split prepare
-    // spends without transfer progress, inside the owner's no-progress window.
+    // Up to NOAH_PROFILE_CANDIDATE_VALIDATION_CALLS validator steps a scan,
+    // each one read of at most 20 bytes, so the bound below, one step a scan,
+    // is generous. The other half's copy of this validation is the longest
+    // stretch a split prepare spends without transfer progress, inside the
+    // owner's no-progress window.
     // Keep the prior table-work bound and add only the two bounded passes
     // over the new domains (checksum and semantic decoding), plus envelopes.
-    const uint32_t extra_steps = (1920u + 34903u + 12u + 19u) / 20u + (1920u + 19u) / 20u + (34903u + 19u) / 20u + 2u;
+    const uint32_t extra_steps = (1920u + NOAH_PROFILE_MACROS_V1_MAX_SIZE + 12u + 19u) / 20u + (1920u + 19u) / 20u + (NOAH_PROFILE_MACROS_V1_MAX_SIZE + 19u) / 20u + 2u;
     assert(validation_scans < 8000u + extra_steps);
     assert(validation_scans * NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS < NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS);
     assert_published(maximum, &expected, 1);
@@ -554,6 +588,8 @@ int main(int argc, char **argv) {
             }
         }
         assert(noah_active_profile_settings_length() > 0 && noah_setting(NOAH_SETTING_TAPPING_TERM, 0) == TAPPING_TERM);
+        // The authored autocorrect list ships empty.
+        assert(noah_active_profile_autocorrect_list()->typos == 0u);
         noah_active_profile_rgb_frame_t factory_rgb;
         assert(noah_active_profile_rgb_runtime_capture_frame(&owner.rgb, &factory_rgb) == NOAH_ACTIVE_PROFILE_RGB_OK);
         assert(factory_rgb.identity.kind == NOAH_ACTIVE_PROFILE_KIND_COMPILED_DEFAULTS && factory_rgb.view.reader.read != owner.compiled_reader.read);
@@ -570,7 +606,7 @@ int main(int argc, char **argv) {
         for (size_t i = 0; i < NOAH_PROFILE_DOMAIN_REGISTRY_COUNT; i++) {
             const noah_profile_domain_shape_t *shape  = noah_profile_domain_at(i);
             bool                               found  = false;
-            const noah_profile_blob_v1_t      *source = use_imported && (shape->id == NOAH_PROFILE_DOMAIN_V1_COMBOS || shape->id == NOAH_PROFILE_DOMAIN_V1_SETTINGS) ? &fixture : &compiled;
+            const noah_profile_blob_v1_t      *source = use_imported && (shape->id == NOAH_PROFILE_DOMAIN_V1_COMBOS || shape->id == NOAH_PROFILE_DOMAIN_V1_SETTINGS || shape->id == NOAH_PROFILE_DOMAIN_V1_AUTOCORRECT) ? &fixture : &compiled;
             for (size_t j = 0; j < source->domain_count; j++)
                 if (source->domains[j].id == shape->id) {
                     domains[i] = source->domains[j];
@@ -594,6 +630,17 @@ int main(int argc, char **argv) {
         save(length);
         assert_published(candidate, &expected, 1);
         assert(noah_setting_combo_output_behaviors() == !use_imported);
+        // The fixture's list (autocorrect_domain_v2.json's "small"): several
+        // typos resolve to one stored correction.
+        if (use_imported) {
+            const noah_profile_autocorrect_v1_list_t *list = noah_active_profile_autocorrect_list();
+            noah_profile_autocorrect_v1_typo_t        first, second;
+            uint8_t                                   text[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX];
+            noah_profile_autocorrect_v1_correction_t  stored;
+            assert(list->corrections == 10u && list->typos == 15u && list->part_typos == 3u);
+            assert(noah_profile_autocorrect_v1_find(list, (const uint8_t *)"becuase", 7u, &first) && noah_profile_autocorrect_v1_find(list, (const uint8_t *)"becasue", 7u, &second) && first.correction == second.correction);
+            assert(noah_profile_autocorrect_v1_correction(list, first.correction, &stored, text) && stored.length == 7u && memcmp(text, "because", 7u) == 0);
+        }
         reboot();
         until_state(NOAH_PROFILE_OWNER_READY_VALIDATED);
         assert(settings_applies == 3); // compiled, the save's activation, the reboot's

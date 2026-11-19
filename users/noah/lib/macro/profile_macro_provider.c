@@ -7,6 +7,7 @@
 
 #include "../profile/runtime/active_profile_keymap_macros_runtime.h"
 #include "macro_slot_provider.h"
+#include "typing_stage.h"
 
 #ifndef NOAH_MACRO_SLOT_DELAY
 #    define NOAH_MACRO_SLOT_DELAY TAP_CODE_DELAY
@@ -88,11 +89,8 @@ static bool profile_macro_provider_load_ir(uint8_t slot, macro_payload_ir_t *ir,
     return macro_payload_decode_qmk_window(ir, cursor, profile_macro_found.remaining, noah_active_profile_macro_read_byte, &profile_macro_found.offset);
 }
 
-bool noah_profile_macro_start(uint16_t action) {
-    if (!IS_QK_MACRO(action)) {
-        return false;
-    }
-
+// The decoder cache follows the stored macros: a new publication empties it.
+static void profile_macro_provider_follow_publication(void) {
     static uint32_t publication;
     uint32_t current = noah_active_profile_keymap_macros_publication();
     if (current != publication) {
@@ -100,11 +98,42 @@ bool noah_profile_macro_start(uint16_t action) {
         macro_slot_provider_invalidate_all(&profile_macro_provider, profile_macro_slots);
         publication = current;
     }
-    return macro_slot_provider_start(&profile_macro_provider, profile_macro_slots, (uint8_t)(action - QK_MACRO), MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, NOAH_MACRO_SLOT_DELAY, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_STARTED;
+}
+
+bool noah_profile_macro_can_play(uint16_t action) {
+    if (!IS_QK_MACRO(action)) return false;
+    profile_macro_provider_follow_publication();
+    return macro_slot_provider_can_start(&profile_macro_provider, profile_macro_slots, (uint8_t)(action - QK_MACRO));
+}
+
+static bool profile_macro_start_from(uint16_t action, macro_payload_source_t source) {
+    if (!IS_QK_MACRO(action)) {
+        return false;
+    }
+
+    profile_macro_provider_follow_publication();
+    return macro_slot_provider_start(&profile_macro_provider, profile_macro_slots, (uint8_t)(action - QK_MACRO), MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, NOAH_MACRO_SLOT_DELAY, source) == MACRO_PAYLOAD_START_STARTED;
+}
+
+bool noah_profile_macro_start(uint16_t action) {
+    return profile_macro_start_from(action, MACRO_PAYLOAD_SOURCE_SLOT);
+}
+
+bool noah_profile_macro_start_replacement(uint16_t action) {
+    return profile_macro_start_from(action, MACRO_PAYLOAD_SOURCE_REPLACEMENT);
+}
+
+// A build or host test without the typing stage (typing_stage.h).
+__attribute__((weak)) bool noah_typing_stage_defer_macro(uint8_t slot) {
+    (void)slot;
+    return false;
 }
 
 bool noah_profile_macro_try_play(uint16_t action) {
     if (!IS_QK_MACRO(action)) return false;
+    // A macro key pressed while typed keys are held back waits its turn
+    // behind them instead of finding the engine busy (D-F69).
+    if (noah_typing_stage_defer_macro((uint8_t)(action - QK_MACRO))) return true;
     (void)noah_profile_macro_start(action);
     return true;
 }

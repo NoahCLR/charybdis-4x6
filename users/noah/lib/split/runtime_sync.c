@@ -169,6 +169,9 @@ static split_runtime_base_sync_packet_t split_runtime_sync_build_base_packet(uin
 #        endif
 #    endif
         .key_preview_layer = key_feedback_preview_layer(),
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+        .autocorrect_feedback = noah_autocorrect_feedback(),
+#    endif
     };
 
 #    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_ACTIVE_HALF_ENABLE)
@@ -214,6 +217,9 @@ static bool split_runtime_base_packet_is_active(const split_runtime_base_sync_pa
     return (pkt->automouse_progress != 0u && split_runtime_sync_pointer_layer_on()) || pkt->active_mode_id != POINTING_MODE_ID_NONE || pkt->locked_mode_id != POINTING_MODE_ID_NONE
 #    ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
            || pkt->pointing_mode_owner_sides != SPLIT_SIDE_MASK_NONE || key_origin_bitmap_has_any(pkt->pointing_mode_owner_bitmap)
+#    endif
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+           || pkt->autocorrect_feedback.kind != NOAH_AUTOCORRECT_FEEDBACK_NONE
 #    endif
            || pkt->key_preview_layer != UINT8_MAX;
 }
@@ -409,6 +415,9 @@ static void split_runtime_sync_slave_base_rpc(uint8_t initiator2target_buffer_si
     key_origin_bitmap_copy(split_runtime_sync_remote.pointing_mode_owner_bitmap, packet->pointing_mode_owner_bitmap);
 #    endif
     split_runtime_sync_remote.key_preview_layer = packet->key_preview_layer;
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    split_runtime_sync_remote.autocorrect_feedback = packet->autocorrect_feedback;
+#    endif
     noah_runtime_publication_end(&split_runtime_sync_remote.base_generation);
 
     noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_RECEIVE, pointing_mode_mask_from_id(packet->active_mode_id), pointing_mode_mask_from_id(packet->locked_mode_id));
@@ -452,12 +461,12 @@ static void split_runtime_sync_slave_key_feedback_semantic_rpc(uint8_t initiator
     (void)target2initiator_buffer;
 
     if (initiator2target_buffer_size < sizeof(split_runtime_key_feedback_semantic_packet_t)) {
-        split_runtime_sync_log_packet_size_mismatch("key-feedback semantic", initiator2target_buffer_size, sizeof(split_runtime_key_feedback_semantic_packet_t));
+        split_runtime_sync_log_packet_size_mismatch("behaviour-feedback semantic", initiator2target_buffer_size, sizeof(split_runtime_key_feedback_semantic_packet_t));
         return;
     }
 
     if (initiator2target_buffer_size != sizeof(split_runtime_key_feedback_semantic_packet_t)) {
-        split_runtime_sync_log_packet_size_mismatch("key-feedback semantic", initiator2target_buffer_size, sizeof(split_runtime_key_feedback_semantic_packet_t));
+        split_runtime_sync_log_packet_size_mismatch("behaviour-feedback semantic", initiator2target_buffer_size, sizeof(split_runtime_key_feedback_semantic_packet_t));
     }
 
     noah_runtime_publication_begin(&split_runtime_sync_remote.key_feedback_semantic_generation);
@@ -474,12 +483,12 @@ static void split_runtime_sync_slave_key_feedback_branch_rpc(uint8_t initiator2t
     (void)target2initiator_buffer;
 
     if (initiator2target_buffer_size < sizeof(split_runtime_key_feedback_branch_packet_t)) {
-        split_runtime_sync_log_packet_size_mismatch("key-feedback branch", initiator2target_buffer_size, sizeof(split_runtime_key_feedback_branch_packet_t));
+        split_runtime_sync_log_packet_size_mismatch("behaviour-feedback branch", initiator2target_buffer_size, sizeof(split_runtime_key_feedback_branch_packet_t));
         return;
     }
 
     if (initiator2target_buffer_size != sizeof(split_runtime_key_feedback_branch_packet_t)) {
-        split_runtime_sync_log_packet_size_mismatch("key-feedback branch", initiator2target_buffer_size, sizeof(split_runtime_key_feedback_branch_packet_t));
+        split_runtime_sync_log_packet_size_mismatch("behaviour-feedback branch", initiator2target_buffer_size, sizeof(split_runtime_key_feedback_branch_packet_t));
     }
 
     noah_runtime_publication_begin(&split_runtime_sync_remote.key_feedback_branch_generation);

@@ -8,6 +8,7 @@
 #include "users/noah/lib/profile/storage/profile_other_half_store_backend.h"
 #include "users/noah/lib/profile/storage/profile_record_identity.h"
 #include "profile_store_saved_fixture.h"
+#include "released_half_fixture.h"
 
 enum {
     ACTION_ABI_DIGEST = UINT32_C(0x11223344),
@@ -29,7 +30,7 @@ typedef struct {
     uint32_t                               compiled_digest;
 } fixture_t;
 
-static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
+static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 4u, 8u, 0u, 1u};
 
 static uint32_t always_safe(void *context) {
     (void)context;
@@ -717,7 +718,51 @@ static void test_other_half_store_answers_its_state_questions(void) {
     assert(!noah_profile_other_half_store_backend_awaiting_activation(&fixture.other_half));
 }
 
+// A copy from a half on the released firmware (released_half_fixture.h): its
+// descriptor names schema 4.3, its seven domains and its digests. The split
+// decoder refuses that frame first; were it to reach this store, the
+// descriptor check refuses it before the candidate store opens anything, and
+// the copy's chunks and commit find nothing to write to.
+static void test_a_released_halfs_copy_is_refused_before_the_store(void) {
+    fixture_t                       fixture;
+    noah_profile_split_descriptor_t ours;
+    noah_profile_split_descriptor_t released = {
+        .generation              = 9u,
+        .payload_crc32           = payload_crc(empty_profile, sizeof(empty_profile)),
+        .payload_digest          = payload_digest(empty_profile, sizeof(empty_profile)),
+        .compiled_default_digest = RELEASED_COMPILED_DEFAULT_DIGEST,
+        .action_abi_digest       = RELEASED_ACTION_ABI_DIGEST,
+        .payload_length          = sizeof(empty_profile),
+        .schema_major            = RELEASED_SCHEMA_MAJOR,
+        .schema_minor            = RELEASED_SCHEMA_MINOR,
+        .domain_mask             = RELEASED_DOMAIN_MASK,
+        .profile_flags           = NOAH_PROFILE_STORE_FLAG_OVERRIDE,
+        .origin_half             = 1u,
+        .readable                = true,
+        .has_profile             = true,
+    };
+    uint32_t reads;
+    uint32_t writes;
+
+    fixture_init(&fixture);
+    reads  = fixture.memory.reads;
+    writes = fixture.memory.writes;
+    assert(noah_profile_other_half_store_backend_begin(&fixture.other_half, &released) == NOAH_PROFILE_OTHER_HALF_STORE_INVALID_METADATA);
+    assert(noah_profile_other_half_store_backend_state(&fixture.other_half) == NOAH_PROFILE_OTHER_HALF_STORE_REJECTED);
+    assert(noah_profile_other_half_store_backend_write(&fixture.other_half, released.generation, released.payload_digest, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_OTHER_HALF_STORE_INVALID_METADATA);
+    assert(noah_profile_other_half_store_backend_commit_begin(&fixture.other_half, &released) != NOAH_PROFILE_OTHER_HALF_STORE_OK);
+    assert(fixture.memory.reads == reads && fixture.memory.writes == writes);
+    assert(!noah_profile_store_prepare_active(&fixture.store) && !noah_profile_store_saved(&fixture.store));
+    assert(noah_profile_candidate_store_backend_admission_owner(&fixture.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
+    // The refusal held nothing: this build's copy is taken afterwards.
+    ours = descriptor_for(&fixture, 9u, 1u, NOAH_PROFILE_STORE_FLAG_OVERRIDE, 0u);
+    transfer_payload(&fixture, &ours);
+    assert(finish_commit(&fixture, &ours) == NOAH_PROFILE_OTHER_HALF_STORE_OK && saved_generation(&fixture.store) == 9u);
+    puts("a released half's copy is refused before the store");
+}
+
 int main(void) {
+    test_a_released_halfs_copy_is_refused_before_the_store();
     test_other_half_store_answers_its_state_questions();
     test_identity_forms_compare_one_tuple();
     test_copy_over_64_kib();

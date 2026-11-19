@@ -18,6 +18,7 @@
 #include "../../state/shared/runtime_context_internal.h"
 #include "held_action.h"
 #include "held_repeat.h"
+#include "../../macro/typing_stage.h"
 
 static inline bool keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
@@ -321,7 +322,12 @@ bool held_action_release_owned_by_key(keypos_t key_pos) {
     return released;
 }
 
+// A build or host test without the typing stage (typing_stage.h).
+__attribute__((weak)) keypos_t noah_typing_stage_noted_key;
+
 void held_action_register(keypos_t key_pos, uint16_t action) {
+    // A held action takes its usages here or below, whichever path holds it.
+    noah_typing_stage_noted_key = key_pos;
     if (held_action_is_pure_modifier(action)) {
         held_modifier_register(key_pos, action);
         return;

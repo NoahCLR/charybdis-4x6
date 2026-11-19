@@ -137,12 +137,21 @@ enum charybdis_keymap_layers {
 #        define RGB_COMBO_FEEDBACK_ENABLE
 #    endif
 
-// Key-behavior feedback overlay.
+// Behaviour feedback overlay.
 // Shows multi-tap progress and hold-threshold colors on individual keys.
 // Comment out RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE to disable entirely.
 #    define RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-// Flash half-period for keys held with PRESS_AND_HOLD_UNTIL_RELEASE or repeat actions.
+// Flash half-period for keys held with PRESS_AND_HOLD_UNTIL_RELEASE or repeat
+// actions.
 #    define RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS 200
+
+// Replacement feedback stage.
+// Flashes when text replacement replaces an input or takes a replacement back.
+// Comment out RGB_AUTOCORRECT_FEEDBACK_ENABLE to disable the stage entirely.
+#    define RGB_AUTOCORRECT_FEEDBACK_ENABLE
+// How long one replacement flash lasts, ms. The live profile stores its own
+// once one is saved.
+#    define RGB_AUTOCORRECT_FEEDBACK_FLASH_MS 200
 
 // Auto-mouse timeout fade overlay.
 // Fades from the authored pointer layer rendering toward its destination
@@ -167,6 +176,10 @@ enum charybdis_keymap_layers {
 #define NOAH_DEFAULT_UNICODE_PLAYBACK 0
 // 1 when macOS classified the keyboard as ISO.
 #define NOAH_DEFAULT_MACOS_ISO 0
+
+// How long text replacement's leader waits after its last key, ms (1,000 to
+// 10,000). The live profile stores its own once one is saved.
+#define NOAH_LEADER_TIMEOUT_MS 2000
 
 // The keyboard's own name, the USB product name computers and Charybdis Ark
 // list it under: at most 32 bytes of UTF-8. Empty keeps QMK's built-in name.

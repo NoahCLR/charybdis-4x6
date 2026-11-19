@@ -4,14 +4,14 @@
 //
 // Owns the custom split RPC sync for runtime-visible state. The sync surface
 // is intentionally split into three logical domains:
-// - base runtime state (automouse / pd / preview)
+// - base runtime state (automouse / pd / preview / replacement feedback)
 // - combo RGB locality (underlay + overlay)
-// - authored key-feedback truth (semantic state + broad owner state + tap branch state)
+// - authored behaviour-feedback truth (semantic state + broad owner state + tap branch state)
 //
 // The master periodically re-sends each surface as a heartbeat so a rebooted
 // or rejoined half can recover even if the relevant state did not change. The
 // combo packet is built every pass and sent only when it changed, is forced, or
-// its heartbeat is due. The heavier key-feedback packets are built only while
+// its heartbeat is due. The heavier behaviour-feedback packets are built only while
 // active, dirty, forced, or heartbeat-due, so idle scans do not derive them.
 // A shared transport-health gate stops a send pass after its first failure and
 // suppresses packet building until a bounded recovery-probe deadline.
@@ -26,6 +26,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "../autocorrect/autocorrect_feedback.h"
 #include "../key/runtime/feedback.h"
 #include "../key/runtime/slot/origin_registry.h"
 #include "../pointing/defs/pointing_mode_flags.h"
@@ -44,6 +45,9 @@ typedef struct __attribute__((packed)) {
     uint8_t pointing_mode_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 #endif
     uint8_t key_preview_layer;
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    noah_autocorrect_feedback_t autocorrect_feedback;
+#endif
 } split_runtime_base_sync_packet_t;
 
 typedef struct __attribute__((packed)) {
@@ -70,6 +74,9 @@ typedef struct {
     uint8_t pointing_mode_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 #endif
     uint8_t key_preview_layer;
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    noah_autocorrect_feedback_t autocorrect_feedback;
+#endif
     uint8_t combo_underlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
     uint8_t combo_overlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
     uint8_t key_feedback_flash_visibility_bitmap[KEY_ORIGIN_BITMAP_SIZE];
@@ -226,6 +233,30 @@ static inline void split_runtime_sync_notify_key_feedback_dirty(void) {}
 // caller keeps the copy it already holds. Staging costs a few dozen bytes of
 // stack on the render path, which is what makes "a failed read leaves your
 // buffer alone" true rather than merely intended.
+
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+// The base packet's replacement feedback: its kind and keys are drawn
+// together, so they are read as one publication.
+static inline bool split_runtime_sync_remote_read_autocorrect_feedback(noah_autocorrect_feedback_t *out_feedback) {
+    noah_autocorrect_feedback_t staged;
+
+    for (uint8_t attempt = 0; attempt < NOAH_RUNTIME_PUBLICATION_READ_ATTEMPTS; attempt++) {
+        uint8_t generation = noah_runtime_publication_observe(&split_runtime_sync_remote.base_generation);
+
+        if (noah_runtime_publication_in_flight(generation)) {
+            continue;
+        }
+
+        staged = split_runtime_sync_remote.autocorrect_feedback;
+        if (noah_runtime_publication_settled(&split_runtime_sync_remote.base_generation, generation)) {
+            *out_feedback = staged;
+            return true;
+        }
+    }
+
+    return false;
+}
+#endif
 
 static inline bool split_runtime_sync_remote_read_combo(uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap) {
     uint8_t staged_underlay[KEY_ORIGIN_BITMAP_SIZE];

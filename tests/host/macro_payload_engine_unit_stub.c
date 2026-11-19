@@ -3,3 +3,4 @@
 // These key-runtime unit harnesses do not link or run the macro output engine.
 // The actual protected path is covered by the gesture integration harness.
 bool macro_payload_engine_protected(void) {return false;}
+bool macro_payload_engine_ignores_presses(void) {return false;}

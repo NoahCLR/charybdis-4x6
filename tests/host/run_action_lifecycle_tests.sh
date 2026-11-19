@@ -27,6 +27,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/action/action_kind.c" \
     "$ROOT/users/noah/lib/action/action_kind_dispatch.c" \
     "$ROOT/users/noah/lib/action/action_lifecycle.c" \
+    "$ROOT/users/noah/lib/key/behavior/participation.c" \
     -o "$BIN"
 
 "$BIN"

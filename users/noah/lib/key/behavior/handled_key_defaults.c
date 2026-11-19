@@ -53,22 +53,6 @@ bool handled_key_resolution_step_present(const handled_key_resolution_t *resolut
     return resolution && key_behavior_step_present(resolution->step);
 }
 
-static bool handled_key_resolution_uses_buffered_modifier_single_step(const handled_key_resolution_t *resolution) {
-    noah_action_desc_t desc;
-
-    if (!resolution) {
-        return false;
-    }
-
-    desc = noah_action_describe(resolution->keycode);
-
-    if (handled_key_resolution_step_present(resolution) || (resolution->flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0u) {
-        return false;
-    }
-
-    return (resolution->flags & HANDLED_KEY_FLAG_MULTI_TAP) != 0u && noah_action_desc_is_pure_modifier_literal(desc);
-}
-
 bool handled_key_resolution_uses_fallback_hold_behavior(const handled_key_resolution_t *resolution) {
     if (!resolution || resolution->tap_count != 1) {
         return false;
@@ -129,10 +113,6 @@ static uint16_t handled_key_single_tap_action(const handled_key_resolution_t *re
 
     if (resolution->step.tap.present) {
         return resolution->step.tap.action;
-    }
-
-    if (handled_key_resolution_uses_buffered_modifier_single_step(resolution)) {
-        return KC_NO;
     }
 
     return handled_key_default_tap_action(resolution);
@@ -217,13 +197,37 @@ uint16_t handled_key_tap_action_behavior(const handled_key_resolution_t *resolut
         return resolution->step.tap.action;
     }
 
-    // An empty tap at a later count repeats the first tap: the one the row sets
-    // there, or the key's own (D-F33).
-    if (resolution->first_tap.present) {
-        return resolution->first_tap.action;
-    }
+    // An empty tap at a later count is the standard key's, sent once per
+    // press (D-F64): never another tap count's, whatever this count's holds.
+    handled_key_resolution_t standard;
 
-    return handled_key_single_tap_action(resolution);
+    handled_key_resolution_standard_key_into(resolution, false, &standard);
+    return handled_key_single_tap_action(&standard);
+}
+
+// The standard key: what the key does with no behaviour (D-F64), at the
+// behaviour's own thresholds. The one exception is a single tap set to
+// Transparent, which is the standard key's tap: the key below. A key that
+// holds itself from the tap / hold threshold does so through its fallback
+// hold, which another key's output settles at once; `threshold_hold` makes it
+// an ordinary threshold hold instead, for a series that must send its taps
+// before the hold. A pointing-mode key, which runs its mode from the press,
+// runs it from the threshold then too: an empty branch's hold starts there,
+// after the taps before it (D-F64).
+void handled_key_resolution_standard_key_into(const handled_key_resolution_t *resolution, bool threshold_hold, handled_key_resolution_t *out) {
+    *out           = *resolution;
+    out->tap_count = 1u;
+    out->step      = key_behavior_step_none();
+    if (resolution->single_tap_transparent) {
+        out->step.tap = (tap_behavior_t)TAP_SENDS(KC_TRNS);
+    }
+    if (threshold_hold && (handled_key_hold_strategy_behavior(out) == KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK || out->pointing_mode != 0)) {
+        out->step.hold = (hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(out->keycode);
+    }
+}
+
+bool handled_key_resolution_is_empty_branch(const handled_key_resolution_t *resolution) {
+    return resolution && key_behavior_branch_is_empty(resolution->tap_count, key_behavior_step_present(resolution->step));
 }
 
 uint8_t handled_key_tap_repeat_count_behavior(const handled_key_resolution_t *resolution, uint16_t tap_action) {

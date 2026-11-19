@@ -168,7 +168,16 @@ pointing-mode outputs) go out through `noah_emit_*`
 (`settle_pending_fallback_holds`; `NOAH_EMIT_POLICY_NONE` does not), it first
 settles every key whose fallback hold is due
 (`noah_key_runtime_settle_pending_fallback_hold()` in `api.c`, which holds no
-plan because it runs beneath another plan's projection). Held actions call
+plan because it runs beneath another plan's projection), except the press of
+the output's own key: a key's taps never turn its own press into a hold, so a
+run's taps sent at the next press of the key go out ahead of it (D-F64). Nor
+does it settle a press that came after the output's key was pressed: taps go
+out in press order, so a modifier rolled onto after Enter, or pressed inside
+Escape's multi-tap window, holds only after Enter or Escape is typed. An
+output of no key (a pointing mode's tap) settles every due key. A delayed tap
+settles before `keyboard_mod_policy_begin_action_replay()` suspends the live
+modifiers, so the state the replay restores keeps a modifier it settled while
+that key is down, and the tap goes out under it. Held actions call
 `noah_action_press` and `noah_action_release` directly, or take an
 `owned_keycode` lease, with no settle. In `action_lifecycle.c`,
 `noah_action_tap_at` and `noah_action_press` try a macro first;

@@ -53,6 +53,11 @@
           "reason": "GCC 15 inlines emission and action tap dispatch into noah_emit_action_tap_at; a step that sends a custom key taps its shortcut through the action-kind operations table (D-F26)."
         },
         {
+          "caller": "noah_emit_action_tap_at",
+          "callee": "noah_action_leader",
+          "reason": "GCC 15 inlines emission and action tap dispatch into noah_emit_action_tap_at; the Leader key's tap or press calls the typing stage through the action-kind operations table (D-F71)."
+        },
+        {
           "caller": "io_read",
           "callee": "flash_read",
           "reason": "the profile store reads the slot flash region in place through its injected flash backend (D-F29)"
@@ -106,6 +111,16 @@
           "caller": "process_record_user",
           "callee": "key_runtime_process_stage_idle_custom_key",
           "reason": "GCC 15 inlines the userspace process flow into the chained keymap process_record_user; its stage table invokes this handler indirectly."
+        },
+        {
+          "caller": "macro_payload_finish",
+          "callee": "macro_slot_provider_correction_finished",
+          "reason": "The macro engine invokes the finish callback the slot provider registered for a correction (D-F69)."
+        },
+        {
+          "caller": "macro_slot_provider_correction_finished",
+          "callee": "autocorrect_playback_finished",
+          "reason": "The slot provider frees the shared window, then invokes the finish callback autocorrect passed with its correction (D-F69)."
         }
       ],
       "cycle_bounds": [
@@ -136,7 +151,7 @@
         },
         {
           "name": "handled press planning",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_process_plan_handled_key_press", "key_runtime_core_effect_plan_push_delayed_action_with_flags", "key_runtime_core_effect_plan_push"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_process_plan_handled_key_press", "key_runtime_core_effect_plan_push_delayed_action", "key_runtime_core_effect_plan_push"]
         },
         {
           "name": "handled press projection with fallback settlement",
@@ -184,7 +199,7 @@
         },
         {
           "name": "handled release bounded deferred fallback settlement",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
         },
         {
           "name": "non-handled release cleanup lookup",
@@ -200,7 +215,7 @@
         },
         {
           "name": "matrix scan bounded deferred fallback settlement",
-          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
         },
         {
           "name": "matrix scan combo-origin candidate retirement",
@@ -236,19 +251,19 @@
         },
         {
           "name": "handled profile macro IR preflight",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_start", "macro_payload_ir_next"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_try_play", "noah_profile_macro_start", "profile_macro_start_from", "macro_slot_provider_compile", "macro_payload_preflight_window", "macro_payload_ir_next"]
         },
         {
           "name": "handled profile macro window decode held sequence",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_start", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "macro_payload_flush_pending_qmk_sequence", "macro_payload_ir_write_key_action", "macro_payload_hold_balance_note_down"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_try_play", "noah_profile_macro_start", "profile_macro_start_from", "macro_slot_provider_compile", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "macro_payload_flush_pending_qmk_sequence", "macro_payload_ir_write_key_action", "macro_payload_hold_balance_note_down"]
         },
         {
           "name": "handled profile macro slot search",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_start", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "profile_macro_provider_find_slot", "noah_active_profile_macro_bank_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_try_play", "noah_profile_macro_start", "profile_macro_start_from", "macro_slot_provider_compile", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "profile_macro_provider_find_slot", "noah_active_profile_macro_bank_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "handled profile macro window storage read",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_start", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_active_profile_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_try_play", "noah_profile_macro_start", "profile_macro_start_from", "macro_slot_provider_compile", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_active_profile_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "matrix scan macro window refill held sequence",
@@ -280,11 +295,11 @@
         },
         {
           "name": "pointing task directional profile macro window decode held sequence",
-          "functions": ["main", "pointing_device_task", "directional_drain", "emit_tap", "noah_profile_macro_start", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "macro_payload_flush_pending_qmk_sequence", "macro_payload_ir_write_key_action", "macro_payload_hold_balance_note_down"]
+          "functions": ["main", "pointing_device_task", "directional_drain", "emit_tap", "noah_profile_macro_start", "profile_macro_start_from", "macro_slot_provider_compile", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "macro_payload_flush_pending_qmk_sequence", "macro_payload_ir_write_key_action", "macro_payload_hold_balance_note_down"]
         },
         {
           "name": "pointing task directional profile macro window storage read",
-          "functions": ["main", "pointing_device_task", "directional_drain", "emit_tap", "noah_profile_macro_start", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_active_profile_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+          "functions": ["main", "pointing_device_task", "directional_drain", "emit_tap", "noah_profile_macro_start", "profile_macro_start_from", "macro_slot_provider_compile", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_active_profile_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "physical press participation indexed behavior lookup",
@@ -324,7 +339,7 @@
         },
         {
           "name": "handled compiled-default macro parse",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_start", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_compile", "macro_payload_ir_write_text"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_try_play", "noah_profile_macro_start", "profile_macro_start_from", "macro_slot_provider_compile", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_compile", "macro_payload_ir_write_text"]
         },
         {
           "name": "physical key profile lookup",
@@ -381,6 +396,106 @@
         {
           "name": "idle custom key stage",
           "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_idle_custom_key"]
+        },
+        {
+          "name": "handled press fallback settlement preempting a held pointing mode, its change queued by the typing stage",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "key_runtime_core_pd_projection_preempt_held_actions_for_mode", "held_action_unregister", "held_action_or_modifier_release_owned_by_key", "held_action_remove_slot", "noah_action_release", "pointing_mode_apply_command", "pointing_mode_apply_activate_mode", "pointing_mode_transition_unlock", "pointing_mode_transition_deactivate_with_lock_state", "noah_pd_engine_exit", "keyboard_mod_ownership_unregister", "keyboard_mod_ownership_unregister_mods", "send_6kro_report", "autocorrect_queue_change", "autocorrect_push"]
+        },
+        {
+          "name": "handled macro key waiting behind a correction",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_try_play", "autocorrect_push"]
+        },
+        {
+          "name": "matrix scan autocorrect candidate",
+          "functions": ["main", "matrix_scan", "autocorrect_lookup", "autocorrect_consider", "autocorrect_correction_text", "autocorrect_plan", "autocorrect_strokes_for", "host_layout_lookup"]
+        },
+        {
+          "name": "matrix scan autocorrect correction text",
+          "functions": ["main", "matrix_scan", "autocorrect_lookup", "autocorrect_start_correction", "autocorrect_correction_text", "autocorrect_plan", "autocorrect_strokes_for", "host_layout_lookup"]
+        },
+        {
+          "name": "matrix scan autocorrect correction preflight",
+          "functions": ["main", "matrix_scan", "autocorrect_lookup", "autocorrect_start_correction", "autocorrect_play", "macro_payload_preflight_window", "macro_payload_ir_next"]
+        },
+        {
+          "name": "matrix scan autocorrect correction start",
+          "functions": ["main", "matrix_scan", "autocorrect_lookup", "autocorrect_start_correction", "autocorrect_play", "macro_payload_start_windows", "send_6kro_report", "autocorrect_queue_change", "autocorrect_push"]
+        },
+        {
+          "name": "matrix scan autocorrect undo start",
+          "functions": ["main", "matrix_scan", "autocorrect_start_undo", "autocorrect_play", "macro_payload_start_windows", "send_6kro_report", "autocorrect_queue_change", "autocorrect_push"]
+        },
+        {
+          "name": "matrix scan autocorrect correction finished",
+          "functions": ["main", "matrix_scan", "macro_payload_finish", "macro_slot_provider_correction_finished", "autocorrect_playback_finished"]
+        },
+        {
+          "name": "matrix scan autocorrect reading a key through the host layout",
+          "functions": ["main", "matrix_scan", "autocorrect_pump", "autocorrect_read_key", "macro_payload_typing_host", "macro_payload_host_resolve", "host_layout_lookup"]
+        },
+        {
+          "name": "handled press custom-key shortcut tap, its usage's owners told to the typing stage",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_action_tap_custom_key", "owned_keycode_acquire_chord", "owned_keycode_acquire_usages", "owned_keycode_note_owners", "autocorrect_queue_change", "autocorrect_push"]
+        },
+        {
+          "name": "handled release custom-key shortcut release, its usage's owners told to the typing stage",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "held_action_unregister", "held_action_or_modifier_release_owned_by_key", "held_action_remove_slot", "owned_keycode_release_chord", "owned_keycode_release_usages", "owned_keycode_note_owners", "autocorrect_queue_change", "autocorrect_push"]
+        },
+        {
+          "name": "handled press literal action tap, its usage's owners told to the typing stage",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_action_tap_literal", "owned_keycode_tap_literal", "owned_keycode_acquire", "owned_keycode_acquire_usages", "owned_keycode_note_owners", "autocorrect_queue_change", "autocorrect_push"]
+        },
+        {
+          "name": "native overlap stage, a physical key's usage told to the typing stage",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_native_overlap", "key_runtime_process_settle_report_ownership", "owned_keycode_note_owners", "autocorrect_queue_change", "autocorrect_push"]
+        },
+        {
+          "name": "matrix scan autocorrect candidate macro storage read",
+          "functions": ["main", "matrix_scan", "autocorrect_lookup", "autocorrect_consider", "noah_profile_macro_can_play", "macro_slot_provider_compile", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_active_profile_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "matrix scan autocorrect replacement macro storage read",
+          "functions": ["main", "matrix_scan", "profile_macro_start_from", "macro_slot_provider_compile", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_active_profile_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "handled press Leader key, the report the typing stage missed read first",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_action_leader", "send_6kro_report", "autocorrect_queue_change", "autocorrect_push"]
+        },
+        {
+          "name": "matrix scan leader send text",
+          "functions": ["main", "matrix_scan", "autocorrect_lead_match", "autocorrect_strokes_for", "host_layout_lookup"]
+        },
+        {
+          "name": "matrix scan leader send start",
+          "functions": ["main", "matrix_scan", "autocorrect_lead_match", "autocorrect_play", "macro_payload_start_windows", "send_6kro_report", "autocorrect_queue_change", "autocorrect_push"]
+        },
+        {
+          "name": "matrix scan leader send macro storage read",
+          "functions": ["main", "matrix_scan", "autocorrect_lead_match", "noah_profile_macro_can_play", "macro_slot_provider_compile", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_active_profile_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "matrix scan leader send macro start",
+          "functions": ["main", "matrix_scan", "autocorrect_lead_match", "profile_macro_start_from", "macro_slot_provider_compile", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_active_profile_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "matrix scan autocorrect list read",
+          "functions": ["main", "matrix_scan", "autocorrect_read_list", "noah_profile_autocorrect_v1_correction", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "lighting behaviour feedback area by the newest key",
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_key_feedback_stage_paint_area.isra.0", "rgb_runtime_key_feedback_stage_owner_case.lto_priv.0", "rgb_runtime_key_feedback_stage_key_case.lto_priv.0", "key_feedback_tap_branch_map_get.lto_priv.0"]
+        },
+        {
+          "name": "lighting behaviour feedback accent row read",
+          "functions": ["main", "rgb_matrix_task", "noah_profile_rgb_v1_key_group_at", "group_row_at", "accessor_read.lto_priv.0", "read_bytes.lto_priv.1", "noah_profile_reader_read"]
+        },
+        {
+          "name": "lighting behaviour feedback accent paint",
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_key_feedback_stage_paint_group.isra.0", "memcpy"]
+        },
+        {
+          "name": "lighting view validation step",
+          "functions": ["main", "rgb_matrix_task", "rgb_active_profile_config_group_selectors.constprop.0", "read_table_selectors.constprop.0", "frame_status.lto_priv.0", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_v1_validation_step", "validation_reject_captured.isra.0", "validation_reject.isra.0", "clear_error.lto_priv.2", "memset"]
         }
       ]
     },

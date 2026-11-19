@@ -7,10 +7,10 @@
 // This module now exposes three distinct surfaces:
 // - preview layer display state
 // - combo RGB locality (underlay vs overlay)
-// - authored key-behavior feedback truth as packed semantic and tap-branch maps
+// - authored behaviour-feedback truth as packed semantic and tap-branch maps
 //
 // Exact per-key truth is produced on the master half. Split sync mirrors the
-// already-computed combo locality bitmaps plus packed key-feedback maps so the
+// already-computed combo locality bitmaps plus packed behaviour-feedback maps so the
 // slave renders the same scene without direct access to the key runtime.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
@@ -19,6 +19,7 @@
 #include <stdint.h>
 
 #include "feedback_kind.h"
+#include "types.h"
 #include "slot/keypos_codec.h"
 #include "slot/origin_registry.h"
 
@@ -69,6 +70,8 @@ typedef enum {
     KEY_FEEDBACK_BROAD_OWNER_GLOBAL = 0,
     KEY_FEEDBACK_BROAD_OWNER_LEFT_HALF,
     KEY_FEEDBACK_BROAD_OWNER_RIGHT_HALF,
+    // The newest key with any tap branch pending: behaviour feedback's 0xff
+    // accent rows follow it (D-F73); rows naming one branch read every key.
     KEY_FEEDBACK_BROAD_OWNER_GROUP_TAP_BRANCH_PENDING,
     KEY_FEEDBACK_BROAD_OWNER_GROUP_TAP_COMMITTED,
     KEY_FEEDBACK_BROAD_OWNER_GROUP_HOLD_ACTIVE,
@@ -79,8 +82,8 @@ typedef enum {
 #define KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE ((uint8_t)KEY_FEEDBACK_BROAD_OWNER_COUNT)
 #define KEY_FEEDBACK_BROAD_OWNER_MAP_EMPTY_INIT {KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE}
 
-_Static_assert(KEY_FEEDBACK_TAP_BRANCH_BITS <= 8u, "key feedback tap branch values must fit in one byte");
-_Static_assert(KEY_BEHAVIOR_MAX_TAP_COUNT - 1u <= KEY_FEEDBACK_TAP_BRANCH_MASK, "key feedback tap branch map must represent every authored tap count");
+_Static_assert(KEY_FEEDBACK_TAP_BRANCH_BITS <= 8u, "behaviour-feedback tap branch values must fit in one byte");
+_Static_assert(KEY_BEHAVIOR_MAX_TAP_COUNT - 1u <= KEY_FEEDBACK_TAP_BRANCH_MASK, "the behaviour-feedback tap branch map must represent every authored tap count");
 
 typedef enum {
     KEY_FEEDBACK_SEMANTIC_NONE = 0,
@@ -92,7 +95,7 @@ typedef enum {
     KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED,
 } key_feedback_semantic_t;
 
-_Static_assert(KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED <= KEY_FEEDBACK_SEMANTIC_MASK, "key feedback semantic map must represent every semantic value");
+_Static_assert(KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED <= KEY_FEEDBACK_SEMANTIC_MASK, "the behaviour-feedback semantic map must represent every semantic value");
 
 static inline bool key_feedback_semantic_is_flashing(key_feedback_semantic_t semantic) {
     return semantic == KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING || semantic == KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING;
@@ -232,7 +235,7 @@ static inline void key_feedback_broad_owner_map_clear(uint8_t *map) {
 
 static inline keypos_t key_feedback_broad_owner_map_get(const uint8_t *map, key_feedback_broad_owner_slot_t slot) {
     if (!(map && slot < KEY_FEEDBACK_BROAD_OWNER_COUNT)) {
-        return (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS};
+        return NOAH_KEY_RUNTIME_NO_KEY;
     }
 
     return key_runtime_keypos_unpack((key_runtime_packed_keypos_t)map[slot]);

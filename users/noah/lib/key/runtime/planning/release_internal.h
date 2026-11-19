@@ -26,7 +26,6 @@ typedef struct {
     bool                                  momentary_layer_tap_interrupted;
     bool                                  quick_tap;
     bool                                  quick_immediate_hold;
-    bool                                  buffered_base_tap;
     pointing_mode_mask_t                  lock_tap_mode;
     key_runtime_release_decision_t        decision;
 } key_runtime_core_active_release_resolution_t;
@@ -42,6 +41,9 @@ typedef struct {
     key_runtime_core_pending_multi_tap_release_outcome_t outcome;
     uint16_t                                             action;
     uint8_t                                              repeat_count;
+    // HELD_LIFECYCLE: the standard tap an empty branch sends repeat_count
+    // times before its hold (D-F64).
+    uint16_t                                             tap_action;
     bool                                                 tap_branch_feedback;
     bool                                                 tap_commit_feedback;
     bool                                                 action_feedback;

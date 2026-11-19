@@ -72,7 +72,7 @@ static void encode_capabilities_page_one(uint8_t *payload, const noah_profile_wi
     payload[4]  = capabilities->max_combos;
     payload[5]  = capabilities->max_keys_per_combo;
     payload[6]  = capabilities->max_reusable_rgb_groups;
-    payload[7]  = capabilities->max_rgb_stage_group_rows;
+    payload[7]  = capabilities->max_rgb_table_group_rows;
     payload[8]  = capabilities->physical_led_count;
     payload[9]  = capabilities->led_bitmap_size;
     payload[10] = capabilities->custom_key_slots;
@@ -90,7 +90,18 @@ static void encode_capabilities_page_two(uint8_t *payload, const noah_profile_wi
     write_u32(&payload[6], capabilities->max_profile_payload);
     write_u32(&payload[10], capabilities->profile_slot_payload);
     write_u32(&payload[14], capabilities->macro_bytes);
-    // Bytes 18..24 remain canonical zero padding.
+    write_u16(&payload[18], capabilities->max_rgb_stage_group_rows);
+    // Bytes 20..24 remain canonical zero padding.
+}
+
+static void encode_capabilities_page_three(uint8_t *payload, const noah_profile_wire_v1_capabilities_t *capabilities) {
+    write_u16(&payload[0], capabilities->autocorrect_corrections);
+    write_u16(&payload[2], capabilities->autocorrect_typos);
+    write_u16(&payload[4], capabilities->autocorrect_text_bytes);
+    write_u32(&payload[6], capabilities->autocorrect_bytes);
+    payload[10] = capabilities->autocorrect_text_max;
+    payload[11] = capabilities->autocorrect_correction_max;
+    // Bytes 12..24 remain canonical zero padding.
 }
 
 static void encode_status_page_zero(uint8_t *payload, const noah_profile_wire_v1_device_status_t *status) {
@@ -152,8 +163,10 @@ bool noah_profile_wire_v1_handle_get(const noah_profile_wire_v1_read_service_t *
             encode_capabilities_page_zero(&frame[WIRE_PAYLOAD], &service->capabilities);
         } else if (page == 1u) {
             encode_capabilities_page_one(&frame[WIRE_PAYLOAD], &service->capabilities);
-        } else {
+        } else if (page == 2u) {
             encode_capabilities_page_two(&frame[WIRE_PAYLOAD], &service->capabilities);
+        } else {
+            encode_capabilities_page_three(&frame[WIRE_PAYLOAD], &service->capabilities);
         }
     } else if (page == 0u) {
         encode_status_page_zero(&frame[WIRE_PAYLOAD], &service->status);

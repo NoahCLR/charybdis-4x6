@@ -27,9 +27,22 @@ noah_host_export_qmk_cpath "$ROOT"
 cp "$ROOT/tests/fixtures/client-regression/portable.bin.pd5" "$BUILD_DIR/old.bin"
 for fixture in populated maximum; do
     python3 - "$ROOT/tests/fixtures/${fixture}_profile_v4.fixture" "$BUILD_DIR/$fixture.bin" <<'PYTHON'
-import pathlib, sys
-fields = dict(line.split("=", 1) for line in pathlib.Path(sys.argv[1]).read_text().splitlines() if "=" in line)
-pathlib.Path(sys.argv[2]).write_bytes(bytes.fromhex(fields["profile.hex"]))
+import pathlib, struct, sys
+fields = dict(line.split("=", 1) for line in pathlib.Path(sys.argv[1]).read_text().splitlines() if "=" in line and not line.startswith("#"))
+blob = bytes.fromhex(fields["profile.hex"])
+# The fixture's own lines say what its blob holds: its length, and each
+# domain's version and length, which clients read beside the bytes.
+assert int(fields["profile.byte_length"]) == len(blob), sys.argv[1]
+offset, listed = 8, {key for key in fields if key.startswith("domain.")}
+for _ in range(blob[6]):
+    domain, version, length = blob[offset], blob[offset + 1], struct.unpack_from("<I", blob, offset + 2)[0]
+    for field, value in (("version", version), ("length", length)):
+        key = f"domain.{domain:02x}.{field}"
+        assert fields.get(key) == str(value), f"{sys.argv[1]}: {key} is {fields.get(key)}, the blob holds {value}"
+        listed.discard(key)
+    offset += 6 + length
+assert offset == len(blob) and not listed, (sys.argv[1], sorted(listed))
+pathlib.Path(sys.argv[2]).write_bytes(blob)
 PYTHON
 done
 
@@ -64,6 +77,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/profile_pd_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_keymap_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_macros_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_autocorrect_compiled_v1.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
@@ -79,11 +93,16 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_macros_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_autocorrect_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_autocorrect_words_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         -o "$bin"
-    if [ "$name" = configured ] || [ "$name" = configured_sanitized ]; then
+    if [ "$name" = other_release ]; then
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture"
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/populated.bin"
+    elif [ "$name" = configured ] || [ "$name" = configured_sanitized ]; then
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" ${NOAH_WRITE_PD_FIXTURE:+--write-fixture}
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --reject-profile "$BUILD_DIR/old.bin"
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/populated.bin"
@@ -98,6 +117,9 @@ build_and_run() {
 
 build_and_run configured -DNOAH_PORTABLE_PROFILE_ENABLE
 build_and_run configured_sanitized -DNOAH_PORTABLE_PROFILE_ENABLE -fsanitize=address,undefined -fno-omit-frame-pointer
+# A build of another release has the same action-ABI digest, so a profile
+# saved under one release restores onto the next (D-F77).
+build_and_run other_release -DNOAH_PORTABLE_PROFILE_ENABLE -DNOAH_FIRMWARE_VERSION='NOAH_FIRMWARE_RELEASE(2030u, 1u, 2u, 3u)'
 build_and_run empty -DNOAH_KEYMAP_EMPTY_KEY_BEHAVIORS -DNOAH_KEYMAP_EMPTY_COMBOS -DNOAH_PORTABLE_PROFILE_ENABLE
 
 # Keep the materializer available when RGB is compiled out: that variant emits
@@ -119,6 +141,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/profile/schema/profile_pd_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_keymap_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_macros_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_autocorrect_compiled_v1.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
@@ -126,7 +149,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/profile/runtime/profile_action_runtime_v1.c"
 
 # The golden compiled PD domain is the shared "presets" vector, and its RGB
-# domain is version 4 with a colour for each of the sixteen layers and a row
+# domain is version 7 with a colour for each of the sixteen layers and a row
 # for each of the 32 slots.
 python3 - "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" "$ROOT/tests/fixtures/pd_mode_domain_v4.json" <<'PY'
 import json, struct, sys
@@ -140,7 +163,7 @@ for _ in range(blob[6]):
     offset += 6 + length
 presets = next(case for case in json.loads(Path(sys.argv[2]).read_text())["valid"] if case["name"] == "presets")
 assert domains[0x50] == (4, bytes.fromhex(presets["hex"])), "compiled PD domain differs from the presets vector"
-assert domains[0x10][0] == 4 and domains[0x10][1][0] == 4 and domains[0x10][1][5] == 16 and domains[0x10][1][7] == 32
+assert domains[0x10][0] == 7 and domains[0x10][1][0] == 7 and domains[0x10][1][5] == 16 and domains[0x10][1][7] == 32
 PY
 
 # The compiled defaults are Noah's keyboard profile, domain by domain, apart

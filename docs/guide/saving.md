@@ -4,7 +4,7 @@ Everything you can change without a reflash is one **profile**: the keymap,
 behaviours, combos, macros, custom keys, pointing modes, lighting, settings
 and the keyboard's name. Each half keeps its own copy, and the two keep each
 other up to date over the cable. Ark's
-[Review and save](https://github.com/NoahCLR/charybdis-ark/blob/dev/docs/guide/review-and-save.md)
+[Review and save](https://github.com/NoahCLR/charybdis-ark/blob/main/docs/guide/review-and-save.md)
 page is the app's side of this; this page is the keyboard's.
 
 ## What the keyboard runs
@@ -18,8 +18,9 @@ The keyboard runs, in order of preference:
 
 Unplugging, or a restart, drops the working copy, so the keyboard always
 starts from its saved profile. A saved profile is used only by firmware with
-exactly the same compiled defaults and firmware version as the firmware that
-saved it; any other firmware starts from its own compiled defaults (see
+exactly the same compiled defaults, profile format and actions as the
+firmware that saved it; any other firmware starts from its own compiled
+defaults (see
 [Installing](installing.md#what-happens-to-your-profile)).
 
 ## Edits, Save and the edit mode

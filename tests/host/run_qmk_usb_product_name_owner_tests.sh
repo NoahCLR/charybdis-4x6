@@ -55,6 +55,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/profile_pd_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_keymap_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_macros_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_autocorrect_compiled_v1.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
@@ -70,10 +71,13 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_macros_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_autocorrect_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_autocorrect_words_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_owner.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_autocorrect_runtime.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_working_copy.c" \
         "$ROOT/users/noah/lib/profile/split/profile_working_sync.c" \
         "$ROOT/users/noah/lib/profile/runtime/active_profile_keymap_macros_runtime.c" \

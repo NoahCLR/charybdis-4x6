@@ -69,7 +69,7 @@ Held by: `tests/host/run_profile_wire_v1_tests.sh` (`profile_wire_v1_test.c`, th
 
 ## Capability pages — GET `0x01`
 
-A client reads these before anything else. Three byte pages, `0..2`; page 3
+A client reads these before anything else. Four byte pages, `0..3`; page 4
 and above answer status `2`.
 
 Page 0, the identity (see [README.md](README.md#version-identity)):
@@ -77,15 +77,15 @@ Page 0, the identity (see [README.md](README.md#version-identity)):
 | Byte | Field |
 | ---: | --- |
 | 0 | capability layout, `3` |
-| 1 | capability page count, `3` |
-| 2–3 | Profile Wire major `2`, minor `0` |
-| 4–5 | schema major `4`, minor `3` |
+| 1 | capability page count, `4` |
+| 2–3 | Profile Wire major `2`, minor `2` |
+| 4–5 | schema major `4`, minor `8` |
 | 6 | report size, `32` |
 | 7 | candidate chunk capacity: `20` when feature bit 1 is set, otherwise `0` |
 | 8 | profile status page count, `2` |
 | 9–12 | feature word, below |
 | 13–16 | action-ABI digest; `0` until the live-profile owner reports |
-| 17–20 | firmware version, never `0` |
+| 17–20 | firmware version: the release the build includes ([README.md](README.md#version-identity)), never `0` |
 | 21–24 | compiled-default digest; `0` until the owner reports |
 
 Page 1, every ceiling that fits a byte:
@@ -98,8 +98,8 @@ Page 1, every ceiling that fits a byte:
 | 3 | tap depth: branches per behaviour | 5, or the build's `KEY_BEHAVIOR_MAX_TAP_COUNT` |
 | 4 | maximum combos | 128 |
 | 5 | maximum inputs per combo | 16 |
-| 6 | maximum reusable lighting groups | 16 |
-| 7 | maximum lighting stage-group rows | 32 |
+| 6 | maximum reusable lighting groups | 128 |
+| 7 | maximum lighting group rows in one stage table (D-F63) | 255 |
 | 8 | physical LEDs | 58 with RGB Matrix, otherwise 0 |
 | 9 | LED bitmap bytes | 8 |
 | 10 | custom keys | 128 |
@@ -118,8 +118,22 @@ Page 2, the wider ceilings; every byte count is 32 bits:
 | 2–5 | profile slot size in bytes | 131,072 |
 | 6–9 | maximum profile payload | 130,048 |
 | 10–13 | slot payload capacity | 130,048 |
-| 14–17 | macro domain capacity in bytes | 34,903 |
-| 18–24 | zero | |
+| 14–17 | macro domain capacity in bytes | 40,960 |
+| 18–19 | maximum lighting group rows in all five stage tables (D-F63) | 640 |
+| 20–24 | zero | |
+
+Page 3, the [autocorrect list](autocorrect-domain.md#ceilings)'s ceilings
+(D-F68):
+
+| Byte | Field | This firmware |
+| ---: | --- | --- |
+| 0–1 | maximum corrections | 1,024 |
+| 2–3 | maximum typos | 1,024 |
+| 4–5 | text capacity in bytes, corrections and typos together | 20,480 |
+| 6–9 | autocorrect domain capacity in bytes | 36,874 |
+| 10 | maximum bytes in one typo | 32 |
+| 11 | maximum bytes in one text correction | 128 |
+| 12–24 | zero | |
 
 The values come from one header, `users/noah/lib/compat/qmk_profile_capabilities.h`,
 which the Raw HID channel and the contract probe (`tests/host/run_contract_probe.sh`)
@@ -341,7 +355,7 @@ not route, and every value not listed, is answered unhandled (`0xFF`).
 
 | Command | Value | Operation | Builds | Specified in |
 | --- | ---: | --- | --- | --- |
-| get | `0x01` | capability pages 0–2 | all | [this file](#capability-pages--get-0x01) |
+| get | `0x01` | capability pages 0–3 | all | [this file](#capability-pages--get-0x01) |
 | get | `0x02` | profile status pages 0–1 | all | [this file](#profile-status--get-0x02) |
 | get | `0x03` | cadence recorder | diagnostic | [this file](#diagnostic-values) |
 | get | `0x04` | saved payload | all | [this file](#payload-readback--get-0x04-and-0x05) |

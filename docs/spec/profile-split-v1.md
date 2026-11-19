@@ -365,6 +365,12 @@ Each half compares its own descriptor with the other half's:
 - Unreadable, invalid and incompatible fail closed. Incompatible, concurrent
   commit and corrupt same tuple stop the reconciler with `INCOMPATIBLE`,
   `CONFLICT` and `CORRUPT`; neither half's record is overwritten.
+- A half on another schema never reaches this table: a frame's descriptor
+  names its schema, and one naming another schema does not decode, so it is
+  answered `INVALID_FRAME` before any store call. The sender counts that as a
+  lost exchange and polls again. A half beside one on another release (one
+  half flashed, the other not yet) therefore stays unresolved, on its
+  compiled defaults, with neither record written, until both run one schema.
 - A newer local profile is pushed; a newer profile on the other half is
   pulled with `PAYLOAD_REQUEST`. The transport role never decides which
   profile wins.
@@ -383,7 +389,7 @@ Each half compares its own descriptor with the other half's:
   authority. How two provisional candidates are arbitrated is
   [`logical-profile-transaction-v1.md`](logical-profile-transaction-v1.md)'s.
 
-Held by: `tests/host/run_profile_split_foundation_tests.sh` (`test_authority_decision_table`, `test_authority_publication_and_activation_observer`), `tests/host/run_profile_split_reconciler_tests.sh` (`test_concurrent_commit_stops_without_overwrite`, `test_same_tuple_corruption_stops_without_overwrite`, `test_incompatible_firmware_stops_without_write`, `test_refresh_publishes_new_local_authority_during_backoff`, `test_descriptor_changes_are_validated_before_backoff`, `test_descriptor_is_read_only_when_its_revision_moves`).
+Held by: `tests/host/run_profile_split_foundation_tests.sh` (`test_released_descriptor_frames_do_not_decode`, `test_authority_decision_table`, `test_authority_publication_and_activation_observer`), `tests/host/run_profile_split_reconciler_tests.sh` (`test_a_released_halfs_descriptors_are_refused_before_any_store_call`, `test_beside_a_released_half_this_half_polls_and_never_copies`, `test_concurrent_commit_stops_without_overwrite`, `test_same_tuple_corruption_stops_without_overwrite`, `test_incompatible_firmware_stops_without_write`, `test_refresh_publishes_new_local_authority_during_backoff`, `test_descriptor_changes_are_validated_before_backoff`, `test_descriptor_is_read_only_when_its_revision_moves`), `tests/host/run_profile_owner_tests.sh` (`test_a_saved_half_beside_a_released_half_waits_on_its_compiled_defaults`), `tests/host/include/released_half_fixture.h`.
 
 ## Receiving a copy
 

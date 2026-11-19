@@ -162,3 +162,9 @@ static inline key_behavior_step_t key_behavior_step_none(void) {
 static inline bool key_behavior_step_present(key_behavior_step_t step) {
     return step.tap.present || step.hold.present || step.long_hold.present;
 }
+
+// A later tap count whose branch sets nothing: the standard key pressed once
+// per tap (D-F64).
+static inline bool key_behavior_branch_is_empty(uint8_t tap_count, bool step_present) {
+    return tap_count > 1u && !step_present;
+}

@@ -64,7 +64,7 @@
 // Register the custom split RPCs for:
 // - base runtime-visible state (automouse / pd / preview)
 // - combo feedback locality
-// - truthful key-feedback semantics and tap branch state
+// - truthful behaviour-feedback semantics and tap branch state
 // - the profile copy and commit between halves
 // - the profile store's flash timing on the other half (diagnostics only)
 // - the working copy's live edits and the edit mode (D-F32)
@@ -214,8 +214,8 @@
 
 // ─── Firmware identity and EEPROM ─────────────────────────────────────────
 
-// The firmware version the Profile Wire capability page reports (D-F31).
-#define NOAH_FIRMWARE_VERSION 0x00010000u
+// The firmware version (D-F77).
+#include "firmware_version.h"
 // VIA is not supported (D-F31). QMK's logical EEPROM holds only its eeconfig,
 // with room for a user datablock: the wear-leveling backing is QMK's RP2040
 // default of 8 KiB, so the RAM mirror of logical EEPROM is 4 KiB per half. The

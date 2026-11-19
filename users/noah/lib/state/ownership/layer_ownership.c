@@ -120,6 +120,10 @@ bool layer_ownership_is_held(uint8_t layer) {
     return layer < LAYER_COUNT && layer_ownership_state()->momentary_refcounts[layer] > 0u;
 }
 
+bool layer_ownership_owns(uint8_t layer) {
+    return layer_ownership_should_be_active(layer);
+}
+
 bool layer_ownership_set_lock_state(uint8_t layer, bool locked) {
     noah_layer_ownership_state_t *state = layer_ownership_state();
 

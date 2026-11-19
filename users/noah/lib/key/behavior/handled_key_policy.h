@@ -96,7 +96,6 @@ static inline handled_key_behavior_contract_t handled_key_behavior_contract(key_
         .long_hold                                      = long_held,
         .quick_tap_pointing_mode_lock                   = pointing_mode,
         .suppress_tap_on_layer_interrupt                = (flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0,
-        .buffered_base_tap_dispatches_tap               = (flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0 && tap_action == KC_NO,
         .quick_release_of_immediate_hold_dispatches_tap = hold_registers_on_press(hold),
         .fallback_hold_suppresses_nonquick_release      = (flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0,
         // A layer hold sends no tap when held past the tap term, except a tap

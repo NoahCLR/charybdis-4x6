@@ -33,6 +33,13 @@ static noah_active_profile_rgb_result_t frame_status(const noah_active_profile_r
     return status;
 }
 
+#ifdef RGB_ACTIVE_PROFILE_CONFIG_TEST_BACKEND
+static rgb_active_profile_config_test_reads_t test_reads;
+#    define COUNT_READ(field_) (test_reads.field_++)
+#else
+#    define COUNT_READ(field_) ((void)0)
+#endif
+
 static hsv_t native_hsv(noah_profile_rgb_v1_hsv_t color) {
     return (hsv_t){.h = color.h, .s = color.s, .v = color.v};
 }
@@ -98,6 +105,7 @@ bool rgb_active_profile_config_layer_group_at(const noah_active_profile_rgb_fram
         noah_profile_rgb_v1_group_t     dictionary_group;
         noah_profile_rgb_v1_error_t     error;
 
+        COUNT_READ(layer_rows);
         if (noah_profile_rgb_v1_layer_group_at(view, index, &row, &error) != NOAH_PROFILE_RGB_V1_OK || row.group_id >= view->group_count || noah_profile_rgb_v1_group_at(view, row.group_id, &dictionary_group, &error) != NOAH_PROFILE_RGB_V1_OK || dictionary_group.id != row.group_id) {
             return false;
         }
@@ -234,6 +242,7 @@ bool rgb_active_profile_config_pd_group_at(const noah_active_profile_rgb_frame_t
         noah_profile_rgb_v1_group_t     dictionary_group;
         noah_profile_rgb_v1_error_t     error;
 
+        COUNT_READ(pd_rows);
         if (noah_profile_rgb_v1_pd_group_at(view, index, &row, &error) != NOAH_PROFILE_RGB_V1_OK || row.group_id >= view->group_count || noah_profile_rgb_v1_group_at(view, row.group_id, &dictionary_group, &error) != NOAH_PROFILE_RGB_V1_OK || dictionary_group.id != row.group_id) {
             return false;
         }
@@ -320,6 +329,7 @@ bool rgb_active_profile_config_combo_group_at(const noah_active_profile_rgb_fram
         noah_profile_rgb_v1_group_t           dictionary_group;
         noah_profile_rgb_v1_error_t           error;
 
+        COUNT_READ(combo_rows);
         if (noah_profile_rgb_v1_combo_group_at(view, index, &row, &error) != NOAH_PROFILE_RGB_V1_OK || row.group_id >= view->group_count || noah_profile_rgb_v1_group_at(view, row.group_id, &dictionary_group, &error) != NOAH_PROFILE_RGB_V1_OK || dictionary_group.id != row.group_id) {
             return false;
         }
@@ -348,28 +358,12 @@ bool rgb_active_profile_config_key_stage_enabled(const noah_active_profile_rgb_f
 }
 
 #ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-static bool key_feedback_fixed_config(const noah_active_profile_rgb_frame_t *frame, hsv_t *tap_committed_color, hsv_t *hold_active_color, hsv_t *long_hold_active_color, key_feedback_tap_commit_mode_t *tap_commit_mode, rgb_locality_t *locality) {
+static bool key_feedback_record(const noah_active_profile_rgb_frame_t *frame, noah_profile_rgb_v1_key_feedback_t *row) {
     const noah_profile_rgb_v1_view_t *view;
     noah_active_profile_rgb_result_t  status = frame_status(frame, &view);
+    noah_profile_rgb_v1_error_t       error;
 
-    if (!(tap_committed_color && hold_active_color && long_hold_active_color && tap_commit_mode && locality)) {
-        return false;
-    }
-
-    if (status == NOAH_ACTIVE_PROFILE_RGB_OK && (view->stage_enable_mask & NOAH_PROFILE_RGB_V1_STAGE_KEY_BEHAVIOR) != 0u) {
-        noah_profile_rgb_v1_key_feedback_t row;
-        noah_profile_rgb_v1_error_t        error;
-
-        if (noah_profile_rgb_v1_key_feedback(view, &row, &error) == NOAH_PROFILE_RGB_V1_OK) {
-            *tap_committed_color    = native_hsv(row.tap_committed_color);
-            *hold_active_color      = native_hsv(row.hold_active_color);
-            *long_hold_active_color = native_hsv(row.long_hold_active_color);
-            *tap_commit_mode        = (key_feedback_tap_commit_mode_t)row.tap_commit_mode;
-            *locality               = (rgb_locality_t)row.locality;
-            return true;
-        }
-    }
-    return false;
+    return status == NOAH_ACTIVE_PROFILE_RGB_OK && (view->stage_enable_mask & NOAH_PROFILE_RGB_V1_STAGE_KEY_BEHAVIOR) != 0u && noah_profile_rgb_v1_key_feedback(view, row, &error) == NOAH_PROFILE_RGB_V1_OK;
 }
 #endif
 
@@ -382,22 +376,37 @@ bool rgb_active_profile_config_key_feedback(const noah_active_profile_rgb_frame_
         return false;
     }
     memset(config, 0, sizeof(*config));
-    if (status == NOAH_ACTIVE_PROFILE_RGB_OK && (view->stage_enable_mask & NOAH_PROFILE_RGB_V1_STAGE_KEY_BEHAVIOR) != 0u && view->tap_branch_color_count <= ARRAY_SIZE(config->tap_branch_colors)) {
-        config->tap_branch_color_count = view->tap_branch_color_count;
-        for (uint8_t index = 0u; index < config->tap_branch_color_count; index++) {
-            noah_profile_rgb_v1_hsv_t   color;
-            noah_profile_rgb_v1_error_t error;
+    if (status == NOAH_ACTIVE_PROFILE_RGB_OK && (view->stage_enable_mask & NOAH_PROFILE_RGB_V1_STAGE_KEY_BEHAVIOR) != 0u && view->tap_branch_color_count <= NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS) {
+        noah_profile_rgb_v1_key_feedback_t row;
+        uint8_t                            committed, hold, long_hold;
 
-            if (noah_profile_rgb_v1_tap_branch_color_at(view, index, &color, &error) != NOAH_PROFILE_RGB_V1_OK) {
+        config->tap_branch_count = view->tap_branch_color_count;
+        for (uint8_t index = 0u; index < config->tap_branch_count; index++) {
+            noah_profile_rgb_v1_feedback_t branch;
+            noah_profile_rgb_v1_error_t    error;
+
+            if (noah_profile_rgb_v1_tap_branch_at(view, index, &branch, &error) != NOAH_PROFILE_RGB_V1_OK) {
                 return false;
             }
-            config->tap_branch_colors[index] = native_hsv(color);
+            config->case_colors[index]     = native_hsv(branch.color);
+            config->case_localities[index] = (rgb_locality_t)branch.locality;
         }
-    } else {
-        return false;
+        if (!key_feedback_record(frame, &row)) {
+            return false;
+        }
+        committed                          = rgb_active_profile_key_tier_case(config, RGB_ACTIVE_PROFILE_KEY_TIER_TAP_COMMITTED);
+        hold                               = rgb_active_profile_key_tier_case(config, RGB_ACTIVE_PROFILE_KEY_TIER_HOLD);
+        long_hold                          = rgb_active_profile_key_tier_case(config, RGB_ACTIVE_PROFILE_KEY_TIER_LONG_HOLD);
+        config->case_colors[committed]     = native_hsv(row.tap_committed_color);
+        config->case_localities[committed] = (rgb_locality_t)row.tap_committed_locality;
+        config->case_colors[hold]          = native_hsv(row.hold_active_color);
+        config->case_localities[hold]      = (rgb_locality_t)row.hold_active_locality;
+        config->case_colors[long_hold]     = native_hsv(row.long_hold_active_color);
+        config->case_localities[long_hold] = (rgb_locality_t)row.long_hold_active_locality;
+        config->tap_commit_mode            = (key_feedback_tap_commit_mode_t)row.tap_commit_mode;
+        return true;
     }
-
-    return key_feedback_fixed_config(frame, &config->tap_committed_color, &config->hold_active_color, &config->long_hold_active_color, &config->tap_commit_mode, &config->locality);
+    return false;
 #else
     (void)frame;
     (void)config;
@@ -419,10 +428,6 @@ uint8_t rgb_active_profile_config_key_group_count(const noah_active_profile_rgb_
     return 0u;
 }
 
-#ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-
-#endif
-
 bool rgb_active_profile_config_key_group_at(const noah_active_profile_rgb_frame_t *frame, uint8_t index, rgb_active_profile_key_group_t *group) {
 #ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
     const noah_profile_rgb_v1_view_t *view;
@@ -437,6 +442,7 @@ bool rgb_active_profile_config_key_group_at(const noah_active_profile_rgb_frame_
         noah_profile_rgb_v1_group_t     dictionary_group;
         noah_profile_rgb_v1_error_t     error;
 
+        COUNT_READ(key_rows);
         if (noah_profile_rgb_v1_key_group_at(view, index, &row, &error) != NOAH_PROFILE_RGB_V1_OK || row.group_id >= view->group_count || noah_profile_rgb_v1_group_at(view, row.group_id, &dictionary_group, &error) != NOAH_PROFILE_RGB_V1_OK || dictionary_group.id != row.group_id) {
             return false;
         }
@@ -455,18 +461,205 @@ bool rgb_active_profile_config_key_group_at(const noah_active_profile_rgb_frame_
 
 #ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 key_feedback_tap_commit_mode_t key_feedback_tap_commit_mode(void) {
-    noah_active_profile_rgb_frame_t  frame;
-    noah_active_profile_rgb_result_t result;
-    hsv_t                            tap_committed_color;
-    hsv_t                            hold_active_color;
-    hsv_t                            long_hold_active_color;
-    key_feedback_tap_commit_mode_t   tap_commit_mode;
-    rgb_locality_t                   locality;
+    noah_active_profile_rgb_frame_t    frame;
+    noah_active_profile_rgb_result_t   result;
+    noah_profile_rgb_v1_key_feedback_t row;
 
     result = rgb_active_profile_config_capture_frame(&frame);
-    if ((result != NOAH_ACTIVE_PROFILE_RGB_OK && result != NOAH_ACTIVE_PROFILE_RGB_COMPILED_FALLBACK) || !key_feedback_fixed_config(&frame, &tap_committed_color, &hold_active_color, &long_hold_active_color, &tap_commit_mode, &locality) || !rgb_active_profile_config_frame_current(&frame)) {
+    if ((result != NOAH_ACTIVE_PROFILE_RGB_OK && result != NOAH_ACTIVE_PROFILE_RGB_COMPILED_FALLBACK) || !key_feedback_record(&frame, &row) || !rgb_active_profile_config_frame_current(&frame)) {
         return KEY_FEEDBACK_TAP_COMMIT_OFF;
     }
-    return tap_commit_mode;
+    return (key_feedback_tap_commit_mode_t)row.tap_commit_mode;
+}
+#endif
+
+bool rgb_active_profile_config_autocorrect_stage_enabled(const noah_active_profile_rgb_frame_t *frame) {
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    const noah_profile_rgb_v1_view_t *view;
+    noah_active_profile_rgb_result_t  status = frame_status(frame, &view);
+
+    return status == NOAH_ACTIVE_PROFILE_RGB_OK && (view->stage_enable_mask & NOAH_PROFILE_RGB_V1_STAGE_AUTOCORRECT) != 0u;
+#else
+    (void)frame;
+    return false;
+#endif
+}
+
+bool rgb_active_profile_config_autocorrect_feedback(const noah_active_profile_rgb_frame_t *frame, rgb_active_profile_autocorrect_feedback_t *config) {
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    const noah_profile_rgb_v1_view_t *view;
+    noah_active_profile_rgb_result_t  status = frame_status(frame, &view);
+
+    if (!config) {
+        return false;
+    }
+
+    if (status == NOAH_ACTIVE_PROFILE_RGB_OK && (view->stage_enable_mask & NOAH_PROFILE_RGB_V1_STAGE_AUTOCORRECT) != 0u) {
+        noah_profile_rgb_v1_autocorrect_feedback_t row;
+        noah_profile_rgb_v1_error_t                error;
+
+        if (noah_profile_rgb_v1_autocorrect_feedback(view, &row, &error) == NOAH_PROFILE_RGB_V1_OK) {
+            for (uint8_t semantic = 0u; semantic < ARRAY_SIZE(config->colors); semantic++) {
+                config->colors[semantic]     = native_hsv(row.colors[semantic]);
+                config->localities[semantic] = (rgb_locality_t)row.localities[semantic];
+            }
+            return true;
+        }
+    }
+#else
+    (void)frame;
+    (void)config;
+#endif
+    return false;
+}
+
+uint8_t rgb_active_profile_config_autocorrect_group_count(const noah_active_profile_rgb_frame_t *frame) {
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    const noah_profile_rgb_v1_view_t *view;
+    noah_active_profile_rgb_result_t  status = frame_status(frame, &view);
+
+    if (status == NOAH_ACTIVE_PROFILE_RGB_OK && (view->stage_enable_mask & NOAH_PROFILE_RGB_V1_STAGE_AUTOCORRECT) != 0u) {
+        return view->autocorrect_group_count;
+    }
+#else
+    (void)frame;
+#endif
+    return 0u;
+}
+
+bool rgb_active_profile_config_autocorrect_group_at(const noah_active_profile_rgb_frame_t *frame, uint8_t index, rgb_active_profile_autocorrect_group_t *group) {
+#ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    const noah_profile_rgb_v1_view_t *view;
+    noah_active_profile_rgb_result_t  status = frame_status(frame, &view);
+
+    if (!group) {
+        return false;
+    }
+
+    if (status == NOAH_ACTIVE_PROFILE_RGB_OK && (view->stage_enable_mask & NOAH_PROFILE_RGB_V1_STAGE_AUTOCORRECT) != 0u && index < view->autocorrect_group_count) {
+        noah_profile_rgb_v1_group_row_t row;
+        noah_profile_rgb_v1_group_t     dictionary_group;
+        noah_profile_rgb_v1_error_t     error;
+
+        COUNT_READ(autocorrect_rows);
+        if (noah_profile_rgb_v1_autocorrect_group_at(view, index, &row, &error) != NOAH_PROFILE_RGB_V1_OK || row.group_id >= view->group_count || noah_profile_rgb_v1_group_at(view, row.group_id, &dictionary_group, &error) != NOAH_PROFILE_RGB_V1_OK || dictionary_group.id != row.group_id) {
+            return false;
+        }
+        group->selector = row.selector;
+        group->color    = native_hsv(row.color);
+        memcpy(group->bitmap, dictionary_group.bitmap, sizeof(group->bitmap));
+        return true;
+    }
+#else
+    (void)frame;
+    (void)index;
+    (void)group;
+#endif
+    return false;
+}
+
+// The selectors of the frame's rows, keyed like the layer stage's colour cache
+// (rgb_layer_stage.c): by the frame's epoch, publication count and liveness.
+// An epoch is never reused while the runtime lives, so selectors read while a
+// publication landed can never be current again, and a frame that is no longer
+// current gets none.
+static struct {
+    uint8_t  selectors[NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS];
+    uint32_t epoch;
+    uint32_t publication_count;
+    uint8_t  layer_count;
+    uint8_t  pd_count;
+    uint8_t  key_count;
+    uint8_t  autocorrect_count;
+    bool     live;
+    bool     valid;
+} selector_cache;
+
+#if UINTPTR_MAX == UINT32_MAX
+_Static_assert(sizeof(selector_cache) <= NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS + 16u, "the lighting selector cache is one byte per group row");
+#endif
+
+typedef noah_profile_rgb_v1_result_t (*group_row_reader_t)(const noah_profile_rgb_v1_view_t *view, uint8_t index, noah_profile_rgb_v1_group_row_t *row, noah_profile_rgb_v1_error_t *error);
+
+// One table's selectors, each row read only while the frame is current.
+static bool read_table_selectors(const noah_active_profile_rgb_frame_t *frame, group_row_reader_t read_row, uint8_t count, uint16_t *next) {
+    for (uint8_t index = 0u; index < count; index++) {
+        const noah_profile_rgb_v1_view_t *view;
+        noah_profile_rgb_v1_group_row_t   row;
+        noah_profile_rgb_v1_error_t       error;
+
+        COUNT_READ(selector_reads);
+        if (frame_status(frame, &view) != NOAH_ACTIVE_PROFILE_RGB_OK || read_row(view, index, &row, &error) != NOAH_PROFILE_RGB_V1_OK) {
+            return false;
+        }
+        selector_cache.selectors[(*next)++] = row.selector;
+    }
+    return true;
+}
+
+static bool read_group_selectors(const noah_active_profile_rgb_frame_t *frame) {
+    const noah_profile_rgb_v1_view_t *view;
+    uint16_t                          next  = 0u;
+    uint8_t                           layer = rgb_active_profile_config_layer_group_count(frame);
+    uint8_t                           pd    = rgb_active_profile_config_pd_group_count(frame);
+    uint8_t                           key   = rgb_active_profile_config_key_group_count(frame);
+    uint8_t                           autocorrect = rgb_active_profile_config_autocorrect_group_count(frame);
+
+    if ((uint16_t)layer + pd + key + autocorrect > NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS || !read_table_selectors(frame, noah_profile_rgb_v1_layer_group_at, layer, &next) || !read_table_selectors(frame, noah_profile_rgb_v1_pd_group_at, pd, &next) || !read_table_selectors(frame, noah_profile_rgb_v1_key_group_at, key, &next) || !read_table_selectors(frame, noah_profile_rgb_v1_autocorrect_group_at, autocorrect, &next)) {
+        return false;
+    }
+    selector_cache.layer_count       = layer;
+    selector_cache.pd_count          = pd;
+    selector_cache.key_count         = key;
+    selector_cache.autocorrect_count = autocorrect;
+    // A publication that landed during the reads leaves nothing to keep.
+    return frame_status(frame, &view) == NOAH_ACTIVE_PROFILE_RGB_OK;
+}
+
+bool rgb_active_profile_config_group_selectors(const noah_active_profile_rgb_frame_t *frame, rgb_active_profile_group_selectors_t *selectors) {
+    // Without a frame the accessors read the compiled view, as an uninstalled
+    // runtime's frame does.
+    const noah_profile_rgb_v1_view_t *view;
+    uint32_t                          epoch             = frame ? frame->epoch : 0u;
+    uint32_t                          publication_count = frame ? frame->publication_count : 0u;
+    bool                              live              = frame && frame->live;
+
+    if (!selectors || frame_status(frame, &view) != NOAH_ACTIVE_PROFILE_RGB_OK) {
+        return false;
+    }
+    if (!(selector_cache.valid && selector_cache.epoch == epoch && selector_cache.publication_count == publication_count && selector_cache.live == live)) {
+        selector_cache.valid = false;
+        if (!read_group_selectors(frame)) {
+            return false;
+        }
+        selector_cache.epoch             = epoch;
+        selector_cache.publication_count = publication_count;
+        selector_cache.live              = live;
+        selector_cache.valid             = true;
+    }
+    *selectors = (rgb_active_profile_group_selectors_t){
+        .layer       = selector_cache.selectors,
+        .pd          = selector_cache.selectors + selector_cache.layer_count,
+        .key         = selector_cache.selectors + selector_cache.layer_count + selector_cache.pd_count,
+        .autocorrect = selector_cache.selectors + selector_cache.layer_count + selector_cache.pd_count + selector_cache.key_count,
+        .layer_count = selector_cache.layer_count,
+        .pd_count    = selector_cache.pd_count,
+        .key_count   = selector_cache.key_count,
+        .autocorrect_count = selector_cache.autocorrect_count,
+    };
+    return true;
+}
+
+void rgb_active_profile_config_invalidate_group_selectors(void) {
+    selector_cache.valid = false;
+}
+
+#ifdef RGB_ACTIVE_PROFILE_CONFIG_TEST_BACKEND
+void rgb_active_profile_config_test_reset_reads(void) {
+    test_reads = (rgb_active_profile_config_test_reads_t){0};
+}
+
+rgb_active_profile_config_test_reads_t rgb_active_profile_config_test_reads(void) {
+    return test_reads;
 }
 #endif

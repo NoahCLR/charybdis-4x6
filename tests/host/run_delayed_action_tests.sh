@@ -27,6 +27,10 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/action/action_dispatch.c" \
     "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_state.c" \
     "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_policy.c" \
+    "$ROOT/users/noah/lib/compat/qmk_mod_contract.c" \
+    "$ROOT/users/noah/lib/state/ownership/keyboard_mod_ownership.c" \
+    "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
+    "$ROOT/users/noah/lib/state/shared/runtime_shared_state.c" \
     -o "$BIN"
 
 "$BIN"

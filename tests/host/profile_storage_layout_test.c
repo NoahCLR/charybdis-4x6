@@ -13,7 +13,7 @@ _Static_assert(NOAH_PROFILE_WIRE_V1_MAX_BEHAVIOR_ROWS == 128u, "unexpected behav
 _Static_assert(NOAH_PROFILE_WIRE_V1_MAX_TAP_STEPS_PER_BEHAVIOR == NOAH_PROFILE_TAP_DEPTH, "unexpected tap-step ceiling");
 _Static_assert(NOAH_PROFILE_WIRE_V1_MAX_POPULATED_BEHAVIOR_STEPS == 128u * NOAH_PROFILE_TAP_DEPTH, "unexpected populated-step ceiling");
 _Static_assert(NOAH_PROFILE_WIRE_V1_MAX_COMBOS == 128u && NOAH_PROFILE_WIRE_V1_MAX_KEYS_PER_COMBO == 16u, "unexpected combo ceilings");
-_Static_assert(NOAH_PROFILE_WIRE_V1_MAX_REUSABLE_RGB_GROUPS == 16u && NOAH_PROFILE_WIRE_V1_MAX_RGB_STAGE_GROUP_ROWS == 32u, "unexpected v1 RGB-group ceilings");
+_Static_assert(NOAH_PROFILE_WIRE_V1_MAX_REUSABLE_RGB_GROUPS == 128u && NOAH_PROFILE_WIRE_V1_MAX_RGB_STAGE_GROUP_ROWS == 640u && NOAH_PROFILE_WIRE_V1_MAX_RGB_TABLE_GROUP_ROWS == 255u, "unexpected RGB-group ceilings (D-F63)");
 _Static_assert(NOAH_PROFILE_WIRE_V1_MAX_CUSTOM_KEYS == 128u && NOAH_PROFILE_WIRE_V1_MAX_HARDCODED_MACRO_BYTES == 1024u, "unexpected custom-key and retired user-macro ceilings");
 
 int main(void) {

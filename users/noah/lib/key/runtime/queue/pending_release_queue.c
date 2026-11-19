@@ -312,7 +312,7 @@ uint8_t key_runtime_core_pending_release_count(void) {
     return state ? state->pending_release_count : 0u;
 }
 
-bool key_runtime_core_queue_pending_release_dispatch_for_owner(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods, bool tap_commit_feedback, uint16_t owner_token_id) {
+static bool key_runtime_core_queue_pending_release_for_owner(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods, bool tap_commit_feedback, uint16_t owner_token_id) {
     key_runtime_core_state_t *state = key_runtime_core_state();
     pending_release_slot_t   *pending;
     uint8_t                   index;
@@ -351,8 +351,14 @@ bool key_runtime_core_queue_pending_release_dispatch(keypos_t key_pos, uint16_t 
     key_runtime_core_state_t *state = key_runtime_core_state();
     press_token_t            *token = (state && key_runtime_core_pending_release_keypos_valid(key_pos)) ? &state->press_tokens[key_runtime_core_pending_release_keypos_index(key_pos)] : NULL;
 
-    return key_runtime_core_queue_pending_release_dispatch_for_owner(key_pos, action, mods, tap_commit_feedback, token ? token->token_id : 0u);
+    return key_runtime_core_queue_pending_release_for_owner(key_pos, action, mods, tap_commit_feedback, token ? token->token_id : 0u);
 }
+
+#ifdef NOAH_HOST_TEST_ENV
+bool key_runtime_core_queue_pending_release_dispatch_for_owner(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods, bool tap_commit_feedback, uint16_t owner_token_id) {
+    return key_runtime_core_queue_pending_release_for_owner(key_pos, action, mods, tap_commit_feedback, owner_token_id);
+}
+#endif
 
 bool key_runtime_core_pending_release_at_order(uint8_t order, pending_release_t *out) {
     key_runtime_core_state_t                 *state = key_runtime_core_state();

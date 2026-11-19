@@ -15,14 +15,14 @@
 // 1, 2 or 3 (tap, press, release) and a nonzero keycode; 4 and decimal digits
 // (a delay) ended by any other byte, which the delay consumes, or by the
 // macro's terminator; 5 and a protection level of 1 or 2, only as the macro's
-// first two bytes. The capacity is today's VIA bank, so every bank VIA could
-// hold fits. Whether a macro can play (its presses released, every tap in one
-// window, its text typeable on the host) is checked when it plays, as it is
-// for VIA's bank.
+// first two bytes. The capacity (D-F76) is above VIA's former bank, so
+// every bank VIA could hold fits. Whether a macro can play (its presses
+// released, every tap in one window, its text typeable on the host) is
+// checked when it plays, as it is for VIA's bank.
 enum {
     NOAH_PROFILE_MACROS_V1_VERSION  = NOAH_PROFILE_DOMAIN_VERSION_MACROS,
     NOAH_PROFILE_MACROS_V1_SLOTS    = 128u,
-    NOAH_PROFILE_MACROS_V1_MAX_SIZE = 34903u,
+    NOAH_PROFILE_MACROS_V1_MAX_SIZE = 40960u,
     NOAH_PROFILE_MACROS_V1_PREFIX   = 0x01u,
     NOAH_PROFILE_MACROS_V1_TAP      = 0x01u,
     NOAH_PROFILE_MACROS_V1_DOWN     = 0x02u,

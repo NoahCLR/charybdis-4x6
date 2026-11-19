@@ -14,6 +14,8 @@ The authored profile lives in
 | [`rgb_config.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | lighting: layer, pointing-mode and feedback colours, LED groups |
 | [`pd_config.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/pd_config.c) | the 32 pointing slots |
 | `authored_macro_bank.h` | generated from the macros; never edited by hand |
+| [`autocorrect.txt`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/autocorrect.txt) | the autocorrect list: what is typed and what replaces it |
+| `authored_autocorrect_list.h` | generated from the list; never edited by hand |
 
 The runtime under [`users/noah/`](../../users/noah/) is generic: it holds no
 names, timings or colours of mine, and you shouldn't need to touch it.
@@ -87,11 +89,53 @@ MACRO(MACRO_10, "Select All + Copy", "{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}")
 
 After changing the macros, regenerate `authored_macro_bank.h`:
 
-```sh NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh
-tests/host/run_real_profile_validation_tests.sh ```
+```sh
+NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh
+```
 
 A stale copy fails the build. Authored macros play uninterruptibly only when
 they need Unicode entry ([Macros](macros.md#uninterruptible-playback)).
+
+### The autocorrect list
+
+`autocorrect.txt` lists what the keyboard replaces
+([Text replacement](autocorrect.md)), one input a line, in the form
+QMK's autocorrect lists use, which calls an input a typo and its
+replacement a correction:
+
+```
+:teh: -> the                    # the whole word
+:nu -> un                       # at the start of a word
+mnet: -> ment                   # at the end of a word
+tihng -> thing                  # anywhere in a word
+:pnumber: -> +31 6 1234 5678    # text that is no word
+:sig: => 12                     # plays macro slot 12
+leader pn -> +31 6 1234 5678    # after the Leader key only
+leader kr => 12                 # after the Leader key, plays macro slot 12
+both :adn: -> and               # as you type and after the Leader key
+```
+
+A colon before the input ties it to the start of a word and one after
+it to the end; both make it the whole word, and neither lets it match
+anywhere. These are the matches Ark writes with `*`. `=>` names a macro slot
+in place of text, for a whole word. Several inputs
+can name one replacement, and each names only one. An input is letters and
+digits, with apostrophes only between them, of up to 32 bytes, and matches
+whatever its case; the replacement is up to 128 bytes on one line, typed as
+you write it. A line that begins `leader` fires only after the Leader key
+([the leader](keys.md#the-leader)), its input typed whole, so without
+colons; one that begins `both` fires as you type and after the Leader key.
+Straight before the arrow either word is an input like any other: `both ->
+and` replaces `both` as you type. Every line of one replacement fires the same way. The list holds 1,024
+inputs and 1,024 replacements. It ships empty.
+
+After changing it, regenerate `authored_autocorrect_list.h`:
+
+```sh
+python3 tools/autocorrect/build.py --write-authored keyboards/bastardkb/charybdis/4x6/keymaps/noah
+```
+
+A stale copy fails the build, and so does a list the keyboard cannot hold.
 
 ### Combos
 
@@ -160,13 +204,17 @@ behaviour.
   `CUSTOM_LONGER_HOLD_TERM`, `CUSTOM_MULTI_TAP_TERM`, `COMBO_TERM`.
 - **Pointing**: the DPI ladders, `CHARYBDIS_AUTO_SNIPING_LAYER`,
   `AUTO_MOUSE_DEFAULT_LAYER` and `AUTO_MOUSE_TIME`.
+- **Text replacement**: how long the leader waits after its last key,
+  `NOAH_LEADER_TIMEOUT_MS` (1,000 to 10,000; [keys](keys.md#the-leader)).
 - **Lighting**: `RGB_MATRIX_MAXIMUM_BRIGHTNESS` (the limit no colour may
-  pass), the background effect, `NOAH_RGB_IDLE_TIMEOUT_MS`, the key feedback
-  flash interval and the auto-mouse fade's hold, `AUTOMOUSE_RGB_DEAD_TIME`,
-  which must stay below `AUTO_MOUSE_TIME`. Comment out
-  `RGB_POINTING_MODE_FEEDBACK_ENABLE`, `RGB_COMBO_FEEDBACK_ENABLE`,
-  `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` (which takes the layer preview with it)
-  or `RGB_AUTOMOUSE_GRADIENT_ENABLE` to leave that stage out of the build.
+  pass), the background effect, `NOAH_RGB_IDLE_TIMEOUT_MS`, the behaviour
+  feedback flash interval (`RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS`),
+  how long a replacement flash lasts (`RGB_AUTOCORRECT_FEEDBACK_FLASH_MS`),
+  and the auto-mouse fade's hold, `AUTOMOUSE_RGB_DEAD_TIME`, which must stay
+  below `AUTO_MOUSE_TIME`. Comment out `RGB_POINTING_MODE_FEEDBACK_ENABLE`,
+  `RGB_COMBO_FEEDBACK_ENABLE`, `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` (which takes
+  the layer preview with it), `RGB_AUTOCORRECT_FEEDBACK_ENABLE` or
+  `RGB_AUTOMOUSE_GRADIENT_ENABLE` to leave that stage out of the build.
 - **Host**: `NOAH_DEFAULT_HOST_OS` (0 Auto, 1 macOS, 2 Windows, 3 Linux),
   `NOAH_DEFAULT_HOST_LAYOUT` (an id from the
   [host layouts](../spec/host-layouts-v1.md#catalogue)),
@@ -187,10 +235,11 @@ Colours are `HSV(hue, saturation, value)`, each 0 to 255:
   `KEYS_MAPPED_ON_THIS_LAYER_ONLY`). `HSV(0, 0, 0)` is no colour.
 - `RGB_LED_GROUP(...)` names LEDs by the map at the top of the file;
   `layer_led_groups_data`, `pointing_mode_led_groups_data`,
-  `combo_feedback_led_groups_data` and `key_behavior_feedback_led_groups_data`
-  paint them per layer, pointing mode or kind of feedback, with
-  `RGB_LAYER_GROUP_ALL`, `RGB_POINTING_MODE_GROUP_ALL` and
-  `KEY_FEEDBACK_GROUP_ALL` for all of them. In a group row, `HSV(0, 0, 0)` takes
+  `combo_feedback_led_groups_data`, `key_behavior_feedback_led_groups_data`
+  and `autocorrect_feedback_led_groups_data` paint them per layer, pointing
+  mode or kind of feedback, with `RGB_LAYER_GROUP_ALL`,
+  `RGB_POINTING_MODE_GROUP_ALL`, `KEY_FEEDBACK_GROUP_ALL` and
+  `AUTOCORRECT_FEEDBACK_GROUP_ALL` for all of them. In a group row, `HSV(0, 0, 0)` takes
   the stage's colour. `saved_led_groups_data` keeps groups no stage uses yet,
   for Ark to offer.
 - `automouse_fade_end_config`: `FOLLOW_REAL_DESTINATION`,
@@ -199,9 +248,26 @@ Colours are `HSV(hue, saturation, value)`, each 0 to 255:
 - `pointing_mode_colors[]`: a colour and `.locality` for every pointing slot
   (`POINTING_MODE_DRAGSCROLL`… `POINTING_MODE_PINCH`, then
   `POINTING_MODE_6` to `_31`).
-- `combo_feedback_colors` and `key_behavior_feedback_colors`: the colours,
-  `.tap_commit_mode` (`KEY_FEEDBACK_TAP_COMMIT_OFF` or
-  `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS`) and `.locality`.
+- `combo_feedback_colors`: `.color` and `.locality`.
+- `key_behavior_feedback_colors`: `RGB_TAP_BRANCHES(...)`, one
+  `{.color, .locality}` per tap count from the double tap; each tier's colour
+  beside its locality (`.tap_committed_color` and `.tap_committed_locality`,
+  `.hold_active_*`, `.long_hold_active_*`); and `.tap_commit_mode`
+  (`KEY_FEEDBACK_TAP_COMMIT_OFF` or `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS`).
+  Its group rows name `KEY_FEEDBACK_GROUP_TAP_COUNT_2` to `_5`,
+  `KEY_FEEDBACK_GROUP_TAP_COMMITTED`, `_HOLD_ACTIVE` or `_LONG_HOLD_ACTIVE`,
+  `KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY` for every tap branch, or
+  `KEY_FEEDBACK_GROUP_ALL` for every case.
+- `autocorrect_feedback_colors`: `.text_color`, `.macro_color`,
+  `.undo_color` and `.leading_color` for
+  [replacement feedback](lighting.md#replacement-feedback), each beside its
+  locality (`.text_locality` and so on).
+
+A colour a layer, pointing slot, combo feedback or feedback case owns is
+passthrough at `HSV(0, 0, 0)`, or any hue with saturation and value 0: it
+paints nothing. To turn its LEDs off (dark), give it saturation, `HSV(h, 255, 0)`. In a group
+row `HSV(0, 0, 0)` takes its owner's colour instead, and the auto-mouse
+fade's end colour is literal.
 
 Locality is `RGB_BOTH_HALVES`, `RGB_LEFT_HALF`, `RGB_RIGHT_HALF`,
 `RGB_KEY_HALF` or `RGB_KEYS_ONLY`. Keep `MATERIALIZE_RGB_CONFIG();` at the
@@ -262,7 +328,8 @@ It builds both halves in the same Docker image releases are built in and
 writes them to `../builds/<branch>/` (or `BUILD_ROOT`) as
 `<n>_charybdis_left.uf2` and `<n>_charybdis_right.uf2`, with a note of what
 they were built from. Every build also validates the authored profile: a
-misplaced action, a stale macro bank or a bad colour fails it.
+misplaced action, a stale macro bank or autocorrect list or a bad colour fails
+it.
 
 [Development](../development.md) has the details, and
 [Hook overrides](hooks.md) is for adding code of your own.

@@ -8,6 +8,7 @@
 #include "users/noah/lib/profile/split/profile_split_reconciler.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "profile_store_saved_fixture.h"
+#include "released_half_fixture.h"
 
 _Static_assert((unsigned)NOAH_PROFILE_SPLIT_V1_FRAME_MAX <= (unsigned)SPLIT_FAULT_LINK_FRAME_MAX, "the fault link carries the largest split frame");
 
@@ -17,7 +18,7 @@ enum {
     MAX_PREPARE_TIME_MS = 60000u,
 };
 
-static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
+static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 4u, 8u, 0u, 1u};
 static const uint8_t max_profile[NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE];
 // Fault sweeps plant one fault at every exchange of a copy, so their cost
 // grows with the square of its length. The protocol does not depend on
@@ -2801,9 +2802,262 @@ static void test_wide_reuse_through_the_reconciler(void) {
     assert_wide_copy_refused_after_checksums(&left);
 }
 
+// ── Beside a half on the released firmware (released_half_fixture.h) ────────
+//
+// A person flashes one half, then the other: in between, the other half runs
+// v2026.10.27 (schema 4.3) and answers with the bytes it sends. Its saved
+// record below, and its replies.
+
+static const released_record_t released_record = {
+    .generation     = 12u,
+    .payload_length = 4096u,
+    .payload_crc32  = UINT32_C(0x5eed0001),
+    .payload_digest = UINT32_C(0x5eed0002),
+    .origin_half    = 0u,
+};
+
+typedef struct {
+    // What this half sent it, by frame kind (index 1..12).
+    uint32_t sent[13];
+    // Answer this half's METADATA with the released half's own METADATA, as
+    // if it had decoded the poll; every other request still gets its error.
+    bool answer_with_descriptor;
+} released_half_t;
+
+// The released half's RPC callback: this build's frames all name schema 4.8,
+// which its decoder refuses, so it answers every one as undecodable.
+static bool released_half_receive(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
+    released_half_t *released = context;
+
+    assert(request_length >= NOAH_PROFILE_SPLIT_V1_FRAME_SIZE && response_length >= NOAH_PROFILE_SPLIT_V1_FRAME_SIZE && request[1] < 13u);
+    released->sent[request[1]]++;
+    memset(response, 0, response_length);
+    if (released->answer_with_descriptor && request[1] == NOAH_PROFILE_SPLIT_V1_METADATA) {
+        released_descriptor_frame(response, NOAH_PROFILE_SPLIT_V1_METADATA, &released_record, 0u);
+    } else {
+        released_invalid_frame_reply(response);
+    }
+    return true;
+}
+
+// This half alone, linked to the released half.
+static void released_pair_init(half_t *half, released_half_t *released) {
+    noah_profile_split_reconciler_config_t config = {
+        .local_context     = half,
+        .local_descriptor  = local_descriptor,
+        .local_read        = local_read,
+        .transport_context = half,
+        .exchange          = exchange,
+        .other_half_store  = &half->other_half_store,
+    };
+
+    half->link.receive    = released_half_receive;
+    half->link.other_half = released;
+    noah_profile_split_reconciler_init(&half->reconciler, &config);
+}
+
+// Everything a receiver could change before its scan: the reconciler, both
+// store backends and the store, byte for byte.
+typedef struct {
+    noah_profile_split_reconciler_t         reconciler;
+    noah_profile_other_half_store_backend_t other_half_store;
+    noah_profile_candidate_store_backend_t  candidate_backend;
+    noah_profile_store_t                    store;
+    uint32_t                                reads;
+    uint32_t                                writes;
+} receiver_state_t;
+
+static void receiver_state_take(const half_t *half, receiver_state_t *state) {
+    memcpy(&state->reconciler, &half->reconciler, sizeof(state->reconciler));
+    memcpy(&state->other_half_store, &half->other_half_store, sizeof(state->other_half_store));
+    memcpy(&state->candidate_backend, &half->candidate_backend, sizeof(state->candidate_backend));
+    memcpy(&state->store, &half->store, sizeof(state->store));
+    state->reads  = half->memory.reads;
+    state->writes = half->memory.writes;
+}
+
+static bool receiver_state_unchanged(const half_t *half, const receiver_state_t *state) {
+    return memcmp(&state->reconciler, &half->reconciler, sizeof(state->reconciler)) == 0 && memcmp(&state->other_half_store, &half->other_half_store, sizeof(state->other_half_store)) == 0 && memcmp(&state->candidate_backend, &half->candidate_backend, sizeof(state->candidate_backend)) == 0 && memcmp(&state->store, &half->store, sizeof(state->store)) == 0 && state->reads == half->memory.reads && state->writes == half->memory.writes;
+}
+
+static bool same_identity(const noah_active_profile_identity_t *a, const noah_active_profile_identity_t *b) {
+    return a->generation == b->generation && a->payload_crc32 == b->payload_crc32 && a->payload_digest == b->payload_digest && a->compiled_default_digest == b->compiled_default_digest && a->action_abi_digest == b->action_abi_digest && a->origin == b->origin && a->kind == b->kind;
+}
+
+// After a request reached the scan: the backends and the store as they were.
+static bool receiver_state_unchanged_but_reply_cache(const half_t *half, const receiver_state_t *state) {
+    return memcmp(&state->other_half_store, &half->other_half_store, sizeof(state->other_half_store)) == 0 && memcmp(&state->candidate_backend, &half->candidate_backend, sizeof(state->candidate_backend)) == 0 && memcmp(&state->store, &half->store, sizeof(state->store)) == 0 && state->reads == half->memory.reads && state->writes == half->memory.writes;
+}
+
+static void assert_other_half_unresolved(const half_t *half, noah_profile_split_authority_state_t expected, bool transfer_pending) {
+    noah_profile_split_authority_status_t status;
+    uint8_t                               unresolved = 0u;
+
+    assert(noah_profile_split_authority_status(noah_profile_split_reconciler_authority(&half->reconciler), &status));
+    assert(status.state == expected && status.transfer_pending == transfer_pending);
+    assert(noah_profile_split_authority_other_half_observer((void *)noah_profile_split_reconciler_authority(&half->reconciler), &unresolved) && unresolved == 1u);
+}
+
+// This half as receiver, the released half as sender (its METADATA polls and
+// a copy it would push). Every descriptor names schema 4.3, which
+// noah_profile_split_descriptor_valid refuses, so the frame does not decode
+// (profile_split_protocol_v1.c, frame_shape_valid) and the request is
+// answered INVALID_FRAME with generation and digest zero
+// (profile_split_reconciler.c, noah_profile_split_reconciler_receive) before
+// the mailbox: no state of this half changes, and nothing reaches its store.
+// The one documented change follows: having taken no request, this half reads
+// the other half as unreadable once its timeout passes.
+static void test_a_released_halfs_descriptors_are_refused_before_any_store_call(void) {
+    static half_t          half;
+    static receiver_state_t before;
+    released_half_t        released = {0};
+    const struct {
+        uint8_t                  kind;
+        const released_record_t *record;
+        uint8_t                  flags;
+    } frames[] = {
+        {NOAH_PROFILE_SPLIT_V1_METADATA, &released_record, RELEASED_FLAG_NO_PREPARED_PUSH},
+        {NOAH_PROFILE_SPLIT_V1_METADATA, NULL, RELEASED_FLAG_NO_PREPARED_PUSH},
+        {NOAH_PROFILE_SPLIT_V1_METADATA, &released_record, 0u},
+        {NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN, &released_record, 0u},
+        {NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE, &released_record, 0u},
+        {NOAH_PROFILE_SPLIT_V1_PREPARE_COMMIT, &released_record, 0u},
+        {NOAH_PROFILE_SPLIT_V1_ABORT, &released_record, 0u},
+    };
+    uint8_t                       error[RELEASED_SPLIT_FRAME_SIZE];
+    uint8_t                       request[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
+    uint8_t                       response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    noah_profile_split_v1_frame_t decoded;
+    uint32_t                      now = 0u;
+
+    half_storage_init(&half);
+    install_profile(&half, 3u, 1u);
+    released_pair_init(&half, &released);
+    released_invalid_frame_reply(error);
+    for (uint32_t scan = 0u; scan < 4u; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        (void)noah_profile_split_reconciler_scan(&half.reconciler, false, now);
+    }
+    for (size_t index = 0u; index < sizeof(frames) / sizeof(frames[0]); index++) {
+        released_descriptor_frame(request, frames[index].kind, frames[index].record, frames[index].flags);
+        // The frame is well formed but for the schema it names: with this
+        // build's minor it decodes.
+        request[5]  = NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR;
+        request[31] = released_crc8(request, 31u);
+        assert(noah_profile_split_v1_frame_decode(request, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, &decoded));
+        released_descriptor_frame(request, frames[index].kind, frames[index].record, frames[index].flags);
+
+        receiver_state_take(&half, &before);
+        memset(response, 0xA5, sizeof(response));
+        assert(noah_profile_split_reconciler_receive(&half.reconciler, request, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, response, sizeof(response)));
+        assert(memcmp(response, error, sizeof(error)) == 0);
+        assert(receiver_state_unchanged(&half, &before));
+        (void)noah_profile_split_reconciler_scan(&half.reconciler, false, now);
+        assert(half.memory.reads == before.reads && half.memory.writes == before.writes);
+        now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
+    }
+    // Its copy's chunk names no schema and decodes, but this half holds no
+    // copy of it: answered BUSY, no lease, with no store call.
+    {
+        uint8_t length = released_chunk_frame(request, &released_record, 0u, empty_profile, sizeof(empty_profile));
+
+        receiver_state_take(&half, &before);
+        for (uint32_t attempt = 0u; attempt < 4u; attempt++, now += NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS) {
+            assert(noah_profile_split_reconciler_receive(&half.reconciler, request, length, response, sizeof(response)));
+            (void)noah_profile_split_reconciler_scan(&half.reconciler, false, now);
+        }
+        assert(noah_profile_split_v1_reply_decode(response, sizeof(response), &decoded));
+        assert(decoded.kind == NOAH_PROFILE_SPLIT_V1_ACK && decoded.status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY && decoded.busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_NO_LEASE);
+        assert(half.memory.reads == before.reads && half.memory.writes == before.writes);
+        assert(receiver_state_unchanged_but_reply_cache(&half, &before));
+    }
+    for (uint32_t elapsed = 0u; elapsed <= NOAH_PROFILE_SPLIT_OTHER_HALF_TIMEOUT_MS; elapsed += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        (void)noah_profile_split_reconciler_scan(&half.reconciler, false, now);
+    }
+    assert(half.memory.reads == before.reads && half.memory.writes == before.writes);
+    assert(saved_generation(&half.store) == 3u && saved_of(&half.store)->origin_half == 1u);
+    assert_other_half_unresolved(&half, NOAH_PROFILE_SPLIT_AUTHORITY_OTHER_HALF_UNREADABLE, false);
+    puts("a released half's descriptors are refused before the mailbox, the store or any state");
+}
+
+// This half as sender. The released half answers its METADATA as
+// undecodable, INVALID_FRAME with generation and digest zero, which this half
+// takes as a lost exchange (handle_protocol_error, transport_lost): it
+// forgets the other half and polls again after the backoff, which stops
+// growing at 1 s. Were the released half to answer with its own METADATA,
+// that reply does not decode either (noah_profile_split_v1_reply_decode),
+// and is a lost exchange the same way. Nothing ends the polling (no timeout,
+// no STOPPED), so the half stays where the owner put it: while it holds a
+// saved profile, RECONCILING_COMMITTED on its compiled defaults
+// (profile_owner.c, scan_boot_reconciliation; held by profile_owner_test.c).
+// Here it never starts a copy, never stores, never reads its slot for a push,
+// and the profile it runs is never republished.
+static void test_beside_a_released_half_this_half_polls_and_never_copies(void) {
+    static half_t                  half;
+    noah_active_profile_status_t   provider_before;
+    noah_active_profile_status_t   provider_after;
+    staged_source_t                source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    noah_profile_split_descriptor_t candidate;
+
+    for (unsigned mode = 0u; mode < 3u; mode++) {
+        released_half_t released = {.answer_with_descriptor = mode == 1u};
+        uint32_t        reads;
+        uint32_t        writes;
+        uint32_t        now = 0u;
+        noah_profile_other_half_store_state_t store_state;
+        noah_profile_storage_admission_owner_t admission;
+        uint32_t        claims_before_push = 0u;
+
+        half_storage_init(&half);
+        install_profile(&half, 3u, 1u);
+        released_pair_init(&half, &released);
+        reads       = half.memory.reads;
+        writes      = half.memory.writes;
+        store_state = noah_profile_other_half_store_backend_state(&half.other_half_store);
+        admission   = noah_profile_candidate_store_backend_admission_owner(&half.candidate_backend);
+        assert(noah_active_profile_provider_status(&half.provider, &provider_before) == NOAH_ACTIVE_PROFILE_OK);
+        // An Apply begun in the mixed state: its copy is offered, never taken.
+        if (mode == 2u) {
+            (void)noah_profile_split_reconciler_scan(&half.reconciler, true, now);
+            now += 10u;
+            candidate = saved_descriptor(&half, 4u, 1u);
+            assert(noah_profile_split_reconciler_prepared_push_begin(&half.reconciler, &candidate, &source, staged_read));
+            claims_before_push = half.no_push_claims;
+        }
+        for (; now < 30000u; now += 10u) {
+            noah_profile_split_reconciler_status_t status;
+
+            (void)noah_profile_split_reconciler_scan(&half.reconciler, true, now);
+            assert(noah_profile_split_reconciler_status(&half.reconciler, &status));
+            assert(status.state == NOAH_PROFILE_SPLIT_RECONCILER_DISCOVER || (mode == 2u && status.state == NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN));
+            // The Apply's push stays pending, never ready.
+            assert(status.transfer_pending == (mode == 2u) && status.prepared_push_active == (mode == 2u));
+            assert(!noah_profile_split_reconciler_prepared_push_ready(&half.reconciler, NULL));
+        }
+        // Only polls (and, for the Apply, its opening PREPARE_BEGIN): no
+        // chunk, reuse, durable prepare, commit, pull or abort.
+        assert(released.sent[NOAH_PROFILE_SPLIT_V1_METADATA] == half.metadata_requests);
+        assert(released.sent[NOAH_PROFILE_SPLIT_V1_METADATA] + released.sent[NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN] == half.link.exchanges);
+        assert(mode == 2u ? released.sent[NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN] != 0u : released.sent[NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN] == 0u);
+        assert(half.no_push_claims == (mode == 2u ? claims_before_push : half.metadata_requests));
+        assert(half.reconciler.transport_failure_count == half.link.exchanges);
+        // It never gives up: still polling, about once a second, at the end.
+        assert(half.link.exchanges >= 25u && half.link.exchanges <= 40u);
+        assert(source.reads == 0u && half.memory.reads == reads && half.memory.writes == writes);
+        assert(saved_generation(&half.store) == 3u);
+        assert(noah_profile_other_half_store_backend_state(&half.other_half_store) == store_state);
+        assert(noah_profile_candidate_store_backend_admission_owner(&half.candidate_backend) == admission);
+        assert(noah_active_profile_provider_status(&half.provider, &provider_after) == NOAH_ACTIVE_PROFILE_OK);
+        assert(same_identity(&provider_after.active, &provider_before.active) && provider_after.publication_count == provider_before.publication_count && !provider_after.has_pending);
+        assert_other_half_unresolved(&half, NOAH_PROFILE_SPLIT_AUTHORITY_OTHER_HALF_UNREADABLE, mode == 2u);
+    }
+    puts("beside a released half this half polls about once a second and never copies or stores");
+}
+
 int main(int argc, char **argv) {
     assert(argc == 2);
     load_maximum_profile(argv[1]);
+    test_a_released_halfs_descriptors_are_refused_before_any_store_call();
+    test_beside_a_released_half_this_half_polls_and_never_copies();
     // Production slots now exercise both the wide copies and the full fault
     // suite; no early return may hide the original coverage.
     make_wide_profile();

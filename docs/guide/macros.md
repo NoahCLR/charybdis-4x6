@@ -4,7 +4,7 @@ A **macro** is a named sequence the keyboard plays back: text, keys and
 chords, delays, and key presses and releases of their own. There are 128
 macro slots, `MACRO_0` to `MACRO_127`. A macro can sit on a key, be a
 behaviour's tap or hold, a combo's output, or a pointing mode's direction. Ark's
-[Macros](https://github.com/NoahCLR/charybdis-ark/blob/dev/docs/guide/macros.md)
+[Macros](https://github.com/NoahCLR/charybdis-ark/blob/main/docs/guide/macros.md)
 page writes and records them.
 
 ## Playing
@@ -16,8 +16,11 @@ page writes and records them.
 - As a hold that is held until release, a macro plays once at the threshold.
 - Every key a macro presses it also releases, and it never lets go of a key
   something else is holding. A macro that would leave a key down, release one
-  it never pressed, or hold more than 16 keys at once doesn't play.
-- The 128 macros share 34,903 bytes, and one macro can use all the free
+  it never pressed, or hold more than six keys at once, doesn't play. Six is
+  all the keyboard report has room for; modifiers, media, system and mouse
+  keys don't count, up to 16 keys held in all. A chord counts with the keys
+  still held, and text needs one of the six free.
+- The 128 macros share 40,960 bytes, and one macro can use all the free
   space.
 
 ## Typing through your host layout

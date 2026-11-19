@@ -100,8 +100,9 @@ static key_behavior_step_t key_behavior_step_lookup_in_config(const key_behavior
     return config->tap_counts[tap_count - 1];
 }
 
-// Highest authored tap_counts[] index plus one: how many branches the row offers.
-// A quick run of taps past it types the first tap (D-F33).
+// Highest authored tap_counts[] index plus one: how many branches the behaviour
+// offers.
+// A quick run of taps past it types the standard key (D-F64).
 static uint8_t key_behavior_authored_tap_depth_in_config(const key_behavior_t *config) {
     uint8_t depth = 0u;
 

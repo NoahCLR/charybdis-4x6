@@ -31,6 +31,11 @@ extern const key_behavior_feedback_color_config_t     key_behavior_feedback_colo
 extern const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups;
 extern const uint8_t                                  key_behavior_feedback_led_group_count;
 #    endif
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+extern const autocorrect_feedback_color_config_t     autocorrect_feedback_colors;
+extern const autocorrect_feedback_led_group_t *const autocorrect_feedback_led_groups;
+extern const uint8_t                                 autocorrect_feedback_led_group_count;
+#    endif
 
 #    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
 #        include "../../pointing/defs/pointing_modes.h"
@@ -60,6 +65,28 @@ static uint8_t rgb_validation_pointing_mode_color_match_count(pointing_mode_mask
     }
 
     return matches;
+}
+#    endif
+
+#    if (defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)) || defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE) || defined(RGB_AUTOCORRECT_FEEDBACK_ENABLE) || (defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE))
+// Whether an authored locality is one of the five, logging `table.field`, or
+// `table[row].field` for a row at or past 0, when it is not.
+static bool rgb_validation_check_locality(const char *table, int16_t row, const char *field, rgb_locality_t locality) {
+    if (locality <= RGB_KEYS_ONLY) {
+        return true;
+    }
+#        ifdef CONSOLE_ENABLE
+    if (row >= 0) {
+        uprintf("Invalid %s[%u].%s %u; expected RGB_BOTH_HALVES (0), RGB_LEFT_HALF (1), RGB_RIGHT_HALF (2), RGB_KEY_HALF (3), or RGB_KEYS_ONLY (4)\n", table, (unsigned int)row, field, (unsigned int)locality);
+    } else {
+        uprintf("Invalid %s.%s %u; expected RGB_BOTH_HALVES (0), RGB_LEFT_HALF (1), RGB_RIGHT_HALF (2), RGB_KEY_HALF (3), or RGB_KEYS_ONLY (4)\n", table, field, (unsigned int)locality);
+    }
+#        else
+    (void)table;
+    (void)row;
+    (void)field;
+#        endif
+    return false;
 }
 #    endif
 
@@ -102,25 +129,7 @@ static void rgb_validation_log_invalid_automouse_fade_end_mode(uint8_t mode) {
 }
 #    endif
 
-#    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
-static void rgb_validation_log_invalid_combo_feedback_locality(uint8_t locality) {
-#        ifdef CONSOLE_ENABLE
-    uprintf("Invalid combo_feedback_colors.locality %u; expected RGB_BOTH_HALVES (0), RGB_LEFT_HALF (1), RGB_RIGHT_HALF (2), RGB_KEY_HALF (3), or RGB_KEYS_ONLY (4)\n", (unsigned int)locality);
-#        else
-    (void)locality;
-#        endif
-}
-#    endif
-
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-static void rgb_validation_log_invalid_key_behavior_feedback_locality(uint8_t locality) {
-#        ifdef CONSOLE_ENABLE
-    uprintf("Invalid key_behavior_feedback_colors.locality %u; expected RGB_BOTH_HALVES (0), RGB_LEFT_HALF (1), RGB_RIGHT_HALF (2), RGB_KEY_HALF (3), or RGB_KEYS_ONLY (4)\n", (unsigned int)locality);
-#        else
-    (void)locality;
-#        endif
-}
-
 static void rgb_validation_log_invalid_key_behavior_feedback_tap_commit_mode(uint8_t mode) {
 #        ifdef CONSOLE_ENABLE
     uprintf("Invalid key_behavior_feedback_colors.tap_commit_mode %u; expected KEY_FEEDBACK_TAP_COMMIT_OFF (0) or KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS (1)\n", (unsigned int)mode);
@@ -131,13 +140,24 @@ static void rgb_validation_log_invalid_key_behavior_feedback_tap_commit_mode(uin
 
 static void rgb_validation_log_invalid_key_behavior_feedback_tap_branch_colors(void) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Invalid key_behavior_feedback_colors tap-count branch colors; RGB_TAP_BRANCH_COLORS(...) must provide at least one color\n");
+    uprintf("Invalid key_behavior_feedback_colors tap branches; RGB_TAP_BRANCHES(...) must provide at least one\n");
 #        endif
 }
 
 static void rgb_validation_log_invalid_key_behavior_feedback_group_semantic(uint8_t group_index, uint8_t semantic) {
 #        ifdef CONSOLE_ENABLE
-    uprintf("Invalid key_behavior_feedback_led_groups[%u].semantic %u; expected KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING (0), KEY_FEEDBACK_GROUP_TAP_COMMITTED (1), KEY_FEEDBACK_GROUP_HOLD_ACTIVE (2), KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE (3), or KEY_FEEDBACK_GROUP_ALL (4)\n", (unsigned int)group_index, (unsigned int)semantic);
+    uprintf("Invalid key_behavior_feedback_led_groups[%u].semantic %u; expected KEY_FEEDBACK_GROUP_TAP_COUNT_2 (0), KEY_FEEDBACK_GROUP_TAP_COMMITTED (1), KEY_FEEDBACK_GROUP_HOLD_ACTIVE (2), KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE (3), KEY_FEEDBACK_GROUP_TAP_COUNT_3 (4), KEY_FEEDBACK_GROUP_TAP_COUNT_4 (5), KEY_FEEDBACK_GROUP_TAP_COUNT_5 (6), KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY (7), or KEY_FEEDBACK_GROUP_ALL (8)\n", (unsigned int)group_index, (unsigned int)semantic);
+#        else
+    (void)group_index;
+    (void)semantic;
+#        endif
+}
+#    endif
+
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+static void rgb_validation_log_invalid_autocorrect_feedback_group_semantic(uint8_t group_index, uint8_t semantic) {
+#        ifdef CONSOLE_ENABLE
+    uprintf("Invalid autocorrect_feedback_led_groups[%u].semantic %u; expected AUTOCORRECT_FEEDBACK_GROUP_TEXT (0), AUTOCORRECT_FEEDBACK_GROUP_MACRO (1), AUTOCORRECT_FEEDBACK_GROUP_UNDO (2), AUTOCORRECT_FEEDBACK_GROUP_LEADING (3), or AUTOCORRECT_FEEDBACK_GROUP_ALL (4)\n", (unsigned int)group_index, (unsigned int)semantic);
 #        else
     (void)group_index;
     (void)semantic;
@@ -152,15 +172,6 @@ static void rgb_validation_log_unknown_pointing_mode_color(uint8_t color_index, 
 #        else
     (void)color_index;
     (void)mode;
-#        endif
-}
-
-static void rgb_validation_log_invalid_pointing_mode_color_locality(uint8_t color_index, uint8_t locality) {
-#        ifdef CONSOLE_ENABLE
-    uprintf("Invalid pointing_mode_colors[%u].locality %u; expected RGB_BOTH_HALVES (0), RGB_LEFT_HALF (1), RGB_RIGHT_HALF (2), RGB_KEY_HALF (3), or RGB_KEYS_ONLY (4)\n", (unsigned int)color_index, (unsigned int)locality);
-#        else
-    (void)color_index;
-    (void)locality;
 #        endif
 }
 
@@ -237,9 +248,7 @@ static void rgb_validation_validate_automouse_fade_end_config(void) {
 
 #    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
 static void rgb_validation_validate_combo_feedback_config(void) {
-    if (combo_feedback_colors.locality > RGB_KEYS_ONLY) {
-        rgb_validation_log_invalid_combo_feedback_locality((uint8_t)combo_feedback_colors.locality);
-    }
+    (void)rgb_validation_check_locality("combo_feedback_colors", -1, "locality", combo_feedback_colors.locality);
 }
 
 static void rgb_validation_validate_combo_feedback_led_groups(void) {
@@ -258,14 +267,18 @@ static void rgb_validation_validate_combo_feedback_led_groups(void) {
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static void rgb_validation_validate_key_behavior_feedback_config(void) {
-    if (key_behavior_feedback_colors.locality > RGB_KEYS_ONLY) {
-        rgb_validation_log_invalid_key_behavior_feedback_locality((uint8_t)key_behavior_feedback_colors.locality);
-    }
+    (void)rgb_validation_check_locality("key_behavior_feedback_colors", -1, "tap_committed_locality", key_behavior_feedback_colors.tap_committed_locality);
+    (void)rgb_validation_check_locality("key_behavior_feedback_colors", -1, "hold_active_locality", key_behavior_feedback_colors.hold_active_locality);
+    (void)rgb_validation_check_locality("key_behavior_feedback_colors", -1, "long_hold_active_locality", key_behavior_feedback_colors.long_hold_active_locality);
     if (key_behavior_feedback_colors.tap_commit_mode > KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS) {
         rgb_validation_log_invalid_key_behavior_feedback_tap_commit_mode((uint8_t)key_behavior_feedback_colors.tap_commit_mode);
     }
-    if (!key_behavior_feedback_colors.tap_branch_colors || key_behavior_feedback_colors.tap_branch_color_count == 0u) {
+    if (!key_behavior_feedback_colors.tap_branches || key_behavior_feedback_colors.tap_branch_count == 0u) {
         rgb_validation_log_invalid_key_behavior_feedback_tap_branch_colors();
+        return;
+    }
+    for (uint8_t branch_index = 0u; branch_index < key_behavior_feedback_colors.tap_branch_count; branch_index++) {
+        (void)rgb_validation_check_locality("key_behavior_feedback_colors.tap_branches", branch_index, "locality", key_behavior_feedback_colors.tap_branches[branch_index].locality);
     }
 }
 
@@ -288,6 +301,33 @@ static void rgb_validation_validate_key_behavior_feedback_led_groups(void) {
 }
 #    endif
 
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+static void rgb_validation_validate_autocorrect_feedback_config(void) {
+    (void)rgb_validation_check_locality("autocorrect_feedback_colors", -1, "text_locality", autocorrect_feedback_colors.text_locality);
+    (void)rgb_validation_check_locality("autocorrect_feedback_colors", -1, "macro_locality", autocorrect_feedback_colors.macro_locality);
+    (void)rgb_validation_check_locality("autocorrect_feedback_colors", -1, "undo_locality", autocorrect_feedback_colors.undo_locality);
+    (void)rgb_validation_check_locality("autocorrect_feedback_colors", -1, "leading_locality", autocorrect_feedback_colors.leading_locality);
+}
+
+static void rgb_validation_validate_autocorrect_feedback_led_groups(void) {
+    for (uint8_t group_index = 0; group_index < autocorrect_feedback_led_group_count; group_index++) {
+        const autocorrect_feedback_led_group_t *group    = &autocorrect_feedback_led_groups[group_index];
+        uint8_t                                 semantic = (uint8_t)group->semantic;
+
+        if (semantic > AUTOCORRECT_FEEDBACK_GROUP_ALL) {
+            rgb_validation_log_invalid_autocorrect_feedback_group_semantic(group_index, semantic);
+        }
+
+        const rgb_led_group_t *led_group = &group->led_group;
+        for (uint8_t led_index = 0; led_index < led_group->count; led_index++) {
+            if (led_group->leds[led_index] >= RGB_MATRIX_LED_COUNT) {
+                rgb_validation_log_invalid_layer_led_index("autocorrect_feedback_led_groups", group_index, led_index, led_group->leds[led_index]);
+            }
+        }
+    }
+}
+#    endif
+
 #    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
 static void rgb_validation_validate_pointing_mode_colors(void) {
     for (uint8_t color_index = 0; color_index < pointing_mode_color_count; color_index++) {
@@ -298,8 +338,7 @@ static void rgb_validation_validate_pointing_mode_colors(void) {
             rgb_validation_log_unknown_pointing_mode_color(color_index, mode);
         }
 
-        if (locality > RGB_KEYS_ONLY) {
-            rgb_validation_log_invalid_pointing_mode_color_locality(color_index, locality);
+        if (!rgb_validation_check_locality("pointing_mode_colors", color_index, "locality", (rgb_locality_t)locality)) {
             continue;
         }
 
@@ -355,6 +394,10 @@ void noah_rgb_validate_config(void) {
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
     rgb_validation_validate_key_behavior_feedback_config();
     rgb_validation_validate_key_behavior_feedback_led_groups();
+#    endif
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+    rgb_validation_validate_autocorrect_feedback_config();
+    rgb_validation_validate_autocorrect_feedback_led_groups();
 #    endif
 
 #    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)

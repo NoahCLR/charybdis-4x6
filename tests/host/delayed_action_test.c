@@ -7,6 +7,7 @@
 
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
+#include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 
 enum {
     TEST_DELAYED_ACTION_A     = 0x0004,
@@ -24,15 +25,19 @@ typedef struct {
     uint8_t  col;
 } tap_call_t;
 
+layer_state_t layer_state;
+
 static uint8_t fake_mods;
 static uint8_t fake_weak_mods;
 static uint8_t fake_oneshot_mods;
 static uint8_t fake_oneshot_locked_mods;
 
+// A fallback hold registers its modifier as a real one, nothing else.
 static uint8_t fallback_hold_settle_real_mods;
-static uint8_t fallback_hold_settle_weak_mods;
-static uint8_t fallback_hold_settle_oneshot_mods;
-static uint8_t fallback_hold_settle_oneshot_locked_mods;
+// The modifier a fallback hold registers through the firmware's own ledger,
+// as held_action_register() does for a bare modifier, once: a registered hold
+// is never due again.
+static uint16_t fallback_hold_settle_ledger_keycode;
 
 static uint8_t    fallback_hold_activation_count;
 static tap_call_t tap_call;
@@ -56,12 +61,11 @@ static void test_reset_stubs(void) {
     fake_oneshot_mods                        = 0;
     fake_oneshot_locked_mods                 = 0;
     fallback_hold_settle_real_mods           = 0;
-    fallback_hold_settle_weak_mods           = 0;
-    fallback_hold_settle_oneshot_mods        = 0;
-    fallback_hold_settle_oneshot_locked_mods = 0;
+    fallback_hold_settle_ledger_keycode      = KC_NO;
     fallback_hold_activation_count           = 0;
     tap_call                                 = (tap_call_t){0};
     tap_call_count                           = 0;
+    keyboard_mod_ownership_reset_for_test();
 }
 
 static tap_call_t test_current_tap_call(uint16_t keycode) {
@@ -124,14 +128,24 @@ void clear_oneshot_locked_mods(void) {
     fake_oneshot_locked_mods = 0;
 }
 
+void add_mods(uint8_t mods) {
+    fake_mods |= mods;
+}
+
+void del_mods(uint8_t mods) {
+    fake_mods &= (uint8_t)~mods;
+}
+
 void send_keyboard_report(void) {}
 
-bool noah_key_runtime_settle_pending_fallback_hold(void) {
+bool noah_key_runtime_settle_pending_fallback_hold(keypos_t emitting_key_pos) {
+    (void)emitting_key_pos;
     fallback_hold_activation_count++;
     fake_mods |= fallback_hold_settle_real_mods;
-    fake_weak_mods |= fallback_hold_settle_weak_mods;
-    fake_oneshot_mods |= fallback_hold_settle_oneshot_mods;
-    fake_oneshot_locked_mods |= fallback_hold_settle_oneshot_locked_mods;
+    if (fallback_hold_settle_ledger_keycode != KC_NO) {
+        keyboard_mod_ownership_register(fallback_hold_settle_ledger_keycode);
+        fallback_hold_settle_ledger_keycode = KC_NO;
+    }
     return true;
 }
 
@@ -295,7 +309,9 @@ static void test_delayed_action_restores_saved_mod_state_after_emit(void) {
     CHECK(fallback_hold_activation_count == 1);
 }
 
-static void test_delayed_action_settles_fallback_holds_inside_replay_window(void) {
+// A fallback hold the tap settles goes out with the tap, and is still held
+// when the replay ends: its key is still down.
+static void test_delayed_action_settles_fallback_holds_and_keeps_them(void) {
     delayed_action_mods_t mods = {
         .real           = 0x10,
         .weak           = 0x20,
@@ -304,14 +320,11 @@ static void test_delayed_action_settles_fallback_holds_inside_replay_window(void
     };
 
     test_reset_stubs();
-    fake_mods                                = 0x01;
-    fake_weak_mods                           = 0x02;
-    fake_oneshot_mods                        = 0x04;
-    fake_oneshot_locked_mods                 = 0x08;
-    fallback_hold_settle_real_mods           = 0x03;
-    fallback_hold_settle_weak_mods           = 0x05;
-    fallback_hold_settle_oneshot_mods        = 0x06;
-    fallback_hold_settle_oneshot_locked_mods = 0x07;
+    fake_mods                      = 0x01;
+    fake_weak_mods                 = 0x02;
+    fake_oneshot_mods              = 0x04;
+    fake_oneshot_locked_mods       = 0x08;
+    fallback_hold_settle_real_mods = 0x02;
 
     dispatch_delayed_action(TEST_DELAYED_ACTION_B, mods);
 
@@ -319,10 +332,10 @@ static void test_delayed_action_settles_fallback_holds_inside_replay_window(void
     CHECK(tap_call_count == 1);
     CHECK(tap_call.keycode == TEST_DELAYED_ACTION_B);
     CHECK(tap_call.real == (uint8_t)(mods.real | fallback_hold_settle_real_mods));
-    CHECK(tap_call.weak == (uint8_t)(mods.weak | fallback_hold_settle_weak_mods));
-    CHECK(tap_call.oneshot == (uint8_t)(mods.oneshot | fallback_hold_settle_oneshot_mods));
-    CHECK(tap_call.oneshot_locked == (uint8_t)(mods.oneshot_locked | fallback_hold_settle_oneshot_locked_mods));
-    CHECK(fake_mods == 0x01);
+    CHECK(tap_call.weak == mods.weak);
+    CHECK(tap_call.oneshot == mods.oneshot);
+    CHECK(tap_call.oneshot_locked == mods.oneshot_locked);
+    CHECK(fake_mods == (uint8_t)(0x01 | fallback_hold_settle_real_mods));
     CHECK(fake_weak_mods == 0x02);
     CHECK(fake_oneshot_mods == 0x04);
     CHECK(fake_oneshot_locked_mods == 0x08);
@@ -337,14 +350,11 @@ static void test_delayed_macro_runs_with_clean_mod_state(void) {
     };
 
     test_reset_stubs();
-    fake_mods                                = 0x01;
-    fake_weak_mods                           = 0x02;
-    fake_oneshot_mods                        = 0x04;
-    fake_oneshot_locked_mods                 = 0x08;
-    fallback_hold_settle_real_mods           = 0x03;
-    fallback_hold_settle_weak_mods           = 0x05;
-    fallback_hold_settle_oneshot_mods        = 0x06;
-    fallback_hold_settle_oneshot_locked_mods = 0x07;
+    fake_mods                      = 0x01;
+    fake_weak_mods                 = 0x02;
+    fake_oneshot_mods              = 0x04;
+    fake_oneshot_locked_mods       = 0x08;
+    fallback_hold_settle_real_mods = 0x02;
 
     dispatch_delayed_action(TEST_DELAYED_MACRO_ACTION, mods);
 
@@ -355,10 +365,41 @@ static void test_delayed_macro_runs_with_clean_mod_state(void) {
     CHECK(tap_call.weak == 0);
     CHECK(tap_call.oneshot == 0);
     CHECK(tap_call.oneshot_locked == 0);
-    CHECK(fake_mods == 0x01);
+    CHECK(fake_mods == (uint8_t)(0x01 | fallback_hold_settle_real_mods));
     CHECK(fake_weak_mods == 0x02);
     CHECK(fake_oneshot_mods == 0x04);
     CHECK(fake_oneshot_locked_mods == 0x08);
+}
+
+// Through the firmware's own modifier ledger: Left Shift with a behaviour row
+// is down, counted but not in the report (its press never reached QMK), when
+// an earlier key's delayed tap settles its fallback hold. Shift goes out with
+// the tap, stays in the report while its key is down, and leaves with its
+// release. A delayed macro settles it the same way, and runs without it.
+static void test_delayed_tap_keeps_the_modifier_it_settles_held(void) {
+    const uint16_t actions[] = {KC_ESC, TEST_DELAYED_MACRO_ACTION};
+    keyrecord_t    shift     = {.event = {.key = {.row = 1, .col = 0}, .type = KEY_EVENT, .pressed = true, .time = 1}};
+
+    for (uint8_t index = 0; index < 2u; index++) {
+        test_reset_stubs();
+        shift.event.pressed = true;
+        keyboard_mod_ownership_track_physical_keycode_event(KC_LEFT_SHIFT, &shift);
+        CHECK(fake_mods == 0);
+
+        fallback_hold_settle_ledger_keycode = KC_LEFT_SHIFT;
+        dispatch_delayed_action_at((keypos_t){.row = 0, .col = 0}, actions[index], (delayed_action_mods_t){0});
+
+        CHECK(tap_call_count == 1);
+        CHECK(tap_call.keycode == actions[index]);
+        CHECK(tap_call.real == (actions[index] == KC_ESC ? MOD_BIT(KC_LEFT_SHIFT) : 0u));
+        CHECK(fake_mods == MOD_BIT(KC_LEFT_SHIFT));
+
+        // Its release: held_action_unregister(), then the physical count.
+        keyboard_mod_ownership_unregister(KC_LEFT_SHIFT);
+        shift.event.pressed = false;
+        keyboard_mod_ownership_track_physical_keycode_event(KC_LEFT_SHIFT, &shift);
+        CHECK(fake_mods == 0);
+    }
 }
 
 static void test_delayed_action_at_preserves_origin_key_pos(void) {
@@ -382,8 +423,9 @@ static void test_delayed_action_at_preserves_origin_key_pos(void) {
 
 int main(void) {
     test_delayed_action_restores_saved_mod_state_after_emit();
-    test_delayed_action_settles_fallback_holds_inside_replay_window();
+    test_delayed_action_settles_fallback_holds_and_keeps_them();
     test_delayed_macro_runs_with_clean_mod_state();
+    test_delayed_tap_keeps_the_modifier_it_settles_held();
     test_delayed_action_at_preserves_origin_key_pos();
     puts("delayed_action host tests passed");
     return 0;

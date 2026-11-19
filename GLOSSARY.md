@@ -44,7 +44,7 @@ _Avoid_: app (in specs), editor, host (for the program)
 **Profile**:
 Everything the keyboard can be told to do without a reflash, kept as one
 versioned whole: keymap, behaviours, combos, macros, custom keys, pointing
-modes, lighting, settings and the keyboard's name.
+modes, lighting, settings, the autocorrect list and the keyboard's name.
 _Avoid_: config, configuration, setup, layout, keymap (for the whole)
 
 **Domain**:
@@ -96,6 +96,11 @@ _Avoid_: slot (alone), bank, record (for the area)
 What a firmware build reports it supports and holds, read by a client before
 anything else.
 _Avoid_: features, feature flags, version check
+
+**Firmware version**:
+The firmware release a build includes, such as `v2026.10.27`, reported in its
+capabilities; it says which build is running and nothing depends on it.
+_Avoid_: ABI version, firmware revision, build number
 
 ## Changing the profile
 
@@ -247,6 +252,12 @@ _Avoid_: level, stage, longer hold, second hold
 Everything a behaviour does on one tap count: its tap, hold and long hold.
 _Avoid_: tap step, step, row, tap-count entry
 
+**Standard key**:
+What a key does with no behaviour: its own tap and hold. A behaviour's
+empty tiers and every press past its deepest tap count are the standard key
+(D-F64); a single tap set to Transparent is its tap.
+_Avoid_: built-in behaviour, default key, fallback key
+
 **Hold style**:
 How a hold sends its action: held until release, tapped at the threshold,
 tapped on release, or repeated while held.
@@ -272,6 +283,13 @@ _Avoid_: chord (for this), key combination
 How close together a combo's keys must be pressed.
 _Avoid_: combo term, combo timeout
 
+**Switch key**:
+A key that turns combos (`CM_ON`, `CM_OFF`, `CM_TOGG`), behaviours
+(`BH_ON`, `BH_OFF`, `BH_TOGG`), auto-mouse (`AM_ON`, `AM_OFF`, `AM_TOGG`) or
+autocorrect (`AC_ON`, `AC_OFF`, `AC_TOGG`) on, off or the other way for the whole keyboard until it restarts, never
+saved; the stored switch stays as it is.
+_Avoid_: toggle key, combo toggle, behaviour key
+
 **Participation**:
 Whether a press uses its behaviour and whether it can join a combo, allowed
 only when the whole keyboard, the source layer, the definition and the
@@ -291,6 +309,107 @@ _Avoid_: action (for this), event, token
 A macro playing with held typing keys suspended and new presses ignored, so
 nothing the person does mixes into what it types.
 _Avoid_: protected playback, input protection
+
+## Autocorrect
+
+**Text replacement**:
+The keyboard replacing what is typed when a word ends: a typo with the right
+word, an abbreviation with longer text, a typed form with a macro. It is the
+name people see. The code, the domain, the specs, the fixtures and the keys
+(`AC_ON`, `AC_OFF`, `AC_TOGG`) were named for **autocorrect** and keep that
+name, and they call a replacement a `correction` and a typed form a `typo`.
+_Avoid_: text expansion, snippets, abbreviations (for the feature), shortcut
+(a custom key's)
+
+**Autocorrect list**:
+What the keyboard replaces and with what, kept in the profile as its own
+domain.
+_Avoid_: dictionary, autocorrect table, trie, word list
+
+**Entry**:
+One replacement with every typed form that produces it.
+_Avoid_: rule, pair, row (for this), mapping
+
+**Replacement**:
+What an entry puts in place of what was typed, stored once: text of up to 128
+bytes on one line, typed as written, or a macro slot, played. `correction` in
+code, on the wire and in fixtures.
+_Avoid_: correction (outside those names), fix, target, output, expansion
+
+**Typed form**:
+What is typed to get an entry's replacement, stored case-folded: a
+misspelling, or an abbreviation such as `pnumber`. It belongs to exactly one
+replacement. People know it as an **input**: the guide says input, as the
+app and its files do, and the specs and ADRs here say typed form for the
+same thing. `typo` in code, on the wire and in fixtures.
+_Avoid_: typo (as the term, outside those names; a misspelling is still a
+typo), trigger, pattern, source, abbreviation (as a second term)
+
+**Leader**:
+Text replacement's own Leader key, QMK's `QK_LEADER`: after it, what is typed
+is held on the keyboard and sent only as the replacement of a typed form that
+fires after the leader (D-F71). Not QMK's Leader feature, which the build leaves out.
+_Avoid_: leader sequence (for the key), QMK Leader
+
+**Leading**:
+The keyboard holding what is typed after the Leader key, showing the computer
+none of it, until it sends a replacement or drops what it holds. Lighting shows
+it as replacement feedback's leading colour (D-F72).
+_Avoid_: leader mode, waiting (alone)
+
+**How it fires** (a replacement's trigger):
+Whether a replacement's typed forms fire as a word ends, after the Leader key
+alone, or both (D-F71): the replacement's, never a typed form's, so a client
+switches it without touching them. After the leader a typed form is its whole
+text, whatever its match. Trigger `0`, `1` or `2` in bits 1–2 of the
+correction row's kind byte; Ark writes them As you type, After Leader and
+Both. A typed form of a replacement that fires after the leader is what
+people call a **leader input**.
+_Avoid_: leader sequence (for what is stored), leader typo, shortcut, mode
+
+**Leader timeout**:
+How long the leader waits after its last key before it sends a typed form a
+longer one begins with, or drops what is held: settings scalar 32.
+_Avoid_: leader term, leader window
+
+**Word**:
+What text replacement follows as it is typed: letters and digits, with
+apostrophes between them. Apostrophes before and after it stay on screen and
+are not part of what a typed form matches.
+_Avoid_: token, string (for this)
+
+**Word end**:
+The character that finishes a word: anything that is not a letter, a digit or
+an apostrophe, and Enter or Tab. A typed form is replaced only here.
+_Avoid_: delimiter, boundary, trigger key
+
+**Undo a replacement**:
+Backspace pressed right after a text replacement that a printing character
+ended: the ending character goes and the word comes back as typed. A macro
+has none.
+_Avoid_: revert (for this), rollback
+
+**Fresh start**:
+Text replacement forgetting the word because the cursor may have moved: the
+next character starts a new word.
+
+**Suspended**:
+Text replacement replacing nothing until the next word end, because it no
+longer knows where the word on screen starts.
+
+**Typing stage**:
+The step between live key ownership and the keyboard report where text
+replacement reads what is typed and holds keys back while a replacement is
+typed or its macro plays.
+_Avoid_: filter, interceptor, deferral layer
+
+**Where it matches**:
+What part of a word a typed form has to be: the whole word, the start of a
+word, the end of a word, or anywhere in a word. A stored number; a client may
+write the three part-of-word ones with `*` where other letters may go
+(`recieve*`, `*mnet`, `*tihng*`). A macro's typed forms match the whole word.
+After the leader a typed form is its whole text, whatever its match.
+_Avoid_: boundary, anchor, mode, match type
 
 ## Pointing
 
@@ -359,9 +478,67 @@ Everything the keyboard's LEDs show, all of it feedback about state.
 _Avoid_: RGB (in prose), backlight
 
 **Stage**:
-One of the six lighting layers drawn in order, from the background effect up
-to key feedback; each can be switched off.
+One of the seven lighting layers drawn in order: the background effect, layer
+colours, the auto-mouse fade, pointing modes, combo feedback, behaviour
+feedback and replacement feedback; each can be switched off.
 _Avoid_: layer (for this), pass, overlay
+
+**Behaviour feedback**:
+The stage that shows what a key with a behaviour is doing: the tap count it
+has reached, a hold or long hold pending or running, and a tap that commits.
+_Avoid_: key feedback (the code keeps key_feedback and KEY_BEHAVIOR_FEEDBACK names)
+
+**Replacement feedback**:
+The stage that flashes when text replacement changes what was typed: a typed
+form replaced with text, replaced by its macro, or a replacement undone, each
+in its own colour (D-F70). What the leader sends flashes as a replacement
+does (D-F71). It also holds a colour of its own, not a flash, while the
+keyboard is leading (D-F72). `autocorrect feedback` in code.
+_Avoid_: autocorrect flash (in prose), correction feedback, typo light
+
+**Case**:
+One thing a feedback stage shows, with its own colour, locality and accents
+(D-F73): for behaviour feedback the tap branch pending for each tap count
+from 2, tap committed, hold and long hold; for replacement feedback text
+replaced, macro replaced, undone and leading. A stored row names a case by
+its semantic, every tap branch at once by semantic `7` (D-F75), or every
+case by `0xff`. When a stage's cases share one setting it says when, not where.
+Ark calls a case of behaviour feedback a **behaviour state** (**Every
+behaviour state** for `0xff`) and keeps case for replacement feedback's: the
+same thing.
+_Avoid_: kind, state (for this), mode
+
+**Accent**:
+Chosen LEDs that light over their stage's own colour while what owns them
+shows: a layer that is on, the running pointing slot, the combo feedback, a
+feedback case, or any one of a stage's owners (D-F63). An accent lights in a
+colour of its own or, at `0, 0, 0`, its owner's. It is stored as a group row,
+and Ark says accent too.
+_Avoid_: LED group, override, kind of feedback
+
+**Group row**:
+How the lighting domain stores an accent: a selector naming its owner (a
+layer, a pointing slot, a case's semantic, `7` for every tap branch, or
+`0xff` for all; combo rows have none), a colour and an LED set's id, in one
+table per stage that has accents: at most 255 in one table and 640 in all
+(D-F63). The specs and code say group
+row; prose says accent.
+_Avoid_: LED group (for the row), assignment, rule
+
+**LED set**:
+One of the lighting domain's reusable sets of LEDs, which group rows name by
+id: up to 128, stored once however many rows light it, so rows that light the
+same LEDs share one (D-F63). The specs call it a reusable group, authored
+data an `rgb_led_group_t`; Ark says LED set too.
+_Avoid_: LED group (in prose), mask, bitmap (for the set)
+
+**Passthrough**:
+A colour of saturation and value `0`, at any hue, owned by a layer, pointing
+slot, the combo feedback or a feedback case: it paints nothing and what is
+beneath shows, while the owner's coloured accents still paint (D-F74).
+Value `0` with saturation turns the LEDs **off**: they go dark, covering what
+is beneath. In a group row `0, 0, 0` is the owner's colour instead.
+_Avoid_: off (for this), transparent, clear
 
 **Background effect**:
 QMK's own lighting effect, the bottom stage everything else paints over.
@@ -369,7 +546,11 @@ _Avoid_: base lighting, base RGB, RGB mode
 
 **Locality**:
 Where a feedback colour paints: both halves, one half, the half of the key
-that caused it, or only the keys themselves.
+that caused it, or only the keys themselves. Each pointing slot and each
+feedback case has its own (D-F73). For replacement feedback the key
+that caused it is the one that ended the word, the Backspace that undid the
+replacement, or the key that ended leading; leading's, and that of what the
+leader timeout sends, is the Leader key that began it.
 _Avoid_: scope, target, region
 
 ## Talking to the keyboard

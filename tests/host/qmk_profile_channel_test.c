@@ -289,6 +289,11 @@ static void test_capability_hook(void) {
     assert(read_u32(&frame[WIRE_PAYLOAD + 21u]) == live_owner_status.compiled_default_digest);
 #endif
     assert(read_u32(&frame[WIRE_PAYLOAD + 17u]) == NOAH_FIRMWARE_VERSION);
+    // The firmware version is the release the build includes (D-F77): year,
+    // month, then the release's .N above a five-bit day.
+    assert(NOAH_FIRMWARE_RELEASE(2026u, 10u, 27u, 0u) == UINT32_C(0x07EA0A1B));
+    assert(NOAH_FIRMWARE_RELEASE(2026u, 10u, 27u, 1u) == UINT32_C(0x07EA0A3B));
+    assert(NOAH_FIRMWARE_RELEASE(2031u, 12u, 31u, 7u) == UINT32_C(0x07EF0CFF));
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x32u, 1u);
     channel(frame, sizeof(frame));
@@ -306,6 +311,8 @@ static void test_capability_hook(void) {
     assert(frame[WIRE_PAYLOAD + 12u] == 0u);
 #endif
     assert(frame[WIRE_PAYLOAD + 13u] == NOAH_PROFILE_WIRE_V1_MAX_NAME_BYTES && frame[WIRE_PAYLOAD + 14u] == 32u && frame[WIRE_PAYLOAD + 15u] == MATRIX_ROWS * MATRIX_COLS);
+    // Lighting: LED sets and the group rows of one table (D-F63).
+    assert(frame[WIRE_PAYLOAD + 6u] == 128u && frame[WIRE_PAYLOAD + 7u] == 255u);
 
     // ...and the wider ones, 32-bit capacities, on page 2.
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x33u, 2u);
@@ -315,7 +322,18 @@ static void test_capability_hook(void) {
     assert(read_u32(&frame[WIRE_PAYLOAD + 2u]) == NOAH_PROFILE_STORAGE_SLOT_A_SIZE);
     assert(read_u32(&frame[WIRE_PAYLOAD + 6u]) == NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX);
     assert(read_u32(&frame[WIRE_PAYLOAD + 10u]) == NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX);
-    assert(read_u32(&frame[WIRE_PAYLOAD + 14u]) == 34903u);
+    assert(read_u32(&frame[WIRE_PAYLOAD + 14u]) == 40960u);
+    // The group rows of all four lighting tables (D-F63).
+    assert(read_u16(&frame[WIRE_PAYLOAD + 18u]) == 640u);
+    for (uint8_t index = WIRE_PAYLOAD + 20u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) assert(frame[index] == 0u);
+
+    // ...and the autocorrect list's on page 3 (D-F68).
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x34u, 3u);
+    channel(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+    assert(read_u16(&frame[WIRE_PAYLOAD]) == 1024u && read_u16(&frame[WIRE_PAYLOAD + 2u]) == 1024u && read_u16(&frame[WIRE_PAYLOAD + 4u]) == 20480u);
+    assert(read_u32(&frame[WIRE_PAYLOAD + 6u]) == 36874u && frame[WIRE_PAYLOAD + 10u] == 32u && frame[WIRE_PAYLOAD + 11u] == 128u);
+    for (uint8_t index = WIRE_PAYLOAD + 12u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) assert(frame[index] == 0u);
 }
 
 #ifndef NOAH_LIVE_PROFILE_OWNER_ENABLE

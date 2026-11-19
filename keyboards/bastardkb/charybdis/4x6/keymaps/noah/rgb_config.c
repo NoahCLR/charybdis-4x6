@@ -7,8 +7,8 @@
 //   2. the auto-mouse base-stage transition
 //   3. later overlay surfaces
 //
-// Want to change layer, LED-group, automouse, pointing-mode, or key-behavior
-// feedback colors? Edit this file.
+// Want to change layer, LED-group, automouse, pointing-mode, behaviour
+// feedback or replacement feedback colors? Edit this file.
 // Want to change the rendering logic?  Edit users/noah/lib/rgb/core/rgb_runtime.c
 // and the stage modules under users/noah/lib/rgb/.
 // For shared RGB config types and the HSV helper, see
@@ -19,12 +19,15 @@
 //   - Stage color tables define each renderer's normal color.
 //   - LED group tables repaint selected LEDs after that stage's normal render.
 //   - RGB_*_GROUP_ALL rows match every active item in that stage; they do not
-//     create layer, pointing-mode, combo, or key-feedback state by themselves.
+//     create layer, pointing-mode, combo, or behaviour-feedback state by themselves.
 //   - In LED group tables only, HSV(0, 0, 0) means inherit the active stage
 //     color. Nonzero HSV values override the stage color for that LED group.
-//   - In normal color tables, HSV(0, 0, 0) is just an authored black/off color.
-//     A layer with saturation 0 and value 0 is skipped by the layer renderer;
-//     for LAYER_BASE, that leaves the default RGB Matrix effect visible.
+//   - In normal color tables, saturation 0 and value 0 (HSV(0, 0, 0)) is
+//     passthrough: that layer, pointing slot, combo or feedback case paints
+//     nothing, so what is beneath shows; for LAYER_BASE that leaves the
+//     default RGB Matrix effect visible. Value 0 with saturation, such as
+//     HSV(0, 255, 0), turns the LEDs off (black). The auto-mouse end color is always literal
+//     (D-F74).
 //
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -131,7 +134,7 @@ static const rgb_led_group_t saved_led_groups_data[] = RGB_SAVED_LED_GROUP_TABLE
 // In LED group rows, HSV(0, 0, 0) inherits the matching layer color. Use a
 // nonzero HSV value only when the group should override that stage color.
 // Inheritance only paints when the matched layer has a solid authored color;
-// with the current black/off LAYER_BASE, use a nonzero group color if you want
+// with the current passthrough LAYER_BASE, use a nonzero group color if you want
 // a visible base-layer accent.
 static const layer_led_group_t layer_led_groups_data[] = RGB_LED_GROUP_TABLE(
     // { .layer = LAYER_NAV, .color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_RIGHT_THUMB },
@@ -156,7 +159,7 @@ static const layer_led_group_t layer_led_groups_data[] = RGB_LED_GROUP_TABLE(
 //     key while the automouse renderer is active
 //
 // .end_color is used only by the END_COLOR_* modes above. Later overlays such
-// as pointing-mode color or key feedback can still repaint on top of the
+// as pointing-mode color or behaviour feedback can still repaint on top of the
 // visible result.
 #    ifdef RGB_AUTOMOUSE_GRADIENT_ENABLE
 const automouse_fade_end_config_t automouse_fade_end_config = {
@@ -216,7 +219,7 @@ const pointing_mode_color_t pointing_mode_colors[] = {
         .color         = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
         .locality      = RGB_RIGHT_HALF,
     },
-    // Slots 8..31 start uncoloured; every slot keeps a row.
+    // Slots 8..31 start passthrough, painting nothing; every slot keeps a row.
     {.pointing_mode = POINTING_MODE_8, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
     {.pointing_mode = POINTING_MODE_9, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
     {.pointing_mode = POINTING_MODE_10, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
@@ -267,7 +270,7 @@ static const pointing_mode_led_group_t pointing_mode_led_groups_data[] = RGB_LED
 //   - if a combo is held, its combo color stays active
 //   - combo-owned preview / PD state can route that combo underneath those
 //     state indicators
-//   - authored key-behavior feedback can still repaint above the combo color
+//   - authored behaviour feedback can still repaint above the combo color
 //     on the same keys
 //
 // Locality decides where the combo layer paints:
@@ -299,7 +302,7 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 #    endif // COMBO_ENABLE && RGB_COMBO_FEEDBACK_ENABLE
 
 //
-// ─── Key behavior feedback ──────────────────────────────────────────────────
+// ─── Behaviour feedback ─────────────────────────────────────────────────────
 //
 // Visual feedback for the custom key behavior engine state.
 //
@@ -308,68 +311,142 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 //   - hold tier = .hold on the winning tap index
 //   - long-hold tier = .long_hold on the winning tap index
 //
+// Each case below has its own color and its own locality, where it paints:
+//   - RGB_BOTH_HALVES = both halves
+//   - RGB_LEFT_HALF, RGB_RIGHT_HALF = always that half
+//   - RGB_KEY_HALF = the half of the key showing it; a combo spanning the
+//     halves paints both
+//   - RGB_KEYS_ONLY = only the keys showing it; a combo paints every combo key
+// When keys show cases with different localities at once, both halves paint
+// first, then one half, then the key's half, then the keys alone, so a
+// narrower case stays seen over a wider one. Where two cases share a
+// locality the newest key's case paints it; when the newest key's case has
+// another locality, the later case in case order paints over the earlier.
+//
 // Tap feedback:
-//   - RGB_TAP_BRANCH_COLORS(...) = the tap branch currently selected and not yet
+//   - RGB_TAP_BRANCHES(...) = the tap branch currently selected and not yet
 //     entered. Each tap past the base one switches the key to that branch's color
 //     and holds it until the branch is entered, at which point the action colors
-//     below take over. The table starts at tap count 2 and higher tap counts
-//     clamp to the last configured color
+//     below take over. The list starts at tap count 2 and higher tap counts
+//     take the last branch's color and locality
 //   - branch 0 paints nothing: it is the non-tapping surface, so the layer color
 //     or effect underneath simply stays, and one tap does not show the user meant
 //     to enter a tap branch at all
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
-    RGB_TAP_BRANCH_COLORS(HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 2
-                          HSV(222, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), // tap count 3
-                          HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),  // tap count 4
-                          HSV(25, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS)   // tap count 5
-                          ),
+    RGB_TAP_BRANCHES({.color = HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .locality = RGB_KEY_HALF}, // tap count 2
+                     {.color = HSV(222, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .locality = RGB_KEY_HALF}, // tap count 3
+                     {.color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .locality = RGB_KEY_HALF},  // tap count 4
+                     {.color = HSV(25, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .locality = RGB_KEY_HALF}   // tap count 5
+                     ),
 
     // Used for committed authored non-base tap branches that do not already
     // have state feedback. Base single-tap commits stay quiet under the pulse
     // mode below.
-    .tap_committed_color = HSV(0, 0, 150),
+    .tap_committed_color    = HSV(0, 0, 150),
+    .tap_committed_locality = RGB_KEY_HALF,
 
     // Only authored double-tap and higher tap branches can pulse tap-commit feedback.
     .tap_commit_mode = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,
 
     // Used for authored hold-tier pending / active states and commit pulses.
-    .hold_active_color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .hold_active_color    = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .hold_active_locality = RGB_KEY_HALF,
 
     // Used for authored long-hold-tier active states and commit pulses.
-    .long_hold_active_color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
-
-    .locality = RGB_KEY_HALF,
+    .long_hold_active_color    = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .long_hold_active_locality = RGB_KEY_HALF,
 };
 
-// ─── Key-Behavior Feedback LED Groups ───────────────────────────────────────
+// ─── Behaviour Feedback LED Groups ──────────────────────────────────────────
 //
-// Paint specific LEDs a different color while key-behavior feedback is active.
-// These groups repaint after the feedback locality render when a matching
-// visible semantic category is live.
+// Paint specific LEDs a different color while behaviour feedback is active.
+// These groups repaint after the cases' locality render when the case they
+// name shows.
 //
-// In LED group rows, HSV(0, 0, 0) inherits the active feedback color. Use a
-// nonzero HSV value only when the group should override that stage color.
+// In LED group rows, HSV(0, 0, 0) inherits the color of the case that shows.
+// Use a nonzero HSV value only when the group should override that color.
 //
-// .semantic chooses which visible key-behavior state can drive the group:
-//   - KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING = a double-tap-or-higher branch is
-//     selected and has not been entered yet
+// .semantic chooses which case drives the group:
+//   - KEY_FEEDBACK_GROUP_TAP_COUNT_2 = the double-tap branch is selected and
+//     has not been entered yet, on any key
+//   - KEY_FEEDBACK_GROUP_TAP_COUNT_3, KEY_FEEDBACK_GROUP_TAP_COUNT_4 = the same
+//     for the triple and quadruple tap
+//   - KEY_FEEDBACK_GROUP_TAP_COUNT_5 = the same for tap count 5 or more
+//   - KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY = every tap branch, following the
+//     newest key with one selected, in that branch's color, and no tier;
+//     rendered after the ALL rows and before the rows naming one case
 //   - KEY_FEEDBACK_GROUP_TAP_COMMITTED = tap action commit pulse for authored
 //     non-base tap branches that do not already have state feedback
 //   - KEY_FEEDBACK_GROUP_HOLD_ACTIVE = hold-tier pending / active / commit
 //     feedback
 //   - KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE = long-hold-tier active / commit
 //     feedback
-//   - KEY_FEEDBACK_GROUP_ALL = one group row that follows any visible concrete
-//     semantic above; rendered before specific semantic rows so narrower rows
-//     can override it
+//   - KEY_FEEDBACK_GROUP_ALL = one group row that follows the newest key
+//     with a tap branch selected, in that branch's color, and each tier above;
+//     rendered before the rows naming one case so narrower rows can override it
 static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
-    // { .semantic = KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING, .color = HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
+    // { .semantic = KEY_FEEDBACK_GROUP_TAP_COUNT_2, .color = HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     // { .semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     // { .semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     // { .semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
     {.semantic = KEY_FEEDBACK_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS}, );
 #    endif // RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+
+//
+// ─── Replacement feedback ───────────────────────────────────────────────────
+//
+// A flash when text replacement (autocorrect) changes what was typed, or what
+// the leader sends. It lasts RGB_AUTOCORRECT_FEEDBACK_FLASH_MS (config.h) and
+// paints above every other stage. While the leader waits its colour is held.
+//
+//   - .text_color = an input was replaced with text
+//   - .macro_color = an input was replaced by its macro
+//   - .undo_color = Backspace right after a replacement put the word back
+//   - .leading_color = held while the leader waits for what is typed after it
+//
+// Here a color of saturation 0 and value 0, such as HSV(0, 0, 0), is
+// passthrough: it paints nothing for its case, so each of the four can paint
+// nothing by itself. Use HSV(h, 255, 0) to turn its LEDs off.
+//
+// Each case has its own locality, where it paints; one case shows at a time:
+//   - RGB_BOTH_HALVES, RGB_LEFT_HALF, RGB_RIGHT_HALF = those halves
+//   - RGB_KEY_HALF = the half of the key that ended the word, of the
+//     Backspace that undid the replacement, or of the key that ended leading;
+//     for leading, and for what the leader's timeout sends, the Leader key
+//   - RGB_KEYS_ONLY = that key alone; a combo's output paints every combo key
+// A Leader no key sent (an action outside the matrix) paints both halves
+// under RGB_KEY_HALF and every key under RGB_KEYS_ONLY.
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+const autocorrect_feedback_color_config_t autocorrect_feedback_colors = {
+    .text_color       = HSV(106, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .text_locality    = RGB_KEY_HALF,
+    .macro_color      = HSV(234, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .macro_locality   = RGB_KEY_HALF,
+    .undo_color       = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .undo_locality    = RGB_KEY_HALF,
+    .leading_color    = HSV(170, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .leading_locality = RGB_KEY_HALF,
+};
+
+// ─── Replacement Feedback LED Groups ────────────────────────────────────────
+//
+// Paint specific LEDs a different color while a replacement flash or leading
+// shows. These groups repaint after the stage's locality render.
+//
+// In LED group rows, HSV(0, 0, 0) inherits the color of the case that shows.
+//
+// .semantic chooses which case drives the group:
+//   - AUTOCORRECT_FEEDBACK_GROUP_TEXT = a text replacement
+//   - AUTOCORRECT_FEEDBACK_GROUP_MACRO = a macro replacement
+//   - AUTOCORRECT_FEEDBACK_GROUP_UNDO = an undone replacement
+//   - AUTOCORRECT_FEEDBACK_GROUP_LEADING = the leader waiting
+//   - AUTOCORRECT_FEEDBACK_GROUP_ALL = any of them; rendered before the rows
+//     naming one case so narrower rows can override it
+static const autocorrect_feedback_led_group_t autocorrect_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
+    // { .semantic = AUTOCORRECT_FEEDBACK_GROUP_UNDO, .color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
+    {.semantic = AUTOCORRECT_FEEDBACK_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS}, );
+#    endif // RGB_AUTOCORRECT_FEEDBACK_ENABLE
 
 // Expand the authored RGB tables, derived counts, and RGB feedback policy
 // bridges above into the runtime symbols expected by the userspace runtime.

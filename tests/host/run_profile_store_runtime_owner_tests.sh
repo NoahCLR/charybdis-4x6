@@ -40,6 +40,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/compat/qmk_profile_split_transport.c" \
         "$ROOT/users/noah/lib/compat/qmk_profile_working.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_owner.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_autocorrect_runtime.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_working_copy.c" \
         "$ROOT/users/noah/lib/profile/split/profile_working_sync.c" \
         "$ROOT/users/noah/lib/profile/runtime/active_profile_keymap_macros_runtime.c" \
@@ -56,6 +57,8 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_macros_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_autocorrect_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_autocorrect_words_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/split/profile_split_authority.c" \

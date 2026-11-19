@@ -9,11 +9,13 @@
 #include "users/noah/lib/profile/runtime/profile_action_placement_v1.h"
 #include "users/noah/lib/profile/runtime/profile_owner.h"
 #include "users/noah/lib/profile/runtime/active_profile_keymap_macros_runtime.h"
+#include "users/noah/lib/profile/runtime/active_profile_autocorrect_runtime.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/lib/profile/schema/profile_pd_v1.h"
 #include "users/noah/lib/profile/schema/profile_settings_v1.h"
 #include "users/noah/lib/profile/storage/profile_flash_store.h"
 #include "profile_store_saved_fixture.h"
+#include "released_half_fixture.h"
 
 _Static_assert((unsigned)NOAH_PROFILE_SPLIT_V1_FRAME_MAX <= (unsigned)SPLIT_FAULT_LINK_FRAME_MAX && (unsigned)NOAH_PROFILE_WORKING_SYNC_FRAME_MAX <= (unsigned)SPLIT_FAULT_LINK_FRAME_MAX, "the fault link carries both protocols' largest frames");
 
@@ -22,10 +24,22 @@ _Static_assert((unsigned)NOAH_PROFILE_SPLIT_V1_FRAME_MAX <= (unsigned)SPLIT_FAUL
 #define TEST_PD_DOMAIN NOAH_PROFILE_DOMAIN_V1_PD, NOAH_PROFILE_DOMAIN_VERSION_PD, NOAH_PROFILE_PD_V1_HEADER_SIZE, 0u, 0u, 0u, \
                        NOAH_PROFILE_PD_V1_VERSION, NOAH_PROFILE_PD_V1_SLOT_COUNT, NOAH_PROFILE_PD_V1_RECORD_SIZE, 0u, 0u, 0u, 0u, 0u
 
-static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 4u, 3u, 1u, 1u, TEST_PD_DOMAIN};
+static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 4u, 8u, 1u, 1u, TEST_PD_DOMAIN};
+
+// Autocorrect lists in domain 0x80's encoding (autocorrect_domain_v2.json's
+// "one"): teh -> the. It is this build's authored list, what the compiled
+// defaults correct.
+#define TEST_LIST_ONE 0x01u, 0x00u, 0x01u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x06u, 0x00u, 0x00u, 0x00u, 0x03u, 0x00u, 0x00u, 0x00u, 0x03u, 0x00u, 0x03u, 0x00u, 0x00u, 0x00u, 0x74u, 0x68u, 0x65u
+const uint8_t  authored_autocorrect_list[]    = {TEST_LIST_ONE, 0x74u, 0x65u, 0x68u};
+const uint16_t authored_autocorrect_list_size = sizeof(authored_autocorrect_list);
+// The same rows with the typo "the": a typo that is its own correction.
+static const uint8_t refused_list[] = {TEST_LIST_ONE, 0x74u, 0x68u, 0x65u};
+// hte, teh -> the, and tihng -> thing anywhere in a word.
+static const uint8_t edited_list[] = {0x02u, 0x00u, 0x03u, 0x00u, 0x01u, 0x00u, 0x00u, 0x00u, 0x13u, 0x00u, 0x00u, 0x00u, 0x03u, 0x00u, 0x00u, 0x00u, 0x03u, 0x00u, 0x05u, 0x00u, 0x02u, 0x00u, 0x08u, 0x00u, 0x03u, 0x00u, 0x00u, 0x00u, 0x0bu, 0x00u, 0x03u, 0x00u, 0x00u, 0x00u, 0x0eu, 0x00u, 0x05u, 0x03u, 0x01u, 0x00u, 0x02u, 0x00u,
+                                      0x74u, 0x68u, 0x65u, 0x74u, 0x68u, 0x69u, 0x6eu, 0x67u, 0x68u, 0x74u, 0x65u, 0x74u, 0x65u, 0x68u, 0x74u, 0x69u, 0x68u, 0x6eu, 0x67u};
 
 static const uint8_t long_profile[] = {
-    0x4eu, 0x4cu, 0x50u, 0x31u, 0x04u, 0x03u, 0x02u, 0x01u, 0x10u, 0x04u, 0x4fu, 0x02u, 0x00u, 0x00u, 0x04u, 0x00u,
+    0x4eu, 0x4cu, 0x50u, 0x31u, 0x04u, 0x08u, 0x02u, 0x01u, 0x10u, 0x07u, 0x65u, 0x02u, 0x00u, 0x00u, 0x07u, 0x00u,
     0x1fu, 0x00u, 0x10u, 0x10u, 0x0cu, 0x20u, 0x0cu, 0x00u, 0x04u, 0x08u, 0x3au, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u,
     0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u, 0x01u, 0x01u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u,
     0x02u, 0x02u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u, 0x03u, 0x03u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
@@ -59,10 +73,12 @@ static const uint8_t long_profile[] = {
     0xc8u, 0x0cu, 0x1fu, 0x50u, 0xffu, 0xc8u, 0x0bu, 0xffu, 0x64u, 0xffu, 0xc8u, 0x0au, 0x00u, 0x78u, 0xffu, 0xc8u,
     0x09u, 0x1fu, 0x8cu, 0xffu, 0xc8u, 0x08u, 0xffu, 0xa0u, 0xffu, 0xc8u, 0x07u, 0x00u, 0xb4u, 0xffu, 0xc8u, 0x06u,
     0x1fu, 0xc8u, 0xffu, 0xc8u, 0x05u, 0xffu, 0xdcu, 0xffu, 0xc8u, 0x04u, 0xbfu, 0xffu, 0xc8u, 0x03u, 0x00u, 0xffu,
-    0xc8u, 0x28u, 0xffu, 0xc8u, 0x50u, 0xffu, 0xc8u, 0x78u, 0xffu, 0xc8u, 0x00u, 0x00u, 0x96u, 0x12u, 0xffu, 0xc8u,
-    0x94u, 0xffu, 0xc8u, 0x01u, 0x03u, 0x00u, 0x00u, 0xffu, 0xc8u, 0x04u, 0x01u, 0x1eu, 0xffu, 0xc8u, 0x05u, 0x02u,
-    0x3cu, 0xffu, 0xc8u, 0x06u, 0x03u, 0x5au, 0xffu, 0xc8u, 0x07u, 0xffu, 0x78u, 0xffu, 0xc8u, 0x08u, 0x00u, 0x96u,
-    0xffu, 0xc8u, 0x09u, 0x01u, 0xb4u, 0xffu, 0xc8u, 0x0au, 0x02u, 0xd2u, 0xffu, 0xc8u, 0x0bu,
+    0xc8u, 0x03u, 0x28u, 0xffu, 0xc8u, 0x03u, 0x50u, 0xffu, 0xc8u, 0x03u, 0x78u, 0xffu, 0xc8u, 0x03u, 0x00u, 0x00u,
+    0x96u, 0x12u, 0xffu, 0xc8u, 0x94u, 0xffu, 0xc8u, 0x01u, 0x03u, 0x03u, 0x03u, 0x00u, 0x00u, 0xffu, 0xc8u, 0x04u,
+    0x01u, 0x1eu, 0xffu, 0xc8u, 0x05u, 0x02u, 0x3cu, 0xffu, 0xc8u, 0x06u, 0x03u, 0x5au, 0xffu, 0xc8u, 0x07u, 0xffu,
+    0x78u, 0xffu, 0xc8u, 0x08u, 0x00u, 0x96u, 0xffu, 0xc8u, 0x09u, 0x01u, 0xb4u, 0xffu, 0xc8u, 0x0au, 0x02u, 0xd2u,
+    0xffu, 0xc8u, 0x0bu, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
+    0x00u, 0x00u, 0x00u,
     TEST_PD_DOMAIN,
 };
 
@@ -2392,6 +2408,91 @@ static void test_live_edit_reaches_both_halves_and_save_writes_both(void) {
     puts("a live edit reaches both halves without flash; Save writes both by reuse; a replug boots the saved profile; Revert follows on both");
 }
 
+// What the keyboard would correct `typo` to, read as an engine reads it.
+static bool list_corrects(const char *typo, const char *correction) {
+    const noah_profile_autocorrect_v1_list_t *list = noah_active_profile_autocorrect_list();
+    noah_profile_autocorrect_v1_typo_t        found;
+    uint8_t                                   text[NOAH_PROFILE_AUTOCORRECT_V1_CORRECTION_MAX];
+    noah_profile_autocorrect_v1_correction_t  stored;
+    return noah_profile_autocorrect_v1_find(list, (const uint8_t *)typo, (uint8_t)strlen(typo), &found) && noah_profile_autocorrect_v1_correction(list, found.correction, &stored, text) && stored.length == strlen(correction) && memcmp(text, correction, stored.length) == 0;
+}
+
+// The autocorrect list (domain 0x80, D-F68) is read in place from whatever is
+// active: the authored list under the compiled defaults, the working copy
+// after a live edit, and the saved slot after a Save and a replug. An edit
+// reaches both halves, and a list the domain refuses changes nothing.
+static void test_the_autocorrect_list_follows_the_active_profile(void) {
+    static noah_profile_owner_t left;
+    static noah_profile_owner_t right;
+    static memory_t             left_memory;
+    static memory_t             right_memory;
+    static uint8_t              expected[NOAH_PROFILE_PAYLOAD_MAX];
+    split_link_t                left_link          = split_link_to(&right);
+    split_link_t                right_link         = split_link_to(&left);
+    split_fault_link_t          left_working_link  = working_link_to(&right);
+    split_fault_link_t          right_working_link = working_link_to(&left);
+    noah_profile_working_splice_t create  = {.domain_id = NOAH_PROFILE_DOMAIN_V1_AUTOCORRECT, .insert = sizeof(edited_list), .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
+    noah_profile_working_splice_t replace = {.domain_id = NOAH_PROFILE_DOMAIN_V1_AUTOCORRECT, .remove = sizeof(edited_list), .insert = sizeof(refused_list)};
+    noah_profile_autocorrect_v1_typo_t typo;
+    noah_active_profile_status_t       provider;
+    uint32_t                           now    = 1000u;
+    uint32_t                           length = sizeof(compiled_blob) + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE + sizeof(edited_list);
+
+    erased_memory(&left_memory);
+    erased_memory(&right_memory);
+    boot_live_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &left_working_link, &right_working_link, 0xAC0FFEE1u, &now);
+    scan_until_converged(&left, &right, &now);
+    // The compiled defaults: the authored list.
+    assert(noah_active_profile_autocorrect_list()->typos == 1u && list_corrects("teh", "the") && !list_corrects("hte", "the"));
+
+    // A live edit creates the domain on both halves, in RAM, and says the
+    // list was published again: a lookup under way starts over on it.
+    {
+        uint32_t writes    = left_memory.writes + right_memory.writes;
+        uint32_t published = noah_active_profile_autocorrect_publication();
+        assert(live_edit(&left, &right, 1u, &create, edited_list, sizeof(edited_list), &now) == NOAH_PROFILE_WORKING_OK);
+        scan_until_converged(&left, &right, &now);
+        assert(left_memory.writes + right_memory.writes == writes);
+        assert(noah_active_profile_autocorrect_publication() != published);
+    }
+    memcpy(expected, compiled_blob, sizeof(compiled_blob));
+    expected[6] = (uint8_t)(compiled_blob[6] + 1u);
+    expected[sizeof(compiled_blob)]      = NOAH_PROFILE_DOMAIN_V1_AUTOCORRECT;
+    expected[sizeof(compiled_blob) + 1u] = NOAH_PROFILE_DOMAIN_VERSION_AUTOCORRECT;
+    write_u32(&expected[sizeof(compiled_blob) + 2u], sizeof(edited_list));
+    memcpy(&expected[sizeof(compiled_blob) + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE], edited_list, sizeof(edited_list));
+    assert_same_active(&left, &right, expected, length);
+    assert(left.working.active && right.working.active);
+    // The working copy: two typos name one stored correction, and the
+    // part-of-word typo is listed for the scan.
+    assert(noah_active_profile_autocorrect_list()->corrections == 2u && list_corrects("teh", "the") && list_corrects("hte", "the") && list_corrects("tihng", "thing"));
+    assert(noah_profile_autocorrect_v1_part_at(noah_active_profile_autocorrect_list(), 0u, &typo, NULL) && typo.match == NOAH_PROFILE_AUTOCORRECT_V1_MATCH_ANYWHERE && typo.length == 5u);
+
+    // A list the domain refuses is refused whole, naming the typo row and
+    // the reason, and the list stays as it was.
+    assert(live_edit(&left, &right, 2u, &replace, refused_list, sizeof(refused_list), &now) != NOAH_PROFILE_WORKING_OK);
+    assert(left.working.error.code == NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN && left.working.error.domain_id == NOAH_PROFILE_DOMAIN_V1_AUTOCORRECT);
+    assert(left.working.error.table_id == NOAH_PROFILE_AUTOCORRECT_V1_TABLE_TYPOS && left.working.error.row_index == 0u && left.working.error.field_id == NOAH_PROFILE_AUTOCORRECT_V1_TYPO_IS_CORRECTION);
+    scan_until_converged(&left, &right, &now);
+    assert_same_active(&left, &right, expected, length);
+    assert(list_corrects("hte", "the"));
+
+    // Save, then a replug: both halves boot the saved slot and read the list
+    // from it.
+    assert(noah_profile_owner_save(&left, 40u, left.working.session, left.working.revision) == NOAH_PROFILE_WORKING_QUEUED);
+    for (uint32_t guard = 0u; guard < 20000u && left.save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE; guard++) scan_pair(&left, &right, &now);
+    assert(left.save.last_result == NOAH_PROFILE_WORKING_OK && left.saved_descriptor.generation == 1u && right.saved_descriptor.generation == 1u);
+    assert(left.saved_descriptor.payload_length == length && left.saved_descriptor.payload_digest == digest_of(expected, length) && right.saved_descriptor.payload_digest == left.saved_descriptor.payload_digest);
+    scan_until_converged(&left, &right, &now);
+    left_working_link.exchanges = 0u;
+    boot_live_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &left_working_link, &right_working_link, 0xAC0FFEE2u, &now);
+    scan_until_converged(&left, &right, &now);
+    assert(!left.working.active && noah_active_profile_provider_status(&left.provider, &provider) == NOAH_ACTIVE_PROFILE_OK && provider.active.kind == NOAH_ACTIVE_PROFILE_KIND_VALIDATED_PROFILE);
+    assert_same_active(&left, &right, expected, length);
+    assert(noah_active_profile_autocorrect_list()->typos == 3u && list_corrects("teh", "the") && list_corrects("hte", "the") && list_corrects("tihng", "thing") && !list_corrects("the", "the"));
+    puts("the autocorrect list is read from the compiled defaults, the working copy and the saved slot, on both halves");
+}
+
 // Both links lose replies while a Save runs: every third working-copy reply
 // and every fifth durable one. Each protocol sends again what it did not hear
 // answered, and the Save lands once, on both halves.
@@ -2654,7 +2755,76 @@ static void test_a_save_after_taking_the_other_halfs_copy_lands(void) {
 #include "profile_owner_admission_test.inc"
 #include "profile_owner_stopped_test.inc"
 
+// The other half runs the released firmware, v2026.10.27 (schema 4.3,
+// released_half_fixture.h): it answers this half's polls as undecodable, and
+// its own polls name a schema this half's decoder refuses. A half holding a
+// saved profile then waits for reconciliation that never comes, with no
+// timeout (scan_boot_reconciliation): RECONCILING_COMMITTED on its compiled
+// defaults, writing nothing, as master and as slave.
+static bool released_half_receive(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
+    (void)context;
+    (void)request;
+    assert(request_length >= NOAH_PROFILE_SPLIT_V1_FRAME_SIZE && response_length >= NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    memset(response, 0, response_length);
+    released_invalid_frame_reply(response);
+    return true;
+}
+
+static void test_a_saved_half_beside_a_released_half_waits_on_its_compiled_defaults(void) {
+    static const released_record_t released = {.generation = 7u, .payload_length = 4096u, .payload_crc32 = 1u, .payload_digest = 2u, .origin_half = 1u};
+    noah_profile_owner_t           seeded;
+    noah_profile_owner_t           owner;
+    memory_t                       memory;
+    uint32_t                       now = 1000u;
+
+    memset(&memory, 0, sizeof(memory));
+    memset(memory.bytes, 0xff, sizeof(memory.bytes));
+    boot_empty(&seeded, &memory);
+    commit_blob(&seeded, 71u, &now);
+    assert(seeded.saved_descriptor.generation == 1u);
+    for (unsigned master = 0u; master < 2u; master++) {
+        split_link_t                 link   = {.link = {.receive = released_half_receive}};
+        uint32_t                     writes = memory.writes;
+        uint32_t                     reached = 0u;
+        uint32_t                     polls_answered = 0u;
+        noah_profile_owner_status_t  status;
+
+        assert(noah_profile_owner_init(&owner, &(noah_profile_owner_config_t){
+                                                   .store_io                = {.read = memory_read, .write = memory_write, .context = &memory},
+                                                   .split_exchange          = split_exchange,
+                                                   .split_transport_context = &link,
+                                                   .origin_half             = 0u,
+                                                   .other_half_required     = true,
+                                               }));
+        for (uint32_t elapsed = 0u; elapsed < 60000u; elapsed += 10u, now += 10u) {
+            if (!master && elapsed % 50u == 0u) {
+                uint8_t poll[RELEASED_SPLIT_FRAME_SIZE];
+                uint8_t reply[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+
+                released_descriptor_frame(poll, NOAH_PROFILE_SPLIT_V1_METADATA, &released, RELEASED_FLAG_NO_PREPARED_PUSH);
+                // Its polls are answered once the owner has built its split
+                // endpoint, before then refused as the callback refuses them.
+                if (noah_profile_split_reconciler_receive(noah_profile_owner_split_reconciler(&owner), poll, sizeof(poll), reply, sizeof(reply))) {
+                    assert(reply[1] == NOAH_PROFILE_SPLIT_V1_ERROR && reply[2] == NOAH_PROFILE_SPLIT_V1_STATUS_INVALID_FRAME);
+                    polls_answered++;
+                }
+            }
+            (void)noah_profile_owner_scan(&owner, master != 0u, now);
+            if (owner.state == NOAH_PROFILE_OWNER_RECONCILING_COMMITTED && reached == 0u) {
+                reached = elapsed;
+            }
+            assert(reached == 0u || owner.state == NOAH_PROFILE_OWNER_RECONCILING_COMMITTED);
+        }
+        assert(owner.state == NOAH_PROFILE_OWNER_RECONCILING_COMMITTED && reached < 1000u);
+        assert(noah_profile_owner_status(&owner, &status) && status.active.kind == NOAH_ACTIVE_PROFILE_KIND_COMPILED_DEFAULTS);
+        assert(memory.writes == writes);
+        assert(master ? link.metadata_frames >= 50u : link.link.exchanges == 0u && polls_answered >= 1000u);
+    }
+    puts("a saved half beside a released half waits on its compiled defaults and writes nothing");
+}
+
 int main(void) {
+    test_a_saved_half_beside_a_released_half_waits_on_its_compiled_defaults();
     test_admission_matrix();
     test_a_mode_change_waits_until_the_halves_agree();
     test_a_mode_change_waits_for_an_apply_copying_to_the_other_half();
@@ -2669,6 +2839,7 @@ int main(void) {
     test_adjustments_without_a_settings_domain();
     test_a_failed_automatic_save_is_reported_and_not_repeated();
     test_live_edit_reaches_both_halves_and_save_writes_both();
+    test_the_autocorrect_list_follows_the_active_profile();
     test_save_survives_lost_replies_on_both_links();
     test_repeated_local_steps_save_in_far_fewer_grants();
     test_a_save_after_taking_the_other_halfs_copy_lands();

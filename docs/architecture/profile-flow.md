@@ -42,6 +42,8 @@ defaults run ([device-resident profile](../spec/device-resident-profile.md#autho
 Runtimes read the active profile only through the views the provider's
 invalidators rebuild: `active_profile_keymap_macros_runtime.c` (read by
 `compat/qmk_profile_keymap.c` and `macro/profile_macro_provider.c`),
+`active_profile_autocorrect_runtime.c` (the autocorrect list, read in place,
+D-F68),
 `active_profile_key_behavior_runtime.c` (`key/behavior/`),
 `active_profile_rgb_runtime.c` (`rgb/core/rgb_active_profile_config.c`),
 `active_profile_combo_runtime.c` (`compat/qmk_active_profile_combos.c`),

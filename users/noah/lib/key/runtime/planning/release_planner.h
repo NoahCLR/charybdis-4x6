@@ -32,7 +32,6 @@ typedef struct {
     key_runtime_release_hold_contract_t hold;
     pointing_mode_mask_t                quick_tap_pointing_mode_lock;
     bool                                suppress_tap_on_layer_interrupt;
-    bool                                buffered_base_tap_dispatches_tap;
     bool                                quick_release_of_immediate_hold_dispatches_tap;
     bool                                fallback_hold_suppresses_nonquick_release;
     bool                                nonquick_release_dispatches_tap;
@@ -52,7 +51,6 @@ typedef enum {
 } key_runtime_release_hold_action_mode_t;
 
 typedef struct {
-    bool                                   buffered_base_tap_dispatches_tap;
     bool                                   quick_tap_dispatches_tap;
     bool                                   pointing_mode_lock_tap_allowed;
     bool                                   quick_immediate_hold_dispatches_tap;
@@ -128,7 +126,6 @@ static inline key_runtime_release_contract_t key_runtime_release_contract_for_in
         .hold                                           = key_runtime_release_hold_contract_for_interaction(interaction),
         .quick_tap_pointing_mode_lock                   = interaction->contract.quick_tap_pointing_mode_lock,
         .suppress_tap_on_layer_interrupt                = interaction->contract.suppress_tap_on_layer_interrupt,
-        .buffered_base_tap_dispatches_tap               = interaction->contract.buffered_base_tap_dispatches_tap,
         .quick_release_of_immediate_hold_dispatches_tap = interaction->contract.quick_release_of_immediate_hold_dispatches_tap,
         .fallback_hold_suppresses_nonquick_release      = interaction->contract.fallback_hold_suppresses_nonquick_release,
         .nonquick_release_dispatches_tap                = interaction->contract.nonquick_release_dispatches_tap,
@@ -163,7 +160,6 @@ static inline key_runtime_release_semantics_t key_runtime_release_semantics_for_
     switch (phase) {
         case KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW:
             return (key_runtime_release_semantics_t){
-                .buffered_base_tap_dispatches_tap = true,
                 .quick_tap_dispatches_tap         = true,
                 .pointing_mode_lock_tap_allowed   = true,
                 .checks_fallback_hold_suppression = true,
@@ -199,11 +195,6 @@ static inline bool key_runtime_release_query_momentary_layer_tap_suppresses_quic
 
 static inline bool key_runtime_release_query_quick_tap(const key_runtime_release_query_t *query) {
     return query && query->interaction && query->elapsed < query->interaction->binding.tap_hold_term && !key_runtime_release_query_momentary_layer_tap_suppresses_quick_tap(query);
-}
-
-static inline bool key_runtime_release_query_buffered_base_tap(const key_runtime_release_query_t *query) {
-    key_runtime_release_contract_t contract = key_runtime_release_contract_for_interaction(query ? query->interaction : NULL);
-    return query && query->interaction && contract.buffered_base_tap_dispatches_tap && !query->held_action_active;
 }
 
 static inline bool key_runtime_release_query_quick_immediate_hold(const key_runtime_release_query_t *query) {
@@ -267,7 +258,6 @@ static inline key_runtime_release_decision_t key_runtime_release_decision_pointi
 static inline key_runtime_release_decision_t key_runtime_release_decide(const key_runtime_release_query_t *query) {
     key_runtime_release_contract_t contract;
     bool                           quick_tap;
-    bool                           buffered_base_tap;
     bool                           quick_immediate_hold;
     pointing_mode_mask_t           lock_tap_mode;
 
@@ -277,16 +267,11 @@ static inline key_runtime_release_decision_t key_runtime_release_decide(const ke
 
     contract             = key_runtime_release_contract_for_interaction(query->interaction);
     quick_tap            = key_runtime_release_query_quick_tap(query);
-    buffered_base_tap    = key_runtime_release_query_buffered_base_tap(query);
     quick_immediate_hold = key_runtime_release_query_quick_immediate_hold(query);
     lock_tap_mode        = key_runtime_release_query_lock_tap_mode(query);
 
     if (query->pointing_mode_lock_consumed_on_press) {
         return key_runtime_release_decision_base(query);
-    }
-
-    if (query->semantics.buffered_base_tap_dispatches_tap && buffered_base_tap) {
-        return key_runtime_release_decision_tap(query);
     }
 
     if (query->semantics.quick_tap_dispatches_tap && quick_tap) {

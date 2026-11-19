@@ -169,12 +169,6 @@ static void key_runtime_core_query_press_token_deferred_release_profile(const ke
         goto done;
     }
 
-    if (token->interaction.contract.buffered_base_tap_dispatches_tap) {
-        before = true;
-        after  = true;
-        goto done;
-    }
-
     if (!key_runtime_core_query_press_token_quick_tap_suppressed(token)) {
         before = token->tap_outcome_available || key_runtime_core_query_press_token_has_pointing_mode_quick_lock_candidate(token);
     }

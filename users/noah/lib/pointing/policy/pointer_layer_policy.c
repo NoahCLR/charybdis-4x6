@@ -138,7 +138,12 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
         return;
     }
 
-    noah_qmk_contract_auto_mouse_keyevent(pressed);
+    // QMK zeroes the tracker if auto-mouse was switched, retargeted or
+    // retimed while the button was held (AM_ON, AM_TOGG, a live settings
+    // edit), and a release below zero would leave auto-mouse active.
+    if (pressed || noah_qmk_contract_auto_mouse_key_tracker() > 0) {
+        noah_qmk_contract_auto_mouse_keyevent(pressed);
+    }
 }
 
 // One count on QMK's key tracker while the runtime locks or holds the
@@ -204,7 +209,9 @@ layer_state_t pointer_layer_policy_apply(layer_state_t state) {
 
     // Keep the configured pointer layer alive while anchored. Outside the
     // sniping exception above, overlap with other keyboard layers is allowed.
-    if (auto_mouse_anchored) {
+    // With auto-mouse off nothing would turn a forced layer off again, so
+    // only a layer owner keeps it (D-F66).
+    if (auto_mouse_anchored && noah_qmk_contract_auto_mouse_enabled()) {
         state |= auto_mouse_mask;
     }
 

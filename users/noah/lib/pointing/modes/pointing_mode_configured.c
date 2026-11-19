@@ -28,7 +28,7 @@ static bool emit_tap(const noah_pd_tap_t *tap) {
     if (!key) return false;
     if (IS_QK_MACRO(key)) {
         // Playback continues across scans, so only inherited modifiers apply.
-        (void)noah_key_runtime_settle_pending_fallback_hold();
+        (void)noah_key_runtime_settle_pending_fallback_hold(NOAH_KEY_RUNTIME_NO_KEY);
         return noah_profile_macro_start(key);
     }
     if (IS_MOUSEKEY_BUTTON(key)) {

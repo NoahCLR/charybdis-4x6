@@ -121,9 +121,9 @@ typedef struct {
     bool                           momentary_layer_tap_interrupted;
     bool                           pending_release_emission;
     bool                           release_keycode_mismatched;
-    // The press came past the deepest tap count of a quick run (D-F33): the run
-    // was sent as its first tap, and this press is a single tap of its own.
-    bool                           typing;
+    // The press came past the deepest tap count of a quick run (D-F64): the run
+    // was sent as the standard key's taps, and this press is the standard key.
+    bool                           past_depth;
     key_runtime_slot_interaction_t interaction;
     key_runtime_slot_phase_t       slot_phase;
 } press_token_t;
@@ -137,17 +137,16 @@ typedef struct {
     // path took the key over. A resolved series accepts no further taps and shows
     // no branch color.
     bool     resolved;
-    uint16_t single_action;
     uint16_t tap_action;
     uint8_t  tap_repeat_count;
     bool     tap_branch_has_authored_step;
     bool     tap_branch_has_authored_tap;
     bool     has_more_taps;
     uint8_t  authored_tap_depth;
-    // A quick run went past the deepest branch (D-F33). Each further press in
-    // it is a single tap of its own, and sends the first tap, until the
-    // multi-tap window lapses.
-    bool                 typing;
+    // A quick run went past the deepest branch (D-F64). Each further press in
+    // it is the standard key, a press of its own, until the multi-tap window
+    // lapses.
+    bool                 past_depth;
     hold_behavior_t      hold;
     hold_behavior_t      long_hold;
     uint16_t             tap_hold_term_ms;
@@ -438,7 +437,7 @@ void                           key_runtime_core_scan(key_runtime_core_effect_pla
 // The handled keys whose fallback hold is due now, as bits of their press
 // token index, decided for all of them at once; true if any. The effect that
 // registers one is key_runtime_core_fallback_hold_effect(index).
-bool                           key_runtime_core_pending_fallback_holds(uint32_t due[KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT]);
+bool                           key_runtime_core_pending_fallback_holds(uint32_t due[KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT], keypos_t except_key_pos);
 bool                           key_runtime_core_fallback_hold_effect(uint16_t index, key_runtime_effect_t *effect);
 
 static inline void key_runtime_core_state_reset(key_runtime_core_state_t *state) {
