@@ -17,7 +17,7 @@
 # is letters and digits, with apostrophes only between them, and is
 # matched whatever its case. A line that begins `leader` takes its input
 # whole, without colons; every line of one replacement fires the same way.
-# After a change, regenerate authored_autocorrect_list.h:
+# After a change, regenerate generated/authored_autocorrect_list.h:
 #
 #   python3 tools/autocorrect/build.py --write-authored keyboards/bastardkb/charybdis/4x6/keymaps/starter
 #

@@ -68,11 +68,11 @@ hold it. Then, as they apply:
 
 1. Authored keymap, combo, macro or lighting data changed:
    `run_real_profile_validation_tests.sh`. A `MACROS()` change regenerates
-   the profile's `authored_macro_bank.h` with
+   the profile's `generated/authored_macro_bank.h` with
    `NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh`
    (pass the keymap path for another profile); validation refuses a stale copy.
    A change to the profile's `autocorrect.txt` regenerates its
-   `authored_autocorrect_list.h` with
+   `generated/authored_autocorrect_list.h` with
    `python3 tools/autocorrect/build.py --write-authored <keymap folder>`, and a
    host-layout change that adds a letter regenerates the word table and its
    fixture with `python3 tools/autocorrect/build.py --write`; both are refused

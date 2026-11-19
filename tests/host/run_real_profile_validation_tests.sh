@@ -120,7 +120,7 @@ run_validation_variant() {
         -o "$bin"
 
     if [ "${NOAH_WRITE_AUTHORED_MACRO_BANK:-}" = 1 ] && [ "$name" = default ]; then
-        NOAH_AUTHORED_MACRO_BANK_HEADER="$KEYMAP_PATH_ABS/authored_macro_bank.h" "$bin"
+        NOAH_AUTHORED_MACRO_BANK_HEADER="$KEYMAP_PATH_ABS/generated/authored_macro_bank.h" "$bin"
     else
         "$bin"
     fi
@@ -129,11 +129,12 @@ run_validation_variant() {
 # NOAH_WRITE_AUTHORED_MACRO_BANK=1 regenerates the authored macro bank: the
 # first variant writes it, the next compiles and checks the result. A placeholder
 # lets a profile without one compile the first time.
-if [ "${NOAH_WRITE_AUTHORED_MACRO_BANK:-}" = 1 ] && [ ! -f "$KEYMAP_PATH_ABS/authored_macro_bank.h" ]; then
-    printf '#pragma once\n\n#define NOAH_AUTHORED_MACRO_BANK 0\n' >"$KEYMAP_PATH_ABS/authored_macro_bank.h"
+if [ "${NOAH_WRITE_AUTHORED_MACRO_BANK:-}" = 1 ] && [ ! -f "$KEYMAP_PATH_ABS/generated/authored_macro_bank.h" ]; then
+    mkdir -p "$KEYMAP_PATH_ABS/generated"
+    printf '#pragma once\n\n#define NOAH_AUTHORED_MACRO_BANK 0\n' >"$KEYMAP_PATH_ABS/generated/authored_macro_bank.h"
 fi
 
-# The authored autocorrect list: authored_autocorrect_list.h is what
+# The authored autocorrect list: generated/authored_autocorrect_list.h is what
 # autocorrect.txt encodes to, and the list is one the domain holds.
 python3 "$ROOT/tools/autocorrect/build.py" --check-authored "$KEYMAP_PATH_ABS"
 

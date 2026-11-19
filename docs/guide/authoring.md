@@ -20,9 +20,8 @@ folders hold the same files, linked here in `noah`:
 | [`config.h`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | the layer list, timings, pointer and lighting settings, host and name |
 | [`rgb_config.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | lighting: layer, pointing-mode and feedback colours, LED groups |
 | [`pd_config.c`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/pd_config.c) | the 32 pointing slots |
-| `authored_macro_bank.h` | generated from the macros; never edited by hand |
 | [`autocorrect.txt`](../../keyboards/bastardkb/charybdis/4x6/keymaps/noah/autocorrect.txt) | the autocorrect list: what is typed and what replaces it |
-| `authored_autocorrect_list.h` | generated from the list; never edited by hand |
+| `generated/` | what the tools make from the macros and the autocorrect list; never edited by hand |
 
 The runtime under [`users/noah/`](../../users/noah/) is generic: it holds no
 names, timings or colours of mine, and you shouldn't need to touch it.
@@ -94,7 +93,8 @@ forms, never two. A row holds at least one of the three.
 MACRO(MACRO_10, "Select All + Copy", "{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}")
 ```
 
-After changing the macros, regenerate `authored_macro_bank.h`:
+After changing the macros, regenerate `generated/authored_macro_bank.h` (add
+the keymap folder for `starter`):
 
 ```sh
 NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh
@@ -136,7 +136,7 @@ Straight before the arrow either word is an input like any other: `both ->
 and` replaces `both` as you type. Every line of one replacement fires the same way. The list holds 1,024
 inputs and 1,024 replacements. It ships empty.
 
-After changing it, regenerate `authored_autocorrect_list.h`:
+After changing it, regenerate `generated/authored_autocorrect_list.h`:
 
 ```sh
 python3 tools/autocorrect/build.py --write-authored keyboards/bastardkb/charybdis/4x6/keymaps/noah

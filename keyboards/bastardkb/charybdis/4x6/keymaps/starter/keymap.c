@@ -723,14 +723,10 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // clang-format on
 };
 
-// MACROS() above in the bank encoding. Regenerate it with
-// NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh.
-#include "authored_macro_bank.h"
-
-// autocorrect.txt, beside this file, as the profile's autocorrect list.
-// Regenerate it with
-// python3 tools/autocorrect/build.py --write-authored keyboards/bastardkb/charybdis/4x6/keymaps/starter.
-#include "authored_autocorrect_list.h"
+// MACROS() above and autocorrect.txt beside this file, encoded by the tools.
+// Nothing in generated/ is edited by hand; validation says when to regenerate.
+#include "generated/authored_macro_bank.h"
+#include "generated/authored_autocorrect_list.h"
 
 // Expand the authored macro tables, combo table, and derived counts above
 // into the runtime symbols expected by the userspace runtime and QMK.
