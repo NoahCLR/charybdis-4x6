@@ -191,9 +191,8 @@ the ball moves.
   layout and the author's app shortcuts. There is no blank profile. Coming
   from VIA, save your layout there before flashing (Save + Load, Save Current
   Layout): Ark's **Backups** imports its keys and macros, and nothing else is
-  carried over. On Windows or Linux, Ark's **Host**
-  settings can swap Ctrl and Command, but the default shortcuts and macros
-  are Mac shortcuts, so expect to change some of them.
+  carried over. On Windows or Linux, expect to change some of the default
+  shortcuts and macros, which are Mac shortcuts.
 - **Editor:** Ark, in Chrome or Edge. VIA isn't supported.
 - **Taps that wait:** on a key that also has a double tap, a single tap waits
   out the multi tap window (150 ms by default) to see if a second tap
@@ -237,7 +236,7 @@ the ball moves.
    Use both files from the same release.
 3. Connect the halves and plug the right half into the computer.
 4. Open <https://ark.ncleroy.dev> in Chrome or Edge, click
-   **Choose keyboard…** and select the keyboard. In **Host**, set your
+   **Choose keyboard…** and select the keyboard. In **Typing**, set your
    computer's system and keyboard layout, so keys and macros type the right
    characters, and save. Then export a first backup from **Backups**.
 
