@@ -78,7 +78,7 @@ you type its input as a word.
   your list, Leader then `p` `n` types your phone number at once.
 - When one leader input begins another, `abc` and `abcd`, press Enter to
   send the shorter one, or wait: after the leader timeout, 2 seconds unless
-  you set another in Ark (Settings → Host), it is sent too.
+  you set another in Ark (**Leader waits** on Typing), it is sent too.
 - A character that leaves what you typed the start of no leader input ends
   it, and nothing is sent, that character included. Escape ends it too, and
   so do Enter and the timeout when what you typed is no leader input.
@@ -183,8 +183,8 @@ the keyboard to Ark can read it. Do not use a replacement for a password.
 
 ## Turning it off
 
-The **Text replacement** switch in Ark, under Settings → Host, turns it off
-in the profile. Three [switch keys](keys.md#where-behaviours-and-combos-run),
+The **Text replacement** switch on Ark's Typing screen turns it off in the
+profile. Three [switch keys](keys.md#where-behaviours-and-combos-run),
 `AC_ON`, `AC_OFF` and `AC_TOGG`, turn it on, off or the other way until the
 keyboard is unplugged. They never change the switch in Ark, and with text
 replacement switched off there `AC_ON` does not turn it on.

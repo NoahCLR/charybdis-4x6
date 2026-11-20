@@ -90,6 +90,17 @@ auto_mouse_cc -Wall -Wextra -Werror -Wno-unused-parameter \
     "$BUILD_DIR/qmk_pointing_device_auto_mouse.o" \
     -o "$BUILD_DIR/qmk_auto_mouse_toggle_contract_test"
 "$BUILD_DIR/qmk_auto_mouse_toggle_contract_test"
+# QMK leaves its old pointer layer on when its layer setting moves; the
+# auto-mouse switch turns it off. Run the switch against QMK's own auto-mouse.
+auto_mouse_cc -Wall -Wextra -Werror -Wno-unused-parameter \
+    -UQMK_KEYBOARD_H -DQMK_KEYBOARD_H='"tests/host/qmk_auto_mouse_contract_keyboard.h"' \
+    -DMATRIX_ROWS=10 -DMATRIX_COLS=6 -DLAYER_COUNT=16 \
+    -I"$ROOT/users/noah" \
+    "$ROOT/tests/host/qmk_auto_mouse_layer_move_contract_test.c" \
+    "$ROOT/users/noah/lib/pointing/policy/auto_mouse_switch.c" \
+    "$BUILD_DIR/qmk_pointing_device_auto_mouse.o" \
+    -o "$BUILD_DIR/qmk_auto_mouse_layer_move_contract_test"
+"$BUILD_DIR/qmk_auto_mouse_layer_move_contract_test"
 
 PYTHONDONTWRITEBYTECODE=1 python3 - "$QMK_ROOT" "$ROOT" <<'PY'
 from pathlib import Path

@@ -15,5 +15,5 @@
 // Host tests build other releases with -DNOAH_FIRMWARE_VERSION to show the
 // action-ABI digest does not depend on it; firmware builds never set it.
 #ifndef NOAH_FIRMWARE_VERSION
-#define NOAH_FIRMWARE_VERSION NOAH_FIRMWARE_RELEASE(2026, 11, 19, 0)
+#define NOAH_FIRMWARE_VERSION NOAH_FIRMWARE_RELEASE(2026, 11, 20, 0)
 #endif
