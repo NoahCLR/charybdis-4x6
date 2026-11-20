@@ -105,10 +105,11 @@ static uint32_t projected_setting(uint8_t id, uint32_t fallback) {
 // durable owner of these values, so QMK's EEPROM copies are never written
 // here and never win at boot. Combos on/off is not pushed: QMK's combo flag
 // is the runtime override beside the stored master (participation.c).
-// Auto-mouse on/off reaches QMK with its override (auto_mouse_switch.c).
+// Auto-mouse on/off reaches QMK with its override, and the pointer layer
+// through the same switch (auto_mouse_switch.c).
 void noah_qmk_portable_apply(void) {
     auto_mouse_switch_apply(projected_setting(NOAH_SETTING_AUTO_MOUSE_ENABLED, 1u) != 0u);
-    set_auto_mouse_layer(projected_setting(NOAH_SETTING_AUTO_MOUSE_LAYER, get_auto_mouse_layer()));
+    auto_mouse_switch_set_layer(projected_setting(NOAH_SETTING_AUTO_MOUSE_LAYER, get_auto_mouse_layer()));
     set_auto_mouse_timeout(projected_setting(NOAH_SETTING_AUTO_MOUSE_TIMEOUT, get_auto_mouse_timeout()));
     set_auto_mouse_debounce(projected_setting(NOAH_SETTING_AUTO_MOUSE_DEBOUNCE, get_auto_mouse_debounce()));
     uint16_t dpi    = projected_setting(NOAH_SETTING_DEFAULT_DPI, charybdis_get_pointer_default_dpi());

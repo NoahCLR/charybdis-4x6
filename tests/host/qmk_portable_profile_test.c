@@ -3,6 +3,7 @@
 #include <string.h>
 #include "portable_profile_keyboard.h"
 #include "users/noah/lib/compat/qmk_portable_profile.h"
+#include "users/noah/lib/pointing/policy/auto_mouse_switch.h"
 #include "users/noah/lib/profile/runtime/active_profile_settings_runtime.h"
 #include "users/noah/lib/profile/schema/profile_settings_defaults.h"
 #include "profile_test_blob.h"
@@ -42,13 +43,20 @@ uint8_t get_auto_mouse_debounce(void) {
 void set_auto_mouse_enable(bool value) {
     am_enabled = value;
 }
-// The stored setting reaches QMK through the auto-mouse switch, which adds
-// its override (auto_mouse_switch_test.c).
-static int am_stored = -1;
-void auto_mouse_switch_apply(bool stored) {
+// On/off and the pointer layer reach QMK through the auto-mouse switch, which
+// adds its override and turns off a pointer layer QMK would leave on
+// (auto_mouse_switch_test.c), never straight to QMK.
+static int      am_stored = -1;
+static unsigned am_layer_pushes, am_bare_layer_pushes;
+void            auto_mouse_switch_apply(bool stored) {
     am_stored = stored;
 }
+void auto_mouse_switch_set_layer(uint8_t layer) {
+    am_layer_pushes++;
+    am_layer = layer;
+}
 void set_auto_mouse_layer(uint8_t value) {
+    am_bare_layer_pushes++;
     am_layer = value;
 }
 void set_auto_mouse_timeout(uint16_t value) {
@@ -345,11 +353,15 @@ int main(int argc, char **argv) {
     view.changed_domain_mask = NOAH_PROFILE_DOMAIN_MASK_SETTINGS;
     noah_active_profile_settings_invalidate(NULL, 4, view.identity, view.identity, &view);
     assert(projections == 6 && durable_writes == 0);
-    // Auto-mouse on/off is pushed as the stored setting, through the switch.
-    assert(am_stored == 1);
-    am_stored = -1;
+    // Auto-mouse on/off and the pointer layer are pushed as stored, through
+    // the switch.
+    assert(am_stored == 1 && am_layer_pushes > 0u && am_bare_layer_pushes == 0u);
+    am_stored       = -1;
+    am_layer        = 3u;
+    am_layer_pushes = 0u;
     noah_qmk_portable_apply();
-    assert(am_stored == 1);
+    assert(am_stored == 1 && am_layer_pushes == 1u && am_bare_layer_pushes == 0u);
+    assert(am_layer == noah_setting(NOAH_SETTING_AUTO_MOUSE_LAYER, 0u) && am_layer == 4u);
     am_timeout = 900; // a key moving QMK's value shows in the runtime readback only
     assert(noah_qmk_portable_live_setting(NOAH_SETTING_AUTO_MOUSE_TIMEOUT) == 900 && noah_qmk_portable_live_setting(NOAH_SETTING_COMBOS_ENABLED) == 0u);
     FILE *responses = argc > 1 ? fopen(argv[1], "wb") : NULL;

@@ -8,8 +8,9 @@
 #include "users/noah/lib/pointing/policy/auto_mouse_switch.h"
 #include "users/noah/lib/profile/runtime/active_profile_settings_runtime.h"
 
-// QMK's auto-mouse as the BK pin has it: set_auto_mouse_enable() resets its
-// tracker and timers and never touches the layer.
+// QMK's auto-mouse as the BK pin has it: set_auto_mouse_enable() and
+// set_auto_mouse_layer() reset its tracker and timers and never touch the
+// layer state.
 static bool          fake_enabled;
 static uint8_t       fake_layer;
 static int8_t        fake_key_tracker;
@@ -44,6 +45,12 @@ void set_auto_mouse_enable(bool enable) {
 
 uint8_t get_auto_mouse_layer(void) {
     return fake_layer;
+}
+
+void set_auto_mouse_layer(uint8_t layer) {
+    if (fake_layer == layer) return;
+    fake_layer       = layer;
+    fake_key_tracker = 0;
 }
 
 bool layer_state_cmp(layer_state_t state, uint8_t layer) {
@@ -158,12 +165,68 @@ static void test_only_the_switch_off_on_the_master_turns_the_layer_off(void) {
     CHECK(!fake_enabled && layer_state_cmp(layer_state, 4u) && layer_off_calls == 0u);
 }
 
+// A pointer layer auto-mouse turned on goes off when the setting moves it to
+// another layer (a change of layer priority, a new pointer layer), since QMK
+// then times out only the new one; other layers stay as they are.
+static void test_moving_the_pointer_layer_turns_the_old_one_off(void) {
+    reset();
+    fake_layer  = 3u;
+    layer_state = (layer_state_t)1u << 3 | (layer_state_t)1u << 1;
+    auto_mouse_switch_set_layer(4u);
+    CHECK(fake_layer == 4u && layer_state == (layer_state_t)1u << 1);
+
+    // Moving it while the old layer is off turns nothing off.
+    reset();
+    fake_layer  = 3u;
+    layer_state = (layer_state_t)1u << 1;
+    auto_mouse_switch_set_layer(4u);
+    CHECK(fake_layer == 4u && layer_state == (layer_state_t)1u << 1 && layer_off_calls == 0u);
+}
+
+// Pushing the layer auto-mouse already targets (every settings push) leaves
+// it on: auto-mouse still owns it and times it out.
+static void test_pushing_the_same_pointer_layer_keeps_it(void) {
+    reset();
+    layer_state = (layer_state_t)1u << 4;
+    auto_mouse_switch_set_layer(4u);
+    CHECK(fake_layer == 4u && layer_state_cmp(layer_state, 4u) && layer_off_calls == 0u);
+}
+
+// The old layer stays when something else owns it, when auto-mouse is off
+// (it did not turn it on), and on the slave half, whose layers follow the
+// master half.
+static void test_a_moved_pointer_layer_another_owner_keeps_stays(void) {
+    reset();
+    fake_layer        = 3u;
+    layer_state       = (layer_state_t)1u << 3;
+    fake_owned_layers = (layer_state_t)1u << 3;
+    auto_mouse_switch_set_layer(4u);
+    CHECK(fake_layer == 4u && layer_state_cmp(layer_state, 3u) && layer_off_calls == 0u);
+
+    reset();
+    fake_enabled = false;
+    fake_layer   = 3u;
+    layer_state  = (layer_state_t)1u << 3;
+    auto_mouse_switch_set_layer(4u);
+    CHECK(fake_layer == 4u && layer_state_cmp(layer_state, 3u) && layer_off_calls == 0u);
+
+    reset();
+    fake_master = false;
+    fake_layer  = 3u;
+    layer_state = (layer_state_t)1u << 3;
+    auto_mouse_switch_set_layer(4u);
+    CHECK(fake_layer == 4u && layer_state_cmp(layer_state, 3u) && layer_off_calls == 0u);
+}
+
 int main(void) {
     test_qmk_runs_stored_and_override();
     test_settings_push_keeps_the_override();
     test_switching_off_turns_its_pointer_layer_off();
     test_a_pointer_layer_another_owner_keeps_stays();
     test_only_the_switch_off_on_the_master_turns_the_layer_off();
+    test_moving_the_pointer_layer_turns_the_old_one_off();
+    test_pushing_the_same_pointer_layer_keeps_it();
+    test_a_moved_pointer_layer_another_owner_keeps_stays();
     puts("auto-mouse switch tests passed");
     return 0;
 }

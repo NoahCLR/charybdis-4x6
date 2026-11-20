@@ -11,6 +11,16 @@
 
 static bool auto_mouse_override = true;
 
+// A pointer layer QMK's auto-mouse let go of without turning it off goes off
+// here; one a key holds or locks, or a pointing mode owns, stays with its
+// owner, and the pointer layer policy keeps one an anchoring pointing mode
+// needs. Layer state is the master half's; the slave half follows it.
+static void auto_mouse_switch_release_layer(uint8_t layer) {
+    if (is_keyboard_master() && layer_state_cmp(layer_state, layer) && !layer_ownership_owns(layer)) {
+        layer_off(layer);
+    }
+}
+
 void auto_mouse_switch_apply(bool stored) {
     bool    enable = stored && auto_mouse_override;
     bool    was_on = noah_qmk_contract_auto_mouse_enabled();
@@ -19,12 +29,22 @@ void auto_mouse_switch_apply(bool stored) {
     noah_qmk_contract_auto_mouse_set_enable(enable);
     // QMK's set_auto_mouse_enable(false) clears its tracker and timers but
     // leaves the pointer layer on, and its task stops before the timeout that
-    // would turn it off. A layer auto-mouse turned on goes off here; one a key
-    // holds or locks, or a pointing mode owns, stays with its owner, and the
-    // pointer layer policy keeps one an anchoring pointing mode needs. Layer
-    // state is the master half's; the slave half follows it.
-    if (was_on && !enable && is_keyboard_master() && layer_state_cmp(layer_state, layer) && !layer_ownership_owns(layer)) {
-        layer_off(layer);
+    // would turn it off.
+    if (was_on && !enable) {
+        auto_mouse_switch_release_layer(layer);
+    }
+}
+
+void auto_mouse_switch_set_layer(uint8_t layer) {
+    uint8_t old = noah_qmk_contract_auto_mouse_layer();
+
+    noah_qmk_contract_auto_mouse_set_layer(layer);
+    // QMK's set_auto_mouse_layer() clears its tracker and timers but leaves
+    // the old pointer layer on, and from then on times out only the new one.
+    // It goes off after the move, so the pointer layer policy no longer
+    // counts it as the pointer layer an anchor forces back on.
+    if (layer != old && noah_qmk_contract_auto_mouse_enabled()) {
+        auto_mouse_switch_release_layer(old);
     }
 }
 
