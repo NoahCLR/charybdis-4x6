@@ -58,8 +58,9 @@ jobs:
         run: QMK_ROOT="$GITHUB_WORKSPACE/qmk_firmware" sh tests/host/run_all_host_tests.sh
 
   pair:
-    # The release publishes these exact files: built in the release image at
-    # the pin, reproducibly, so they equal a local pair of the same commit.
+    # The release publishes these exact files: the starter keymap's pair
+    # (D-F78), built in the release image at the pin, reproducibly, so they
+    # equal the starter pair beside a local pair of the same commit.
     name: Pair build
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
@@ -96,13 +97,13 @@ jobs:
       # The pair stays inside the workspace and is uploaded by relative paths:
       # in a container job, ${{ runner.temp }} names the host's path, not the
       # container's, and the upload would miss files.
-      - name: Build the flashable pair
+      - name: Build the starter pair
         run: |
           QMK_ROOT="$GITHUB_WORKSPACE/qmk_firmware" OUTPUT_DIR="$GITHUB_WORKSPACE/release-pair" \
             sh tools/build-release-firmware-pair.sh
 
       - name: State the firmware contract
-        run: QMK_ROOT="$GITHUB_WORKSPACE/qmk_firmware" sh tests/host/run_contract_probe.sh --output "$GITHUB_WORKSPACE/release-pair/firmware-contract.json"
+        run: QMK_ROOT="$GITHUB_WORKSPACE/qmk_firmware" NOAH_KEYMAP=starter sh tests/host/run_contract_probe.sh --output "$GITHUB_WORKSPACE/release-pair/firmware-contract.json"
 
       - name: Record what was built
         run: |
