@@ -103,7 +103,7 @@ QMK rather than replacing it (D-F60).
 | Where | What it does |
 | --- | --- |
 | `noah_pointing_device_init_user` | targets `AUTO_MOUSE_DEFAULT_LAYER` and enables auto-mouse |
-| `auto_mouse_switch.c` | QMK's flag is the stored setting AND the override the auto-mouse keys switch (D-F66); switching it off turns the pointer layer off unless `layer_ownership` owns it, since QMK leaves it on |
+| `auto_mouse_switch.c` | QMK's flag is the stored setting AND the override the auto-mouse keys switch (D-F66), and QMK's pointer layer is the stored one; switching auto-mouse off, or moving its layer, turns the pointer layer it leaves off unless `layer_ownership` owns it, since QMK leaves it on |
 | `is_mouse_record_user` → `pointer_layer_policy_is_mouse_key_record` | mouse keys, anchoring pointing keys, layer holds while an anchoring mode runs, keys whose behaviour is a mouse gesture, DPI keys; a press resolved from the pointer layer counts for its own record and settles in finalize |
 | `noah_layer_state_set_user` → `pointer_layer_policy_apply` | after the linked layers have decided the mode: a prefer-typing mode strips the layer; an auto-sniping layer or a mode its layer started strips a separate pointer layer; otherwise, while auto-mouse is on, any anchor (QMK's toggle, its key tracker, an anchoring mode its key runs) forces it on |
 | `pointing_mode_lifecycle.c` | a prefer-typing mode turns the layer off at activation; a locked anchoring mode adds one synthetic tracker count unless it owns QMK's toggle; a locked scrolling mode turns QMK's toggle on, and off at unlock only if it turned it on (registry lock hooks) |
@@ -174,8 +174,8 @@ reads as one whole publication. Lighting reads that view on both halves.
 - Activation, locks, owner keys: `runtime/pointing_mode_state.c`; side effects
   of a transition: `runtime/pointing_mode_lifecycle.c`; traits from a slot:
   `runtime/pointing_mode_registry.c`.
-- Pointer layer rules: `policy/pointer_layer_policy.c`; auto-mouse on/off:
-  `policy/auto_mouse_switch.c`; QMK's auto-mouse and
+- Pointer layer rules: `policy/pointer_layer_policy.c`; auto-mouse on/off
+  and which layer it targets: `policy/auto_mouse_switch.c`; QMK's auto-mouse and
   pointing APIs only through `compat/qmk_auto_mouse_contract.h` and
   `compat/qmk_pointing_contract.h`.
 - How a key starts or locks a mode: `key/runtime/projection/pd_projection.c`
@@ -186,6 +186,8 @@ reads as one whole publication. Lighting reads that view on both halves.
 - Engine, movements and outputs: `run_pointing_mode_handlers_tests.sh`.
 - Activation, owners, locks, pointer layer and DPI: `run_pd_runtime_tests.sh`,
   `run_pointing_mode_tests.sh`, `run_pointer_layer_policy_tests.sh`.
+- Auto-mouse on/off and its layer: `run_auto_mouse_switch_tests.sh`; a moved
+  pointer layer against QMK's own auto-mouse: `run_qmk_contract_checks.sh`.
 - Keys and linked layers against the runtime, mouse buttons in a mode, held
   modifiers: `run_pointing_mode_key_runtime_integration_tests.sh`,
   `run_layer_ownership_tests.sh`.

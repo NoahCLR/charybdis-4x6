@@ -556,9 +556,11 @@ push of the settings never undoes the override. Switching auto-mouse off, by
 key or by an edit, turns the pointer layer off unless a key's hold, a lock, a
 one-shot or a pointing mode's layers keep it: QMK leaves the layer on and,
 with auto-mouse off, never times it out. While it is off no anchor forces the
-pointer layer on.
+pointer layer on. Moving the pointer layer (a new settings scalar 5, as a
+change of layer priority sends) turns the old one off under the same rule:
+QMK leaves it on and times out only the new one.
 
-Held by: `tests/host/run_qmk_portable_profile_tests.sh` (`qmk_portable_profile_test.c`), `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_overrides_beside_the_masters`), `tests/host/run_auto_mouse_switch_tests.sh` (`auto_mouse_switch_test.c`).
+Held by: `tests/host/run_qmk_portable_profile_tests.sh` (`qmk_portable_profile_test.c`), `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_overrides_beside_the_masters`), `tests/host/run_auto_mouse_switch_tests.sh` (`auto_mouse_switch_test.c`), `tests/host/run_qmk_contract_checks.sh` (`qmk_auto_mouse_layer_move_contract_test.c`).
 
 ## A stopped keyboard
 
