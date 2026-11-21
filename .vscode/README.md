@@ -11,8 +11,7 @@ working directory explicitly to this firmware repository.
   included, into `../builds/<current branch>/`. When QMK is not at the
   `qmk-pin.json` commit it says so, and the pair's note records the QMK commit
   it used and that it is not the pin. `verify`, CI and releases build at the
-  pin. The former shell-alias build task is
-  retired; the alias itself is not managed here.
+  pin.
 - **Build right half + compilation database** runs `qmk compile --compiledb`
   in the sibling QMK checkout with `QMK_USERSPACE` set to this repo,
   `FORCE_MASTER=yes` and `NOAH_PHYSICAL_HALF=right`. This generates QMK's

@@ -24,7 +24,7 @@ exempt = {'tests/host/firmware_client_independence_test.py', '.github/workflows/
 tracked = subprocess.run(['git', '-C', str(root), 'ls-files', '-z'], check=True, capture_output=True).stdout
 checked = 0
 for name in tracked.decode().split('\0'):
-    if not name or name in exempt or name.startswith(('docs/', 'tests/fixtures/', 'measurements/')):
+    if not name or name in exempt or name.startswith(('docs/', 'tests/fixtures/')):
         continue
     path = root / name
     if path.suffix in prose or not path.is_file():

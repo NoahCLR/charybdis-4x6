@@ -4,10 +4,6 @@
     "files.exclude": {
         "**/.DS_Store": true,
         ".claude/": true,
-        "layouts/": true,
-        "memory/": true,
-        "keyboards/.keep": true,
-        "keyboards/bastardkb/charybdis/4x6/keymaps/vendor/": true,
         "compile_commands.json": true,
         "**/__pycache__/**": true
     },

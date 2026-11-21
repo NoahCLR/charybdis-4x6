@@ -221,8 +221,7 @@ cadence build it reads the cadence recorder's window count just before
 arming and just after, and summarises the windows wholly between them, stage
 times included. It also estimates the poll rate with measured split time
 removed, a comparison between builds rather than a prediction. Install its
-dependencies with `npm ci --prefix tools`. Capture with the procedure in
-[`measurements/pointing-cadence/`](../../measurements/pointing-cadence/README.md),
-which also keeps the recorded sets.
+dependencies with `npm ci --prefix tools`. Capture with
+[the pointing-cadence procedure](../measuring.md#pointing-cadence).
 
 Held by: `tests/host/run_split_activity_tests.sh` (`split_diagnostics_tool_test.cjs`).
