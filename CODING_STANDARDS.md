@@ -116,7 +116,7 @@ are in [architecture](docs/architecture/README.md).
 | The fork-only and internal QMK symbols `compat/` adapts appear nowhere else in userspace or keymap C, except allowlisted hooks QMK calls by name | `run_compat_boundary_tests.sh` |
 | The QMK and fork contracts `compat/` relies on hold in the selected QMK (`QMK_ROOT`; the pin under verify) | `run_qmk_contract_checks.sh` |
 | No `.c` file under `users/` or `keyboards/` reads a weak const object it defines | `tests/host/weak_const_default_test.py` (in `run_all_host_tests.sh`) |
-| No tracked file outside prose, `docs/`, `tests/fixtures/` and `measurements/` names the app; frozen fixture hashes match | `run_firmware_client_independence_tests.sh` |
+| No tracked file outside prose, `docs/` and `tests/fixtures/` names the app; frozen fixture hashes match | `run_firmware_client_independence_tests.sh` |
 | Every runner runs in the build image; every workflow's `image:` equals `tools/build-image` | `tests/host/pair_build_script_test.py` (in `run_all_host_tests.sh`) |
 | The pair builds only at the BK pin, in the image | `tools/build-firmware-pair.sh`, held by `pair_build_script_test.py` |
 | The removed split baud selector fails the build | `run_split_transport_build_tests.sh` |

@@ -1,4 +1,52 @@
-# Pointing cadence
+# Hardware measurements
+
+How to take a measurement on the keyboard so its numbers can be trusted,
+repeated and compared. The captures themselves are not part of this
+repository: they go into a `measurements/` folder at the repository root,
+which git ignores, and stay on the Mac that took them. Keep them in the main
+checkout; a task worktree is removed when its branch lands.
+
+## Layout
+
+```
+measurements/
+  <subject>/                        one kind of measurement, one capture procedure
+    YYYY-MM-DD-<label>/             one set: one firmware build, one sitting
+      README.md                     the set record: build, conditions, results, notes
+      <workload>-<run>.json         raw tool output, unedited
+```
+
+Subjects:
+
+| Subject | Measures | Procedure |
+| --- | --- | --- |
+| `pointing-cadence/` | Master loop: pointing polls, poll gaps, loop stages, split transactions | [Pointing cadence](#pointing-cadence) |
+| `peer-copy/` | Unchanged committed-profile peer copy, validation and polling | [Peer copy timing](#peer-copy-timing) |
+
+## Rules
+
+- **A set is one firmware build, flashed once, captured in one sitting.** A new
+  build, a reflash, a profile change or a different host starts a new set.
+- **Raw output is kept as written.** Never edit, trim or merge capture files. A
+  bad capture is deleted before the set is recorded, and the set record says
+  so.
+- **Every set names its source.** Build from a committed, clean tree so the set
+  can name the userspace commit; name the QMK commit too. A set built from
+  uncommitted source cannot be repeated and is not recorded.
+- **The label says what the set is for**, such as `stage-timing` or
+  `no-coalescing`, so two sets can be compared by name. The date is the capture
+  date.
+- **Compare sets that differ in one thing**, and say what it is. Each subject
+  below says which differences are comparable.
+- **Conclusions live elsewhere.** A set record states facts and anomalies;
+  what a result decides goes in the plan or spec it governs, naming the set
+  and quoting the numbers it rests on.
+
+To add a subject, add a section here with its capture procedure (build,
+conditions, workloads, validity checks, how to compare) and a row in the table
+above.
+
+## Pointing cadence
 
 How often the right (master) half runs its loop and polls the sensor, where
 the loop's time goes, and what the split link costs. Captured with
@@ -11,18 +59,9 @@ the loop's time goes, and what the split link costs. Captured with
   exclusive time per loop stage, in one-second windows.
 
 Both are specified in
-[`docs/spec/split-activity-sync.md`](../../docs/spec/split-activity-sync.md),
-including what each loop stage covers. Pointing polls are pointing-task runs,
-an upper bound on the USB mouse reports; the host's own report rate is the
-final word.
-
-## Sets
-
-| Set | Firmware | Recorder | Purpose |
-| --- | --- | --- | --- |
-| [2026-09-28-stage-timing](2026-09-28-stage-timing/README.md) | `ac9e9508`, coalescing on | format 2 | Attribute the loop to its stages |
-
-## Capture procedure
+[the split activity contract](spec/split-activity-sync.md), including what
+each loop stage covers. Pointing polls are pointing-task runs, an upper bound
+on the USB mouse reports; the host's own report rate is the final word.
 
 Follow every step. Most of them remove a source of variation that the numbers
 cannot reveal after the fact.
@@ -69,9 +108,11 @@ cannot reveal after the fact.
 
 ### 3. Capture
 
-Run one capture per workload and run, writing straight into the set folder:
+Install the tool's dependency once with `npm ci --prefix tools`. Run one
+capture per workload and run, writing straight into the set folder:
 
 ```sh
+mkdir -p measurements/pointing-cadence/<set>
 node tools/capture-split-diagnostics.cjs > measurements/pointing-cadence/<set>/idle-1.json
 ```
 
@@ -121,10 +162,9 @@ data; note it in the set record.
    node tools/summarize-cadence-captures.cjs measurements/pointing-cadence/<set>/*.json
    ```
 
-4. Add the set to the index above, and put what it decides in the plan or
-   spec it serves, linking the set.
+4. Put what it decides in the plan or spec it serves, naming the set.
 
-## Comparing sets
+### Comparing sets
 
 - Compare sets that differ in one thing: the firmware change under test, or a
   build flag. Name it in both set records.
@@ -140,7 +180,7 @@ data; note it in the set record.
 - Compare distributions and gaps, not only mean polls per second: the gaps of
   5 ms or more are what a user feels.
 
-## Split transaction ids
+### Split transaction ids
 
 Captures number transactions; the numbering follows the build's split
 features. For builds of this repository since `25dacb46` (22 transactions):
@@ -174,7 +214,7 @@ python3 tools/split-transaction-ids.py
 
 `--compiledb` rewrites `compile_commands.json` in this repository and in QMK.
 
-## Set record template
+### Set record template
 
 ```markdown
 # <set name>
@@ -188,7 +228,7 @@ python3 tools/split-transaction-ids.py
 | QMK | `<commit>`; <clean, or what is dirty> |
 | Build | `<exact build command>` → `<n>_charybdis_{right,left}_diagnostic_cadence.uf2` |
 | Recorder | format <1 or 2> |
-| Split link | 230,400 baud; activity coalescing <on/off> |
+| Split link | 460,800 baud; activity coalescing <on/off> |
 | Profile | <compiled profile, unchanged after flashing / other> |
 | Host | <computer, OS>; <port and cable if noted> |
 | Lighting | <profile default, awake / other> |
@@ -203,3 +243,38 @@ python3 tools/split-transaction-ids.py
 <Anything unusual: deleted captures, failures, long gaps, deviations from the
 procedure. Decisions go in the plan or spec, not here.>
 ```
+
+## Peer copy timing
+
+Measures the copy of an unchanged committed custom profile to the other half
+through the ordinary logical Apply, including receiver validation and
+completion collection.
+
+1. Record the exact firmware pair and userspace/QMK commits running on both
+   halves. Do not flash as part of an agent capture.
+2. Obtain Noah's authorization to re-Apply the current profile. Close other
+   clients and take `/tmp/charybdis-keyboard.lock` with `mkdir`; wait while it
+   exists, and release it with `rmdir` on every exit.
+3. Use a scratch Node probe through the client's ordinary portable-profile
+   restore path. Read the current complete profile, retain the recovery copy,
+   and restore it unchanged. Do not toggle macros or edit any domain.
+4. Record Apply step timestamps and candidate status page 1 transitions,
+   polling about every 3 ms between completed HID requests. Include phase,
+   status, offset, length, BUSY reason/state, transport failures, retry count
+   and BUSY streak. Save stdout verbatim as `unchanged-N.txt`; the text format
+   preserves the probe's original output. Profile bytes and recovery documents
+   stay outside the set folder.
+5. Where supported, also collect candidate status page 2 at phase boundaries:
+   reused bytes, reuse attempts, source-unavailable replies, reconciler scan
+   invocations and RPC attempts. Read page 1 around each diagnostic sample to
+   detect transitions. Older firmware returns `UNKNOWN_PAGE`.
+6. Repeat unchanged under the same conditions. Report status-sampling
+   uncertainty: these host timestamps are observations, not device-side scan
+   timestamps. Page-1 retries alone do not give a scan count. Separate copy
+   work, validation and time until the sender collects completion.
+
+Comparisons require the same profile length/content, host, polling workload,
+USB orientation and otherwise idle keyboard. A new firmware build is a new
+set. Exact scan/RPC counts require page 2; serial transaction timing requires
+the optional split recorder described under
+[Pointing cadence](#pointing-cadence).

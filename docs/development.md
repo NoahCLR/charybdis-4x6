@@ -236,7 +236,7 @@ Firmware builds, the full host suite and diagnostics need no Ark checkout
 profile, pointing and macro-size vectors live in
 `tests/fixtures/client-regression/` with producer and checksum records, and
 `run_firmware_client_independence_tests.sh` fails if a tracked file outside
-prose, `docs/`, `tests/fixtures/` and `measurements/` names the app. CI's
+prose, `docs/` and `tests/fixtures/` names the app. CI's
 release gate, `Agreement with Ark main`, is the one exemption (D-F06).
 
 Independence runs one way: Ark reads firmware. These paths are Ark's inputs,
@@ -292,6 +292,6 @@ NOAH_SPLIT_ACTIVITY_COALESCE=no sh tools/build-firmware-pair.sh
 
 After flashing a measurement pair, `node tools/capture-split-diagnostics.cjs`
 reads both recorders. See [the activity contract](spec/split-activity-sync.md)
-and follow [the capture procedure](../measurements/pointing-cadence/README.md)
-so captures compare; recorded sets live under
-[`measurements/`](../measurements/README.md), never edited.
+and follow [the capture procedure](measuring.md#pointing-cadence) so captures
+compare. Recorded sets stay in the untracked `measurements/` folder, never
+edited.
