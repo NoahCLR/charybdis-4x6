@@ -19,12 +19,7 @@ indent_size = 4
 charset = utf-8
 max_line_length = 200
 
-# Make these match what we have in .gitattributes
 [*.mk]
-end_of_line = lf
-indent_style = tab
-
-[Makefile]
 end_of_line = lf
 indent_style = tab
 

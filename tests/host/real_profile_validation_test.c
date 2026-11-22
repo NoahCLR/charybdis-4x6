@@ -259,7 +259,7 @@ static void check_authored_macro_bank(void) {
     const char *path = getenv("NOAH_AUTHORED_MACRO_BANK_HEADER");
     if (!path) {
         if (authored_macro_bank_size != bank.length || memcmp(authored_macro_bank, bank.bytes, bank.length) != 0) {
-            fprintf(stderr, "stale authored_macro_bank.h: run NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh\n");
+            fprintf(stderr, "stale generated/authored_macro_bank.h: run NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh [keymap folder]\n");
         }
         CHECK(authored_macro_bank_size == bank.length);
         CHECK(memcmp(authored_macro_bank, bank.bytes, bank.length) == 0);

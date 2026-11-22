@@ -6,7 +6,10 @@
 # tests/fixtures. Firmware only states what it is; the agreement check that
 # judges it lives with the client. Built with the production feature set
 # (users/noah/rules.mk defaults: live-profile owner and mutation, PD profile,
-# split, Raw HID, combos, RGB matrix, pointing device).
+# split, Raw HID, combos, RGB matrix, pointing device), with the noah keymap's
+# compiled defaults; NOAH_KEYMAP=starter states the starter keymap's, the
+# defaults of the pair a release publishes (D-F78). Only the compiled-default
+# digest differs between them.
 #
 #   sh tests/host/run_contract_probe.sh [--output FILE]
 
@@ -26,7 +29,11 @@ fi
 . "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
-KEYMAP_PATH="$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah"
+case "${NOAH_KEYMAP:-noah}" in
+    noah|starter) ;;
+    *) echo "NOAH_KEYMAP must be noah or starter" >&2; exit 1 ;;
+esac
+KEYMAP_PATH="$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/${NOAH_KEYMAP:-noah}"
 BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
 

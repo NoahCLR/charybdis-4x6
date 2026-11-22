@@ -108,15 +108,15 @@ are in [architecture](docs/architecture/README.md).
 | Every tracked `.c` file under `users/noah/` is in a source list of `source_manifest.mk` or allowlisted with how it is built; every listed file exists | `run_source_manifest_tests.sh` |
 | Every firmware build runs real-profile validation and fails with it | `users/noah/rules.mk`; `run_feature_gate_compile_tests.sh` checks `rules.mk` still calls it |
 | Authored data places only supported actions, with no raw layer actions | `noah_action_supported_at()` in `run_keymap_validation_tests.sh` and `run_real_profile_validation_tests.sh` |
-| `authored_macro_bank.h` matches the profile's `MACROS()` | `run_real_profile_validation_tests.sh` |
-| `authored_autocorrect_list.h` matches the profile's `autocorrect.txt` | `run_real_profile_validation_tests.sh` |
+| `generated/authored_macro_bank.h` matches the profile's `MACROS()` | `run_real_profile_validation_tests.sh` |
+| `generated/authored_autocorrect_list.h` matches the profile's `autocorrect.txt` | `run_real_profile_validation_tests.sh` |
 | The autocorrect word table and domain fixture reproduce from the host layouts | `run_profile_autocorrect_v1_tests.sh` |
 | The weak hook defaults call their `noah_*` helpers, and a test override that chains keeps the behaviour | `run_hook_chaining_tests.sh` |
 | Any other userspace or keymap file that defines one of those hooks calls the `noah_*` helpers its default calls, or replaces it on purpose with `// Replaces noah_<helper>(): <why>` in its body ([hook overrides](docs/guide/hooks.md#replacing-a-default)) | `run_hook_override_tests.sh` |
 | The fork-only and internal QMK symbols `compat/` adapts appear nowhere else in userspace or keymap C, except allowlisted hooks QMK calls by name | `run_compat_boundary_tests.sh` |
 | The QMK and fork contracts `compat/` relies on hold in the selected QMK (`QMK_ROOT`; the pin under verify) | `run_qmk_contract_checks.sh` |
 | No `.c` file under `users/` or `keyboards/` reads a weak const object it defines | `tests/host/weak_const_default_test.py` (in `run_all_host_tests.sh`) |
-| No tracked file outside prose, `docs/`, `tests/fixtures/` and `measurements/` names the app; frozen fixture hashes match | `run_firmware_client_independence_tests.sh` |
+| No tracked file outside prose, `docs/` and `tests/fixtures/` names the app; frozen fixture hashes match | `run_firmware_client_independence_tests.sh` |
 | Every runner runs in the build image; every workflow's `image:` equals `tools/build-image` | `tests/host/pair_build_script_test.py` (in `run_all_host_tests.sh`) |
 | The pair builds only at the BK pin, in the image | `tools/build-firmware-pair.sh`, held by `pair_build_script_test.py` |
 | The removed split baud selector fails the build | `run_split_transport_build_tests.sh` |

@@ -47,10 +47,13 @@ and any skipped, and for boundary work the contracts touched.
   gate that mirrors it, in the same change.
 - Never flash firmware or Apply a profile to verify a change; host tests and
   the pair never prove hardware acceptance.
-- Read [`measurements/README.md`](measurements/README.md) before taking or
-  quoting a measurement; never edit a capture file.
+- Read [`docs/measuring.md`](docs/measuring.md) before taking or quoting a
+  measurement; captures stay out of git, and a capture file is never edited.
 - A change to a wire format, fixture bytes, a spec's contract, or a probe Ark
   compiles names the Ark follow-up ([independence](docs/development.md#independence-from-ark)).
+- There are two keymap folders: `noah`, the pair Noah flashes, and `starter`,
+  the one a release publishes (D-F78). A change meant for released defaults
+  goes in `starter`; never put Noah's own keys, macros or names there.
 - The firmware version (`users/noah/firmware_version.h`) is written only by
   the vault's `release`; never change it by hand (D-F77).
 - A lasting decision is the next ADR (D-F<n>, [domain docs](docs/agents/domain.md));

@@ -1,0 +1,433 @@
+// ────────────────────────────────────────────────────────────────────────────
+// RGB Color Configuration
+// ────────────────────────────────────────────────────────────────────────────
+//
+// Read this file in render order:
+//   1. base layer render surfaces
+//   2. the auto-mouse base-stage transition
+//   3. later overlay surfaces
+//
+// Want to change layer, LED-group, automouse, pointing-mode, behaviour
+// feedback or replacement feedback colors? Edit this file.
+// Want to change the rendering logic?  Edit users/noah/lib/rgb/core/rgb_runtime.c
+// and the stage modules under users/noah/lib/rgb/.
+// For shared RGB config types and the HSV helper, see
+// users/noah/lib/rgb/core/rgb_config_helpers.h.
+// For split-safe LED helper functions, see users/noah/lib/rgb/core/rgb_helpers.h.
+//
+// Authoring rules:
+//   - Stage color tables define each renderer's normal color.
+//   - LED group tables repaint selected LEDs after that stage's normal render.
+//   - RGB_*_GROUP_ALL rows match every active item in that stage; they do not
+//     create layer, pointing-mode, combo, or behaviour-feedback state by themselves.
+//   - In LED group tables only, HSV(0, 0, 0) means inherit the active stage
+//     color. Nonzero HSV values override the stage color for that LED group.
+//   - In normal color tables, saturation 0 and value 0 (HSV(0, 0, 0)) is
+//     passthrough: that layer, pointing slot, combo or feedback case paints
+//     nothing, so what is beneath shows; for LAYER_BASE that leaves the
+//     default RGB Matrix effect visible. Value 0 with saturation, such as
+//     HSV(0, 255, 0), turns the LEDs off (black). The auto-mouse end color is always literal
+//     (D-F74).
+//
+// ────────────────────────────────────────────────────────────────────────────
+
+#include "noah_keymap.h" // layer enum, POINTING_MODE_* constants, hsv_t, rgb config types, RGB config helpers
+
+#if defined(RGB_MATRIX_ENABLE)
+
+// ─── LED Map ────────────────────────────────────────────────────────────────
+//
+// Reference map for LED group authoring:
+//
+//   ╭───────────────────────                ╭────────────────────────╮
+//     0   7   8  15  16  20                   49  45  44  37  36  29
+//   ├───────────────────────┤               ├────────────────────────┤
+//     1   6   9  14  17  21                   50  46  43  38  35  30
+//   ├───────────────────────┤               ├────────────────────────┤
+//     2   5  10  13  18  22                   51  47  42  39  34  31
+//   ├───────────────────────┤               ├────────────────────────┤
+//     3   4  11  12  19  23                   52  48  41  40  33  32
+//   ╰───────────────────────╯               ╰────────────────────────╯
+//                       26  27  28     53  54
+//                           25  24     55      (56)
+//                     ╰────────────╯ ╰────────╯
+//
+// LED 56 is the custom trackball LED soldered on the right half, not part of
+// the standard key matrix.
+//
+// Define reusable physical groups here, then reference them from any
+// per-stage LED group table below.
+#    define RGB_LED_GROUP_LEFT_THUMB RGB_LED_GROUP(26, 27, 28, 25, 24)
+#    define RGB_LED_GROUP_RIGHT_THUMB RGB_LED_GROUP(53, 54, 55)
+#    define RGB_LED_GROUP_THUMBS RGB_LED_GROUP(26, 27, 28, 25, 24, 53, 54, 55)
+#    define RGB_LED_GROUP_TRACKBALL RGB_LED_GROUP(56)
+
+// ─── Layer colors ───────────────────────────────────────────────────────────
+//
+// Layer indicator colors and render modes, indexed by layer enum.
+// LAYER_BASE is the persistent layer underlay: a non-black color paints below
+// higher layers, while HSV(0, 0, 0) lets the default RGB Matrix effect show.
+// The configured auto-mouse target layer uses its authored layer color as the
+// timeout fade start state.
+// .mode:
+//   - ALL_KEYS = paint the whole layer color wash
+//   - KEYS_MAPPED_ON_THIS_LAYER_ONLY = paint only keys that have a real key
+//     assigned on that layer; lower active layers remain visible underneath
+//     transparent positions
+//                       { .color = HSV(hue, sat, val), .mode = ... }
+const layer_color_config_t layer_colors[LAYER_COUNT] = {
+    [LAYER_BASE]    = {.color = HSV(0, 0, 0), .mode = ALL_KEYS},
+    [LAYER_LOWER]   = {.color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_RAISE]   = {.color = HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_POINTER] = {.color = HSV(0, 0, 150), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_1] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_2] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_3] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_4] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_5] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_6] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_7] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_8] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_9] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_10] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_11] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_12] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+};
+
+// ─── Saved LED Groups ───────────────────────────────────────────────────────
+//
+// LED groups Charybdis Ark keeps for later without painting them anywhere.
+// A group used by a table below is saved with it and need not be listed here.
+static const rgb_led_group_t saved_led_groups_data[] = RGB_SAVED_LED_GROUP_TABLE();
+
+// ─── Layer LED Groups ───────────────────────────────────────────────────────
+//
+// Paint specific LEDs a different color when a layer is active.
+//
+// Layer LED groups repaint after normal layer colors. Rows keyed to LAYER_BASE
+// can act as persistent underlay accents for the layer scene. Use
+// RGB_LAYER_GROUP_ALL to apply one group row to every active layer.
+//
+// In LED group rows, HSV(0, 0, 0) inherits the matching layer color. Use a
+// nonzero HSV value only when the group should override that stage color.
+// Inheritance only paints when the matched layer has a solid authored color;
+// with the current passthrough LAYER_BASE, use a nonzero group color if you want
+// a visible base-layer accent.
+static const layer_led_group_t layer_led_groups_data[] = RGB_LED_GROUP_TABLE(
+    // { .layer = LAYER_RAISE, .color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_RIGHT_THUMB },
+    // { .layer = RGB_LAYER_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS },
+    // { .layer = LAYER_LOWER, .color = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_LEFT_THUMB },
+);
+
+//
+// ─── Auto-mouse timeout fade ────────────────────────────────────────────────
+//
+// Auto-mouse starts from the authored pointer layer rendering above and
+// fades toward the destination configured below. The first AUTOMOUSE_RGB_DEAD_TIME
+// ms are dead time; only the remaining portion of AUTO_MOUSE_TIME animates.
+//
+// .mode chooses how the fade picks its destination:
+//   - FOLLOW_REAL_DESTINATION = land on the real rendered board state after
+//     the pointer layer drops out
+//   - END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW = keep the real destination where
+//     layers paint, but use end_color for keys that would otherwise reveal the
+//     base RGB effect
+//   - END_COLOR_ON_ALL_KEYS = use end_color as the fade destination on every
+//     key while the automouse renderer is active
+//
+// .end_color is used only by the END_COLOR_* modes above. Later overlays such
+// as pointing-mode color or behaviour feedback can still repaint on top of the
+// visible result.
+#    ifdef RGB_AUTOMOUSE_GRADIENT_ENABLE
+const automouse_fade_end_config_t automouse_fade_end_config = {
+    .mode      = FOLLOW_REAL_DESTINATION,
+    .end_color = HSV(167, 255, 199),
+};
+#    endif // RGB_AUTOMOUSE_GRADIENT_ENABLE
+
+// ─── Pointing device mode colors ────────────────────────────────────────────
+//
+// Overlay colors for the active pointing mode.
+// Each entry is tagged with its pointing mode so the order doesn't need to
+// match pointing_modes[] — adding or reordering modes won't silently break
+// colors.
+//
+// Locality decides where the overlay paints:
+//   - RGB_BOTH_HALVES = mirror the PD color across both halves
+//   - RGB_LEFT_HALF = always paint the left half
+//   - RGB_RIGHT_HALF = always paint the right half
+//   - RGB_KEY_HALF = paint the half or halves containing the key footprint
+//     that triggered the current effective pointing mode
+//   - RGB_KEYS_ONLY = paint the key footprint that triggered the current
+//     effective pointing mode; combo-driven triggers paint every combo key
+//
+// { .pointing_mode = ..., .color = HSV(hue, sat, val), .locality = ... }
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+const pointing_mode_color_t pointing_mode_colors[] = {
+    {.pointing_mode = POINTING_MODE_6, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_7, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {
+        .pointing_mode = POINTING_MODE_DRAGSCROLL,
+        .color         = HSV(21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        .locality      = RGB_RIGHT_HALF,
+    },
+    {
+        .pointing_mode = POINTING_MODE_VOLUME,
+        .color         = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        .locality      = RGB_RIGHT_HALF,
+    },
+    {
+        .pointing_mode = POINTING_MODE_BRIGHTNESS,
+        .color         = HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        .locality      = RGB_RIGHT_HALF,
+    },
+    {
+        .pointing_mode = POINTING_MODE_ARROW,
+        .color         = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        .locality      = RGB_RIGHT_HALF,
+    },
+    {
+        .pointing_mode = POINTING_MODE_PINCH,
+        .color         = HSV(55, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        .locality      = RGB_RIGHT_HALF,
+    },
+    {
+        .pointing_mode = POINTING_MODE_ZOOM,
+        .color         = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+        .locality      = RGB_RIGHT_HALF,
+    },
+    // Slots 8..31 start passthrough, painting nothing; every slot keeps a row.
+    {.pointing_mode = POINTING_MODE_8, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_9, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_10, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_11, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_12, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_13, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_14, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_15, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_16, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_17, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_18, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_19, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_20, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_21, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_22, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_23, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_24, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_25, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_26, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_27, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_28, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_29, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_30, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_31, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+};
+
+// ─── Pointing-Device Mode LED Groups ────────────────────────────────────────
+//
+// Paint specific LEDs while a pointing mode feedback state is active. These
+// groups repaint after the active pointing-mode locality render. Use
+// RGB_POINTING_MODE_GROUP_ALL to make one group row follow whichever pointing
+// mode is currently active; it does not create pointing-mode feedback when none
+// is active.
+//
+// In LED group rows, HSV(0, 0, 0) inherits the active pointing-mode color. Use
+// a nonzero HSV value only when the group should override that stage color.
+static const pointing_mode_led_group_t pointing_mode_led_groups_data[] = RGB_LED_GROUP_TABLE(
+    // { .pointing_mode = POINTING_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
+    // { .pointing_mode = RGB_POINTING_MODE_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS },
+);
+#    endif // POINTING_DEVICE_ENABLE && RGB_POINTING_MODE_FEEDBACK_ENABLE
+
+// ─── Combo feedback ────────────────────────────────────────────────────────
+//
+// Visual identity for any currently active combo chord.
+//
+// This is a persistent combo layer:
+//   - if a combo is held, its combo color stays active
+//   - combo-owned preview / PD state can route that combo underneath those
+//     state indicators
+//   - authored behaviour feedback can still repaint above the combo color
+//     on the same keys
+//
+// Locality decides where the combo layer paints:
+//   - RGB_BOTH_HALVES = mirror the combo color across both halves
+//   - RGB_LEFT_HALF = always paint the left half
+//   - RGB_RIGHT_HALF = always paint the right half
+//   - RGB_KEY_HALF = paint the half or halves touched by the live combo
+//     footprint
+//   - RGB_KEYS_ONLY = paint the exact combo keys
+//
+#    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
+const combo_feedback_color_config_t combo_feedback_colors = {
+    .color    = HSV(191, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .locality = RGB_KEY_HALF,
+};
+
+// ─── Combo Feedback LED Groups ──────────────────────────────────────────────
+//
+// Paint specific LEDs a different color while combo feedback is active.
+// These groups repaint after the combo locality render inside whichever combo
+// underlay/overlay substage is live.
+// Combo group rows have no selector and no GROUP_ALL value: every row paints
+// whenever combo feedback is visible. HSV(0, 0, 0) inherits the active combo
+// color.
+//
+// Uncomment or add rows inside this table to enable persistent combo accents.
+static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
+    // {.color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS},
+);
+#    endif // COMBO_ENABLE && RGB_COMBO_FEEDBACK_ENABLE
+
+//
+// ─── Behaviour feedback ─────────────────────────────────────────────────────
+//
+// Visual feedback for the custom key behavior engine state.
+//
+// Terms used below:
+//   - tap index = tap_counts[n] branch (single press, double press, ...)
+//   - hold tier = .hold on the winning tap index
+//   - long-hold tier = .long_hold on the winning tap index
+//
+// Each case below has its own color and its own locality, where it paints:
+//   - RGB_BOTH_HALVES = both halves
+//   - RGB_LEFT_HALF, RGB_RIGHT_HALF = always that half
+//   - RGB_KEY_HALF = the half of the key showing it; a combo spanning the
+//     halves paints both
+//   - RGB_KEYS_ONLY = only the keys showing it; a combo paints every combo key
+// When keys show cases with different localities at once, both halves paint
+// first, then one half, then the key's half, then the keys alone, so a
+// narrower case stays seen over a wider one. Where two cases share a
+// locality the newest key's case paints it; when the newest key's case has
+// another locality, the later case in case order paints over the earlier.
+//
+// Tap feedback:
+//   - RGB_TAP_BRANCHES(...) = the tap branch currently selected and not yet
+//     entered. Each tap past the base one switches the key to that branch's color
+//     and holds it until the branch is entered, at which point the action colors
+//     below take over. The list starts at tap count 2 and higher tap counts
+//     take the last branch's color and locality
+//   - branch 0 paints nothing: it is the non-tapping surface, so the layer color
+//     or effect underneath simply stays, and one tap does not show the user meant
+//     to enter a tap branch at all
+#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
+    RGB_TAP_BRANCHES({.color = HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .locality = RGB_KEY_HALF}, // tap count 2
+                     {.color = HSV(222, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .locality = RGB_KEY_HALF}, // tap count 3
+                     {.color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .locality = RGB_KEY_HALF},  // tap count 4
+                     {.color = HSV(25, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .locality = RGB_KEY_HALF}   // tap count 5
+                     ),
+
+    // Used for committed authored non-base tap branches that do not already
+    // have state feedback. Base single-tap commits stay quiet under the pulse
+    // mode below.
+    .tap_committed_color    = HSV(0, 0, 150),
+    .tap_committed_locality = RGB_KEY_HALF,
+
+    // Only authored double-tap and higher tap branches can pulse tap-commit feedback.
+    .tap_commit_mode = KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS,
+
+    // Used for authored hold-tier pending / active states and commit pulses.
+    .hold_active_color    = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .hold_active_locality = RGB_KEY_HALF,
+
+    // Used for authored long-hold-tier active states and commit pulses.
+    .long_hold_active_color    = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .long_hold_active_locality = RGB_KEY_HALF,
+};
+
+// ─── Behaviour Feedback LED Groups ──────────────────────────────────────────
+//
+// Paint specific LEDs a different color while behaviour feedback is active.
+// These groups repaint after the cases' locality render when the case they
+// name shows.
+//
+// In LED group rows, HSV(0, 0, 0) inherits the color of the case that shows.
+// Use a nonzero HSV value only when the group should override that color.
+//
+// .semantic chooses which case drives the group:
+//   - KEY_FEEDBACK_GROUP_TAP_COUNT_2 = the double-tap branch is selected and
+//     has not been entered yet, on any key
+//   - KEY_FEEDBACK_GROUP_TAP_COUNT_3, KEY_FEEDBACK_GROUP_TAP_COUNT_4 = the same
+//     for the triple and quadruple tap
+//   - KEY_FEEDBACK_GROUP_TAP_COUNT_5 = the same for tap count 5 or more
+//   - KEY_FEEDBACK_GROUP_TAP_BRANCH_ANY = every tap branch, following the
+//     newest key with one selected, in that branch's color, and no tier;
+//     rendered after the ALL rows and before the rows naming one case
+//   - KEY_FEEDBACK_GROUP_TAP_COMMITTED = tap action commit pulse for authored
+//     non-base tap branches that do not already have state feedback
+//   - KEY_FEEDBACK_GROUP_HOLD_ACTIVE = hold-tier pending / active / commit
+//     feedback
+//   - KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE = long-hold-tier active / commit
+//     feedback
+//   - KEY_FEEDBACK_GROUP_ALL = one group row that follows the newest key
+//     with a tap branch selected, in that branch's color, and each tier above;
+//     rendered before the rows naming one case so narrower rows can override it
+static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
+    // { .semantic = KEY_FEEDBACK_GROUP_TAP_COUNT_2, .color = HSV(169, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
+    // { .semantic = KEY_FEEDBACK_GROUP_TAP_COMMITTED, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
+    // { .semantic = KEY_FEEDBACK_GROUP_HOLD_ACTIVE, .color = HSV(18, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
+    // { .semantic = KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE, .color = HSV(148, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
+);
+#    endif // RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
+
+//
+// ─── Replacement feedback ───────────────────────────────────────────────────
+//
+// A flash when text replacement (autocorrect) changes what was typed, or what
+// the leader sends. It lasts RGB_AUTOCORRECT_FEEDBACK_FLASH_MS (config.h) and
+// paints above every other stage. While the leader waits its colour is held.
+//
+//   - .text_color = an input was replaced with text
+//   - .macro_color = an input was replaced by its macro
+//   - .undo_color = Backspace right after a replacement put the word back
+//   - .leading_color = held while the leader waits for what is typed after it
+//
+// Here a color of saturation 0 and value 0, such as HSV(0, 0, 0), is
+// passthrough: it paints nothing for its case, so each of the four can paint
+// nothing by itself. Use HSV(h, 255, 0) to turn its LEDs off.
+//
+// Each case has its own locality, where it paints; one case shows at a time:
+//   - RGB_BOTH_HALVES, RGB_LEFT_HALF, RGB_RIGHT_HALF = those halves
+//   - RGB_KEY_HALF = the half of the key that ended the word, of the
+//     Backspace that undid the replacement, or of the key that ended leading;
+//     for leading, and for what the leader's timeout sends, the Leader key
+//   - RGB_KEYS_ONLY = that key alone; a combo's output paints every combo key
+// A Leader no key sent (an action outside the matrix) paints both halves
+// under RGB_KEY_HALF and every key under RGB_KEYS_ONLY.
+#    ifdef RGB_AUTOCORRECT_FEEDBACK_ENABLE
+const autocorrect_feedback_color_config_t autocorrect_feedback_colors = {
+    .text_color       = HSV(106, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .text_locality    = RGB_KEY_HALF,
+    .macro_color      = HSV(234, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .macro_locality   = RGB_KEY_HALF,
+    .undo_color       = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .undo_locality    = RGB_KEY_HALF,
+    .leading_color    = HSV(170, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
+    .leading_locality = RGB_KEY_HALF,
+};
+
+// ─── Replacement Feedback LED Groups ────────────────────────────────────────
+//
+// Paint specific LEDs a different color while a replacement flash or leading
+// shows. These groups repaint after the stage's locality render.
+//
+// In LED group rows, HSV(0, 0, 0) inherits the color of the case that shows.
+//
+// .semantic chooses which case drives the group:
+//   - AUTOCORRECT_FEEDBACK_GROUP_TEXT = a text replacement
+//   - AUTOCORRECT_FEEDBACK_GROUP_MACRO = a macro replacement
+//   - AUTOCORRECT_FEEDBACK_GROUP_UNDO = an undone replacement
+//   - AUTOCORRECT_FEEDBACK_GROUP_LEADING = the leader waiting
+//   - AUTOCORRECT_FEEDBACK_GROUP_ALL = any of them; rendered before the rows
+//     naming one case so narrower rows can override it
+static const autocorrect_feedback_led_group_t autocorrect_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE(
+    // { .semantic = AUTOCORRECT_FEEDBACK_GROUP_UNDO, .color = HSV(0, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
+);
+#    endif // RGB_AUTOCORRECT_FEEDBACK_ENABLE
+
+// Expand the authored RGB tables, derived counts, and RGB feedback policy
+// bridges above into the runtime symbols expected by the userspace runtime.
+MATERIALIZE_RGB_CONFIG();
+
+#endif // RGB_MATRIX_ENABLE

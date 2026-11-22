@@ -79,35 +79,41 @@ which keys they hold on the mode's colour. A layer above covers both. A layer
 starts at most one slot's mode, and the pointer layer or a default layer in a
 link does nothing.
 
-## The slots I ship
+## What a release sets up
 
-The compiled defaults fill the first eight slots; 8 to 31 start empty. None
-of them has a link.
+A release sets up one mode: Dragscroll, in slot 0, which scrolls. Its key is
+on `X` and `.` of the Pointer layer. Slots 1 to 31 start empty, and the modes
+in them are yours to build in Ark.
 
-| Slot | Mode | What the ball does |
-| --- | --- | --- |
-| 0 | Dragscroll | scrolls |
-| 1 | Volume | up and down change the volume |
-| 2 | Brightness | up and down change screen brightness |
-| 3 | Zoom | up and down send Cmd+= and Cmd+- |
-| 4 | Arrow | sends arrow keys |
-| 5 | Pinch | scrolls up and down with Left Cmd held |
-| 6 | Undo / Redo | left and right send Cmd+Z and Shift+Cmd+Z |
-| 7 | Back / Forward | left and right click mouse buttons 4 and 5, once per movement |
+## Modes to build
 
-Pinch becomes pinch-to-zoom on a Mac with
-[BetterMouse](https://better-mouse.com/), which turns Cmd-scroll into zoom;
-without it, it is Cmd-scroll. Zoom needs no app.
+These are modes I use, as examples of what a slot can hold. None of them is
+set up on a release; Ark's demo profile has them all, with the Mac shortcuts.
+
+| Mode | What the ball does |
+| --- | --- |
+| Volume | up and down change the volume |
+| Brightness | up and down change screen brightness |
+| Zoom | up and down send Ctrl+= and Ctrl+- (Cmd on a Mac) |
+| Arrow | sends arrow keys |
+| Pinch | scrolls up and down with Ctrl held (Cmd on a Mac) |
+| Undo / Redo | left and right send Ctrl+Z and Ctrl+Y (Cmd+Z and Shift+Cmd+Z on a Mac) |
+| Back / Forward | left and right click mouse buttons 4 and 5, once per movement |
+
+Scrolling with Ctrl held zooms in most apps on Windows and Linux. On a Mac,
+scrolling with Cmd held zooms only with an app such as
+[BetterMouse](https://better-mouse.com/). Zoom needs no app on any of them.
 
 ## The pointer layer and sniping
 
 **Auto-mouse** turns the **pointer layer** on when the ball moves and off
-again after a quiet timeout (1.2 s in my profile). Mouse keys, mode keys, the
+again after a quiet timeout (1.2 s by default). Mouse keys, mode keys, the
 DPI keys and behaviours marked as mouse keys keep it on. A typing key turns it
-off once the ball is still; modifiers, modified keys such as Cmd+C, and
+off once the ball is still; modifiers, modified keys such as Ctrl+C, and
 dual-role keys held for their layer or modifiers don't. A mode either keeps
-the pointer layer on under it or gives way to the typing layer; Arrow gives
-way, so the arrows sit on whatever you were typing on.
+the pointer layer on under it or gives way to the typing layer; a mode that
+sends arrow keys can give way, so the arrows sit on whatever you were typing
+on.
 
 The switch keys `AM_ON`, `AM_OFF` and `AM_TOGG` turn auto-mouse on, off or
 the other way until the keyboard is unplugged, as `CM_ON`, `CM_OFF` and
@@ -121,10 +127,13 @@ a one-shot stays, and a mode that keeps the pointer layer on under it does
 so only while auto-mouse is on. With auto-mouse off the pointer layer shows
 no fade.
 
-**Sniping** slows the pointer for precise work. It comes on by itself while
-any of the auto-sniping layers is on (Navigation alone, in my profile), and
-strips a separate pointer layer so those layers keep their keys. Switching
-auto-sniping off keeps the layers chosen for when it comes back on.
+**Sniping** slows the pointer for precise work. The `SNIPING_MODE` key turns
+it on while held; a release has it on `C` and `,` of the Pointer layer. It
+also comes on by itself while any of the auto-sniping layers is on, and
+strips a separate pointer layer so those layers keep their keys. A release
+chooses no auto-sniping layer; I choose my navigation layer, so the pointer
+slows whenever that layer is on. Switching auto-sniping off keeps the layers
+chosen for when it comes back on.
 
 The DPI keys step the pointer speed (400 to 3,400 in steps of 200) and the
 sniping speed (100 to 400 in steps of 100). A mode can run at its own DPI.

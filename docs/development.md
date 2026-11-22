@@ -55,7 +55,7 @@ while you work, then the gates below before handing back.
 | --- | --- |
 | Key runtime | `run_participation_tests.sh`, `run_key_runtime_release_matrix_tests.sh`, `run_key_runtime_modifier_hold_integration_tests.sh`, `run_pointing_mode_key_runtime_integration_tests.sh`, `run_key_runtime_layer_lock_integration_tests.sh`, `run_key_runtime_scenario_tests.sh`, `run_key_runtime_integration_harness_tests.sh`, `run_tap_depth_eight_tests.sh` (the second tap-depth configuration) |
 | Pointing | `run_pointing_mode_tests.sh`, `run_pointing_mode_handlers_tests.sh`, `run_pd_runtime_tests.sh`, `run_pointer_layer_policy_tests.sh`, `run_split_runtime_sync_tests.sh` |
-| Authored profile | `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_real_profile_validation_tests.sh` |
+| Authored profile | `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_real_profile_validation_tests.sh`, `run_starter_keymap_tests.sh` (the starter keymap, D-F78) |
 | Lighting | `run_rgb_validation_tests.sh`, `run_rgb_layer_render_tests.sh` |
 | Hooks and ownership | `run_hook_chaining_tests.sh`, `run_hook_override_tests.sh`, `run_keyboard_mod_ownership_tests.sh`, `run_owned_keycode_tests.sh`, `run_owned_keycode_qmk_report_tests.sh`, `run_held_action_tests.sh`, `run_layer_ownership_tests.sh` |
 | Macros, Raw HID, QMK contracts | `run_qmk_contract_checks.sh`, `run_compat_boundary_tests.sh`, `run_action_lifecycle_tests.sh`, `run_qmk_portable_profile_tests.sh`, `run_macro_payload_tests.sh`, `run_profile_keymap_macros_runtime_tests.sh`, `run_profile_wire_v1_tests.sh` |
@@ -68,11 +68,11 @@ hold it. Then, as they apply:
 
 1. Authored keymap, combo, macro or lighting data changed:
    `run_real_profile_validation_tests.sh`. A `MACROS()` change regenerates
-   the profile's `authored_macro_bank.h` with
+   the profile's `generated/authored_macro_bank.h` with
    `NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh`
    (pass the keymap path for another profile); validation refuses a stale copy.
    A change to the profile's `autocorrect.txt` regenerates its
-   `authored_autocorrect_list.h` with
+   `generated/authored_autocorrect_list.h` with
    `python3 tools/autocorrect/build.py --write-authored <keymap folder>`, and a
    host-layout change that adds a letter regenerates the word table and its
    fixture with `python3 tools/autocorrect/build.py --write`; both are refused
@@ -152,8 +152,9 @@ CI runs for releases, not for development (D-F06). A release's `dev` → `main`
 pull request must pass four checks, including for administrators:
 `Promotion from dev` (`.github/workflows/main-promotion.yml`: only this
 repository's `dev`, with a merge tree identical to it), `Host suite (GCC)`,
-`Pair build` (the side-specific pair at the pinned BK commit, kept as the
-`firmware-pair` artifact with its SHA-256, and `firmware-contract.json`) and
+`Pair build` (the starter keymap's side-specific pair at the pinned BK
+commit, D-F78, kept as the `firmware-pair` artifact with its SHA-256, and
+`firmware-contract.json` with the starter keymap's compiled defaults) and
 `Agreement with Ark main` (Ark's agreement check against this firmware). The
 vault's `release` prepares the release and opens that pull request;
 `release --publish` waits for the checks, re-checks agreement against Ark's
@@ -236,7 +237,7 @@ Firmware builds, the full host suite and diagnostics need no Ark checkout
 profile, pointing and macro-size vectors live in
 `tests/fixtures/client-regression/` with producer and checksum records, and
 `run_firmware_client_independence_tests.sh` fails if a tracked file outside
-prose, `docs/`, `tests/fixtures/` and `measurements/` names the app. CI's
+prose, `docs/` and `tests/fixtures/` names the app. CI's
 release gate, `Agreement with Ark main`, is the one exemption (D-F06).
 
 Independence runs one way: Ark reads firmware. These paths are Ark's inputs,
@@ -292,6 +293,6 @@ NOAH_SPLIT_ACTIVITY_COALESCE=no sh tools/build-firmware-pair.sh
 
 After flashing a measurement pair, `node tools/capture-split-diagnostics.cjs`
 reads both recorders. See [the activity contract](spec/split-activity-sync.md)
-and follow [the capture procedure](../measurements/pointing-cadence/README.md)
-so captures compare; recorded sets live under
-[`measurements/`](../measurements/README.md), never edited.
+and follow [the capture procedure](measuring.md#pointing-cadence) so captures
+compare. Recorded sets stay in the untracked `measurements/` folder, never
+edited.

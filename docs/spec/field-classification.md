@@ -2,9 +2,10 @@
 
 What every value in the authored profile files becomes: profile data a client
 can change without a reflash, or something only a new build changes. The
-authored files are the keymap folder's `keymap.c`, `rgb_config.c`,
+authored files are a keymap folder's `keymap.c`, `rgb_config.c`,
 `config.h` and `pd_config.c`
-(`keyboards/bastardkb/charybdis/4x6/keymaps/noah/`). Each profile-data row
+(`keyboards/bastardkb/charybdis/4x6/keymaps/noah/`, and `…/keymaps/starter/`,
+the one a release publishes, D-F78). Each profile-data row
 names the domain that holds it; the byte layouts are the domain files'
 ([Profile Wire](profile-wire-v1/README.md#layers-and-files),
 [lighting](rgb-domain-v1.md), [pointing](pd-mode-domain-v1.md)). Where a
@@ -104,7 +105,7 @@ Held by: `tests/host/run_real_profile_validation_tests.sh` (`real_profile_valida
 | `CHARYBDIS_DEFAULT_DPI_CONFIG_STEP`, `CHARYBDIS_SNIPING_DPI_CONFIG_STEP` | capability | QMK's DPI ladders; the settings domain accepts 400–3,400 in steps of 200 and 100–400 in steps of 100 |
 | `CHARYBDIS_DRAGSCROLL_DPI`, `POINTING_MODE_VOLUME_DPI`, `POINTING_MODE_BRIGHTNESS_DPI`, `POINTING_MODE_ZOOM_DPI`, `POINTING_MODE_ARROW_DPI` | profile data | pointing slots' DPI, through `pd_config.c` |
 | `CHARYBDIS_AUTO_SNIPING_ENABLE` | capability | |
-| `CHARYBDIS_AUTO_SNIPING_LAYER` | profile data | settings scalar 9, the one layer of the compiled auto-sniping layers |
+| `CHARYBDIS_AUTO_SNIPING_LAYER` | profile data | settings scalar 9, the one layer of the compiled auto-sniping layers; without it (the starter keymap) none |
 | `POINTING_DEVICE_AUTO_MOUSE_ENABLE` | capability | |
 | `AUTO_MOUSE_DEFAULT_LAYER`, `AUTO_MOUSE_TIME` | profile data | settings scalars 5 and 6 |
 | `AUTO_MOUSE_DELAY`, `AUTO_MOUSE_THRESHOLD` | profile data | settings scalars 25 and 26; the keymap redefines both to read them |

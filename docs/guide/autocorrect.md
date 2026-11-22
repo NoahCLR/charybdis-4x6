@@ -128,7 +128,7 @@ It does not work for a macro.
 The keyboard flashes when it replaces something and when you take a
 replacement back, each in its own colour; a word it leaves alone never
 flashes. While the leader waits for what you type after it, the keyboard
-shows a colour of its own, blue in my profile, until the leader is done.
+shows a colour of its own, blue by default, until the leader is done.
 What the leader sends then flashes as a replacement does, on the key that
 sent it, or on the Leader key when the timeout did; a leader that sends
 nothing just lets its colour go. The colours, where they paint and which

@@ -12,8 +12,8 @@ right half, and editing needs Chrome or Edge.
 [Before you flash](#before-you-flash) lists what to know first.
 
 **Try it without a keyboard:** open <https://ark.ncleroy.dev> and choose
-**Explore a demo**. It opens on an example profile close to the defaults, in
-any browser on a computer. Every screen works; saving and live editing need a
+**Explore a demo**. It opens on the demo profile, a complete example, in any
+browser on a computer. Every screen works; saving and live editing need a
 keyboard.
 
 <p align="center">
@@ -50,15 +50,21 @@ nothing changes on the keyboard until you save
 
 ## What the keyboard does
 
+A release starts from the **starter keymap**: Bastard Keyboards' QWERTY layout
+in four layers, and nothing else set up ([Before you flash](#before-you-flash)).
+Everything below can be added in Ark. The examples come from Ark's demo
+profile, so each one can be looked up in the demo.
+
 ### Layers
 
 A layer works like the Fn key on a laptop, except that any key can lead to
-one. The default profile has Base, Number, Symbol, Navigation, Pointing,
-Function and Game, plus Extra, left empty for your own keys. A layer key turns
-its layer on while held, locks it on, or turns it on for the next key only.
-Layers stack: a transparent key on a higher layer passes through to
-the nearest active layer below it. Ark can show layers stacked this way, with
-the keys from lower layers frosted.
+one. The starter keymap has Base, Lower, Raise and Pointer, plus twelve
+empty layers for your own keys; the demo profile has Base, Number, Symbol,
+Navigation, Pointing, Function and Game. A layer key turns its layer on while
+held, locks it on, or turns it on for the next key only. Layers stack: a
+transparent key on a higher layer passes through to the nearest active layer
+below it. Ark can show layers stacked this way, with the keys from lower
+layers frosted.
 
 <p align="center">
   <picture>
@@ -76,9 +82,10 @@ A key's behaviour sets what it does on a tap, a hold and a long hold,
 separately for one to five taps. It belongs to the keycode rather than to a
 position on the board: Esc behaves the same wherever Esc is placed.
 
-The left thumb key locks Symbol on one tap, Number on two, and so on up to
-Pointing on five. Holding on the last tap keeps the layer on only while the
-key is held. A held number key types its shifted symbol, such as `!` for `1`.
+In the demo profile, the left thumb key locks Symbol on one tap, Number on
+two, and so on up to Pointing on five. Holding on the last tap keeps the
+layer on only while the key is held. A held number key types its shifted
+symbol, such as `!` for `1`.
 
 <p align="center">
   <picture>
@@ -92,10 +99,10 @@ key is held. A held number key types its shifted symbol, such as `!` for `1`.
 
 ### Combos
 
-A combo sends something when several keys are pressed together. In the
-default profile `D`+`F` is Tab, and Backspace+Enter sends the author's
-VoiceInk dictation shortcut. A combo can use up to 16 keys; eight keys along
-the bottom row pressed together send Esc.
+A combo sends something when several keys are pressed together. In the demo
+profile `D`+`F` is Tab, and Backspace+Enter sends the shortcut of a dictation
+app, VoiceInk. A combo can use up to 16 keys; eight keys along the bottom row
+pressed together send Esc.
 
 If what a combo sends has a behaviour, the combo runs that behaviour too: the
 bottom-row combo has Esc's double tap and long hold, and `N`+`M`, which sends
@@ -122,15 +129,16 @@ Custom keys send shortcuts that no single keycode can, such as ones that mix
 left and right modifiers (Left Ctrl+Right Option+K). A shortcut holds up to
 six keys, which can include one media key, one system key and mouse keys, and
 can turn layers on while held. Since a behaviour belongs to a keycode, a
-custom key is also how one key gets a behaviour of its own: the right thumb
-key is a custom key. A tap locks Navigation, a double tap is play/pause, a
-double tap held briefly is Esc, and a triple tap skips to the next track.
+custom key is also how one key gets a behaviour of its own: in the demo
+profile the right thumb key is a custom key. A tap locks Navigation, a double
+tap is play/pause, a double tap held briefly is Esc, and a triple tap skips
+to the next track.
 
 ### Macros
 
-A macro can type text, press keys and pause. The default macros send shortcuts
-set up on the author's Mac, for Spotlight, an AI chat, the terminal, clipboard
-history and copying text out of a screenshot. Macros type through the
+A macro can type text, press keys and pause. The demo profile's macros send
+Mac shortcuts, for Spotlight, an AI chat, the terminal, clipboard history and
+copying text out of a screenshot. Macros type through the
 computer's keyboard layout, which keeps accented letters correct on a Dutch or
 German layout. Emoji need Unicode entry on the computer; the [macros
 guide](docs/guide/macros.md) explains it per system. A macro can also block
@@ -138,34 +146,36 @@ other keys while it plays.
 
 ### Trackball
 
-Moving the ball turns on the pointer layer (Pointing in the default profile),
-where `M` and `,` are left and right click. The layer turns off 1.2 seconds
-after the ball stops, or at the first keypress after it stops. Modifiers, and
-shortcuts such as Command+C, don't turn it off.
+Moving the ball turns on the pointer layer (Pointer in the starter keymap,
+where the thumb keys click and `X` or `.` held scrolls; Pointing in the demo
+profile, where `M` and `,` are left and right click). The layer turns off
+1.2 seconds after the ball stops, or at the first keypress after it stops.
+Modifiers, and shortcuts such as Ctrl+C, don't turn it off.
 
-On that layer, holding `N` turns the ball into a volume control, and holding
-`H` into a brightness control. Holding `J` makes the ball scroll with Command
-held, which acts as pinch-to-zoom on a Mac with BetterMouse, and holding `.`
-scrolls the page. A quick tap on `N`, `H`, `J` or `.` still types the
-character.
+In the demo profile, holding `N` on that layer turns the ball into a volume
+control, and holding `H` into a brightness control. Holding `J` makes the
+ball scroll with Command held, which acts as pinch-to-zoom on a Mac with
+BetterMouse, and holding `.` scrolls the page. A quick tap on `N`, `H`, `J`
+or `.` still types the character.
 
 Each of these is a pointing mode: it either scrolls, or sends a key, a mouse
 button or a macro for each direction the ball rolls. It can have its own
 pointer speed and can start automatically whenever a chosen layer is on. The
-Undo / Redo mode, on a double tap held on Right Option, steps through
-Command+Z and Shift+Command+Z as the ball rolls sideways.
+demo profile's Undo / Redo mode, on a double tap held on Right Option, steps
+through Command+Z and Shift+Command+Z as the ball rolls sideways.
 
-Holding `F` turns on Navigation, which slows the pointer (sniping) for
-precise cursor placement. Keys `2` to `5` on the Symbol layer step the normal
-and slow pointer speeds up and down, and Ark shows the new value within about
-a second.
+In the starter keymap, holding `C` or `,` on Pointer slows the pointer
+(sniping) for precise cursor placement, and `R`, `T`, `Y` and `U` step the
+normal and slow pointer speeds. In the demo profile, holding `F` turns on
+Navigation, which snipes, and keys `2` to `5` on the Symbol layer step the
+speeds up and down. Ark shows the new value within about a second.
 
 ### Lighting
 
-Each layer above Base has its own colour: Number green, Symbol blue,
-Navigation indigo. On most of them only the keys in use light up, over the
-background effect. While a thumb key that leads to a layer is held, that
-layer's keys light up before the layer turns on.
+Each layer above Base has its own colour: in the starter keymap Lower green,
+Raise blue and Pointer white. On most of them only the keys in use light up,
+over the background effect. While a thumb key that leads to a layer is held,
+that layer's keys light up before the layer turns on.
 
 From the second tap, the half being tapped shows the colour of that tap
 count, and the colour changes again when a hold starts, so a double tap is
@@ -187,12 +197,12 @@ the ball moves.
 - **Hardware:** BastardKB's Charybdis 4x6 with an RP2040 controller (the
   Splinky build). The trackball and the USB cable go on the right half;
   builds with the trackball on the left aren't supported.
-- **Starting point:** the default profile, set up for a Mac with the Dutch
-  layout and the author's app shortcuts. There is no blank profile. Coming
-  from VIA, save your layout there before flashing (Save + Load, Save Current
-  Layout): Ark's **Backups** imports its keys and macros, and nothing else is
-  carried over. On Windows or Linux, expect to change some of the default
-  shortcuts and macros, which are Mac shortcuts.
+- **Starting point:** the starter keymap, Bastard Keyboards' QWERTY layout in
+  four layers (Base, Lower, Raise and Pointer), for any computer with a US
+  layout, with no macros, combos, behaviours or custom keys. Coming from VIA,
+  save your layout there before flashing (Save + Load, Save Current Layout):
+  Ark's **Backups** imports its keys and macros, and nothing else is carried
+  over.
 - **Editor:** Ark, in Chrome or Edge. VIA isn't supported.
 - **Taps that wait:** on a key that also has a double tap, a single tap waits
   out the multi tap window (150 ms by default) to see if a second tap
@@ -242,10 +252,11 @@ the ball moves.
 
 ## Changing the defaults in C
 
-The compiled defaults are plain C data in the
-[keymap folder](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/), and the
-runtime in [`users/noah/`](./users/noah/) loads them. The default Backspace
-and the custom key behind the VoiceInk combo look like this:
+The compiled defaults are plain C data in a keymap folder, and the runtime in
+[`users/noah/`](./users/noah/) loads them. A release is built from
+[`keymaps/starter`](./keyboards/bastardkb/charybdis/4x6/keymaps/starter/).
+As an example, a behaviour for Backspace and a custom key for a dictation
+app's shortcut look like this:
 
 ```c
 // keymap.c, key_behaviors[]

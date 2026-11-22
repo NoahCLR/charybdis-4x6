@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 // Engineering tool: prints markdown tables comparing capture files written by
-// tools/capture-split-diagnostics.cjs, one column per file. Used for the
-// records under measurements/pointing-cadence/. Reads files only.
+// tools/capture-split-diagnostics.cjs, one column per file. Used for a set's
+// record (docs/measuring.md). Reads files only.
 const fs = require('node:fs');
 const path = require('node:path');
 

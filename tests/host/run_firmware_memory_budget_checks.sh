@@ -18,7 +18,7 @@ if [ ! -f "$ELF" ]; then
     echo "memory-budget ELF not found: $ELF" >&2
     exit 1
 fi
-if find "$ROOT/users/noah" "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah" \
+if find "$ROOT/users/noah" "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/${TARGET#bastardkb_charybdis_4x6_}" \
     -type f \( -name '*.c' -o -name '*.h' -o -name '*.mk' \) -newer "$ELF" -print -quit | grep . >/dev/null; then
     echo "memory-budget ELF is older than firmware source; run a fresh target compile" >&2
     exit 1

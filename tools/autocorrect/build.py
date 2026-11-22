@@ -5,7 +5,7 @@ The word characters and their case folding come from the host layouts: every
 letter and digit a layout types, and what each folds to. This tool writes them
 as the firmware's C table and, with golden vectors of the byte format, as the
 fixture tests/fixtures/autocorrect_domain_v2.json. It also encodes a keymap's
-authored list, autocorrect.txt, into authored_autocorrect_list.h, the compiled
+authored list, autocorrect.txt, into generated/authored_autocorrect_list.h, the compiled
 defaults' domain. See docs/spec/profile-wire-v1/autocorrect-domain.md.
 
   python3 tools/autocorrect/build.py --write            # fixture and C table
@@ -28,7 +28,7 @@ HOST_LAYOUTS = ROOT / "tests" / "fixtures" / "host_layouts_v1.json"
 FIXTURE = ROOT / "tests" / "fixtures" / "autocorrect_domain_v2.json"
 TABLE = ROOT / "users" / "noah" / "lib" / "profile" / "schema" / "profile_autocorrect_words_v1.c"
 AUTHORED_LIST = "autocorrect.txt"
-AUTHORED_HEADER = "authored_autocorrect_list.h"
+AUTHORED_HEADER = Path("generated") / "authored_autocorrect_list.h"
 
 VERSION = 2
 MAX_CORRECTIONS = 1024
@@ -533,6 +533,7 @@ def main() -> None:
         remedy = "python3 tools/autocorrect/build.py --write"
     if args.write or args.write_authored:
         for path, text in outputs.items():
+            path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text, encoding="utf-8")
         return
     stale = [str(path) for path, text in outputs.items() if not path.exists() or path.read_text(encoding="utf-8") != text]

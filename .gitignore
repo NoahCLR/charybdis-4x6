@@ -15,6 +15,9 @@ compile_commands.json
 # Local keyboard backups and hardware-acceptance evidence
 backups/
 
+# Hardware captures (docs/measuring.md)
+measurements/
+
 # Claude Code
 .claude/
 CLAUDE.md
