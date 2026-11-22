@@ -84,7 +84,7 @@ mkdir "$KEYMAP"
 printf '# A test list.\n:teh: -> the\n:Hte: -> the\ntihng -> thing\n:nu -> un\nmnet: -> ment\nleader Sig => 12\nleader s => 12\nboth :pnumber: -> +31 6 1234 5678\nboth  Pn:  -> +31 6 1234 5678\nleader kr -> Kind regards\n' >"$KEYMAP/autocorrect.txt"
 python3 "$ROOT/tools/autocorrect/build.py" --write-authored "$KEYMAP"
 python3 "$ROOT/tools/autocorrect/build.py" --check-authored "$KEYMAP"
-python3 - "$ROOT" "$KEYMAP/authored_autocorrect_list.h" <<'PYCODE'
+python3 - "$ROOT" "$KEYMAP/generated/authored_autocorrect_list.h" <<'PYCODE'
 import pathlib, re, sys
 sys.path.insert(0, str(pathlib.Path(sys.argv[1]) / "tools" / "autocorrect"))
 import build

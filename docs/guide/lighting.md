@@ -39,7 +39,7 @@ pointing mode.
 - For 5 seconds after it starts, each half lights every LED white (brightness
   150) and draws nothing else.
 - The **idle timeout** turns the lighting off after a stretch with no input
-  on either half: 10 minutes in my profile, up to 24 hours, or 0 to keep it
+  on either half: 10 minutes by default, up to 24 hours, or 0 to keep it
   on. Any key or ball movement on either half brings both back.
 - **All lighting** off turns every LED off.
 
@@ -82,7 +82,7 @@ paint (see [Where feedback paints](#where-feedback-paints)).
   run from the double to the quintuple tap.
 - A hold that is pending or running shows the hold colour, a long hold the
   long hold colour. A hold that stays down (held until release, or repeated)
-  flashes at an interval you set (200 ms in my profile).
+  flashes at an interval you set (200 ms by default).
 - A tap that fires from a double tap or later can flash once in the tap
   colour, or never. Taps that are layer or pointing-mode actions never flash,
   since the layer or mode shows itself.
@@ -96,12 +96,12 @@ paint (see [Where feedback paints](#where-feedback-paints)).
 
 When [text replacement](autocorrect.md) changes what you typed, the keyboard
 flashes once, for a length you set apart from the behaviour feedback flash
-interval (200 ms in my profile). The flash begins as the replacement starts
+interval (200 ms by default). The flash begins as the replacement starts
 to be typed.
 
 - An input replaced with **text** flashes one colour, one replaced by a
   **macro** another, and a replacement you **undo** with Backspace a third:
-  green, magenta and red in my profile.
+  green, magenta and red by default.
 - A colour with saturation and brightness both at 0 is passthrough: that
   case paints nothing, and the others still flash.
 - A word that is left as you typed it never flashes, whatever the reason.
@@ -114,7 +114,7 @@ earlier replacement is still being typed, a combo that ends the next word may
 flash on one of its keys only.
 
 While [the leader](autocorrect.md#the-leader) waits for what you type after
-it, a fourth colour, **leading**, shows and stays, blue in my profile:
+it, a fourth colour, **leading**, shows and stays, blue by default:
 
 - It shows from the Leader key until the leader is done, however long that
   takes. Pressing Leader again or taking a character back keeps it.
@@ -143,7 +143,7 @@ undo and leading) chooses where it paints:
   paints both;
 - **only the keys** that caused it, every key of a combo.
 
-My profile paints every case on the half of the key. Several keys can show
+By default every case paints on the half of the key. Several keys can show
 behaviour feedback at once, in different cases. Then the wider places paint
 first and the narrower over them, both halves, then one half, then the half
 of the key, then only the keys, so a tap count shown on its key stays seen
@@ -191,5 +191,5 @@ lost by [the same rules](saving.md#keyboard-adjustments).
 When the pointer layer is about to time out, its colours fade toward what
 will show once it drops: the real colours underneath, an end colour where the
 background effect would show, or an end colour on every key. The colour holds
-for the first part of the timeout (a third in my profile) before it fades.
+for the first part of the timeout (a third by default) before it fades.
 There is no fade with auto-mouse off or while a pointing mode is locked.

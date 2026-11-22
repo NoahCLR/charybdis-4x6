@@ -21,7 +21,7 @@ How long you hold a key picks its **tier**:
 - held past it: a hold;
 - held past the **long hold threshold**: a long hold.
 
-My profile uses 150 ms and 400 ms, and each behaviour can set its own. A hold
+The defaults are 150 ms and 400 ms, and each behaviour can set its own. A hold
 or long hold sends its action in one of four **hold styles**:
 
 - **held until release**: the action goes down at the threshold and stays
@@ -70,7 +70,7 @@ threshold, that interval is empty and the hold can never be sent.
 
 ## Tap counts
 
-Tap a key again within the **multi tap window** (150 ms in my profile) and
+Tap a key again within the **multi tap window** (150 ms by default) and
 the next press is the next **tap count**: double, triple, quadruple and
 quintuple. Each tap count is a **branch** with its own tap, hold and long
 hold.
@@ -101,7 +101,7 @@ hold.
   is Transparent types the key below once per press. A press you hold during
   such a run holds the standard key, after the run's taps before it have gone
   out in the order you pressed them: three taps and a held fourth on an Escape
-  whose single tap long-holds Option+Command+Escape send three Escapes, then
+  whose single tap long-holds Ctrl+Shift+Escape send three Escapes, then
   hold Escape.
 - A behaviour that sets only the single tap doesn't count taps: every press is
   a single tap.
@@ -110,7 +110,7 @@ hold.
 
 `LT()`, `MT()`, `OSM()`, `TT()` and `OSL()` are dual-role keys, and the
 firmware decides their tap or hold itself, with or without a behaviour. They
-use the **dual-role threshold** (200 ms in my profile) unless their behaviour
+use the **dual-role threshold** (200 ms by default) unless their behaviour
 sets its own.
 
 - Held past it, `LT(layer, key)` holds its layer the way `MO(layer)` does,
@@ -186,9 +186,9 @@ the tap count it is on. Either way its own output comes first.
 Waiting keys go out in order, each at the time it was pressed, and the wait
 lasts at most until the deciding key's first hold threshold. A modifier or
 layer key you let go of while such a key is undecided waits too, as in QMK:
-press Cmd, press F, let go of Cmd, then F, and it types Cmd+F. For a key of
-the third kind, letting go of the modifier types its tap there and then, so
-Cmd released just before `,` still types Cmd+,.
+press Ctrl, press F, let go of Ctrl, then F, and it types Ctrl+F. For a key
+of the third kind, letting go of the modifier types its tap there and then,
+so Ctrl released just before `,` still types Ctrl+,.
 
 At most eight key events wait. If a ninth must wait, the oldest goes out at
 once, on the layer and modifiers active then.
@@ -205,8 +205,8 @@ press, release, press and hold, and the first press must have been a tap.
 ## Combos
 
 A **combo** is keys pressed together that send one action instead of their
-own. Their presses must fall within the **combo window**: 50 ms in my
-profile, or a combo's own window. A combo can send any action a key can,
+own. Their presses must fall within the **combo window**: 50 ms by
+default, or a combo's own window. A combo can send any action a key can,
 except `LT()`.
 
 When the combo's action has a behaviour, the combo uses it like a physical
@@ -243,8 +243,8 @@ mixed (Left Ctrl + Right Alt + K), and any layers, each of them optional:
 modifiers alone, a mouse button, or layers alone are shortcuts too. It is the
 custom key's own action: held while you hold the key, tapped when you tap it.
 Unlike a macro it stays down; unlike `C(A(KC_K))` its modifiers can come from
-both sides; unlike `MO()` it can hold several layers at once (Left Cmd +
-Navigation + Extra).
+both sides; unlike `MO()` it can hold several layers at once (Left Ctrl and
+two layers).
 
 Its keys are keyboard keys, media and system keys (play/pause, volume,
 sleep) and mouse keys (buttons, the wheel, cursor movement), in the order you

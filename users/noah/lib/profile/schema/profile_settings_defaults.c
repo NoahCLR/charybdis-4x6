@@ -57,7 +57,13 @@ uint32_t noah_profile_settings_default(uint8_t id) {
         case NOAH_SETTING_AUTO_SNIPING_ENABLED:
             return 1;
         case NOAH_SETTING_AUTO_SNIPING_LAYERS:
+            // A keymap without CHARYBDIS_AUTO_SNIPING_LAYER starts with no
+            // auto-sniping layer, as pointer_layer_policy.c reads it.
+#ifdef CHARYBDIS_AUTO_SNIPING_LAYER
             return UINT32_C(1) << CHARYBDIS_AUTO_SNIPING_LAYER;
+#else
+            return 0u;
+#endif
         case NOAH_SETTING_FEEDBACK_PERIOD:
             return RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS;
         case NOAH_SETTING_AUTO_MOUSE_DEAD_TIME:

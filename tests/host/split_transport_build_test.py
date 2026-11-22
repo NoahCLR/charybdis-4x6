@@ -74,7 +74,8 @@ class SplitTransportBuildTest(unittest.TestCase):
                     "from pathlib import Path\n"
                     "with open(os.environ['PAIR_TEST_LOG'], 'a') as log:\n"
                     "    log.write(json.dumps(sys.argv[1:]) + '\\n')\n"
-                    "Path('bastardkb_charybdis_4x6_noah.uf2').write_text('test artifact')\n"
+                    "keymap = sys.argv[sys.argv.index('-km') + 1]\n"
+                    "Path(f'bastardkb_charybdis_4x6_{keymap}.uf2').write_text('test artifact')\n"
                 )
                 mock.chmod(0o755)
                 log = workspace / "calls.jsonl"
@@ -94,8 +95,14 @@ class SplitTransportBuildTest(unittest.TestCase):
                     continue
                 self.assertEqual(result.returncode, 0, result.stderr)
                 calls = [json.loads(line) for line in log.read_text().splitlines()]
-                self.assertEqual(len(calls), 2)
-                for call, half, role in zip(calls, ("right", "left"), ("MASTER", "SLAVE")):
+                suffix = "" if owner else "_no_owner"
+                suffix += ("_no_activity" if activity == "no" else "") + ("_no_crc" if crc == "no" else "") + ("_diagnostic" if diagnostic else "") + ("_cadence" if cadence else "")
+                # The ordinary pair also builds the starter pair (D-F78); a
+                # comparison pair builds the noah keymap alone.
+                keymaps = ("noah", "starter") if not suffix else ("noah",)
+                self.assertEqual([call[call.index("-km") + 1] for call in calls],
+                                 [keymap for keymap in keymaps for _ in ("right", "left")])
+                for call, half, role in zip(calls, ("right", "left") * len(keymaps), ("MASTER", "SLAVE") * len(keymaps)):
                     self.assertIn(f"NOAH_PHYSICAL_HALF={half}", call)
                     self.assertIn(f"FORCE_{role}=yes", call)
                     self.assertFalse(any("NOAH_SPLIT_BAUD" in argument for argument in call))
@@ -107,10 +114,9 @@ class SplitTransportBuildTest(unittest.TestCase):
                     self.assertEqual("NOAH_SPLIT_CRC=no" in call, crc == "no")
                     self.assertEqual("NOAH_SPLIT_DIAGNOSTICS=yes" in call, diagnostic == "yes")
                     self.assertEqual("NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes" in call, cadence == "yes")
-                suffix = "" if owner else "_no_owner"
-                suffix += ("_no_activity" if activity == "no" else "") + ("_no_crc" if crc == "no" else "") + ("_diagnostic" if diagnostic else "") + ("_cadence" if cadence else "")
                 artifacts = sorted(path.name for path in (workspace / "output").rglob("*.uf2"))
-                self.assertEqual(artifacts, [f"1_charybdis_{half}{suffix}.uf2" for half in ("left", "right")])
+                self.assertEqual(artifacts, sorted(f"1_charybdis_{half}{suffix}{'' if keymap == 'noah' else '_' + keymap}.uf2"
+                                                   for half in ("left", "right") for keymap in keymaps))
                 self.assertEqual("WITHOUT the live-profile owner" in result.stdout, not owner)
 
     def test_release_pair_exports_distinct_halves(self):
@@ -127,7 +133,8 @@ class SplitTransportBuildTest(unittest.TestCase):
                 "from pathlib import Path\n"
                 "half = next(arg.split('=', 1)[1] for arg in sys.argv[1:] "
                 "if arg.startswith('NOAH_PHYSICAL_HALF='))\n"
-                "Path('bastardkb_charybdis_4x6_noah.uf2').write_text(half)\n"
+                "keymap = sys.argv[sys.argv.index('-km') + 1]\n"
+                "Path(f'bastardkb_charybdis_4x6_{keymap}.uf2').write_text(half + ' ' + keymap)\n"
             )
             mock.chmod(0o755)
             output = workspace / "release"
@@ -147,7 +154,7 @@ class SplitTransportBuildTest(unittest.TestCase):
             )
             for half in ("left", "right"):
                 self.assertEqual(
-                    (output / f"bastardkb_charybdis_4x6_noah_{half}.uf2").read_text(), half,
+                    (output / f"bastardkb_charybdis_4x6_noah_{half}.uf2").read_text(), half + " starter",
                 )
 
     def test_pair_rejects_missing_second_artifact(self):
