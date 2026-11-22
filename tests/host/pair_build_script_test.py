@@ -46,14 +46,19 @@ from pathlib import Path
 assert sys.argv[1:4] == ['--config-file', '/dev/null', 'compile'], sys.argv
 assert sys.argv[4:6] == ['-j', '0'], 'compile on every core'
 assert 'QMK_BIN=qmk --config-file /dev/null' in sys.argv, 'make generators must also ignore saved config'
-keymap = Path(os.environ['QMK_USERSPACE']) / 'keyboards/bastardkb/charybdis/4x6/keymaps/noah'
+# Each keymap folder builds by its own name, with the one userspace.
+name = sys.argv[sys.argv.index('-km') + 1]
+assert name in ('noah', 'starter'), name
+assert 'USER_NAME=noah' in sys.argv, 'every keymap builds with users/noah'
+target = 'bastardkb_charybdis_4x6_' + name
+keymap = Path(os.environ['QMK_USERSPACE']) / 'keyboards/bastardkb/charybdis/4x6/keymaps' / name
 for number in range(1, 6):
     assert f'MAIN_KEYMAP_PATH_{number}={keymap}' in sys.argv, 'a QMK keymap symlink must not select other source'
 assert Path.cwd().resolve() == Path(os.environ['QMK_HOME']).resolve()
 # Nothing from an earlier build may survive: a stale .d names another worktree's sources.
-assert not Path('.build/obj_bastardkb_charybdis_4x6_noah').exists(), 'stale objects or dependency files survived'
-Path('.build/obj_bastardkb_charybdis_4x6_noah').mkdir(parents=True)
-Path('.build/obj_bastardkb_charybdis_4x6_noah/runtime_init.d').write_text('runtime_init.o: /removed/worktree/runtime_init.c')
+assert not Path('.build/obj_' + target).exists(), 'stale objects or dependency files survived'
+Path('.build/obj_' + target).mkdir(parents=True)
+Path('.build/obj_' + target + '/runtime_init.d').write_text('runtime_init.o: /removed/worktree/runtime_init.c')
 assert Path(os.environ['QMK_USERSPACE']).resolve() == Path(os.environ['EXPECTED_USERSPACE']).resolve()
 # Reproducible: no build-time version stamps, no machine-specific source paths.
 assert 'SKIP_VERSION=yes' in sys.argv, 'QMK version.h would stamp the build time and git describe'
@@ -63,12 +68,12 @@ assert f'-ffile-prefix-map={Path.cwd()}=/qmk' in flags or f'-ffile-prefix-map={o
 with open(os.environ['PAIR_TEST_LOG'], 'a') as log:
     log.write(json.dumps(sys.argv) + '\\n')
 half = next(arg.split('=', 1)[1] for arg in sys.argv if arg.startswith('NOAH_PHYSICAL_HALF='))
-Path('bastardkb_charybdis_4x6_noah.uf2').write_bytes(half.encode())
+Path(target + '.uf2').write_bytes((half if name == 'noah' else half + ' ' + name).encode())
 if 'NOAH_STACK_BUDGET_ENABLE=yes' in sys.argv:
     for extension in ('elf', 'map'):
-        Path('.build/bastardkb_charybdis_4x6_noah.' + extension).write_text(half)
+        Path('.build/' + target + '.' + extension).write_text(half)
     for flags in ('cflags', 'ldflags'):
-        Path('.build/obj_bastardkb_charybdis_4x6_noah/' + flags + '.txt').write_text(half)
+        Path('.build/obj_' + target + '/' + flags + '.txt').write_text(half)
 ''')
             driver.chmod(0o755)
             stale = qmk / '.build/obj_bastardkb_charybdis_4x6_noah'
@@ -85,7 +90,7 @@ if 'NOAH_STACK_BUDGET_ENABLE=yes' in sys.argv:
             # that fail, as half:gate.
             (source / 'tests/host').mkdir(parents=True)
             (source / 'tests/host/run_firmware_memory_budget_checks.sh').write_text(
-                '#!/bin/sh\nhalf="$(cat "$QMK_ROOT/.build/bastardkb_charybdis_4x6_noah.elf")"\necho "$half"\n'
+                '#!/bin/sh\nhalf="$(cat "$QMK_ROOT/.build/$NOAH_MEMORY_BUDGET_TARGET.elf")"\necho "$half"\n'
                 'case " ${PAIR_TEST_FAIL:-} " in *" $half:memory "*) exit 1 ;; esac\n')
             (source / 'tools/check_firmware_stack_budget.py').write_text(
                 "import argparse, os\nfrom pathlib import Path\n"
@@ -135,10 +140,19 @@ if 'NOAH_STACK_BUDGET_ENABLE=yes' in sys.argv:
                                    env=dict(env, NOAH_ALLOW_UNPINNED_QMK='1'), capture_output=True, text=True)
             self.assertEqual(trial.returncode, 0, trial.stderr)
             self.assertIn('Not the pin: building against BK', trial.stderr)
-            self.assertEqual(len(calls), 2)
+            # The ordinary pair builds both keymaps: noah, then the starter
+            # pair a release publishes (D-F78), each half from its own folder.
+            self.assertEqual([(c[c.index('-km') + 1], next(a for a in c if a.startswith('NOAH_PHYSICAL_HALF=')))
+                              for c in calls],
+                             [('noah', 'NOAH_PHYSICAL_HALF=right'), ('noah', 'NOAH_PHYSICAL_HALF=left'),
+                              ('starter', 'NOAH_PHYSICAL_HALF=right'), ('starter', 'NOAH_PHYSICAL_HALF=left')])
             for half in ('right', 'left'):
                 artifact = base / 'builds/test-pair' / f'1_charybdis_{half}.uf2'
                 self.assertEqual(artifact.read_bytes(), half.encode())
+                starter = base / 'builds/test-pair' / f'1_charybdis_{half}_starter.uf2'
+                self.assertEqual(starter.read_bytes(), f'{half} starter'.encode())
+            # The resource builds build noah alone.
+            self.assertFalse(list((base / 'builds/test-pair').glob('*_resources_starter*')))
             # The note beside the pair names its inputs, image and hashes.
             note = (base / 'builds/test-pair/1_charybdis.build.txt').read_text()
             self.assertIn('bk ' + pinned + '\n', note)
@@ -146,9 +160,57 @@ if 'NOAH_STACK_BUDGET_ENABLE=yes' in sys.argv:
             trial_note = sorted((base / 'builds/test-pair').glob('*_charybdis.build.txt'))[-1].read_text()
             self.assertIn(' (not the pin ' + pinned + ')\n', trial_note)
             self.assertIn('image ' + (REPO / 'tools/build-image').read_text().strip(), note)
+            self.assertIn('keymap noah\n', note)
             for half in ('right', 'left'):
                 digest = hashlib.sha256(half.encode()).hexdigest()
                 self.assertIn(f'sha256 {digest} 1_charybdis_{half}.uf2', note)
+            # The starter pair has its own note, naming its keymap and hashes.
+            starter_note = (base / 'builds/test-pair/1_charybdis_starter.build.txt').read_text()
+            self.assertIn('keymap starter\n', starter_note)
+            self.assertIn('bk ' + pinned + '\n', starter_note)
+            for half in ('right', 'left'):
+                digest = hashlib.sha256(f'{half} starter'.encode()).hexdigest()
+                self.assertIn(f'sha256 {digest} 1_charybdis_{half}_starter.uf2', starter_note)
+            # NOAH_KEYMAP builds one keymap alone, numbered past every filed
+            # pair, and refuses a keymap there is no folder for.
+            git(qmk, 'reset', '-q', '--hard', pinned)
+            only = subprocess.run(['sh', source / 'tools/build-firmware-pair.sh'], cwd=base,
+                                  env=dict(env, NOAH_KEYMAP='starter'), capture_output=True, text=True)
+            self.assertEqual(only.returncode, 0, only.stderr)
+            built = sorted(p.name for p in (base / 'builds/test-pair').glob('*_charybdis_right*.uf2'))
+            self.assertIn('3_charybdis_right_starter.uf2', built)
+            self.assertNotIn('3_charybdis_right.uf2', built)
+            refused = subprocess.run(['sh', source / 'tools/build-firmware-pair.sh'], cwd=base,
+                                     env=dict(env, NOAH_KEYMAP='mine'), capture_output=True, text=True)
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn('NOAH_KEYMAP must be noah or starter', refused.stderr)
+
+    def test_a_release_publishes_the_starter_pair(self):
+        # The published pair and its contract are the starter keymap's (D-F78),
+        # never the noah keymap's pair built beside it.
+        with tempfile.TemporaryDirectory(prefix='release-pair-') as tmp:
+            base = Path(tmp)
+            source = base / 'userspace'
+            (source / 'tools').mkdir(parents=True)
+            shutil.copyfile(REPO / 'tools/build-release-firmware-pair.sh', source / 'tools/build-release-firmware-pair.sh')
+            (source / 'tools/build-firmware-pair.sh').write_text(
+                '#!/bin/sh\nset -eu\nmkdir -p "$BUILD_ROOT/release"\n'
+                'for half in right left; do\n'
+                '  printf "%s noah" "$half" > "$BUILD_ROOT/release/1_charybdis_$half.uf2"\n'
+                '  [ "${NOAH_KEYMAP:-}" != starter ] || printf "%s starter" "$half" > "$BUILD_ROOT/release/1_charybdis_${half}_starter.uf2"\n'
+                'done\n')
+            subprocess.run(['git', 'init', '-q', '-b', 'release', source], check=True)
+            subprocess.run(['git', '-C', source, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid',
+                            'commit', '--allow-empty', '-qm', 'fixture'], check=True)
+            out = base / 'out'
+            subprocess.run(['sh', source / 'tools/build-release-firmware-pair.sh'], check=True, capture_output=True,
+                           env=dict(os.environ, OUTPUT_DIR=str(out)))
+            for half in ('right', 'left'):
+                self.assertEqual((out / f'bastardkb_charybdis_4x6_noah_{half}.uf2').read_text(), f'{half} starter')
+        ci = (REPO / '.github/workflows/ci.yml').read_text()
+        probe = [line for line in ci.splitlines() if 'run_contract_probe.sh --output' in line and 'release-pair' in line]
+        self.assertEqual(len(probe), 1)
+        self.assertIn('NOAH_KEYMAP=starter', probe[0])
 
     def test_pinned_build_refuses_changed_or_uninitialized_submodules(self):
         with tempfile.TemporaryDirectory(prefix='pair-submodules-') as tmp:

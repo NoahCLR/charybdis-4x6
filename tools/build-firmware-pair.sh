@@ -19,6 +19,13 @@ set -eu
 #
 # --no-owner builds the comparison pair without the live-profile owner, for
 # A/B against ordinary behaviour.
+#
+# Two keymap folders build (D-F78): noah, the pair flashed here, and starter,
+# the plain keymap a release publishes. The ordinary pair builds both, the
+# starter pair beside the other as N_charybdis_{right,left}_starter.uf2, so
+# every filed pair includes the one a release would publish. NOAH_KEYMAP=noah
+# or NOAH_KEYMAP=starter builds only that one; the comparison and resource
+# builds below build noah unless NOAH_KEYMAP names starter.
 # The split link runs at a fixed 460,800 baud on both halves (D-F52).
 # The removed NOAH_SPLIT_BAUD selector is refused rather than ignored.
 #
@@ -40,7 +47,6 @@ set -eu
 REPO_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 QMK_ROOT="${QMK_ROOT:-$(CDPATH= cd -- "$REPO_ROOT/../bastardkb-qmk" && pwd)}"
 BUILD_ROOT="${BUILD_ROOT:-$(CDPATH= cd -- "$REPO_ROOT/.." && pwd)/builds}"
-ARTIFACT="$QMK_ROOT/bastardkb_charybdis_4x6_noah.uf2"
 # NOAH_BUILD_IMAGE builds in another image, such as one tools/make-build-image.sh
 # has built but not yet published, to compare its pair before pinning it. The
 # note names the image used.
@@ -188,19 +194,32 @@ case "${NOAH_RESOURCE_CHECKS:-}" in
     *) echo "NOAH_RESOURCE_CHECKS must be yes or no" >&2; exit 1 ;;
 esac
 
+case "${NOAH_KEYMAP:-}" in
+    "") if [ -z "$SUFFIX" ]; then KEYMAPS="noah starter"; else KEYMAPS=noah; fi ;;
+    noah|starter) KEYMAPS="$NOAH_KEYMAP" ;;
+    *) echo "NOAH_KEYMAP must be noah or starter" >&2; exit 1 ;;
+esac
+# keymap_suffix KEYMAP: what the keymap adds to the pair's file names.
+keymap_suffix() { [ "$1" = noah ] || echo "_$1"; }
+
 branch=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD)
 destdir="$BUILD_ROOT/$branch"
 mkdir -p "$destdir"
 
-# Keep the alias's numbering so builds stay in flash order.
+# Keep the alias's numbering so builds stay in flash order; the pairs of one
+# build share a number.
 n=1
-while [ -f "$destdir/${n}_charybdis_right${SUFFIX}.uf2" ]; do
+while :; do
+    taken=""
+    for keymap in $KEYMAPS; do
+        [ ! -f "$destdir/${n}_charybdis_right${SUFFIX}$(keymap_suffix "$keymap").uf2" ] || taken=1
+    done
+    [ -n "$taken" ] || break
     n=$((n + 1))
 done
 
 export QMK_USERSPACE="$REPO_ROOT"
 export QMK_HOME="$QMK_ROOT"
-KEYMAP_ROOT="$REPO_ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah"
 # QMK CLI 1.1.8 prefers saved overlay_dir/qmk_home over environment variables.
 # Isolate this invocation and every QMK generator make calls from that config;
 # otherwise a task worktree can silently build the main checkout instead.
@@ -229,13 +248,14 @@ build_half() {
     # worktrees, so clear all of it: stale objects would link the other half's
     # translation units, and stale make dependency files name sources in
     # whichever worktree built last, which fails once that worktree is removed.
-    rm -rf "$QMK_ROOT/.build/obj_bastardkb_charybdis_4x6_noah"
+    rm -rf "$QMK_ROOT/.build/obj_$TARGET"
     # A successful command must produce this half's UF2, not leave the previous
     # half's artifact at the shared QMK output path.
     rm -f "$ARTIFACT"
     # -j 0 compiles on every core; the pair's bytes do not depend on job order.
-    ( cd "$QMK_ROOT" && qmk --config-file /dev/null compile -j 0 -kb bastardkb/charybdis/4x6 -km noah \
-        -e "QMK_BIN=qmk --config-file /dev/null" \
+    # Every keymap builds with the one userspace, users/noah (USER_NAME).
+    ( cd "$QMK_ROOT" && qmk --config-file /dev/null compile -j 0 -kb bastardkb/charybdis/4x6 -km "$keymap" \
+        -e "QMK_BIN=qmk --config-file /dev/null" -e USER_NAME=noah \
         -e "MAIN_KEYMAP_PATH_1=$KEYMAP_ROOT" -e "MAIN_KEYMAP_PATH_2=$KEYMAP_ROOT" \
         -e "MAIN_KEYMAP_PATH_3=$KEYMAP_ROOT" -e "MAIN_KEYMAP_PATH_4=$KEYMAP_ROOT" \
         -e "MAIN_KEYMAP_PATH_5=$KEYMAP_ROOT" \
@@ -249,16 +269,15 @@ build_half() {
     cp "$ARTIFACT" "$destdir/$name.uf2"
     echo "  -> $destdir/$name.uf2"
     if [ -n "$RESOURCE_ARGS" ]; then
-        target=bastardkb_charybdis_4x6_noah
         # Preserve this half before the next compile replaces QMK's output.
         for extension in elf map; do
-            cp "$QMK_ROOT/.build/$target.$extension" "$destdir/$name.$extension"
+            cp "$QMK_ROOT/.build/$TARGET.$extension" "$destdir/$name.$extension"
         done
         for flags in cflags ldflags; do
-            cp "$QMK_ROOT/.build/obj_$target/$flags.txt" "$destdir/$name.$flags.txt"
+            cp "$QMK_ROOT/.build/obj_$TARGET/$flags.txt" "$destdir/$name.$flags.txt"
         done
         resource_gate "$destdir/$name.memory.txt" \
-            sh "$REPO_ROOT/tests/host/run_firmware_memory_budget_checks.sh"
+            env NOAH_MEMORY_BUDGET_TARGET="$TARGET" sh "$REPO_ROOT/tests/host/run_firmware_memory_budget_checks.sh"
         for manifest in firmware_stack_budget firmware_stack_budget_live_profile_owner; do
             resource_gate "$destdir/$name.$manifest.txt" \
                 python3 "$REPO_ROOT/tools/check_firmware_stack_budget.py" \
@@ -268,22 +287,34 @@ build_half() {
     fi
 }
 
-build_half FORCE_MASTER right "${n}_charybdis_right${SUFFIX}"
-build_half FORCE_SLAVE left "${n}_charybdis_left${SUFFIX}"
-
-# What the pair was built from and with, and its hashes: a published pair can
-# be matched to a local one byte for byte.
 uncommitted() { [ -z "$(git -C "$1" status --porcelain --ignore-submodules=untracked 2>/dev/null)" ] || echo " +uncommitted"; }
-{
-    echo "firmware $(git -C "$REPO_ROOT" rev-parse HEAD)$(uncommitted "$REPO_ROOT")"
-    echo "bk $QMK_HEAD$(uncommitted "$QMK_ROOT")${UNPINNED:-}"
-    echo "image $IMAGE"
-    echo "compiler $(arm-none-eabi-gcc --version 2>/dev/null | head -n 1 || echo unknown)"
-    for half in right left; do
-        file="${n}_charybdis_${half}${SUFFIX}.uf2"
-        echo "sha256 $(python3 -c 'import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' "$destdir/$file") $file"
-    done
-} > "$destdir/${n}_charybdis${SUFFIX}.build.txt"
+for keymap in $KEYMAPS; do
+    KEYMAP_ROOT="$REPO_ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/$keymap"
+    # QMK names its output after the keymap.
+    TARGET="bastardkb_charybdis_4x6_$keymap"
+    ARTIFACT="$QMK_ROOT/$TARGET.uf2"
+    pair="${n}_charybdis_%s${SUFFIX}$(keymap_suffix "$keymap")"
+    echo "Keymap $keymap:"
+    # shellcheck disable=SC2059
+    build_half FORCE_MASTER right "$(printf "$pair" right)"
+    # shellcheck disable=SC2059
+    build_half FORCE_SLAVE left "$(printf "$pair" left)"
+
+    # What the pair was built from and with, and its hashes: a published pair
+    # can be matched to a local one byte for byte.
+    {
+        echo "firmware $(git -C "$REPO_ROOT" rev-parse HEAD)$(uncommitted "$REPO_ROOT")"
+        echo "bk $QMK_HEAD$(uncommitted "$QMK_ROOT")${UNPINNED:-}"
+        echo "image $IMAGE"
+        echo "compiler $(arm-none-eabi-gcc --version 2>/dev/null | head -n 1 || echo unknown)"
+        echo "keymap $keymap"
+        for half in right left; do
+            # shellcheck disable=SC2059
+            file="$(printf "$pair" "$half").uf2"
+            echo "sha256 $(python3 -c 'import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' "$destdir/$file") $file"
+        done
+    } > "$destdir/${n}_charybdis${SUFFIX}$(keymap_suffix "$keymap").build.txt"
+done
 
 if [ -n "$RESOURCE_FAILURES" ]; then
     echo >&2
@@ -293,8 +324,8 @@ fi
 
 echo
 if [ -n "$OWNER_ARGS" ]; then
-    echo "Built the 32-pointing-slot factory-only comparison pair WITHOUT the live-profile owner."
+    echo "Built the 32-pointing-slot factory-only comparison pair WITHOUT the live-profile owner ($KEYMAPS)."
 else
-    echo "Built the 32-pointing-slot pair."
+    echo "Built the 32-pointing-slot pair ($KEYMAPS)."
 fi
 echo "Flash the right half to the master side and the left half to the slave side."
